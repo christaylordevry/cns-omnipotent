@@ -1,6 +1,6 @@
 # Story 2.1: Per-directory manifests for the folder contract
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis pending: story context created, ready for dev. -->
 
