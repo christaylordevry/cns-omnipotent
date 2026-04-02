@@ -1,0 +1,19 @@
+# secrets
+.env
+.env.*
+*.pem
+*.key
+
+# ralph runtime noise (keep specs/tasks, ignore logs)
+.ralph/diagnostics/
+.ralph/events.jsonl
+.ralph/loop.lock
+.ralph/**/loop.lock
+
+# node / python common
+node_modules/
+dist/
+build/
+__pycache__/
+.venv/
+.pytest_cache/

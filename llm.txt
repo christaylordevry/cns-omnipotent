@@ -1,0 +1,17 @@
+SYSTEM: CNS (Central Nervous System) — unified control plane for AI agents, LLMs, CLIs, and IDEs.
+
+This project builds the orchestration layer that sits above the PAKE knowledge engine.
+PAKE handles knowledge schemas, quality scoring, and retrieval.
+CNS handles agent routing, context loading, vault IO, security gates, and input surfaces.
+
+Current phase: Phase 1 — Foundation Layer
+Deliverables: Vault folder contract, AGENTS.md constitution, Vault IO MCP server.
+Spec: specs/cns-vault-contract/CNS-Phase-1-Spec.md
+
+Always:
+- Use BMAD to generate PRD, architecture, epics/stories, sprint tracking.
+- Convert BMAD story files to Ralph specs before implementing.
+- Use Ralph for execution loops until scripts/verify.sh passes.
+- Prefer small commits.
+- Consult specs/cns-vault-contract/AGENTS.md for vault conventions and formatting rules.
+- Phase 1 scope ONLY. Do not implement brain service, Discord bridge, or daemon features.

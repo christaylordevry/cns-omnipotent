@@ -1,0 +1,18 @@
+event_loop:
+  prompt_file: "PROMPT.md"
+  completion_promise: "LOOP_COMPLETE"
+  max_iterations: 40
+  max_runtime_seconds: 7200
+  starting_event: "work.start"
+
+cli:
+  backend: "claude"
+
+backpressure:
+  gates:
+    - name: "docs-exist"
+      command: "test -f _bmad-output/planning-artifacts/PRD.md -o -f docs/prd.md"
+      on_fail: "Missing PRD. Generate it with BMAD before planning/implementation."
+
+RObot:
+  enabled: false
