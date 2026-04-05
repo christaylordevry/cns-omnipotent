@@ -96,7 +96,7 @@ development_status:
 
   epic-8: done
   8-1-nexus-coexistence-documentation: done
-  epic-8-retrospective: optional
+  epic-8-retrospective: done
 
   epic-9: done
   9-1-shared-pake-type-module-for-mcp-and-validation: done
