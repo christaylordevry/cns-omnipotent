@@ -1,0 +1,29 @@
+# Read-only inbox triage panel (Epic D, Story 11.1).
+# Intent: visibility and triage only; policy discourages inline Bases edits (see _meta/bases/_README.md).
+# Target: Obsidian Bases (core), Obsidian 1.9+ per Obsidian Help. Re-validate YAML if your app version differs.
+
+filters:
+  and:
+    - file.inFolder("00-Inbox")
+
+properties:
+  title:
+    displayName: Title
+  pake_type:
+    displayName: Type
+  status:
+    displayName: Status
+  created:
+    displayName: Created
+
+views:
+  - type: table
+    name: "Inbox Triage"
+    sort:
+      - property: created
+        direction: DESC
+    order:
+      - title
+      - pake_type
+      - status
+      - created

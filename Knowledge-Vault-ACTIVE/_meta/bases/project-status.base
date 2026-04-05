@@ -1,0 +1,26 @@
+# Read-only project status panel (Epic D, Story 11.1).
+# Intent: visibility only; see _meta/bases/_README.md for write policy.
+# Target: Obsidian Bases (core), Obsidian 1.9+. Re-validate YAML if your app version differs.
+
+filters:
+  and:
+    - file.inFolder("01-Projects")
+
+properties:
+  title:
+    displayName: Title
+  status:
+    displayName: Status
+  file.mtime:
+    displayName: Modified
+
+views:
+  - type: table
+    name: "Project Status"
+    groupBy:
+      property: file.folder
+      direction: ASC
+    order:
+      - title
+      - status
+      - file.mtime

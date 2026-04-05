@@ -1,0 +1,30 @@
+# Read-only research tracker panel (Epic D, Story 11.1).
+# Intent: visibility only; see _meta/bases/_README.md for write policy.
+# Target: Obsidian Bases (core), Obsidian 1.9+. Re-validate YAML if your app version differs.
+# Filter: InsightNote OR SourceNote under 03-Resources (canonical literals from src/pake/schemas.ts).
+
+filters:
+  and:
+    - file.inFolder("03-Resources")
+    - or:
+        - 'pake_type == "InsightNote"'
+        - 'pake_type == "SourceNote"'
+
+properties:
+  title:
+    displayName: Title
+  pake_type:
+    displayName: Type
+  source_uri:
+    displayName: Source URI
+  tags:
+    displayName: Tags
+
+views:
+  - type: table
+    name: "Research Tracker"
+    order:
+      - title
+      - pake_type
+      - source_uri
+      - tags
