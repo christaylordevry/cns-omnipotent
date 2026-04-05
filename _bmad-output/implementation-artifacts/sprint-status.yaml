@@ -1,5 +1,5 @@
 # generated: 2026-04-01T12:00:00Z
-# last_updated: 2026-04-02T18:00:00Z
+# last_updated: 2026-04-05T18:00:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-01T12:00:00Z"
-last_updated: "2026-04-02T18:00:00Z"
+last_updated: "2026-04-05T18:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -62,26 +62,52 @@ development_status:
   3-5-vault-search: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-writegate-boundary-and-protected-paths: done
   4-2-pake-validation-for-non-inbox-writes: done
   4-3-secret-pattern-scanning: done
-  4-4-vault-create-note: in-progress
-  4-5-vault-update-frontmatter: backlog
-  4-6-vault-append-daily: backlog
-  4-7-vault-move: backlog
-  4-8-unsupported-operations-surface-as-errors: backlog
-  4-9-canonical-read-boundary-hardening: backlog
-  epic-4-retrospective: optional
+  4-4-vault-create-note: done
+  4-5-vault-update-frontmatter: done
+  4-6-vault-append-daily: done
+  4-7-vault-move: done
+  4-8-unsupported-operations-surface-as-errors: done
+  4-9-canonical-read-boundary-hardening: done
+  epic-4-retrospective: done
 
-  epic-5: backlog
-  5-1-auditlogger-append-only-format: backlog
-  5-2-mutations-and-vault-log-action: backlog
-  5-3-operator-audit-playbook: backlog
-  epic-5-retrospective: optional
+  epic-5: done
+  5-1-auditlogger-append-only-format: done
+  5-2-mutations-and-vault-log-action: done
+  5-3-operator-audit-playbook: done
+  epic-5-retrospective: done
 
-  epic-6: backlog
-  6-1-register-full-phase-1-tool-surface: backlog
-  6-2-fixture-vault-integration-tests: backlog
-  6-3-verification-gate: backlog
-  epic-6-retrospective: optional
+  epic-6: done
+  6-1-register-full-phase-1-tool-surface: done
+  6-2-fixture-vault-integration-tests: done
+  6-3-verification-gate: done
+  6-4-verification-gate-domain-error-message-sanitisation: done
+  6-5-vaultrootfromhost-documentation-env-only-policy: done
+  6-6-vault-append-daily-safeparse-removal-h2-regression: done
+  epic-6-retrospective: done
+
+  epic-7: done
+  7-1-vault-move-source-enoent-after-cli-exit-0: done
+  7-2-symlink-cycle-dos-hardening: done
+  epic-7-retrospective: done
+
+  epic-8: done
+  8-1-nexus-coexistence-documentation: done
+  epic-8-retrospective: optional
+
+  epic-9: done
+  9-1-shared-pake-type-module-for-mcp-and-validation: done
+  9-2-reject-filesystem-root-as-cns-vault-root: done
+  9-3-wikilink-repair-scale-and-nfr-documentation: done
+  epic-9-retrospective: optional
+
+  epic-10: done
+  10-1-notebooklm-vault-integration: done
+  epic-10-retrospective: optional
+
+  epic-11: done
+  11-1-obsidian-bases-panels: done
+  epic-11-retrospective: optional
