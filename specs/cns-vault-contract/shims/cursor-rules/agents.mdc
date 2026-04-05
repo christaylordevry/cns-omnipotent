@@ -1,0 +1,8 @@
+---
+description: Load the CNS vault constitution from AI-Context (vault deploy)
+alwaysApply: true
+---
+
+# CNS constitution
+
+For all work in this vault, read and follow `AI-Context/AGENTS.md`. Load extended policy from `AI-Context/modules/` when the task matches Vault IO or security domains.

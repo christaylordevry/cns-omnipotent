@@ -1,0 +1,10 @@
+---
+description: Load the CNS vault constitution from the specs mirror (implementation repo)
+alwaysApply: true
+---
+
+# CNS constitution (repo mirror)
+
+This repository implements CNS Phase 1. Treat `specs/cns-vault-contract/AGENTS.md` as the vault constitution mirror. For detailed Vault IO and security policy, read `specs/cns-vault-contract/modules/` when relevant.
+
+**Mutation audit trail (Story 5.2):** When changing logging, `vault_log_action`, or mutator success paths, treat `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md` as bound spec (also referenced from `specs/cns-vault-contract/CNS-Phase-1-Spec.md` and `specs/cns-vault-contract/modules/security.md`).

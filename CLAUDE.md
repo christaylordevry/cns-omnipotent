@@ -1,5 +1,7 @@
 # Project Rules — CNS (Central Nervous System)
 
+This file is **implementation-repo** project rules for the Omnipotent.md codebase. It is **not** the Obsidian vault `CLAUDE.md` shim; the deployable vault template lives at `specs/cns-vault-contract/shims/CLAUDE.md`.
+
 This repo builds the **Central Nervous System**: a unified control plane that orchestrates all AI agents, LLMs, CLIs, and IDEs from a single vault-based architecture.
 
 ## System Context
@@ -53,7 +55,10 @@ This repo uses:
 
 ## Key References
 
+- **MCP vault root (Phase 1 stdio):** the server reads the vault root **only** from **`CNS_VAULT_ROOT`**. `vaultRootFromHost` on `loadRuntimeConfig` is for programmatic use, tests, and future host wiring, not the current stdio entrypoint. Operators: `specs/cns-vault-contract/README.md` (**Vault IO MCP: vault root (Phase 1)**).
 - Phase 1 Spec: `specs/cns-vault-contract/CNS-Phase-1-Spec.md`
+- Mutation audit + `vault_log_action` (bound spec, reviewer checklist): `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md`
 - AGENTS.md (vault constitution): `specs/cns-vault-contract/AGENTS.md`
+- Operator index and **grounding parity checklist** (MCP, Cursor, Claude Code on WSL): `specs/cns-vault-contract/README.md`
 - BMAD artifacts: `_bmad-output/planning-artifacts/`
 - Verify gate: `scripts/verify.sh`

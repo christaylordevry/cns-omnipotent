@@ -1,0 +1,6 @@
+# Paste this block at the end of the development_status section in sprint-status.yaml
+# (after the epic-10-retrospective line)
+
+  epic-11: in-progress
+  11-1-obsidian-bases-panels: ready-for-dev
+  epic-11-retrospective: optional

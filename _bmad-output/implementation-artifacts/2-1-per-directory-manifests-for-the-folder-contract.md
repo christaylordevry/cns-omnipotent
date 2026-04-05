@@ -79,11 +79,17 @@ so that **humans and agents share one map of the vault** and can place or move w
 - [x] Document the deploy target and where operator should copy/sync from
   - [x] Document deploy locations and copy steps so operators can mirror the manifests into their live vault root.
 
+### Review Findings
+- [x] [Review][Decision] Contract `_README.md` files vs PAKE Standard frontmatter: must `_README.md` directory contract files include PAKE standard keys (e.g., `pake_id`, `pake_type`, `title`, etc.) or are contract-specific frontmatter schemas allowed? Evidence: `specs/cns-vault-contract/AGENTS.md` states "YAML frontmatter required on all notes outside `00-Inbox/`" and includes PAKE standard minimum frontmatter template (with `pake_id`, `pake_type`, `title`, etc.), while these directory manifests use contract-only keys (`purpose`, `schema_required`, `allowed_pake_types`, `naming_convention`) and omit PAKE standard keys (e.g., `Knowledge-Vault-ACTIVE/01-Projects/_README.md`).
+- [x] [Review][Patch] Remove unicode em dash characters in Story 2.1 artifact (`-`) [/_bmad-output/implementation-artifacts/2-1-per-directory-manifests-for-the-folder-contract.md:86]
+- [x] [Review][Patch] Align `01-Projects/_README.md` `naming_convention` with Story 2.1 expectation [Knowledge-Vault-ACTIVE/01-Projects/_README.md:5]
+- [x] [Review][Patch] Align `02-Areas/_README.md` `naming_convention` with Story 2.1 expectation (avoid date-specific prefixes) [Knowledge-Vault-ACTIVE/02-Areas/_README.md:5]
+
 ## Dev Notes
 
 ### Architecture compliance
 - This story is **markdown + documentation**, not TypeScript. It provides the “contract map” that later Vault IO tools will rely on for routing and boundary explanations.  
-  [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 2, Story 2.1]
+  [Source: `_bmad-output/planning-artifacts/epics.md` - Epic 2, Story 2.1]
 
 - Manifest content must reflect the directory contracts defined by `CNS-Phase-1-Spec.md` “Directory Contracts” template.  
   [Source: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` §“Directory Contracts”]
@@ -120,9 +126,9 @@ so that **humans and agents share one map of the vault** and can place or move w
 - Whether to store the deployed vault folder contract manifests inside this repo as a mock `Knowledge-Vault-ACTIVE/` tree (to enable automated tests), or to keep this repo as specs-only and rely on operator deployment. This can be decided when adding automated manifest tests.
 
 ## References
-- [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 2, Story 2.1]
-- [Source: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` — Vault Folder Contract + Directory Contracts template]
-- [Source: `specs/cns-vault-contract/AGENTS.md` — Vault Map + Routing Rules + Formatting Standards]
+- [Source: `_bmad-output/planning-artifacts/epics.md` - Epic 2, Story 2.1]
+- [Source: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` - Vault Folder Contract + Directory Contracts template]
+- [Source: `specs/cns-vault-contract/AGENTS.md` - Vault Map + Routing Rules + Formatting Standards]
 
 ## Dev Agent Record
 

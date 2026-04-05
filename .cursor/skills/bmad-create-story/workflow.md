@@ -293,6 +293,14 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 <step n="5" goal="Create comprehensive story file">
   <critical>📝 CREATE ULTIMATE STORY FILE - The developer's master implementation guide!</critical>
 
+  <!-- Brownfield / existing story files: merge by default -->
+  <critical>BROWNFIELD DEFAULT (standing rule)</critical>
+  <action>Before writing `{default_output_file}`, check whether it already exists on disk.</action>
+  <action>If the file exists and already contains substantive story content (for example `## Story` plus acceptance criteria, scope, or dev notes from a prior author), you MUST use **merge mode**, not a wholesale replace.</action>
+  <action>In **merge mode**: load the full existing file; preserve all prior sections and narrative; append or surgically insert only missing template sections (for example developer context, tasks, dev agent record, gap-filled guardrails). Reconcile duplicates by merging into a single coherent section, not by deleting the original spec.</action>
+  <action>Use **full replace from template.md** only when the target file is missing or is clearly an empty stub (placeholder text only).</action>
+  <action>If unsure, prefer merge mode and add a short "Planning alignment" or "Developer context (merged)" block rather than overwriting.</action>
+
   <action>Initialize from template.md:
   {default_output_file}</action>
   <template-output file="{default_output_file}">story_header</template-output>

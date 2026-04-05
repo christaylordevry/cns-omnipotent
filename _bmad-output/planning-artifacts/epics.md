@@ -178,6 +178,13 @@ The full Phase 1 MCP tool surface is registered, integration-tested on a fixture
 **FRs covered:** FR25, FR26  
 **NFRs addressed:** NFR-R2, NFR-P3, NFR-I1 (MCP configuration documented alongside Epic 1)
 
+### Epic B (Phase 2.0) — Foundation hardening from deferred-work
+
+Harden the vault-io foundation after Phase 1: one module for PAKE type literals, reject meaningless vault roots, and document wikilink-repair scale.
+
+**Source:** `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-03.md` §3.2–3.4.  
+**Tracked in sprint-status as:** `epic-9` (stories `9-1` … `9-3`).
+
 ---
 
 ## Epic 1: Grounded sessions without manual paste
@@ -450,6 +457,20 @@ So that **I do not assume silent success**.
 **Then** I receive `UNSUPPORTED` or equivalent with a clear message  
 **And** this behavior is covered by tests where applicable (FR20, FR21).
 
+### Story 4.9: Canonical read boundary hardening
+
+As an **agent**,  
+I want **`vault_read`, `vault_list`, and `vault_search` to reject paths whose canonical target lies outside the vault**,  
+So that **symlinks cannot leak non-vault filesystem content through MCP reads** (closing the read/write asymmetry noted for Phase 1).
+
+**Acceptance Criteria:**
+
+**Given** a vault-relative path that is lexically under the vault but resolves through a symlink whose **canonical** target is outside the vault  
+**When** a read, list, or search runs on that path  
+**Then** the tool fails with `VAULT_BOUNDARY` and returns no outside content  
+**And** normal paths and existing domain errors (`NOT_FOUND`, `PROTECTED_PATH`, etc.) behave as today  
+**And** when canonical resolution fails with a missing path (including a **dangling symlink** / missing symlink target), the tool fails with `NOT_FOUND`, not `IO_ERROR`, except for genuinely unexpected filesystem errors (FR17 parity on the read surface; NFR-S1).
+
 ---
 
 ## Epic 5: Audit trail operators trust
@@ -542,6 +563,52 @@ So that **Phase 1 completion is objectively gated**.
 
 ---
 
+## Phase 2 — Epic B: Foundation hardening (deferred-work)
+
+### Story B.1: Shared PAKE type module for MCP and validation
+
+As a **maintainer**,  
+I want **a single source of truth for PAKE `pake_type` literals used by Zod schemas and MCP tool registration**,  
+So that **`vault_create_note`, `vault_list` filters, and PAKE Standard validation never drift**.
+
+**Acceptance Criteria:**
+
+**Given** `src/pake/schemas.ts` defines the normative PAKE Standard types  
+**When** MCP tools register enums and list filters  
+**Then** they import the same schema or exported `PAKE_TYPE_VALUES` / `PakeType` — no duplicate string lists in `register-vault-io-tools.ts` or `vault-list.ts`  
+**And** `VaultCreatePakeType` remains a stable alias for tool consumers  
+**And** `bash scripts/verify.sh` passes.
+
+### Story B.2: Reject filesystem root as `CNS_VAULT_ROOT`
+
+As an **operator**,  
+I want **the server to refuse startup when the vault root is the OS filesystem root**,  
+So that **path boundary checks remain meaningful**.
+
+**Acceptance Criteria:**
+
+**Given** `CNS_VAULT_ROOT` resolves to the platform filesystem root (e.g. `/` on POSIX)  
+**When** `loadRuntimeConfig` runs  
+**Then** it fails with `IO_ERROR` and a clear message directing the operator to set a real vault directory  
+**And** a unit test asserts this behavior  
+**And** `bash scripts/verify.sh` passes.
+
+### Story B.3: Wikilink repair scale and NFR documentation
+
+As a **maintainer**,  
+I want **architecture documentation that states the O(n) cost of fallback wikilink repair and practical scale guidance**,  
+So that **operators choose Obsidian CLI when needed and we avoid surprise latency**.
+
+**Acceptance Criteria:**
+
+**Given** `docs/architecture.md`  
+**When** Epic B documentation is complete  
+**Then** it describes full-vault `.md` scan on fallback `vault_move`, O(n) in file count, low-thousands operational assumption, and preference for `CNS_OBSIDIAN_CLI`  
+**And** the prior “Epic B territory” convergence note is updated to reflect the shared module that now exists  
+**And** `bash scripts/verify.sh` passes.
+
+---
+
 ## Final validation (Step 4)
 
 ### FR coverage
@@ -563,3 +630,27 @@ Architecture selects a **TypeScript MCP package** scaffold. Per **user-value epi
 Epic 1 and Epic 2 are documentation- and vault-artifact–centric and do not require Vault IO code. Epic 3+ assume the TypeScript project exists (3.1). Epic 4–6 are code increments on the same server.
 
 **Workflow status:** Ready for development and Ralph/BMAD dev-story handoff. For next workflow steps, use the **bmad-help** skill if you want a guided “what to run next.”
+
+---
+
+## Phase 2 — Epic D: Obsidian Bases panels (visibility layer)
+
+Read-only Bases panels inside the vault give the operator at-a-glance visibility into inbox state, project status, and research coverage. Panels derive their data from PAKE frontmatter already present in vault notes and require no vault-io API calls at read time.
+
+**Source:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-03.md` §Epic D.
+**Tracked in sprint-status as:** `epic-11` (story `11-1`).
+
+### Story D.1: Three read-only Bases panels
+
+As an **operator**,
+I want **`inbox-triage.base`, `project-status.base`, and `research-tracker.base` under `_meta/bases/`**,
+so that **I have persistent, filter-driven visibility into inbox, project, and research state directly inside Obsidian**.
+
+**Acceptance Criteria (summary):**
+
+**Given** PAKE frontmatter exists on notes in `00-Inbox/`, `01-Projects/`, and `03-Resources/`
+**When** the operator opens each `.base` file in Obsidian
+**Then** each panel renders the correct filtered, sorted table view for its domain
+**And** inline editing is not enabled (deferred to a future Epic D story)
+**And** `_meta/bases/_README.md` documents panel purpose, read-only policy, and the write-capability deferral rationale
+**And** `bash scripts/verify.sh` passes (no vault-io code changes in this story).

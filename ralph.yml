@@ -15,9 +15,9 @@ event_loop:
 # Additional Configuration (uncomment to customize)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# core:
-#   scratchpad: ".ralph/agent/scratchpad.md"
-#   specs_dir: ".ralph/specs/"
+core:
+  scratchpad: ".ralph/agent/scratchpad.md"
+  specs_dir: ".ralph/specs/"
 
 # Custom hats for multi-agent workflows:
 # hats:

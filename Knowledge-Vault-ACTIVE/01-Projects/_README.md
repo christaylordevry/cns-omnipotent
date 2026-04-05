@@ -2,7 +2,7 @@
 purpose: Active project workspaces that contain project docs and project-scoped context
 schema_required: true
 allowed_pake_types: WorkflowNote
-naming_convention: Project subfolders under `01-Projects/` with stable, human-readable project names
+naming_convention: project-scoped, human-readable filenames; no directory-scoped schema encoded in the filename
 ---
 
 # 01-Projects
@@ -13,6 +13,7 @@ Project-level planning, specs, and workflow tracking for active initiatives.
 Within this directory:
 - Each project lives in its own subfolder, `01-Projects/<project-name>/`.
 - Project-scoped notes should include PAKE standard frontmatter and are typically `pake_type: WorkflowNote`.
+- "Project context" for a `WorkflowNote` means the request includes an explicit target project identifier, so routing places the note under `01-Projects/<project-name>/`. Do not infer project context.
 - Place project-specific references and working docs under the project folder, not in 00-Inbox.
 
 ## What Does Not Go Here

@@ -1,6 +1,6 @@
 # Story 4.4: `vault_create_note`
 
-Status: in-progress
+Status: done
 
 <!-- Story context generated for Epic 4.4; sprint aligned to in-progress (same session as dev start). -->
 
@@ -21,7 +21,7 @@ so that **knowledge lands in the right folder with valid PAKE when required**.
 
 2. **Given** WriteGate, PAKE, and secret modules from Stories 4.1–4.3  
    **When** I create a note with inputs per Phase 1 spec (`title`, `content`, `pake_type`, `tags`, `confidence_score`, `source_uri` optional, auto `pake_id` / timestamps)  
-   **Then** the file is written **atomically** (write to a temp file in the target directory, then rename) where the platform allows, and routing matches [Source: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` § `vault_create_note`] and [Source: `specs/cns-vault-contract/AGENTS.md` § Routing Rules + WorkflowNote disambiguation].
+   **Then** the file is written **atomically** (write to a temp file in the target directory, then **hard link** to the final name so an existing file yields `EEXIST` instead of silent overwrite, then remove the temp name; same-filesystem as `rename`) where the platform allows, and routing matches [Source: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` § `vault_create_note`] and [Source: `specs/cns-vault-contract/AGENTS.md` § Routing Rules + WorkflowNote disambiguation].
 
 3. **Given** NFR-R1 (no silent inconsistent state)  
    **When** any step fails  
@@ -37,15 +37,15 @@ so that **knowledge lands in the right folder with valid PAKE when required**.
 
 ## Tasks / Subtasks
 
-- [ ] **Pipeline order** (AC: 1, 4) — Implement `vault_create_note` (new `src/tools/vault-create-note.ts` or equivalent) with **WriteGate → PAKE → secret scan**; add a test that would break if `assertVaultWriteContentNoSecretPatterns` runs before `validatePakeForVaultPath` (e.g. PAKE-invalid content that also triggers a pattern: PAKE must fail first with `SCHEMA_INVALID`, not `SECRET_PATTERN`).
+- [x] **Pipeline order** (AC: 1, 4) — Implement `vault_create_note` (new `src/tools/vault-create-note.ts` or equivalent) with **WriteGate → PAKE → secret scan**; add a test that would break if `assertVaultWriteContentNoSecretPatterns` runs before `validatePakeForVaultPath` (e.g. PAKE-invalid content that also triggers a pattern: PAKE must fail first with `SCHEMA_INVALID`, not `SECRET_PATTERN`).
 
-- [ ] **Routing + file body** (AC: 2) — Compute destination directory from `pake_type` and optional project/area parameters per spec; build full markdown with generated `pake_id` (UUID v4), `created` / `modified`, and required PAKE fields.
+- [x] **Routing + file body** (AC: 2) — Compute destination directory from `pake_type` and optional project/area parameters per spec; build full markdown with generated `pake_id` (UUID v4), `created` / `modified`, and required PAKE fields.
 
-- [ ] **Atomic create** (AC: 2, 3) — Exclusive create: fail clearly if the target file already exists; temp + rename in target directory; cleanup temp on error.
+- [x] **Atomic create** (AC: 2, 3) — Exclusive create: fail clearly if the target file already exists; temp + `link` + unlink temp name in target directory (see `specs/cns-vault-contract/modules/security.md`); cleanup temp on error.
 
-- [ ] **MCP registration** (AC: 4) — Register `vault_create_note` in `src/index.ts` with schema matching spec inputs; return `{ pake_id, file_path, created_at }` (or spec-equivalent field names).
+- [x] **MCP registration** (AC: 4) — Register `vault_create_note` in `src/index.ts` with schema matching spec inputs; return `{ pake_id, file_path, created_at }` (or spec-equivalent field names).
 
-- [ ] **Audit logging** (AC: 5) — Wire or explicitly defer with a tracked TODO and reference to `5-2-mutations-and-vault-log-action.md`.
+- [x] **Audit logging** (AC: 5) — Wire or explicitly defer with a tracked TODO and reference to `5-2-mutations-and-vault-log-action.md`.
 
 ## Dev Notes
 
@@ -79,10 +79,36 @@ so that **knowledge lands in the right folder with valid PAKE when required**.
 
 ### Agent Model Used
 
-_(on completion)_
+Composer (Cursor agent)
 
 ### Debug Log References
 
+### Code review (separate pass)
+
+- **Blind Hunter:** WriteGate runs before frontmatter work (`PROTECTED_PATH` test); symlink escape covered (`VAULT_BOUNDARY`); `project`/`area` limited to single segments (blocks `../escape`). No bypass found.
+- **Edge Case Hunter:** Duplicate path → `IO_ERROR`; temp file removed on failure; title slug degenerates to `note.md` when empty after strip; PAKE-invalid + secret body yields `SCHEMA_INVALID` before scan (ordering test). Residual: same-title concurrent creates remain a TOCTOU race (rename failure surfaces as `IO_ERROR`) — acceptable for Phase 1.
+- **Acceptance Auditor:** AC1–5 satisfied; audit append explicitly deferred to Epic 5.2 with in-code comment and story reference. `bash scripts/verify.sh` passed at acceptance.
+
+**Outcome:** Accepted; no blocking changes.
+
 ### Completion Notes List
 
+- Implemented `src/tools/vault-create-note.ts`: `vaultCreateNoteFromMarkdown` runs **WriteGate (`create`) → parseNoteFrontmatter → validatePakeForVaultPath → assertVaultWriteContentNoSecretPatterns**, then exclusive check, temp write in target dir, rename. `vaultCreateNote` adds routing (`destinationDirectoryForCreate`), title slug filename, and `buildVaultCreateNoteMarkdown` (UUID v4, quoted `created`/`modified` strings so gray-matter yields PAKE-compatible types).
+- MCP: `vault_create_note` registered in `src/index.ts` with Zod input; domain errors via `callToolErrorFromCns`.
+- Tests: `tests/vault-io/vault-create-note.test.ts` (happy path, routing, duplicate file, PROTECTED_PATH, VAULT_BOUNDARY symlink, PAKE-before-secret ordering, SECRET_PATTERN, invalid project segment).
+- **AC5 / audit:** No append to `_meta/logs/agent-log.md` in this story; inline comment references deferred work in `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md` (Epic 5.2).
+- Verify gate: `bash scripts/verify.sh` passed.
+
 ### File List
+
+- `src/tools/vault-create-note.ts`
+- `src/index.ts`
+- `tests/vault-io/vault-create-note.test.ts`
+- `_bmad-output/implementation-artifacts/4-4-vault-create-note.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-04-02: Story 4-4 implementation complete; vault_create_note tool, tests, sprint status → review.
+- 2026-04-02: Code review passed; sprint status → done.
+- 2026-04-02: Exclusive create hardened: `link(2)` instead of `rename` to avoid clobbering an existing file; documented in `specs/cns-vault-contract/modules/security.md`.
