@@ -36,6 +36,12 @@ so that {{benefit}}.
 
 - Cite all technical details with source paths and sections, e.g. [Source: docs/<file>.md#Section]
 
+## Standing tasks (every story)
+
+### Standing task: Update operator guide
+- [ ] If this story changes any user-facing behavior (new tool, new workflow, new constraint, new panel, new integration): update `03-Resources/CNS-Operator-Guide.md` via `vault_create_note` (full overwrite) or `vault_update_frontmatter` plus targeted section edit. Bump `modified` date and add a row to the Version History table in Section 12.
+- [ ] If no user-facing behavior changed: note "Operator guide: no update required" in Dev Agent Record.
+
 ## Dev Agent Record
 
 ### Agent Model Used
