@@ -1,1 +1,1 @@
-../../../../specs/cns-vault-contract/AGENTS.md
+../../../specs/cns-vault-contract/AGENTS.md
