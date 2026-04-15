@@ -1,0 +1,66 @@
+{
+  "policy_version": "1.1.0",
+  "policy_notes": "Override escalation: set operatorOverride: true in RoutingContext to bypass deny rules. Override cannot bypass registry existence. See _README.md 'Operator override rules' for full documentation.",
+  "surfaces": {
+    "cursor": {
+      "default_scope": "task",
+      "defaults": {
+        "coding": { "model_alias": "default-coding", "fallback_chain": ["fast"] },
+        "writing": { "model_alias": "fast", "fallback_chain": ["default-reasoning"] },
+        "analysis": { "model_alias": "default-reasoning", "fallback_chain": ["deep", "default-coding"] }
+      },
+      "allow": {
+        "model_aliases": ["default-coding", "default-reasoning", "fast", "deep"]
+      },
+      "deny": {
+        "tools": ["vault_delete", "vault_overwrite_all"]
+      }
+    },
+    "claude-code": {
+      "default_scope": "task",
+      "defaults": {
+        "coding": { "model_alias": "default-coding", "fallback_chain": ["fast"] },
+        "writing": { "model_alias": "fast", "fallback_chain": ["default-coding"] },
+        "analysis": { "model_alias": "default-reasoning", "fallback_chain": ["deep"] }
+      },
+      "allow": {
+        "model_aliases": ["default-coding", "default-reasoning", "fast", "deep"],
+        "tools": ["shell", "read", "grep"]
+      },
+      "deny": {
+        "tools": ["vault_delete", "vault_overwrite_all"]
+      }
+    },
+    "vault-io": {
+      "default_scope": "tool",
+      "defaults": {
+        "coding": { "model_alias": "fast", "fallback_chain": ["default-coding"] },
+        "writing": { "model_alias": "fast", "fallback_chain": ["default-coding"] },
+        "analysis": { "model_alias": "default-reasoning", "fallback_chain": ["deep"] }
+      }
+    },
+    "gemini-cli": {
+      "default_scope": "session",
+      "defaults": {
+        "coding": { "model_alias": "gemini-pro", "fallback_chain": ["gemini-flash"] },
+        "writing": { "model_alias": "gemini-flash", "fallback_chain": ["gemini-pro"] },
+        "analysis": { "model_alias": "gemini-pro", "fallback_chain": ["gemini-flash"] }
+      },
+      "allow": {
+        "model_aliases": ["gemini-pro", "gemini-flash"]
+      }
+    },
+    "unknown": {
+      "default_scope": "session",
+      "defaults": {
+        "coding": { "model_alias": "fast", "fallback_chain": [] },
+        "writing": { "model_alias": "fast", "fallback_chain": [] },
+        "analysis": { "model_alias": "fast", "fallback_chain": ["default-reasoning"] }
+      },
+      "deny": {
+        "model_aliases": ["deep"]
+      }
+    }
+  }
+}
+

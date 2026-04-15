@@ -1,5 +1,5 @@
-# generated: 2026-04-01T12:00:00Z
-# last_updated: 2026-04-05T18:00:00Z
+# generated: 2026-04-12T16:30:00Z
+# last_updated: 2026-04-15T22:00:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -34,8 +34,8 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: "2026-04-01T12:00:00Z"
-last_updated: "2026-04-05T18:00:00Z"
+generated: "2026-04-12T16:30:00Z"
+last_updated: "2026-04-15T06:20:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -102,12 +102,40 @@ development_status:
   9-1-shared-pake-type-module-for-mcp-and-validation: done
   9-2-reject-filesystem-root-as-cns-vault-root: done
   9-3-wikilink-repair-scale-and-nfr-documentation: done
-  epic-9-retrospective: optional
+  epic-9-retrospective: done
 
   epic-10: done
   10-1-notebooklm-vault-integration: done
-  epic-10-retrospective: optional
+  epic-10-retrospective: done
 
   epic-11: done
   11-1-obsidian-bases-panels: done
-  epic-11-retrospective: optional
+  epic-11-retrospective: done
+
+  epic-12: done
+  12-1-brain-service-scope-charter-phase-21: done
+  12-2-brain-corpus-allowlist-contract: done
+  12-3-secret-scan-enforcement-for-indexing: done
+  12-4-minimal-embeddings-pipeline-operator-triggered: done
+  12-5-index-manifest-and-drift-signals: done
+  12-6-retrieval-query-api-read-only: done
+  12-7-pake-quality-weighting-for-retrieval: done
+  12-8-nexus-quarantine-corpus: done # superseded by 12-7 (no reliable Nexus inbound path signal; no-silent-promotion satisfied by missing-quality 0.25 floor)
+  epic-12-retrospective: done
+
+  epic-13: done
+  13-1-mobile-vault-access-journey-and-governance-posture: done
+  epic-13-retrospective: done
+
+  epic-14: done
+  14-1-multi-model-routing-pre-architecture-readout: done
+  epic-14-retrospective: done
+
+  epic-15: done
+  15-1-policy-schema-and-model-alias-registry: done
+  15-2-routing-decision-engine: done
+  15-3-surface-adapters: done
+  15-4-gemini-cli-adapter: review
+  15-5-fallback-orchestration: done
+  15-6-operator-override-governance-controls: done
+  epic-15-retrospective: done

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cns://config/model-routing/reason-codes.schema.json",
+  "title": "CNS routing reason codes registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason_codes"],
+  "properties": {
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/reasonCode" }
+    }
+  },
+  "$defs": {
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "DEFAULT",
+        "FALLBACK_CROSS_PROVIDER",
+        "FALLBACK_EXHAUSTED",
+        "FALLBACK_RATE_LIMIT",
+        "FALLBACK_USED",
+        "OPERATOR_OVERRIDE",
+        "POLICY_DENY",
+        "NO_MATCH_FAIL_CLOSED",
+        "VERSION_MISMATCH"
+      ]
+    }
+  }
+}
+

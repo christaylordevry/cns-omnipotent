@@ -629,7 +629,7 @@ Architecture selects a **TypeScript MCP package** scaffold. Per **user-value epi
 
 Epic 1 and Epic 2 are documentation- and vault-artifact–centric and do not require Vault IO code. Epic 3+ assume the TypeScript project exists (3.1). Epic 4–6 are code increments on the same server.
 
-**Workflow status:** Ready for development and Ralph/BMAD dev-story handoff. For next workflow steps, use the **bmad-help** skill if you want a guided “what to run next.”
+**Workflow status:** Phase 1 (Epics 1–7) and Phase 2.0 (Epics 8–11) are tracked as **done** in `sprint-status.yaml` (2026-04-12). Epic **12** has Story **12.1** done and **12.2–12.8** in backlog for implementation after the Phase 2.1 Brain charter; Epics **13–14** remain planning-first slices. For the next workflow step, use **`/bmad:create-story`** for the next backlog slug under `epic-12` (see `sprint-status.yaml`), or **bmad-help** for a guided choice.
 
 ---
 
@@ -654,3 +654,183 @@ so that **I have persistent, filter-driven visibility into inbox, project, and r
 **And** inline editing is not enabled (deferred to a future Epic D story)
 **And** `_meta/bases/_README.md` documents panel purpose, read-only policy, and the write-capability deferral rationale
 **And** `bash scripts/verify.sh` passes (no vault-io code changes in this story).
+
+---
+
+## Phase 2.1 — Epic 12: Brain service (embeddings, index, retrieval)
+
+**Source:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-03.md` §3.1 and §3.3 (embeddings / RAG / brain deferred past Phase 2.0); implementation repo `CLAUDE.md` scope boundary (“Brain service (RAG + vector index) — Phase 2”).
+
+This epic covers the **PAKE knowledge layer** when augmented by **semantic retrieval**: what may be indexed, how indexes stay consistent with the vault contract, how queries relate to **Vault IO** (governed read/write) versus a future **Brain** read path, and which risks (secrets, protected paths, dual-path Nexus notes) are explicitly in or out of scope. **Epic 12 begins with planning-only stories**; no vector database, indexer, or new MCP tools until a later story explicitly adds them under an updated spec.
+
+**Tracked in sprint-status as:** `epic-12`.
+
+### Story 12.1: Brain service scope charter for Phase 2.1
+
+As a **maintainer**,  
+I want **a single Phase 2.1 “Brain” charter in planning artifacts that freezes scope before any indexer code**,  
+So that **retrieval, embeddings, and the vault stay aligned with WriteGate, PAKE, and audit policy**.
+
+**Acceptance Criteria:**
+
+**Given** Phase 2.0 NotebookLM workflow and Bases visibility exist and Phase 1 Vault IO behavior is unchanged in code  
+**When** the charter is published under `_bmad-output/planning-artifacts/` (new file or an agreed addendum to `prd.md` / `architecture.md`)  
+**Then** it names **inclusions** for Phase 2.1 Brain work (e.g., candidate corpora: which vault subtrees or note types may be embedded; operator-triggered vs scheduled reindex; read-only query API shape at a conceptual level)  
+**And** it names **exclusions** (e.g., mutating the vault only through existing Vault IO tools unless a future story adds a governed mutation path; no silent bypass of `AI-Context/**` or `_meta/` protections; relationship of Brain reads to NotebookLM ingestion stated as “replace / complement / orthogonal”)  
+**And** it documents **security**: how secret-bearing notes, protected paths, and incomplete PAKE notes (e.g., Nexus path) are handled or excluded from the index  
+**And** it states **observability and ops**: how operators detect index drift, stale vectors, or failed embed jobs (design level, not product UI)  
+**And** it lists **explicit follow-on story candidates** (bulleted) for a future SM pass, none of which are implemented in this story  
+**And** **no** production vector store, embedding pipeline, or Brain MCP tool is added to `src/` or `specs/cns-vault-contract/` as part of this story; `bash scripts/verify.sh` behavior is unchanged except for optional markdown-only edits if the verify gate includes them.
+
+### Story 12.2: Brain corpus allowlist contract
+
+As a **maintainer**,  
+I want **an operator-editable allowlist file and validation rules for corpora selection**,  
+So that **indexing stays within explicit subtree and optional `pake_type` boundaries and never silently ingests protected classes**.
+
+**Acceptance Criteria:**
+
+**Given** the Phase 2.1 Brain charter default include/exclude corpus classes (relative to `CNS_VAULT_ROOT`)  
+**When** the allowlist contract is authored and validated  
+**Then** operators can express permitted subtrees and filters in one place with clear invalid-configuration handling  
+**And** embedding protected paths (for example `AI-Context/**`, `_meta/**`) requires an explicit, documented opt-in path consistent with the charter’s “no silent bypass” rule  
+**And** `bash scripts/verify.sh` passes for any code or schema added under this story.
+
+### Story 12.3: Secret scan enforcement for indexing
+
+As a **maintainer**,  
+I want **never-embed exclusion when secret patterns match, with tests and non-leaking errors**,  
+So that **Brain indexing does not amplify accidental secret material in the vault**.
+
+**Acceptance Criteria:**
+
+**Given** the same conceptual scope as WriteGate secret scanning (frontmatter string values and body) aligned with `config/secret-patterns.json` / vault override policy  
+**When** the indexer considers a file for embedding  
+**Then** notes matching secret patterns are excluded from the embed set and the reason is classifiable without echoing matched material  
+**And** automated tests cover match, non-match, and boundary cases  
+**And** `bash scripts/verify.sh` passes.
+
+### Story 12.4: Minimal embeddings pipeline (operator-triggered)
+
+As an **operator**,  
+I want **an on-demand index build with bounded scope and deterministic outputs**,  
+So that **I can refresh semantic retrieval without a shipped scheduler or daemon**.
+
+**Acceptance Criteria:**
+
+**Given** corpora rules from the allowlist contract and secret exclusion behavior  
+**When** the operator runs the documented trigger (for example CLI or single-shot job)  
+**Then** the pipeline produces bounded, reproducible artifacts for a defined corpus slice (no cron product; operator-triggered only for this story)  
+**And** canonical path resolution (`realpath` or equivalent) is applied before reads per the charter’s default-safe posture  
+**And** `bash scripts/verify.sh` passes.
+
+### Story 12.5: Index manifest and drift signals
+
+As an **operator**,  
+I want **an index manifest and freshness signals**,  
+So that **I can detect stale vectors, failed embeds, and drift against the vault without a shipped UI**.
+
+**Acceptance Criteria:**
+
+**Given** charter design expectations for manifest contents (corpus allowlist snapshot, build timestamp, counts of considered / embedded / excluded / failed, exclusion reason breakdown)  
+**When** an index build completes or fails  
+**Then** a machine-readable manifest (or equivalent artifact outside the default embed corpus) is written or updated for operator inspection  
+**And** drift or staleness can be estimated (for example by comparing vault mtimes to last successful build) at the fidelity defined in acceptance criteria for this story  
+**And** failure reporting omits raw secrets and full note bodies  
+**And** `bash scripts/verify.sh` passes.
+
+### Story 12.6: Retrieval query API (read-only)
+
+As an **agent** or **operator**,  
+I want **a read-only retrieval query interface with an explicit trust model**,  
+So that **semantic recall is available without bypassing governed read paths or mutating the vault**.
+
+**Acceptance Criteria:**
+
+**Given** an index built under the same boundary and exclusion rules as the charter  
+**When** a consumer issues a read-only query  
+**Then** results are returned through the defined API shape with documented provenance limits (for example path stability after `vault_move`)  
+**And** the trust model states how this path relates to Vault IO reads and that vault mutation remains only via existing Vault IO tools unless a separate story adds a governed Brain write path  
+**And** `bash scripts/verify.sh` passes.
+
+### Story 12.7: PAKE quality weighting for retrieval
+
+As a **maintainer**,  
+I want **retrieval ranking informed by PAKE metadata**,  
+So that **low-quality or incomplete notes surface less often in primary results**.
+
+**Acceptance Criteria:**
+
+**Given** notes with `pake_type`, `status`, `confidence_score`, and related verification fields where present  
+**When** query results are ranked  
+**Then** documented weighting or down-ranking rules use those fields without silently promoting incomplete Nexus-origin content into the primary corpus unless explicitly allowed by policy  
+**And** behavior is covered by tests on representative fixtures  
+**And** `bash scripts/verify.sh` passes.
+
+### Story 12.8: Nexus quarantine corpus
+
+As an **operator**,  
+I want **an optional separate corpus for incomplete or Nexus-origin notes with visible labeling**,  
+So that **dual-path content is retrievable only when I explicitly opt in**.
+
+**Acceptance Criteria:**
+
+**Given** the charter’s strategies for incomplete PAKE / Nexus-origin notes (exclude, down-rank, or quarantine corpus)  
+**When** the quarantine corpus is enabled in configuration  
+**Then** those notes are indexed only in that corpus, labeled for operators, and excluded from the primary retrieval corpus by default  
+**And** disabling the quarantine corpus returns to charter-default exclusion or down-rank behavior as specified  
+**And** `bash scripts/verify.sh` passes.
+
+---
+
+## Phase 2.1 — Epic 13: Mobile vault access
+
+**Source:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-03.md` §3.1 and §3.3 (mobile deferred to 2.1); implementation repo `CLAUDE.md` (“Mobile access — Phase 2”).
+
+Mobile is **additive**: operators may read, search, or lightly triage from a phone or tablet without redefining Phase 1’s **first-class surfaces** (Cursor, Claude Code, Vault IO on WSL). This epic defines **who may do what, on which stack**, and how mobile sits beside **Nexus** and **Obsidian Sync** without implying a new ungoverned write hose.
+
+**Tracked in sprint-status as:** `epic-13`.
+
+### Story 13.1: Mobile vault access journey and governance posture
+
+As an **operator**,  
+I want **a documented mobile journey with explicit read vs write posture and links into the constitution**,  
+So that **I do not accidentally treat a mobile client as a substitute for Vault IO or confuse it with the Nexus dual-path**.
+
+**Acceptance Criteria:**
+
+**Given** dual-path documentation for Nexus and governed Vault IO already exists in the vault or specs  
+**When** the journey is published (planning artifact and/or vault module under a path that follows the folder contract, with any `AI-Context/**` edits applied by the operator if WriteGate requires it)  
+**Then** it describes at least one **supported read path** (e.g., Obsidian Mobile with Sync, or SSH + terminal reader) and states required **authentication** (device, vault host, Tailscale or equivalent if used)  
+**And** it states **write posture**: which mutations, if any, are allowed from mobile (default assumption: **no** direct mobile writes that bypass Vault IO unless explicitly designed and called out as operator-only risk)  
+**And** it explains how mobile **coexists with Nexus** (read-only awareness, triage back to Inbox, no requirement that Nexus run on the phone)  
+**And** it includes a **decision table** or bullet list: surface → allowed operations → audit expectation (e.g., “Obsidian Mobile edit on disk: not Vault IO audited”)  
+**And** it adds a **constitution pointer**: exact sentence or table row the operator should add to `AGENTS.md` (or an `AI-Context/modules/` file) so agents load mobile rules without expanding Phase 1 MCP tool count  
+**And** no new Vault IO tools or WriteGate changes are required for this story; verification remains documentation-led.
+
+---
+
+## Phase 3 — Epic 14: Multi-model routing (control plane preview)
+
+**Source:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-03.md` §3.1 (multi-model routing — Phase 3); implementation repo `CLAUDE.md` (“Multi-model routing — Phase 3”).
+
+Phase 3 routing is **CNS control-plane** work: how sessions choose models, how credentials and quotas are handled, and how policy stays consistent across IDEs and CLIs. This epic starts with a **pre-architecture readout** so later stories do not bake in one vendor’s API shape.
+
+**Tracked in sprint-status as:** `epic-14`.
+
+### Story 14.1: Multi-model routing pre-architecture readout
+
+As a **maintainer**,  
+I want **a readout that maps surfaces, policies, and configuration boundaries for model selection**,  
+So that **Phase 3 stories can be sliced without retrofitting security or secrets handling**.
+
+**Acceptance Criteria:**
+
+**Given** Phase 1 and Phase 2.0 completion assumptions (Vault IO and vault contract stable)  
+**When** the readout is published under `_bmad-output/planning-artifacts/` (standalone or architecture addendum)  
+**Then** it lists **in-scope surfaces** (e.g., Cursor, Claude Code, future CLI or daemon mentioned only as placeholders) and, for each, whether routing is **per-session**, **per-task**, or **per-tool**  
+**And** it classifies **secrets**: where API keys and org policies live (env, vault-stored config, host keychain) and what must **never** be logged or echoed  
+**And** it defines **policy dimensions** at design level: default model, fallback on rate limit or outage, allowed model list, operator override rules  
+**And** it calls out **dependencies** on Brain or mobile epics if routing must know about retrieval context or device class (explicit “none / soft / hard” dependency statement)  
+**And** it ends with a **recommended epic breakdown** (ordered list of candidate Phase 3 epics or stories) without implementing code, daemons, or new MCP transports  
+**And** no OpenClaw, always-on daemon, or router implementation ships in this story; repo code may remain untouched.

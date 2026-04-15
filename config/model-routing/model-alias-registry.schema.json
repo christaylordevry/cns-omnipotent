@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cns://config/model-routing/model-alias-registry.schema.json",
+  "title": "CNS model alias registry (vendor-neutral, non-secret)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_version", "aliases"],
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "aliases": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/aliasEntry" },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+      }
+    }
+  },
+  "$defs": {
+    "aliasEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model_id"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable provider identifier (vendor-neutral string)."
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider model identifier (non-secret)."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["tools", "vision", "reasoning", "fast", "coding"]
+          },
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 400
+        }
+      }
+    }
+  }
+}
+

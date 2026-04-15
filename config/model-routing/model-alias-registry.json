@@ -1,0 +1,42 @@
+{
+  "registry_version": "1.1.0",
+  "aliases": {
+    "default-coding": {
+      "provider": "anthropic",
+      "model_id": "claude-sonnet",
+      "label": "General coding default",
+      "capabilities": ["coding", "tools"]
+    },
+    "default-reasoning": {
+      "provider": "anthropic",
+      "model_id": "claude-opus",
+      "label": "Deeper reasoning default",
+      "capabilities": ["reasoning", "tools"]
+    },
+    "fast": {
+      "provider": "anthropic",
+      "model_id": "claude-haiku",
+      "label": "Low-latency baseline",
+      "capabilities": ["fast"]
+    },
+    "deep": {
+      "provider": "anthropic",
+      "model_id": "claude-opus",
+      "label": "High-quality, higher-cost",
+      "capabilities": ["reasoning"]
+    },
+    "gemini-pro": {
+      "provider": "google",
+      "model_id": "gemini-2.5-pro",
+      "label": "Gemini Pro default",
+      "capabilities": ["coding", "reasoning", "tools"]
+    },
+    "gemini-flash": {
+      "provider": "google",
+      "model_id": "gemini-2.5-flash",
+      "label": "Gemini Flash (fast, cheaper)",
+      "capabilities": ["fast", "coding"]
+    }
+  }
+}
+

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cns://config/model-routing/policy.schema.json",
+  "title": "CNS model routing policy (non-secret)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_version", "surfaces"],
+  "properties": {
+    "policy_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "surfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cursor", "claude-code", "vault-io", "unknown"],
+      "properties": {
+        "cursor": { "$ref": "#/$defs/surfacePolicy" },
+        "claude-code": { "$ref": "#/$defs/surfacePolicy" },
+        "vault-io": { "$ref": "#/$defs/surfacePolicy" },
+        "gemini-cli": { "$ref": "#/$defs/surfacePolicy" },
+        "unknown": { "$ref": "#/$defs/surfacePolicy" }
+      }
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reasonCode" },
+      "uniqueItems": true,
+      "description": "Optional inline reason codes; canonical registry lives in reason-codes.json."
+    },
+    "policy_notes": {
+      "type": "string",
+      "maxLength": 800,
+      "description": "Non-sensitive notes. Must not contain prompts, responses, or vault content."
+    }
+  },
+  "$defs": {
+    "taskCategory": {
+      "type": "string",
+      "enum": ["coding", "writing", "analysis"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["session", "task", "tool"]
+    },
+    "reasonCode": {
+      "$ref": "reason-codes.schema.json#/$defs/reasonCode"
+    },
+    "modelAlias": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+    },
+    "fallbackChain": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/modelAlias" },
+      "minItems": 0,
+      "maxItems": 16,
+      "uniqueItems": false
+    },
+    "defaultSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_alias", "fallback_chain"],
+      "properties": {
+        "model_alias": { "$ref": "#/$defs/modelAlias" },
+        "fallback_chain": { "$ref": "#/$defs/fallbackChain" }
+      }
+    },
+    "surfacePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaults"],
+      "properties": {
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coding", "writing", "analysis"],
+          "properties": {
+            "coding": { "$ref": "#/$defs/defaultSelection" },
+            "writing": { "$ref": "#/$defs/defaultSelection" },
+            "analysis": { "$ref": "#/$defs/defaultSelection" }
+          }
+        },
+        "allow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "model_aliases": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/modelAlias" },
+              "uniqueItems": true
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Optional allowlist of tool identifiers for the surface."
+            }
+          },
+          "description": "Optional allowlist. If both allow and deny are present and a value matches both, deny takes precedence (fail-closed)."
+        },
+        "deny": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "model_aliases": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/modelAlias" },
+              "uniqueItems": true
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Optional denylist of tool identifiers for the surface."
+            }
+          },
+          "description": "Optional denylist. Deny always takes precedence over allow."
+        },
+        "default_scope": {
+          "$ref": "#/$defs/scope",
+          "description": "Surface routing granularity (policy-level default)."
+        }
+      }
+    },
+    "minimalDecisionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface",
+        "scope",
+        "policy_version",
+        "selected_model_alias",
+        "reason_code",
+        "fallback_chain",
+        "operator_override"
+      ],
+      "properties": {
+        "surface": {
+          "type": "string",
+          "enum": ["cursor", "claude-code", "vault-io", "gemini-cli", "unknown"]
+        },
+        "scope": { "$ref": "#/$defs/scope" },
+        "policy_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "selected_model_alias": { "$ref": "#/$defs/modelAlias" },
+        "reason_code": { "$ref": "#/$defs/reasonCode" },
+        "fallback_chain": { "$ref": "#/$defs/fallbackChain" },
+        "operator_override": { "type": "boolean" }
+      }
+    }
+  }
+}
+

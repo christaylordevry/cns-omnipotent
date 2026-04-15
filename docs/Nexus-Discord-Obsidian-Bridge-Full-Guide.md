@@ -282,6 +282,43 @@ Deeper checks:
 - verify you are in the intended WSL networking mode (mirrored), if you have seen gateway drop issues before
 - check watchdog logs for restart loops
 
+### Symptom E: Claude Code just updated and Nexus stopped responding
+
+Likely causes:
+- Claude Code update reset workspace trust state; a fresh trust prompt appeared that the trust-guard did not detect (UI string changed)
+- Claude Code showed a `needs_configure` or version acknowledgement screen inside the tmux pane before resuming
+- Post-update first-run / onboarding screens appeared and are blocking the session
+
+**Fastest fix (script-assisted, try this first):**
+```bash
+bash /home/christ/ai-factory/projects/NEXUS/scripts/nexus-discord-trust-guard.sh
+```
+Wait up to 15 seconds (3 passes at ~1.2s each + action delay). If Nexus responds in Discord after this, the blocker was detected and cleared automatically.
+
+**If the script fix does not work (manual inspection):**
+```bash
+tmux attach -t nexus-global
+```
+Look at the pane. If any prompt is visible requiring a keypress or selection, press Enter or select the default option. Then detach: `Ctrl+b d`.
+
+**If the pane is empty or claude has exited (process-dead case):**
+```bash
+bash /home/christ/ai-factory/projects/NEXUS/scripts/nexus-discord-bridge.sh --kill
+bash /home/christ/ai-factory/projects/NEXUS/scripts/nexus-discord-bridge.sh --detach
+```
+The watchdog (every 3 min via cron) will also do this automatically if the process is dead.
+
+Deeper checks:
+1. Check what the trust-guard detected (if anything):
+   ```bash
+   tail -n 20 ~/.local/share/nexus-bridge/trust-guard.log
+   ```
+   Look for lines containing `needs_configure`, `update_notice`, `onboarding`, or `trust`. If none appear, the blocker text was not matched.
+2. If the trust-guard log shows no match: Claude Code introduced a new blocking prompt the script does not yet recognise.
+   - `tmux attach -t nexus-global` and note the **exact text** of the prompt.
+   - Add a new pattern to `detect_blocker()` in `NEXUS/scripts/nexus-discord-trust-guard.sh`.
+   - Current patterns cover: workspace trust, plan approval, edit approval, `needs_configure`, version acknowledgement screens, and first-run/onboarding screens.
+
 ---
 
 ## Verification / Health checks (paste-able)
@@ -321,5 +358,6 @@ Links:
 
 ## Notes (important limits)
 - Not 24/7 on a sleeping laptop: if your machine sleeps, WSL processes sleep too.
-- The plugin UI can change: if trust-guard stops clearing prompts, update the script behavior in the NEXUS repo.
+- **Claude Code updates break Nexus regularly.** This is a known recurring pattern. After any Claude Code update, if Nexus stops responding: run `nexus-discord-trust-guard.sh` first (handles most cases automatically), then follow Symptom E above if it does not clear.
+- If trust-guard stops clearing prompts after an update: `tmux attach -t nexus-global`, note the exact blocking prompt text, and add a new pattern to `detect_blocker()` in `NEXUS/scripts/nexus-discord-trust-guard.sh`. The script is designed to be extended.
 

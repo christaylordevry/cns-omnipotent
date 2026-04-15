@@ -1,0 +1,14 @@
+{
+  "reason_codes": [
+    "DEFAULT",
+    "FALLBACK_CROSS_PROVIDER",
+    "FALLBACK_EXHAUSTED",
+    "FALLBACK_RATE_LIMIT",
+    "FALLBACK_USED",
+    "OPERATOR_OVERRIDE",
+    "POLICY_DENY",
+    "NO_MATCH_FAIL_CLOSED",
+    "VERSION_MISMATCH"
+  ]
+}
+

@@ -17,6 +17,22 @@ describe("assertContentMatchesNoSecretPatterns", () => {
     expect(() => assertContentMatchesNoSecretPatterns("hello world", trivial)).not.toThrow();
   });
 
+  it("throws using the first matching pattern when multiple patterns match", () => {
+    const overlapping: CompiledSecretPattern[] = [
+      { id: "first", regex: /foo/ },
+      { id: "second", regex: /foo/ },
+    ];
+    try {
+      assertContentMatchesNoSecretPatterns("prefix foo suffix", overlapping);
+      expect.fail("expected throw");
+    } catch (e: unknown) {
+      expect(e).toMatchObject({
+        code: "SECRET_PATTERN",
+        details: { patternId: "first" },
+      });
+    }
+  });
+
   it("throws SECRET_PATTERN without echoing the matched substring", () => {
     const secret = "SECRET_TEST_TOKEN_ABCD1234";
     const body = `prefix ${secret} suffix`;

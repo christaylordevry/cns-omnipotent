@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-04-05
+modified: 2026-04-15
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -58,6 +58,7 @@ On both surfaces, opening the workspace at the vault root causes the shim to loa
 | `AGENTS.md` (constitution) | `AI-Context/modules/vault-io.md` |
 | Current focus (Section 8 of AGENTS.md) | `AI-Context/modules/security.md` |
 | Routing rules, formatting standards | `AI-Context/modules/notebooklm-workflow.md` |
+| | `AI-Context/modules/routing.md` |
 
 Modules load on demand when the task falls within a module's domain. The constitution is the map; modules are the territory.
 
@@ -265,7 +266,7 @@ Run `bash scripts/verify.sh` before claiming any story done. It is the completio
 |-------|---------|
 | Lint | ESLint across `src/` |
 | Typecheck | TypeScript compiler (`tsc --noEmit`) |
-| Tests | Vitest: 171 tests covering boundary, secrets, audit, PAKE, search, WriteGate |
+| Tests | Vitest: automated suite covering boundary, secrets, audit, PAKE, search, WriteGate, Brain allowlist |
 | Constitution mirror parity | Node script verifying specs mirror matches vault copy |
 
 > [!tip] Run from the repo root: `bash scripts/verify.sh`. Exit 0 = safe to commit.
@@ -311,3 +312,122 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | Date | Version | What changed | Story |
 |------|---------|-------------|-------|
 | 2026-04-05 | 1.0.0 | Initial operator guide covering all Phase 1 and Phase 2 deliverables | N/A (standalone) |
+| 2026-04-13 | 1.1.0 | Added Brain corpus allowlist pointer (Phase 2.1 contract path, vault schema location, verify gate wording) | 12-2-brain-corpus-allowlist-contract |
+| 2026-04-13 | 1.2.0 | Documented Brain secret-pattern exclusion from embeddings (same merged patterns as WriteGate) | 12-3-secret-scan-enforcement-for-indexing |
+| 2026-04-14 | 1.3.0 | Documented one-shot Brain index build (`npm run brain:index`), output directory outside the vault, and artifact file name | 12-4-minimal-embeddings-pipeline-operator-triggered |
+| 2026-04-14 | 1.4.0 | Added index manifest (`brain-index-manifest.json`) with counts, exclusions, and drift/freshness signals | 12-5-index-manifest-and-drift-signals |
+| 2026-04-14 | 1.5.0 | Added read-only index query command (`npm run brain:query`) and documented provenance warnings + stale-path trust model | 12-6-retrieval-query-api-read-only |
+| 2026-04-14 | 1.6.0 | Documented PAKE quality-weighted retrieval ranking and `--no-quality-weighting` opt-out | 12-7-pake-quality-weighting-for-retrieval |
+| 2026-04-15 | 1.7.0 | Added model routing section: overview, operator override rules, version guard, audit trail | 15-6-operator-override-governance-controls |
+
+---
+
+## 13. Brain corpus allowlist (Phase 2.1)
+
+Operators configure **which vault subtrees** feed the Brain embed pipeline using the live JSON file at **`_meta/schemas/brain-corpus-allowlist.json`** (same schema as the implementation-repo example). This file is **not** edited via Vault IO tools; use normal vault editing hygiene.
+
+| Item | Location |
+|------|----------|
+| Human contract | Implementation repo: `_bmad-output/planning-artifacts/brain-corpus-allowlist-contract.md` |
+| Example JSON | Implementation repo: `config/brain-corpus-allowlist.example.json` |
+| Live allowlist | Vault: `_meta/schemas/brain-corpus-allowlist.json` (create deliberately—never paste secrets) |
+
+### One-shot index build (Story 12.4)
+
+From the **CNS implementation repository** (not inside the vault), with `CNS_VAULT_ROOT` pointing at this vault’s root directory:
+
+1. Choose an **absolute output directory outside the vault** (for example under your home directory or a build artifacts folder).
+2. Run: `npm run brain:index -- --output-dir <absolute-path>`
+3. The run writes **`brain-index.json`** into that directory (deterministic ordering, vault-relative paths, stub embedder metadata in this slice). No scheduler, daemon, or MCP tool is involved.
+4. The run also writes **`brain-index-manifest.json`** into the same directory.
+
+If `--output-dir` resolves **inside** the vault boundary, the command **fails** by design so index artifacts do not land under `Knowledge-Vault-ACTIVE/` by default.
+
+Pipeline validation code lives under `src/brain/` (allowlist loader, index build, secret gate). Notes whose **full serialized text** matches the **same merged** secret patterns as WriteGate (`config/secret-patterns.json` plus optional `_meta/schemas/secret-patterns.json`) are **excluded from the embed set** (no write error). The indexing gate returns only a stable reason code and `patternId`—never matched substrings or bodies (`src/brain/indexing-secret-gate.ts`).
+
+### Inspecting freshness / drift (Story 12.5)
+
+The manifest file is **machine-readable** and safe for operator sharing (no note bodies, no frontmatter dumps, no secret substrings). Key fields:
+
+- **Build outcome**: `outcome` is `success` or `failed`.
+- **Counts**: `counts.candidates_discovered`, `counts.embedded`, `counts.excluded`, `counts.failed`.
+- **Why notes were skipped**: `exclusion_reason_breakdown` is keyed by stable reason codes (including the secret-pattern exclusion reason code).
+- **Per-file failures (bounded)**: `failures` includes only vault-relative paths + reason codes + sanitized detail (no bodies, no absolute paths).
+- **Staleness estimate**:
+  - `freshness.last_build_utc` is the build time.
+  - `vault_snapshot.max_mtime_utc` is the newest file mtime among discovered candidates at build time.
+  - `freshness.estimated_stale_count` estimates how many discovered candidates had `mtime > build_timestamp` at build time.
+  - `freshness.estimated_stale_sample` lists up to 20 newest vault-relative paths (paths only).
+
+### Querying the index (read-only retrieval) (Story 12.6)
+
+You can issue a **read-only retrieval query** against an existing `brain-index.json` artifact **without reading live vault files at query time**.
+
+From the CNS implementation repository root:
+
+1. Ensure you have an index output directory from `npm run brain:index`.
+2. Run:
+   - `npm run brain:query -- --index-path <absolute-path-to-brain-index.json> --query "your text" --top-k 10`
+3. The command prints **JSON** to stdout with:
+   - `results[]`: ordered list of `{ path, score }` where `path` is vault-relative POSIX and `score` is cosine similarity
+   - `embedder`: embedder metadata from the index artifact (not from live provider calls)
+   - `warnings[]` (optional): provenance / staleness flags if a sibling manifest is present
+   - `provenance.last_build_utc` (optional): populated from `brain-index-manifest.json` when available
+
+### Quality-weighted ranking (Story 12.7)
+
+By default, the query API applies **PAKE quality weighting** as a multiplier on top of cosine similarity:
+
+```
+final_score = cosine_similarity * quality_multiplier
+```
+
+Where:
+
+- **`quality_multiplier`** is computed from PAKE frontmatter fields captured at **index time**:
+  - `status` weight: `reviewed` → 1.0, `in-progress` → 0.85, `draft` → 0.65, `archived` → 0.4, missing/unknown → 0.5
+  - `confidence_score` weight: if present and in [0, 1], use it; if missing/invalid → 0.5
+  - `verification_status` weight: `verified` → 1.0, `pending` → 0.8, `disputed` → 0.5, missing/unknown → 0.6
+  - If a record has **no quality metadata at all** (no `quality` field in the index record), it receives a flat multiplier of **0.25**.
+
+This is a **safe default posture**: notes created via ungoverned surfaces (e.g. Nexus captures lacking PAKE quality signals) are down-ranked and never silently promoted into top results.
+
+**Opt out (pure cosine ranking):**
+
+- Add `--no-quality-weighting` to the query command:
+  - `npm run brain:query -- --index-path <abs> --query "q" --top-k 10 --no-quality-weighting`
+
+When disabled, ranking falls back to **pure cosine similarity** with deterministic tie-break by `path`.
+
+**Trust model (important):**
+
+- Returned `path` values were captured at **index time** and can become **stale** after a `vault_move` or manual rename. Query does not validate file existence.
+- Query reads only the index artifact (and best-effort sibling `brain-index-manifest.json`) and **never reads vault note bodies** to generate snippets in this story.
+
+---
+
+## 14. Model routing (Epic 15)
+
+The CNS routing layer selects model aliases per surface and task category. Config lives in `config/model-routing/` (implementation repo). The module pointer is at `AI-Context/modules/routing.md`.
+
+### Surfaces covered
+
+Cursor, Claude Code, Gemini CLI, plus internal surfaces (vault-io, unknown).
+
+### Operator override
+
+Pass `operatorOverride: true` in the `RoutingContext` to bypass deny rules. Override cannot bypass registry existence (the alias must exist in `model-alias-registry.json`). Override decisions use the `OPERATOR_OVERRIDE` reason code and are always logged at "visible" tier. Full documentation: `config/model-routing/_README.md` (Operator override rules section).
+
+### Version guard
+
+Policy and registry versions must share the same major version (e.g., 1.x.x + 1.x.x). A major mismatch produces `VERSION_MISMATCH` and halts routing. Minor/patch mismatches produce a console warning but do not fail.
+
+### Audit trail
+
+Routing fallback events append to `AI-Context/agent-log.md` in the format:
+
+```
+- [{timestamp}] ROUTING {tier} {reason_code} {surface}/{taskCategory}: {originalAlias} → {selectedAlias}
+```
+
+The file must pre-exist (the routing layer does not create it). Silent-tier events are still written to the audit log.

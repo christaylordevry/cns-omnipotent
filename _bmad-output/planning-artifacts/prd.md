@@ -115,6 +115,10 @@ Phase 1 MVP is complete when the CNS foundation works end-to-end locally:
 
 - Discord / Nexus surface, NotebookLM ingestion, Obsidian Bases control panels, mobile access, embeddings, and multi-model routing, all built on the stable Phase 1 substrate.
 
+### Phase 2.1 Brain charter
+
+Phase 2.1 starts with a planning-only scope freeze before any indexing or embeddings code is written. See `_bmad-output/planning-artifacts/brain-service-phase-2-1-charter.md`.
+
 ## User Journeys
 
 ### Journey 1: Primary Operator, Success Path (Fresh Session to Productive Work)

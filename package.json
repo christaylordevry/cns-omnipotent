@@ -16,7 +16,9 @@
     "test:gate-failures": "node scripts/assert-verify-failure-modes.mjs",
     "test:node": "node --test tests/*.test.mjs",
     "test:vitest": "vitest run --config vitest.config.ts",
-    "test": "npm run -s test:node && npm run -s test:vitest"
+    "test": "npm run -s test:node && npm run -s test:vitest",
+    "brain:index": "tsx src/brain/build-index-cli.ts",
+    "brain:query": "tsx src/brain/query-index-cli.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

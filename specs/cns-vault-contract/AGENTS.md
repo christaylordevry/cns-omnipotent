@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.3.0 | Last updated: 2026-04-05  
+> Version: 1.6.0 | Last updated: 2026-04-15  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -165,6 +165,12 @@ Never write outside the vault, store secrets, delete without approval, run bulk 
 - **Incomplete notes:** Nexus-created notes **may omit full PAKE frontmatter**. Treat them like **`00-Inbox/`** captures until triaged into canonical PAKE shape. Do not assume every file in governed folders was created through Vault IO or passed WriteGate.
 - **IDE agents:** Prefer Vault IO MCP tools for mutations when configured. Do not bypass Vault IO to mimic Nexus.
 
+### Mobile (distinct from Nexus and Vault IO)
+
+- **Not a governed mutation path:** Mobile clients are **read-first** add-ons. Obsidian Mobile "edit on disk" and ad hoc SSH editing are filesystem changes, not Vault IO tools. They do **not** append lines to `_meta/logs/agent-log.md`.
+- **Write posture:** Default **no direct mobile writes** that bypass Vault IO. Do not propose or normalize broader mobile **writes** unless this constitution and `AI-Context/modules/mobile-posture.md` explicitly allow that path. The named operator read stack for SSH remote inspection is **Tailscale** plus **Blink Shell** (see `../../docs/mobile-vault-access-journey.md`).
+- **Coexistence with Nexus:** Mobile can read Nexus-managed notes as normal vault files. Mobile does **not** need Nexus on the phone. Full journey, decision table, and triage patterns: `../../docs/mobile-vault-access-journey.md`. Module: `AI-Context/modules/mobile-posture.md`.
+
 Operator stack, flags, paths, watchdog, and trust-guard: `../../docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`, `../../docs/Nexus-Discord-Obsidian-Bridge-Operator-Guide.md`.
 
 ---
@@ -191,6 +197,8 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Vault IO            | `AI-Context/modules/vault-io.md`            | Any vault read, write, search, or move beyond quick browsing                                      |
 | Security            | `AI-Context/modules/security.md`            | Credentials, permissions, external access, or secret-adjacent writes                              |
 | NotebookLM workflow | `AI-Context/modules/notebooklm-workflow.md` | NotebookLM queries, source_add, cross-notebook research, InsightNote landing, vault export script |
+| Mobile posture      | `AI-Context/modules/mobile-posture.md`      | Any question about mobile access, or any suggestion that mobile is a write surface               |
+| Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
 
 ### How to Load a Module
 
@@ -207,24 +215,31 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 > Update this section whenever your active priorities shift.  
 > This is the "what am I working on right now" that agents check first.
 
-### Active Projects
+### Project Status
 
-- **CNS Phase 1:** Epics 1–5 are **done**: folder contract and manifests, modular constitution, Vault IO reads and search, governed writes and move, canonical read boundary (Story 4-9), append-only audit logging and `vault_log_action` (Epic 5), operator audit playbook in `../../specs/cns-vault-contract/AUDIT-PLAYBOOK.md`. **Epic 6** closes packaging: full tool surface checks, fixture vault integration tests, and `../../scripts/verify.sh` as the completion gate. Normative spec: `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`.
+- **CNS Phase 1: COMPLETE.** All epics (1–11) shipped and verified. Vault folder contract, AGENTS.md constitution, and Vault IO MCP layer (9 tools) are done. `scripts/verify.sh` passes: 171 tests, lint, typecheck, and build clean as of 2026-04-10. Normative spec: `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`.
+- **CNS Phase 2: Stack A declared.** Adoption sequence: Nexus stability first, then Obsidian Bases (Inbox triage), then NotebookLM ingestion, then mobile read path, then thin retrieval only when vault content density justifies it.
+- **CNS Phase 3 routing: COMPLETE.** Multi-model routing (Epic 15) shipped: policy schema, model alias registry, routing decision engine, three surface adapters (Cursor, Claude Code, Gemini CLI), fallback orchestrator, version guard, vault audit trail. Config: `config/model-routing/`. Module: `AI-Context/modules/routing.md`.
 
 ### Current Priorities
 
-1. **Epic 6:** Map deferred verification and hygiene items from `../../_bmad-output/implementation-artifacts/deferred-work.md` into stories; run the verification gate before calling Phase 1 complete.
-2. Keep directory `_README.md` manifests aligned with the folder contract as the vault grows.
-3. **Operator:** Configure MCP (`CNS_VAULT_ROOT`, optional `CNS_VAULT_DEFAULT_SEARCH_SCOPE`, optional `CNS_OBSIDIAN_CLI` for `vault_move`) per `../../specs/cns-vault-contract/README.md`.
-4. **End-to-end:** On Cursor and Claude Code, confirm grounding and Vault IO journeys match this constitution and modules without manual paste of the vault map.
+1. **Nexus trust-guard (active pain).** The Nexus Discord bot breaks on every Claude Code update, requiring manual reconnection. Fix: update `nexus-discord-trust-guard.sh` (NEXUS repo) to detect `needs_configure` state after updates; add Symptom E and post-update reconnection steps to `../../docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`. Elevated from Phase 2 backlog due to recurring operational impact.
+2. **Obsidian Bases: Inbox triage panel.** Scaffold one `.base` file under `_meta/bases/` using existing frontmatter fields (`pake_type`, `status`, `created`). No new data stores. Success: triage time under 5 minutes per session.
+3. **NotebookLM ingestion acceptance rules.** Before any code: draft the frontmatter contract for NotebookLM-sourced notes (`pake_type: SourceNote`, required `source_uri`, `confidence_score`, `creation_method: ai`). Story 10-1 smoke test is the scaffold.
+4. Keep directory `_README.md` manifests aligned with the folder contract as the vault grows.
 
-### Parking Lot (Acknowledged, Not Active)
+### Phase 2 Backlog (Sequenced, Not Active)
 
-- **Nexus (Discord bridge):** Dual-path coexistence with Vault IO is documented in **Section 5**. Stack and operator runbooks: `../../docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`, `../../docs/Nexus-Discord-Obsidian-Bridge-Operator-Guide.md`. **P3:** documentation complete for single-operator coexistence; further bridge work is Phase 2 product scope, not an undocumented gap in this constitution.
-- NotebookLM ingestion pipeline (Phase 2)
-- Obsidian Bases control panels (Phase 2)
+- Mobile read path: Tailscale + Blink Shell read-only; do not broaden mobile writes unless this constitution and `AI-Context/modules/mobile-posture.md` explicitly allow them
+- Thin local retrieval index: only after vault content density makes search a real pain point
+- Nexus full governance hardening: post-trust-guard fix
+- Mem0-class cross-tool memory: only if measured cross-session amnesia pain justifies it
+- Mobile write path: only after this constitution and `AI-Context/modules/mobile-posture.md` define a governed mobile write path
+
+### Parking Lot (Phase 3+)
+
 - OpenClaw autonomous daemon (Phase 3)
-- Mobile access workflow (Phase 2)
+- pgvector / Archon-class RAG (Phase 3)
 
 ---
 
@@ -242,6 +257,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - **About vault structure:** Check the `_README.md` in the relevant directory.
 - **About a note's schema:** Check `_meta/schemas/` for the relevant pake_type.
 - **About security policy:** Load `AI-Context/modules/security.md`.
+- **About mobile access or mobile writes:** Load `AI-Context/modules/mobile-posture.md`.
 - **About anything else:** Ask the user. One focused question, not a list.
 
 ### When Making Mistakes
@@ -263,6 +279,9 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-04-15 | 1.6.0 | Story 15-6: **Section 7** adds routing module pointer (`AI-Context/modules/routing.md`). **Section 8** marks multi-model routing (Epic 15) complete; removed from parking lot. |
+| 2026-04-14 | 1.5.0 | Story 13-1: **Section 5** adds **Mobile (distinct from Nexus and Vault IO)** (read-first posture, no direct mobile writes unless this constitution and module explicitly allow them, Tailscale + Blink Shell as named SSH read stack, pointer to `docs/mobile-vault-access-journey.md` and module). Canonical journey doc promoted to `docs/mobile-vault-access-journey.md`. Spec mirror and live vault copy synced. |
+| 2026-04-10 | 1.4.0 | **Section 8 rewritten:** Phase 1 marked complete (verify gate passes, 171 tests); Phase 2 Stack A declared; Nexus trust-guard elevated to Priority 1 (recurring operational pain on every Claude Code update); Obsidian Bases Inbox panel as Priority 2; NotebookLM ingestion acceptance rules as Priority 3; Phase 2 backlog sequenced; Phase 3+ items in parking lot. Spec mirror and live vault copy synced. |
 | 2026-04-05 | 1.3.0 | Story 8-1: **Section 5 Nexus** (trusted surface outside Vault IO; startup context; triage rule; IDE guidance); Vault IO audit and PAKE bullets scoped to MCP path; **Section 4** search scope guidance; **Section 6** logging scoped; parking lot points at §5 and P3 doc status; **Section 9** session checklist references **Section 8**. Planning mirror and vault `AI-Context/` copy synced to this file. |
 | 2026-04-02 | 1.2.0 | Post Epics 1–5: list Phase 1 MCP tools and six-field audit behaviour; point to `AUDIT-PLAYBOOK.md`; Section 7 reflects Epic 6 packaging and `deferred-work.md` triage before the verification gate. Live vault copy synced under `Knowledge-Vault-ACTIVE/AI-Context/`. |
 | 2026-04-02 | 1.1.1 | Canonical read boundary aligned with `modules/security.md` and Story 4-9: Vault IO reads use `realpath` before read IO; `VAULT_BOUNDARY` / `NOT_FOUND` semantics as in security module. |

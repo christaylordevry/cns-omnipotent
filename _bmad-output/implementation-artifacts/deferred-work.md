@@ -29,6 +29,35 @@
 
 ---
 
+## Brain service (Epic 12)
+
+### Nexus corpus exclusion by inbound path (12-8 finding)
+
+Story 12-8 attempted to add build-time path exclusion for Nexus-origin notes from
+`brain-index.json`. Investigation found no canonical Nexus inbound prefix exists in
+the vault — Nexus writes to any directory it chooses, with governance limited to
+`_README.md` manifest acknowledgements per `docs/architecture.md`.
+
+**Charter requirement status:** The "no silent promotion" requirement from the
+12-1 Brain scope charter is satisfied by the 12-7 quality floor: Nexus notes
+without PAKE quality metadata score `0.25` and cannot compete with triaged vault
+content at equivalent cosine similarity. Nexus notes *with* valid PAKE metadata
+were operator-triaged and belong in retrieval results.
+
+**Trigger to reopen:** If a canonical Nexus staging path is established (e.g.
+`00-Inbox/nexus/` or `_nexus-inbound/`) and documented in AGENTS.md Section 5
+and the Nexus operator guides, path-based build-time exclusion becomes feasible.
+Implementation is a single filter in `src/brain/build-index.ts` against the
+`CNS_NEXUS_INBOUND_PATH` env var (pattern already used by WriteGate for protected
+paths).
+
+**Alternatively:** If Nexus is updated to write `creation_method: nexus` frontmatter,
+the quality extractor in `src/brain/quality.ts` can key off that field instead of
+path, with no Nexus staging path required.
+
+**Class:** (b) Phase 2 backlog — reopen only if Nexus write behaviour is formalised
+or silent-promotion complaints arise in practice.
+
 ## Epic 6 intake (detail)
 
 ### `vault_move` Obsidian CLI success path (4-7 review)
@@ -128,6 +157,58 @@ Mutators now call `AuditLogger` / `appendRecord`; `vault_log_action` registered.
 Passes because errors throw before audit; fragile if audit moves earlier in the flow. **Accepted for Phase 1.**
 
 - **Class:** (c) (explicitly accepted debt; not blocking Epic 6 unless behaviour changes)
+
+---
+
+## Deferred from: code review of 12-1-brain-service-scope-charter-phase-21 (2026-04-13)
+
+- Nexus-origin note detection mechanism undefined: no reliable signal exists to identify Nexus-created notes at indexing time; needs a follow-on story to define markers (e.g., `creation_method: nexus` or `source_surface` frontmatter)
+- Non-markdown/binary files in candidate subtrees: charter does not scope file types for embedding; implementation detail for the embeddings pipeline story
+- `_README.md` contract manifests in included subtrees: could be embedded as knowledge content; needs implementation-level exclusion or explicit carve-out
+- No consistency model for concurrent mutation during index build: vault writes during indexing could cause mixed-state index; implementation concern for pipeline story
+- Embedding model version not in index manifest: model change silently invalidates all existing vectors; add model identifier to manifest spec in follow-on
+- `pake_type` filter behavior for unknown/missing types: notes with malformed, missing, or future `pake_type` values have no defined handling; schema evolution edge case
+- Query result provenance staleness after vault_move: path references in query results may become stale; solve in query API story
+- Operator allowlist placement vs. protected path exclusion: natural locations for Brain config (`_meta/`, `AI-Context/`) are both excluded by default, creating a bootstrapping problem; solve in allowlist contract story
+
+---
+
+## Deferred from: code review of story 13-1 (2026-04-13)
+
+- Tool count "9 tools" vs previously stated "8" — Section 8 claims 9 tools but repo CLAUDE.md and Phase 1 spec say eight standardized tools; verify which is correct
+- Date skew: AGENTS "Last updated: 2026-04-10" vs sprint-status "2026-04-13" — different clocks for different documents; define an authoritative timestamp policy (and/or regenerate derived timestamps from one source)
+
+---
+
+## Deferred from: code review of 14-1-multi-model-routing-pre-architecture-readout.md (2026-04-13)
+
+- (none — review `decision-needed` items were resolved; `patch` items were fixed in-repo)
+
+---
+
+## Deferred from: code review of story 13-1 (2026-04-13) — follow-ups
+
+- Mirror duplication tax — AGENTS.md and module files are duplicated across vault and specs/ trees; no mechanical enforcement of sync; consider a sync script or single-source-of-truth restructuring
+- Section 8 rewrite scope bundled with 13.1 diff — the uncommitted diff conflates Section 8 changes (likely from story 12.1) with 13.1 mobile work; should be committed separately
+- "171 tests" as a moving target — embedding a specific test count in AGENTS.md creates staleness risk on every test addition/deletion
+- Sprint-status adds epics 12-14 without corresponding planning artifacts in the diff — verify epics.md and story files exist for all tracked entries
+- Retros marked done (epics 9-11) without retro artifacts visible in the diff — confirm artifacts exist or reclassify as optional
+- Thin retrieval and Mem0 backlog items lack measurable acceptance gates — define objective thresholds before these enter active sprint
+- specs/cns-vault-contract/README.md files table doesn't mention mobile-posture module — extend modules listing when README is next updated
+- AGENTS "Adding New Modules" boilerplate doesn't acknowledge mobile module already exists — consider rewording the forward-looking text
+
+---
+
+## Deferred from: code review of 12-5-index-manifest-and-drift-signals (2026-04-14)
+
+- Persist per-file index-time `mtimeMs` values in the manifest so future consumers can compare a specific file's current mtime against the indexed value, not only global freshness aggregates
+
+---
+
+## Deferred from: code review of 12-6-retrieval-query-api-read-only (2026-04-15)
+
+- CLI always uses StubEmbedder — `query-index-cli.ts` hardcodes `new StubEmbedder()`; running `npm run brain:query` against a real-embedder-built index produces meaningless scores. Wire a real embedder adapter when the production embedder story ships.
+- No path normalization or vault-relative validation on result paths — results return `rec.path` verbatim from the index artifact; if the index contains absolute or non-POSIX paths they pass through. Trust boundary belongs to the indexing pipeline (Story 12.4), not this read-only layer.
 
 ---
 
