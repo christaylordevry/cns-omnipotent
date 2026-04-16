@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.6.0 | Last updated: 2026-04-15  
+> Version: 1.7.0 | Last updated: 2026-04-16  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -199,6 +199,7 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | NotebookLM workflow | `AI-Context/modules/notebooklm-workflow.md` | NotebookLM queries, source_add, cross-notebook research, InsightNote landing, vault export script |
 | Mobile posture      | `AI-Context/modules/mobile-posture.md`      | Any question about mobile access, or any suggestion that mobile is a write surface               |
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
+| Context7            | MCP tool (auto-invoked)                     | Any code generation, library usage, API docs, setup or configuration steps |
 
 ### How to Load a Module
 
@@ -258,6 +259,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - **About a note's schema:** Check `_meta/schemas/` for the relevant pake_type.
 - **About security policy:** Load `AI-Context/modules/security.md`.
 - **About mobile access or mobile writes:** Load `AI-Context/modules/mobile-posture.md`.
+- **Context7:** Always invoke the Context7 MCP tools automatically when generating code or answering questions about libraries, APIs, or configuration. Do not wait for the user to type `use context7`.
 - **About anything else:** Ask the user. One focused question, not a list.
 
 ### When Making Mistakes
@@ -279,6 +281,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-04-16 | 1.7.0 | **Section 7** adds Context7 (MCP, auto-invoked). **Section 9** adds Context7 auto-invoke rule under **When Uncertain**. |
 | 2026-04-15 | 1.6.0 | Story 15-6: **Section 7** adds routing module pointer (`AI-Context/modules/routing.md`). **Section 8** marks multi-model routing (Epic 15) complete; removed from parking lot. |
 | 2026-04-14 | 1.5.0 | Story 13-1: **Section 5** adds **Mobile (distinct from Nexus and Vault IO)** (read-first posture, no direct mobile writes unless this constitution and module explicitly allow them, Tailscale + Blink Shell as named SSH read stack, pointer to `docs/mobile-vault-access-journey.md` and module). Canonical journey doc promoted to `docs/mobile-vault-access-journey.md`. Spec mirror and live vault copy synced. |
 | 2026-04-10 | 1.4.0 | **Section 8 rewritten:** Phase 1 marked complete (verify gate passes, 171 tests); Phase 2 Stack A declared; Nexus trust-guard elevated to Priority 1 (recurring operational pain on every Claude Code update); Obsidian Bases Inbox panel as Priority 2; NotebookLM ingestion acceptance rules as Priority 3; Phase 2 backlog sequenced; Phase 3+ items in parking lot. Spec mirror and live vault copy synced. |
