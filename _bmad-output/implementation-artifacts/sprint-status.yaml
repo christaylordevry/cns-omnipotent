@@ -135,7 +135,7 @@ development_status:
   15-1-policy-schema-and-model-alias-registry: done
   15-2-routing-decision-engine: done
   15-3-surface-adapters: done
-  15-4-gemini-cli-adapter: review
+  15-4-gemini-cli-adapter: done
   15-5-fallback-orchestration: done
   15-6-operator-override-governance-controls: done
   epic-15-retrospective: done
