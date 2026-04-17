@@ -8,3 +8,12 @@ alwaysApply: true
 This repository implements CNS Phase 1. Treat `specs/cns-vault-contract/AGENTS.md` as the vault constitution mirror. For detailed Vault IO and security policy, read `specs/cns-vault-contract/modules/` when relevant.
 
 **Mutation audit trail (Story 5.2):** When changing logging, `vault_log_action`, or mutator success paths, treat `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md` as bound spec (also referenced from `specs/cns-vault-contract/CNS-Phase-1-Spec.md` and `specs/cns-vault-contract/modules/security.md`).
+
+## AGENTS.md sync rule
+
+Whenever you edit `AGENTS.md` in this repo, you MUST update **both** copies in the same operation:
+
+1. `specs/cns-vault-contract/AGENTS.md` (repo mirror)
+2. `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` (canonical vault)
+
+Never commit or save changes to one without updating the other. Both copies must be identical after every edit. Confirm both files match before committing.
