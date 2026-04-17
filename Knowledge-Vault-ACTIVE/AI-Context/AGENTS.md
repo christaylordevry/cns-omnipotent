@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.7.0 | Last updated: 2026-04-16  
+> Version: 1.8.0 | Last updated: 2026-04-16  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -218,29 +218,28 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Project Status
 
-- **CNS Phase 1: COMPLETE.** All epics (1–11) shipped and verified. Vault folder contract, AGENTS.md constitution, and Vault IO MCP layer (9 tools) are done. `scripts/verify.sh` passes: 171 tests, lint, typecheck, and build clean as of 2026-04-10. Normative spec: `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`.
-- **CNS Phase 2: Stack A declared.** Adoption sequence: Nexus stability first, then Obsidian Bases (Inbox triage), then NotebookLM ingestion, then mobile read path, then thin retrieval only when vault content density justifies it.
-- **CNS Phase 3 routing: COMPLETE.** Multi-model routing (Epic 15) shipped: policy schema, model alias registry, routing decision engine, three surface adapters (Cursor, Claude Code, Gemini CLI), fallback orchestrator, version guard, vault audit trail. Config: `config/model-routing/`. Module: `AI-Context/modules/routing.md`.
+- **CNS Phase 1: COMPLETE.** Epics 1–7.
+- **CNS Phase 2: COMPLETE.** Epics 8–13.
+- **CNS Phase 3: COMPLETE.** Epics 14–15. Multi-model routing layer shipped. 315 tests, verify.sh green as of 2026-04-16.
 
 ### Current Priorities
 
-1. **Nexus trust-guard (active pain).** The Nexus Discord bot breaks on every Claude Code update, requiring manual reconnection. Fix: update `nexus-discord-trust-guard.sh` (NEXUS repo) to detect `needs_configure` state after updates; add Symptom E and post-update reconnection steps to `../../docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`. Elevated from Phase 2 backlog due to recurring operational impact.
-2. **Obsidian Bases: Inbox triage panel.** Scaffold one `.base` file under `_meta/bases/` using existing frontmatter fields (`pake_type`, `status`, `created`). No new data stores. Success: triage time under 5 minutes per session.
-3. **NotebookLM ingestion acceptance rules.** Before any code: draft the frontmatter contract for NotebookLM-sourced notes (`pake_type: SourceNote`, required `source_uri`, `confidence_score`, `creation_method: ai`). Story 10-1 smoke test is the scaffold.
-4. Keep directory `_README.md` manifests aligned with the folder contract as the vault grows.
+1. **Context7 live on all surfaces.** Claude Code, Gemini CLI, Cursor all connected. Auto-invoke rule in AGENTS.md v1.7.0.
+2. **Nexus trust-guard hardened.** Model pinned to claude-sonnet-4-6 in nexus-discord-bridge.sh. model_error auto-recovery added to trust-guard. Committed in NEXUS repo (318f82b).
+3. **AGENTS.md Section 8 maintenance.** Keep this section current after each session.
 
 ### Phase 2 Backlog (Sequenced, Not Active)
 
-- Mobile read path: Tailscale + Blink Shell read-only; do not broaden mobile writes unless this constitution and `AI-Context/modules/mobile-posture.md` explicitly allow them
-- Thin local retrieval index: only after vault content density makes search a real pain point
-- Nexus full governance hardening: post-trust-guard fix
-- Mem0-class cross-tool memory: only if measured cross-session amnesia pain justifies it
-- Mobile write path: only after this constitution and `AI-Context/modules/mobile-posture.md` define a governed mobile write path
+- Mobile read path: Tailscale + Blink Shell (next meaningful phase)
+- Context7 ↔ CNS repo indexing via GitHub (low effort, revisit when repo visibility decided)
+- Context7 ↔ Brain service deeper integration (planning session needed)
+- Nexus full governance hardening (post-trust-guard stabilisation)
 
 ### Parking Lot (Phase 3+)
 
 - OpenClaw autonomous daemon (Phase 3)
 - pgvector / Archon-class RAG (Phase 3)
+- nexus-discord-trust-guard.sh watchdog automation (auto-run on WSL startup)
 
 ---
 
@@ -281,6 +280,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-04-16 | 1.8.0 | Phase 3 complete; Context7 on all surfaces; Nexus model-pin fix documented |
 | 2026-04-16 | 1.7.0 | **Section 7** adds Context7 (MCP, auto-invoked). **Section 9** adds Context7 auto-invoke rule under **When Uncertain**. |
 | 2026-04-15 | 1.6.0 | Story 15-6: **Section 7** adds routing module pointer (`AI-Context/modules/routing.md`). **Section 8** marks multi-model routing (Epic 15) complete; removed from parking lot. |
 | 2026-04-14 | 1.5.0 | Story 13-1: **Section 5** adds **Mobile (distinct from Nexus and Vault IO)** (read-first posture, no direct mobile writes unless this constitution and module explicitly allow them, Tailscale + Blink Shell as named SSH read stack, pointer to `docs/mobile-vault-access-journey.md` and module). Canonical journey doc promoted to `docs/mobile-vault-access-journey.md`. Spec mirror and live vault copy synced. |
