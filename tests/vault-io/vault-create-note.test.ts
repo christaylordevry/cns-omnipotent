@@ -70,6 +70,38 @@ describe("vault create routing helpers", () => {
 });
 
 describe("vaultCreateNote", () => {
+  it("buildVaultCreateNoteMarkdown includes optional ai_summary", () => {
+    const { markdown } = buildVaultCreateNoteMarkdown({
+      title: "T",
+      content: "c",
+      pake_type: "SourceNote",
+      tags: [],
+      ai_summary: "Short summary.",
+    });
+    expect(markdown).toContain("ai_summary:");
+    expect(markdown).toContain("Short summary.");
+  });
+
+  it("suppressAudit skips agent-log line for vault_create_note", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-create-sa-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+
+    await vaultCreateNote(
+      vaultRoot,
+      {
+        title: "No Audit Line",
+        content: "# Body",
+        pake_type: "SourceNote",
+        tags: [],
+      },
+      { surface: "vitest", suppressAudit: true },
+    );
+
+    await expect(readFile(path.join(vaultRoot, "_meta", "logs", "agent-log.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("creates a SourceNote under 03-Resources with valid PAKE and readable body", async () => {
     const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-create-"));
     await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });

@@ -30,11 +30,15 @@ export type VaultCreateNoteInput = {
   project?: string;
   /** WorkflowNote: area folder under 02-Areas/ when project is absent */
   area?: string;
+  /** Optional AI summary (PAKE optional field). */
+  ai_summary?: string | undefined;
 };
 
 /** MCP / host surface identifier for audit lines; default `unknown`. */
 export type VaultCreateNoteOptions = {
   surface?: string | undefined;
+  /** When true, skip append-only audit line (caller logs a higher-level action, e.g. ingest). */
+  suppressAudit?: boolean | undefined;
 };
 
 function normalizeAbsolute(p: string): string {
@@ -92,18 +96,20 @@ export async function vaultCreateNoteFromMarkdown(
     }
     await unlink(tmpPath);
 
-    const pakeType = frontmatter.pake_type;
-    const titleVal = frontmatter.title;
-    await appendRecord(vaultRoot, {
-      action: "create",
-      tool: "vault_create_note",
-      surface,
-      targetPath: posixRel,
-      payloadInput: {
-        pake_type: typeof pakeType === "string" ? pakeType : String(pakeType),
-        title: typeof titleVal === "string" ? titleVal : String(titleVal),
-      },
-    });
+    if (!options.suppressAudit) {
+      const pakeType = frontmatter.pake_type;
+      const titleVal = frontmatter.title;
+      await appendRecord(vaultRoot, {
+        action: "create",
+        tool: "vault_create_note",
+        surface,
+        targetPath: posixRel,
+        payloadInput: {
+          pake_type: typeof pakeType === "string" ? pakeType : String(pakeType),
+          title: typeof titleVal === "string" ? titleVal : String(titleVal),
+        },
+      });
+    }
   } catch (e: unknown) {
     try {
       await unlink(tmpPath);
@@ -210,6 +216,9 @@ export function buildVaultCreateNoteMarkdown(input: VaultCreateNoteInput): {
   }
   if (input.source_uri !== undefined) {
     lines.push(`source_uri: ${yamlScalarString(input.source_uri)}`);
+  }
+  if (input.ai_summary !== undefined) {
+    lines.push(`ai_summary: ${yamlScalarString(input.ai_summary)}`);
   }
   lines.push("---", "", input.content);
   let markdown = lines.join("\n");

@@ -5,6 +5,9 @@ import { CnsError } from "./errors.js";
 /** Vault-relative path to the append-only agent audit log (Epic 5). */
 export const AUDIT_AGENT_LOG_VAULT_REL = "_meta/logs/agent-log.md";
 
+/** Append-only ingest index (Phase 4 ingest pipeline). */
+export const INGEST_INDEX_VAULT_REL = "_meta/ingest-index.md";
+
 export type WritePurpose = "tool-write" | "audit-append";
 
 export type WriteOperation = "create" | "overwrite" | "append" | "delete" | "mkdir" | "rename";
@@ -163,6 +166,10 @@ export function assertWriteAllowed(
 
   if (isUnderMetaSchemas(posixRel)) {
     throw protectedPath("Writes under _meta/schemas/ are not allowed.", posixRel);
+  }
+
+  if (posixRel === INGEST_INDEX_VAULT_REL && (operation === "append" || operation === "create")) {
+    return;
   }
 
   if (isUnderMeta(posixRel)) {

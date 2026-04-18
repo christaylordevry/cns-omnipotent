@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { assertWriteAllowed, AUDIT_AGENT_LOG_VAULT_REL } from "../../src/write-gate.js";
+import {
+  assertWriteAllowed,
+  AUDIT_AGENT_LOG_VAULT_REL,
+  INGEST_INDEX_VAULT_REL,
+} from "../../src/write-gate.js";
 
 function resolved(vaultRoot: string, ...segments: string[]): string {
   return path.normalize(path.resolve(vaultRoot, ...segments));
@@ -45,6 +49,17 @@ describe("write gate", () => {
     expect(() => assertWriteAllowed(vaultRoot, target)).toThrowError(
       expect.objectContaining({ code: "PROTECTED_PATH" }),
     );
+  });
+
+  it("allows create/append on ingest index path under _meta", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-write-"));
+    const target = resolved(vaultRoot, ...INGEST_INDEX_VAULT_REL.split("/"));
+    expect(() =>
+      assertWriteAllowed(vaultRoot, target, { purpose: "tool-write", operation: "create" }),
+    ).not.toThrow();
+    expect(() =>
+      assertWriteAllowed(vaultRoot, target, { purpose: "tool-write", operation: "append" }),
+    ).not.toThrow();
   });
 
   it("denies writes under _meta/logs except audit-append to agent-log.md", async () => {
