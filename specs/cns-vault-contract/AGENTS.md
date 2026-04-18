@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.8.0 | Last updated: 2026-04-16  
+> Version: 1.9.1 | Last updated: 2026-04-18  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -164,6 +164,7 @@ Never write outside the vault, store secrets, delete without approval, run bulk 
 - **Same startup context:** The launcher uses the vault as working directory. Root **`CLAUDE.md`** points agents at **`AI-Context/AGENTS.md`**, so behavioral rules in this file still apply to Nexus sessions.
 - **Incomplete notes:** Nexus-created notes **may omit full PAKE frontmatter**. Treat them like **`00-Inbox/`** captures until triaged into canonical PAKE shape. Do not assume every file in governed folders was created through Vault IO or passed WriteGate.
 - **IDE agents:** Prefer Vault IO MCP tools for mutations when configured. Do not bypass Vault IO to mimic Nexus.
+- **Tier 1 MCP routing:** Nexus sessions follow the same Tier 1 tool routing and Section 9 rules as IDE agents (Firecrawl, Perplexity, Apify when configured). Nexus filesystem writes remain outside Vault IO governance as above.
 
 ### Mobile (distinct from Nexus and Vault IO)
 
@@ -200,6 +201,9 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Mobile posture      | `AI-Context/modules/mobile-posture.md`      | Any question about mobile access, or any suggestion that mobile is a write surface               |
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
 | Context7            | MCP tool (auto-invoked)                     | Any code generation, library usage, API docs, setup or configuration steps |
+| Firecrawl           | MCP tool (Tier 1)                           | Scrape, crawl, map, or extract web content for research ingestion or source capture                 |
+| Perplexity          | MCP tool (Tier 1)                           | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
+| Apify               | MCP tool (Tier 1)                           | Apify Actors, RAG web browser, Apify Store scrapers; runs, datasets, and docs via hosted MCP      |
 
 ### How to Load a Module
 
@@ -221,11 +225,12 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - **CNS Phase 1: COMPLETE.** Epics 1–7.
 - **CNS Phase 2: COMPLETE.** Epics 8–13.
 - **CNS Phase 3: COMPLETE.** Epics 14–15. Multi-model routing layer shipped. 315 tests, verify.sh green as of 2026-04-16.
+- **CNS Phase 4: IN PROGRESS.** Tier 1 MCP stack (Firecrawl, Perplexity, Apify) and automated ingest pipeline (spec then implementation). Do not start agent chains or brand foundation until Tier 1 MCP is tested with real queries.
 
 ### Current Priorities
 
-1. **Context7 live on all surfaces.** Claude Code, Gemini CLI, Cursor all connected. Auto-invoke rule in AGENTS.md v1.7.0.
-2. **Nexus trust-guard hardened.** Model pinned to claude-sonnet-4-6 in nexus-discord-bridge.sh. model_error auto-recovery added to trust-guard. Committed in NEXUS repo (318f82b).
+1. **Epic 16 Tier 1 MCP (stories 16-1 to 16-3).** Install and configure Firecrawl, Perplexity, and Apify per story files in `_bmad-output/implementation-artifacts/`. Each story closes only after a **successful live tool call** through the MCP server (not only CLI registration or green `claude mcp list`). Keys: Perplexity API at [pplx.ai](https://pplx.ai) (not included in Pro subscription); `FIRECRAWL_API_KEY`; Apify token or OAuth for `https://mcp.apify.com`. Wire into Claude Code (`claude mcp` user scope) and Cursor (`~/.cursor/mcp.json`).
+2. **Epic 16 automated ingest (story 16-4).** Implement after 16-1 to 16-3: `specs/cns-vault-contract/CNS-Phase-4-Automated-Ingest-Pipeline-Spec.md` and vault routing for `00-Inbox/`, PAKE, master index.
 3. **AGENTS.md Section 8 maintenance.** Keep this section current after each session.
 
 ### Phase 2 Backlog (Sequenced, Not Active)
@@ -259,6 +264,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - **About security policy:** Load `AI-Context/modules/security.md`.
 - **About mobile access or mobile writes:** Load `AI-Context/modules/mobile-posture.md`.
 - **Context7:** Always invoke the Context7 MCP tools automatically when generating code or answering questions about libraries, APIs, or configuration. Do not wait for the user to type `use context7`.
+- **Perplexity:** Use the Perplexity MCP when the question requires current market data, competitor intelligence, real-time search results, or information that may have changed in the last 30 days. Do not use it for questions answerable from vault content or established technical documentation (use vault search and Context7 or static docs first).
 - **About anything else:** Ask the user. One focused question, not a list.
 
 ### When Making Mistakes
@@ -280,6 +286,8 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-04-18 | 1.9.1 | **Section 5:** Tier 1 MCP routing for Nexus (same rules as IDE). **Section 9:** Perplexity negative guard (vault and established docs first). **Section 8:** Epic 16 story pointers; live tool-call bar for Tier 1 MCP. |
+| 2026-04-18 | 1.9.0 | **Section 7:** Tier 1 MCP rows (Firecrawl, Perplexity, Apify). **Section 9:** Perplexity routing rule. **Section 8:** Phase 4 in progress; priorities aligned to MCP verification and ingest pipeline spec. |
 | 2026-04-16 | 1.8.0 | Phase 3 complete; Context7 on all surfaces; Nexus model-pin fix documented |
 | 2026-04-16 | 1.7.0 | **Section 7** adds Context7 (MCP, auto-invoked). **Section 9** adds Context7 auto-invoke rule under **When Uncertain**. |
 | 2026-04-15 | 1.6.0 | Story 15-6: **Section 7** adds routing module pointer (`AI-Context/modules/routing.md`). **Section 8** marks multi-model routing (Epic 15) complete; removed from parking lot. |
