@@ -10,7 +10,6 @@ import {
   runHookAgent,
   synthesisRunResultSchema,
   type HookGenerationAdapter,
-  type HookGenerationAdapterInput,
   type HookRunResult,
 } from "../../src/agents/hook-agent.js";
 import type { SynthesisRunResult as SynthResult } from "../../src/agents/synthesis-agent.js";

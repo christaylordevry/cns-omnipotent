@@ -34,6 +34,40 @@ export const HOOK_SLOT_COUNT = 4 as const;
 export const MIN_HOOK_ITERATIONS = 3;
 export const MAX_HOOK_ITERATIONS = 20;
 
+/** Shape of a single settled hook slot (final text + per-iteration score trace). */
+export const hookSlotResultSchema = z.object({
+  slot: z.number().int().min(1),
+  final_hook: z.string().min(1),
+  iterations: z.number().int().min(1),
+  trace: z.array(
+    z.object({
+      iteration: z.number().int().min(1),
+      score: z.number().int().min(1).max(10),
+    }),
+  ),
+});
+
+/**
+ * Discriminated union for the Hook Agent's run result. Exported so downstream
+ * agents (e.g. Boss Agent, 17-5) can validate `unknown` input with a single
+ * source of truth rather than mirroring the shape.
+ */
+export const hookRunResultSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ok"),
+    hook_set_note: z.object({ vault_path: z.string(), pake_id: z.string() }),
+    synthesis_insight_path: z.string(),
+    options: z.array(hookSlotResultSchema),
+    hook_timestamp: z.string(),
+  }),
+  z.object({
+    status: z.literal("skipped"),
+    reason: z.enum(["synthesis-skipped", "synthesis-read-failed"]),
+    synthesis_skip_reason: synthesisSkipReasonSchema.optional(),
+    hook_timestamp: z.string(),
+  }),
+]);
+
 export type HookGenerationAdapterInput = {
   synthesis_body: string;
   synthesis_vault_path: string;

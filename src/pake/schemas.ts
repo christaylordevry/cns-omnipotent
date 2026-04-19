@@ -12,6 +12,7 @@ export const PAKE_TYPE_VALUES = [
   "SourceNote",
   "InsightNote",
   "HookSetNote",
+  "WeaponsCheckNote",
   "SynthesisNote",
   "WorkflowNote",
   "ValidationNote",
