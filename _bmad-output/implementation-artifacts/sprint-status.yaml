@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-04-18T20:00:00Z"
+last_updated: "2026-04-18T23:05:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -146,3 +146,11 @@ development_status:
   16-3-apify-mcp-install-and-live-tool-call-verification: done
   16-4-automated-ingest-pipeline-inbox-classification-pake-index: done
   epic-16-retrospective: done
+
+  epic-17: in-progress # agency first product: content research agent chain
+  17-1-perplexity-mcp-install-and-live-tool-call-verification: backlog # blocked on API key
+  17-2-research-agent-firecrawl-apify-sweep: done
+  17-3-synthesis-agent-patterns-gaps-opportunities: backlog
+  17-4-hook-agent-4-options-3-iterations-gate: backlog
+  17-5-boss-agent-weapons-check-novelty-and-copy-intensity: backlog
+  17-6-answer-filing-insight-synthesis-notes: backlog

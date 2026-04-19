@@ -212,6 +212,15 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 17-2-research-agent-firecrawl-apify-sweep (2026-04-18)
+
+- AC2 “scrape each URL” vs depth modes — story Implementation Guide documents snippet vs full scrape by depth; implementation matches the guide; AC2 prose is tighter than the guide.
+- ~~Query-level Firecrawl/Apify adapter throws leave no `notes_skipped` manifest row~~ — **Resolved in 17-2 (2026-04-18):** synthetic `urn:cns:research-sweep:{firecrawl|apify}:query:…` entries with `fetch_error`.
+- `perplexity_skipped === false` means the probe call succeeded, not that any note has `source: "perplexity"` — document for Story 17-3 synthesis handoff.
+- Apify text-only ingests can yield `notes_skipped[].source_uri === ""` — text sources have no canonical URI; consumers should tolerate empty strings.
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.
