@@ -10,6 +10,7 @@ import {
   apifySweep,
   firecrawlQueryAdapterFailureUri,
   apifyQueryAdapterFailureUri,
+  perplexityAnswerSourceUri,
   type ApifyAdapter,
   type FirecrawlAdapter,
   type ResearchBrief,
@@ -358,6 +359,7 @@ describe("AC: perplexity-stub — graceful degradation", () => {
       adapters: { perplexity },
     });
     expect(result.perplexity_skipped).toBe(true);
+    expect(result.perplexity_answers_filed).toBe(0);
   });
 
   it("orchestrator sets perplexity_skipped=false when slot succeeds", async () => {
@@ -372,6 +374,8 @@ describe("AC: perplexity-stub — graceful degradation", () => {
       adapters: { perplexity },
     });
     expect(result.perplexity_skipped).toBe(false);
+    expect(result.perplexity_answers_filed).toBe(1);
+    expect(result.notes_created.filter((n) => n.source === "perplexity").length).toBe(1);
   });
 
   it("orchestrator does not throw when perplexity is unavailable", async () => {
@@ -437,6 +441,7 @@ describe("AC: manifest — ResearchSweepResult shape", () => {
     expect(Array.isArray(result.notes_created)).toBe(true);
     expect(Array.isArray(result.notes_skipped)).toBe(true);
     expect(typeof result.perplexity_skipped).toBe("boolean");
+    expect(typeof result.perplexity_answers_filed).toBe("number");
     expect(result.sweep_timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     expect(result.notes_created.length).toBe(2);
     expect(researchSweepResultSchema.safeParse(result).success).toBe(true);
@@ -527,6 +532,7 @@ describe("AC: tests — composite scenarios", () => {
     expect(result.notes_created.length).toBe(4);
     expect(result.notes_created.filter((n) => n.source === "firecrawl").length).toBe(2);
     expect(result.notes_created.filter((n) => n.source === "apify").length).toBe(2);
+    expect(result.perplexity_answers_filed).toBe(0);
   });
 
   it("Firecrawl succeeds, Apify adapter throws for all queries", async () => {
@@ -616,5 +622,137 @@ describe("AC: tests — composite scenarios", () => {
 
     expect(directApify.created.length).toBe(1);
     expect(directApify.created[0].source).toBe("apify");
+  });
+});
+
+// ── AC: answer-filing (17-6) ────────────────────────────────────────────────
+
+describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () => {
+  it("does not file answers when perplexity probe skips", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity = makeAvailablePerplexity();
+    const result = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    expect(result.perplexity_skipped).toBe(true);
+    expect(result.perplexity_answers_filed).toBe(0);
+    expect(result.notes_created.filter((n) => n.source === "perplexity")).toEqual([]);
+  });
+
+  it("files InsightNote when one sweep source matches citations", async () => {
+    const vaultRoot = await makeVault();
+    const fc = makeFirecrawl({
+      search: async () => [
+        { url: "https://example.com/only-one", title: "O", snippet: "body only" },
+      ],
+    });
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return {
+          answer: "Synthesised from one hit.",
+          citations: ["https://example.com/only-one"],
+        };
+      },
+    };
+    const result = await runResearchAgent(vaultRoot, validBrief(), {
+      adapters: { firecrawl: fc, perplexity },
+    });
+    expect(result.perplexity_answers_filed).toBe(1);
+    const pNote = result.notes_created.find((n) => n.source === "perplexity");
+    expect(pNote).toBeDefined();
+    const raw = await readFile(path.join(vaultRoot, ...pNote!.vault_path.split("/")), "utf8");
+    expect(raw).toContain("pake_type: InsightNote");
+    expect(raw).toContain("## Linked vault sources");
+    expect(raw).toMatch(/\[\[[^\]]+\]\]/);
+  });
+
+  it("files SynthesisNote when two distinct sweep SourceNotes match citations", async () => {
+    const vaultRoot = await makeVault();
+    const fc = makeFirecrawl({
+      search: async () => [
+        { url: "https://example.com/a", title: "A", snippet: "body a" },
+        { url: "https://example.com/b", title: "B", snippet: "body b" },
+      ],
+    });
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return {
+          answer: "Cross-cutting answer.",
+          citations: ["https://example.com/a", "https://example.com/b"],
+        };
+      },
+    };
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["single-query"] }), {
+      adapters: { firecrawl: fc, perplexity },
+    });
+    expect(result.perplexity_answers_filed).toBe(1);
+    const pNote = result.notes_created.find((n) => n.source === "perplexity");
+    expect(pNote).toBeDefined();
+    const raw = await readFile(path.join(vaultRoot, ...pNote!.vault_path.split("/")), "utf8");
+    expect(raw).toContain("pake_type: SynthesisNote");
+  });
+
+  it("includes perplexity_answers_filed in research_sweep audit payload", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return { answer: "Audited answer.", citations: [] };
+      },
+    };
+    await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    const logBody = await readFile(path.join(vaultRoot, "_meta", "logs", "agent-log.md"), "utf8");
+    expect(logBody).toContain("perplexity_answers_filed");
+  });
+
+  it("second sweep surfaces duplicate for same Perplexity provenance_uri", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return { answer: "Stable answer.", citations: [] };
+      },
+    };
+    const first = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    expect(first.perplexity_answers_filed).toBe(1);
+    const second = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    expect(second.perplexity_answers_filed).toBe(0);
+    expect(
+      second.notes_skipped.some(
+        (s) =>
+          s.reason === "duplicate" &&
+          s.source_uri === perplexityAnswerSourceUri(validBrief().queries[0]),
+      ),
+    ).toBe(true);
+  });
+
+  it("whitespace-only answers do not ingest", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return { answer: "   \n\t  ", citations: [] };
+      },
+    };
+    const result = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    expect(result.perplexity_answers_filed).toBe(0);
+  });
+
+  it("per-query search throw records fetch_error without blocking other queries", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search(q) {
+        if (q === "second") throw new CnsError("UNSUPPORTED", "simulated failure");
+        return { answer: `Answer for ${q}`, citations: [] };
+      },
+    };
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["first", "second"] }),
+      { adapters: { perplexity } },
+    );
+    expect(result.perplexity_answers_filed).toBe(1);
+    expect(result.notes_skipped.some((s) => s.reason === "fetch_error")).toBe(true);
   });
 });

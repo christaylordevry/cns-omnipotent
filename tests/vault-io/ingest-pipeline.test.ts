@@ -70,6 +70,10 @@ describe("resolvePakeType (AC: classify)", () => {
   it("respects ingest_as: HookSetNote override", () => {
     expect(resolvePakeType("text", { ingest_as: "HookSetNote" })).toBe("HookSetNote");
   });
+
+  it("respects ingest_as: SynthesisNote override", () => {
+    expect(resolvePakeType("text", { ingest_as: "SynthesisNote" })).toBe("SynthesisNote");
+  });
 });
 
 // ── Normalize helpers ─────────────────────────────────────────────────────────
@@ -201,6 +205,31 @@ describe("runIngestPipeline end-to-end", () => {
 
     const content = await readFile(path.join(vaultRoot, ...result.vault_path.split("/")), "utf8");
     expect(content).toContain("pake_type: HookSetNote");
+  });
+
+  it("AC: validate — raw text with provenance_uri dedupes on second ingest", async () => {
+    const vaultRoot = await makeVault();
+    const prov = "urn:cns:test:provenance:dedupe-1";
+    const first = await runIngestPipeline(vaultRoot, {
+      input: "# First\n\nBody one.",
+      source_type: "text",
+      provenance_uri: prov,
+      ingest_as: "InsightNote",
+      title_hint: "Provenance Dedupe",
+    });
+    expect(first.status).toBe("ok");
+
+    const second = await runIngestPipeline(vaultRoot, {
+      input: "# Second\n\nDifferent body.",
+      source_type: "text",
+      provenance_uri: prov,
+      ingest_as: "InsightNote",
+      title_hint: "Provenance Dedupe",
+    });
+    expect(second.status).toBe("duplicate");
+    if (second.status === "duplicate") {
+      expect(second.source_uri).toBe(prov);
+    }
   });
 
   it("AC: index — master index is created and contains the ingested note row", async () => {

@@ -48,6 +48,7 @@ function validSweep(overrides: Partial<ResearchSweepResult> = {}): ResearchSweep
     ],
     notes_skipped: [],
     perplexity_skipped: true,
+    perplexity_answers_filed: 0,
     sweep_timestamp: "2026-04-18T22:00:00.000Z",
     ...overrides,
   };
@@ -568,6 +569,7 @@ describe("AC: tests — default adapters behavior", () => {
       ],
       notes_skipped: [],
       perplexity_skipped: true,
+      perplexity_answers_filed: 0,
       sweep_timestamp: "2026-04-18T22:00:00.000Z",
     };
     const result = await runSynthesisAgent(vaultRoot, sweep, {

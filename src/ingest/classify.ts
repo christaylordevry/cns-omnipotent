@@ -17,7 +17,12 @@ export function stripQueryAndFragment(s: string): string {
 /** Caller-supplied ingest options (pipeline stage 1 — Intent). */
 export type IngestOptions = {
   /** Explicit `pake_type` override; defaults to SourceNote for url/pdf, SourceNote for text. */
-  ingest_as?: Extract<PakeType, "SourceNote" | "InsightNote" | "HookSetNote" | "WeaponsCheckNote"> | undefined;
+  ingest_as?:
+    | Extract<
+        PakeType,
+        "SourceNote" | "InsightNote" | "SynthesisNote" | "HookSetNote" | "WeaponsCheckNote"
+      >
+    | undefined;
   /** Tags to attach (pipeline always appends "ingest"). */
   tags?: string[] | undefined;
   /** Pre-computed AI summary to store as `ai_summary`. */
@@ -51,7 +56,10 @@ export function classifySource(input: string): SourceType {
 export function resolvePakeType(
   sourceType: SourceType,
   opts: IngestOptions,
-): Extract<PakeType, "SourceNote" | "InsightNote" | "HookSetNote" | "WeaponsCheckNote"> {
+): Extract<
+  PakeType,
+  "SourceNote" | "InsightNote" | "SynthesisNote" | "HookSetNote" | "WeaponsCheckNote"
+> {
   if (opts.ingest_as !== undefined) return opts.ingest_as;
   // Default: SourceNote for all source types (raw capture semantics)
   return "SourceNote";

@@ -1,7 +1,12 @@
+import path from "node:path";
 import { z } from "zod";
 import { appendRecord } from "../audit/audit-logger.js";
 import { runIngestPipeline, type IngestResult } from "../ingest/pipeline.js";
-import { createPerplexitySlot, type PerplexitySlot } from "./perplexity-slot.js";
+import {
+  createPerplexitySlot,
+  type PerplexityResult,
+  type PerplexitySlot,
+} from "./perplexity-slot.js";
 
 export const researchBriefSchema = z.object({
   topic: z.string().min(1),
@@ -37,6 +42,8 @@ export const researchSweepResultSchema = z.object({
   notes_created: z.array(createdNoteSchema),
   notes_skipped: z.array(skippedNoteSchema),
   perplexity_skipped: z.boolean(),
+  /** Count of Perplexity answers successfully filed as InsightNote/SynthesisNote this sweep. */
+  perplexity_answers_filed: z.number().int().min(0),
   sweep_timestamp: z.string(),
 });
 export type ResearchSweepResult = z.infer<typeof researchSweepResultSchema>;
@@ -49,6 +56,11 @@ export function firecrawlQueryAdapterFailureUri(query: string): string {
 /** Synthetic `source_uri` when the Apify rag-web-browser adapter throws for a query. */
 export function apifyQueryAdapterFailureUri(query: string): string {
   return `urn:cns:research-sweep:apify:query:${encodeURIComponent(query)}`;
+}
+
+/** Synthetic `source_uri` / provenance for a filed Perplexity answer (one per brief query). */
+export function perplexityAnswerSourceUri(query: string): string {
+  return `urn:cns:research-sweep:perplexity:answer:${encodeURIComponent(query)}`;
 }
 
 function sweepBaseTags(brief: ResearchBrief, sweepLabel: "research-sweep" | "apify-sweep"): string[] {
@@ -268,6 +280,151 @@ async function perplexityProbe(slot: PerplexitySlot, brief: ResearchBrief): Prom
   }
 }
 
+function canonUrlKey(raw: string): string | null {
+  const t = raw.trim();
+  const withScheme = /^https?:\/\//i.test(t) ? t : /^www\./i.test(t) ? `https://${t}` : null;
+  if (!withScheme) return null;
+  try {
+    const u = new URL(withScheme);
+    const p = u.pathname.replace(/\/$/, "") || "/";
+    return `${u.hostname.toLowerCase()}|${p}`;
+  } catch {
+    return null;
+  }
+}
+
+function citationMatchesSourceUri(citation: string, sourceUri: string): boolean {
+  const c = citation.trim();
+  const s = sourceUri.trim();
+  if (!c || !s) return false;
+  if (c === s) return true;
+  const kc = canonUrlKey(c);
+  const ks = canonUrlKey(s);
+  return kc !== null && ks !== null && kc === ks;
+}
+
+function matchLinkedAcquisitionNotes(acquisition: CreatedNote[], citations: string[]): CreatedNote[] {
+  const out: CreatedNote[] = [];
+  const seen = new Set<string>();
+  for (const cite of citations) {
+    if (!cite || cite.trim().length === 0) continue;
+    for (const note of acquisition) {
+      if (note.source === "perplexity") continue;
+      const su = note.source_uri;
+      if (!su) continue;
+      if (citationMatchesSourceUri(cite, su)) {
+        if (!seen.has(note.vault_path)) {
+          seen.add(note.vault_path);
+          out.push(note);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function wikilinkBasename(vaultPath: string): string {
+  return path.basename(vaultPath, path.extname(vaultPath));
+}
+
+function renderPerplexityAnswerBody(args: {
+  briefTopic: string;
+  query: string;
+  answer: string;
+  citations: string[];
+  linked: CreatedNote[];
+}): string {
+  const citeBlock =
+    args.citations.length === 0
+      ? "- _none returned_"
+      : args.citations.map((c) => `- ${c}`).join("\n");
+  const linkBlock =
+    args.linked.length === 0
+      ? "- _no vault SourceNotes matched citations from this sweep_"
+      : args.linked.map((n) => `- [[${wikilinkBasename(n.vault_path)}]]`).join("\n");
+  return [
+    `# Perplexity: ${args.briefTopic} — ${args.query}`,
+    "",
+    args.answer.trim(),
+    "",
+    "## Citations",
+    "",
+    citeBlock,
+    "",
+    "## Linked vault sources",
+    "",
+    linkBlock,
+    "",
+  ].join("\n");
+}
+
+async function filePerplexityAnswers(
+  vaultRoot: string,
+  brief: ResearchBrief,
+  acquisitionNotes: CreatedNote[],
+  slot: PerplexitySlot,
+  surface: string,
+  dateYmd: string,
+): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
+  const created: CreatedNote[] = [];
+  const skipped: SkippedNote[] = [];
+  const tagBase = [brief.topic, "perplexity-answer", "research-sweep", ...(brief.tags ?? [])];
+
+  for (const query of brief.queries) {
+    let pr: PerplexityResult;
+    try {
+      pr = await slot.search(query);
+    } catch {
+      skipped.push({ source_uri: perplexityAnswerSourceUri(query), reason: "fetch_error" });
+      continue;
+    }
+    const answer = pr.answer?.trim() ?? "";
+    if (answer.length === 0) continue;
+
+    const linked = matchLinkedAcquisitionNotes(acquisitionNotes, pr.citations ?? []);
+    const ingest_as = linked.length >= 2 ? ("SynthesisNote" as const) : ("InsightNote" as const);
+    const body = renderPerplexityAnswerBody({
+      briefTopic: brief.topic,
+      query,
+      answer: pr.answer,
+      citations: pr.citations ?? [],
+      linked,
+    });
+    const prov = perplexityAnswerSourceUri(query);
+    const title_hint = `Perplexity: ${brief.topic.slice(0, 80)} — ${query.slice(0, 80)} (${dateYmd})`;
+
+    const result = await runIngestPipeline(
+      vaultRoot,
+      {
+        input: body,
+        source_type: "text",
+        provenance_uri: prov,
+        title_hint,
+        ingest_as,
+        tags: [...tagBase, query],
+        ai_summary: answer.slice(0, 500),
+        confidence_score: 0.55,
+      },
+      { surface },
+    );
+
+    if (result.status === "ok") {
+      created.push({
+        vault_path: result.vault_path,
+        pake_id: result.pake_id,
+        source_uri: prov,
+        source: "perplexity",
+      });
+    } else {
+      const source_uri =
+        result.status === "duplicate" ? result.source_uri : perplexityAnswerSourceUri(query);
+      skipped.push({ source_uri, reason: classifyIngestSkip(result) });
+    }
+  }
+
+  return { created, skipped };
+}
+
 export async function runResearchAgent(
   vaultRoot: string,
   brief: ResearchBrief,
@@ -290,11 +447,28 @@ export async function runResearchAgent(
     : Promise.resolve({ created: [], skipped: [] });
 
   const [firecrawlOut, apifyOut] = await Promise.all([firecrawlPromise, apifyPromise]);
+
+  let notes_created = [...firecrawlOut.created, ...apifyOut.created];
+  const notes_skipped = [...firecrawlOut.skipped, ...apifyOut.skipped];
   const perplexity_skipped = await perplexityProbe(perplexity, parsed);
 
-  const notes_created = [...firecrawlOut.created, ...apifyOut.created];
-  const notes_skipped = [...firecrawlOut.skipped, ...apifyOut.skipped];
   const sweep_timestamp = new Date().toISOString();
+  const dateYmd = sweep_timestamp.slice(0, 10);
+
+  let perplexity_answers_filed = 0;
+  if (!perplexity_skipped) {
+    const filed = await filePerplexityAnswers(
+      vaultRoot,
+      parsed,
+      notes_created,
+      perplexity,
+      surface,
+      dateYmd,
+    );
+    notes_created = [...notes_created, ...filed.created];
+    notes_skipped.push(...filed.skipped);
+    perplexity_answers_filed = filed.created.length;
+  }
 
   await appendRecord(vaultRoot, {
     action: "research_sweep",
@@ -306,6 +480,7 @@ export async function runResearchAgent(
       query_count: parsed.queries.length,
       notes_created_count: notes_created.length,
       perplexity_skipped,
+      perplexity_answers_filed,
     },
     isoUtc: sweep_timestamp,
   });
@@ -315,6 +490,7 @@ export async function runResearchAgent(
     notes_created,
     notes_skipped,
     perplexity_skipped,
+    perplexity_answers_filed,
     sweep_timestamp,
   });
 }

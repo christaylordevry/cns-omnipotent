@@ -231,6 +231,12 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 17-6-answer-filing-insight-synthesis-notes (2026-04-18)
+
+- **Bare-host / non-URL-shaped citations:** `canonUrlKey` only accepts `http(s)://…` or `www.…` prefixes before `new URL`. Model citations without a scheme do not match acquisition `source_uri`, so vault backlinks and SynthesisNote thresholding may under-trigger until normalisation is extended or operators document URL-shaped citations only.
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.

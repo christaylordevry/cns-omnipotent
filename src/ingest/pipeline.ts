@@ -28,6 +28,11 @@ export type IngestInput = {
   fetched_content?: string | undefined;
   /** Hint title (used when body has no heading). */
   title_hint?: string | undefined;
+  /**
+   * For `source_type: "text"`, attach a stable URI for PAKE `source_uri` and duplicate detection
+   * (e.g. synthetic URN for derived notes that are not URL-backed bodies).
+   */
+  provenance_uri?: string | undefined;
 } & IngestOptions;
 
 export type IngestResult =
@@ -117,6 +122,14 @@ export async function runIngestPipeline(
     input.fetched_content,
     input.title_hint,
   );
+
+  if (
+    sourceType === "text" &&
+    input.provenance_uri !== undefined &&
+    input.provenance_uri.trim().length > 0
+  ) {
+    normalized.source_uri = input.provenance_uri.trim();
+  }
 
   if (normalized.source_uri !== undefined && normalized.source_uri.length > 0) {
     const dup = await governedNoteExistsWithSourceUri(vaultRoot, normalized.source_uri);
