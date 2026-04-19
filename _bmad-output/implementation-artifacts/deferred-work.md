@@ -221,6 +221,16 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 17-3-synthesis-agent-patterns-gaps-opportunities (2026-04-18)
+
+- **Audit timestamp source split:** `synthesis_run` / `synthesis_skipped` use caller `isoUtc` (run start), while pipeline `ingest` uses default log time; long runs can skew bracket ordering vs strict causality.
+- **Wikilink basename collisions:** synthesis body uses `[[basename]]` only; duplicate stems in different folders produce ambiguous Obsidian links unless vault naming avoids collisions.
+- **No runtime Zod for `SynthesisRunResult`:** consider exported schema when 17-4 consumes untyped JSON.
+- **AC5 `fetched_content` wording:** text path correctly uses `input` as body; `fetched_content` unused for `source_type: "text"` — align story AC prose when convenient.
+- **`synthesisAdapterOutputSchema` non-strict:** unknown adapter keys stripped without error; use `.strict()` only if stricter adapter contracts are desired.
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.
