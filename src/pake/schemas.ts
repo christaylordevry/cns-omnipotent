@@ -11,6 +11,7 @@ const uuidV4Regex =
 export const PAKE_TYPE_VALUES = [
   "SourceNote",
   "InsightNote",
+  "HookSetNote",
   "SynthesisNote",
   "WorkflowNote",
   "ValidationNote",

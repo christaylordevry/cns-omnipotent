@@ -66,6 +66,10 @@ describe("resolvePakeType (AC: classify)", () => {
   it("respects ingest_as: SourceNote override", () => {
     expect(resolvePakeType("text", { ingest_as: "SourceNote" })).toBe("SourceNote");
   });
+
+  it("respects ingest_as: HookSetNote override", () => {
+    expect(resolvePakeType("text", { ingest_as: "HookSetNote" })).toBe("HookSetNote");
+  });
 });
 
 // ── Normalize helpers ─────────────────────────────────────────────────────────
@@ -180,6 +184,23 @@ describe("runIngestPipeline end-to-end", () => {
 
     const content = await readFile(path.join(vaultRoot, ...result.vault_path.split("/")), "utf8");
     expect(content).toContain("pake_type: InsightNote");
+  });
+
+  it("AC: validate — raw text source creates HookSetNote when ingest_as is set", async () => {
+    const vaultRoot = await makeVault();
+    const result = await runIngestPipeline(vaultRoot, {
+      input: "# Hooks draft\n\nOption A and B.",
+      source_type: "text",
+      ingest_as: "HookSetNote",
+      title_hint: "Hook Set",
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.vault_path).toMatch(/^03-Resources\//);
+
+    const content = await readFile(path.join(vaultRoot, ...result.vault_path.split("/")), "utf8");
+    expect(content).toContain("pake_type: HookSetNote");
   });
 
   it("AC: index — master index is created and contains the ingested note row", async () => {

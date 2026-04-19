@@ -151,6 +151,7 @@ export function destinationDirectoryForCreate(input: VaultCreateNoteInput): stri
   switch (pake_type) {
     case "SourceNote":
     case "InsightNote":
+    case "HookSetNote":
     case "SynthesisNote":
     case "ValidationNote":
       return "03-Resources";

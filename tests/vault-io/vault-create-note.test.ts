@@ -27,7 +27,13 @@ tags: []
 
 describe("vault create routing helpers", () => {
   it("routes resource types to 03-Resources", () => {
-    for (const pake_type of ["SourceNote", "InsightNote", "SynthesisNote", "ValidationNote"] as const) {
+    for (const pake_type of [
+      "SourceNote",
+      "InsightNote",
+      "HookSetNote",
+      "SynthesisNote",
+      "ValidationNote",
+    ] as const) {
       expect(destinationDirectoryForCreate({ title: "", content: "", pake_type, tags: [] })).toBe(
         "03-Resources",
       );
