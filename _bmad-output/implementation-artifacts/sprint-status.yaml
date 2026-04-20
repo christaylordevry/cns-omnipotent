@@ -159,3 +159,4 @@ development_status:
   epic-18: in-progress
   18-1-research-agent-output-quality-fixes: done
   18-2-synthesis-adapter-real-claude-api-implementation: done
+  18-3-hook-generation-adapter-real-claude-api-implementation: review
