@@ -27,11 +27,12 @@ function cleanBody(raw: string): string {
 }
 
 /** Normalize URL input: treat the caller-supplied content string as pre-fetched page text. */
-export function normalizeUrl(url: string, fetchedContent: string): NormalizedContent {
+export function normalizeUrl(url: string, fetchedContent: string, titleHint?: string): NormalizedContent {
   let canonical = url.trim();
   if (/^www\./i.test(canonical)) canonical = `https://${canonical}`;
   const body = cleanBody(fetchedContent);
-  const title = deriveTitle(body, canonical);
+  const hint = titleHint?.trim();
+  const title = hint && hint.length > 0 ? hint : deriveTitle(body, canonical);
   return { title, body, source_uri: canonical };
 }
 
@@ -68,7 +69,7 @@ export async function normalizeInput(
           "URL ingest requires fetched_content (pre-fetched page text).",
         );
       }
-      return normalizeUrl(input, fetchedContent);
+      return normalizeUrl(input, fetchedContent, titleHint);
     }
     case "pdf":
       return normalizePdf(input, fetchedContent);

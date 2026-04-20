@@ -26,6 +26,8 @@ async function makeVault(): Promise<string> {
   return vaultRoot;
 }
 
+const LONG_BODY = "x".repeat(220);
+
 function validBrief(overrides: Partial<ResearchBrief> = {}): ResearchBrief {
   return {
     topic: "AI agents",
@@ -74,6 +76,14 @@ describe("AC: brief — schema validation", () => {
       depth: "standard",
     });
     expect(parsed.topic).toBe("x");
+  });
+
+  it("defaults depth to deep when omitted", () => {
+    const parsed = researchBriefSchema.parse({
+      topic: "x",
+      queries: ["q1"],
+    });
+    expect(parsed.depth).toBe("deep");
   });
 
   it("rejects empty queries array", () => {
@@ -137,7 +147,7 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
           {
             url: `https://example.com/${encodeURIComponent(query)}/1`,
             title: `Title ${query}`,
-            snippet: `# Title ${query}\n\nSnippet about ${query}.`,
+            snippet: `# Title ${query}\n\n${LONG_BODY}`,
           },
         ];
       },
@@ -153,6 +163,24 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
     expect(result.notes_created.length).toBe(2);
     expect(result.notes_created.every((n) => n.source === "firecrawl")).toBe(true);
     expect(result.notes_created[0].vault_path).toMatch(/^03-Resources\//);
+  });
+
+  it("skips short firecrawl bodies via quality gate", async () => {
+    const vaultRoot = await makeVault();
+    const fc = makeFirecrawl({
+      search: async () => [{ url: "https://example.com/short", title: "S", snippet: "too short" }],
+    });
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["q"], depth: "standard" }),
+      { adapters: { firecrawl: fc } },
+    );
+
+    expect(result.notes_created.length).toBe(0);
+    expect(result.notes_skipped).toEqual([
+      { source_uri: "https://example.com/short", reason: "quality_gate" },
+    ]);
   });
 
   it("caps firecrawl results at 5 per query for standard depth", async () => {
@@ -193,10 +221,10 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
     const vaultRoot = await makeVault();
     let scrapeCalls = 0;
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/a", title: "A", snippet: "Hello" }],
+      search: async () => [{ url: "https://example.com/a", title: "A", snippet: LONG_BODY }],
       scrape: async (url) => {
         scrapeCalls++;
-        return { markdown: `# Deep\n\nContent from ${url}` };
+        return { markdown: `# Deep\n\n${LONG_BODY}\n\nFrom ${url}` };
       },
     });
 
@@ -217,12 +245,12 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
-        { url: "https://example.com/good", title: "Good", snippet: "Good content" },
-        { url: "https://example.com/bad", title: "Bad", snippet: "Bad content" },
+        { url: "https://example.com/good", title: "Good", snippet: LONG_BODY },
+        { url: "https://example.com/bad", title: "Bad", snippet: LONG_BODY },
       ],
       scrape: async (url) => {
         if (url.endsWith("/bad")) throw new Error("scrape failed");
-        return { markdown: "# Good\n\nBody." };
+        return { markdown: `# Good\n\n${LONG_BODY}` };
       },
     });
 
@@ -242,7 +270,7 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
     const fc = makeFirecrawl({
       search: async (query) => {
         if (query === "bad") throw new Error("search failed");
-        return [{ url: `https://example.com/${query}`, title: query, snippet: "Text" }];
+        return [{ url: `https://example.com/${query}`, title: query, snippet: LONG_BODY }];
       },
     });
 
@@ -270,7 +298,11 @@ describe("AC: apify — rag-web-browser + ingest", () => {
       ragWebBrowser: async (query) => {
         ragCalls++;
         return [
-          { url: `https://apify.example/${encodeURIComponent(query)}`, title: "Apify", text: `Snippet for ${query}` },
+          {
+            url: `https://apify.example/${encodeURIComponent(query)}`,
+            title: `Apify ${query}`,
+            text: `# ${query}\n\n${LONG_BODY}`,
+          },
         ];
       },
     });
@@ -286,12 +318,28 @@ describe("AC: apify — rag-web-browser + ingest", () => {
     expect(result.notes_created.every((n) => n.source === "apify")).toBe(true);
   });
 
+  it("skips short apify bodies via quality gate", async () => {
+    const vaultRoot = await makeVault();
+    const apify = makeApify({
+      ragWebBrowser: async (query) => [{ url: `https://apify.example/${query}`, text: "too short" }],
+    });
+
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q"], depth: "standard" }), {
+      adapters: { apify },
+    });
+
+    expect(result.notes_created.length).toBe(0);
+    expect(result.notes_skipped).toEqual([
+      { source_uri: "https://apify.example/q", reason: "quality_gate" },
+    ]);
+  });
+
   it("continues apify sweep when one query throws", async () => {
     const vaultRoot = await makeVault();
     const apify = makeApify({
       ragWebBrowser: async (query) => {
         if (query === "bad") throw new Error("apify broke");
-        return [{ url: `https://apify.example/${query}`, text: `content ${query}` }];
+        return [{ url: `https://apify.example/${query}`, text: `# ${query}\n\n${LONG_BODY}` }];
       },
     });
 
@@ -342,7 +390,7 @@ describe("AC: perplexity-stub — graceful degradation", () => {
       const result = await runResearchAgent(vaultRoot, validBrief(), {
         adapters: {
           firecrawl: makeFirecrawl({
-            search: async () => [{ url: "https://example.com/a", title: "A", snippet: "body" }],
+            search: async () => [{ url: "https://example.com/a", title: "A", snippet: LONG_BODY }],
           }),
         },
       });
@@ -397,7 +445,7 @@ describe("AC: vault-notes — created via ingest pipeline as SourceNotes", () =>
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
-        { url: "https://example.com/tag-test", title: "Tag Test", snippet: "# Tag Test\n\nContent body." },
+        { url: "https://example.com/tag-test", title: "Tag Test", snippet: `# Tag Test\n\n${LONG_BODY}` },
       ],
     });
 
@@ -425,10 +473,10 @@ describe("AC: manifest — ResearchSweepResult shape", () => {
   it("returns complete manifest with timestamp and counts", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/m", title: "M", snippet: "body" }],
+      search: async () => [{ url: "https://example.com/m", title: "M", snippet: LONG_BODY }],
     });
     const apify = makeApify({
-      ragWebBrowser: async () => [{ url: "https://apify.example/m", text: "apify body" }],
+      ragWebBrowser: async () => [{ url: "https://apify.example/m", text: `# Apify\n\n${LONG_BODY}` }],
     });
 
     const result = await runResearchAgent(
@@ -450,7 +498,7 @@ describe("AC: manifest — ResearchSweepResult shape", () => {
   it("notes_created entries include vault_path, pake_id, source_uri, source", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/shape", title: "S", snippet: "body" }],
+      search: async () => [{ url: "https://example.com/shape", title: "S", snippet: LONG_BODY }],
     });
     const result = await runResearchAgent(vaultRoot, validBrief(), {
       adapters: { firecrawl: fc },
@@ -469,7 +517,7 @@ describe("AC: audit — one sweep-level record + per-note ingest records", () =>
   it("emits one research_sweep audit line", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/audit", title: "A", snippet: "body" }],
+      search: async () => [{ url: "https://example.com/audit", title: "A", snippet: LONG_BODY }],
     });
 
     const result = await runResearchAgent(vaultRoot, validBrief(), {
@@ -497,7 +545,7 @@ describe("AC: audit — one sweep-level record + per-note ingest records", () =>
   it("per-note ingest audit lines are still emitted by the pipeline", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/per-note", title: "P", snippet: "body" }],
+      search: async () => [{ url: "https://example.com/per-note", title: "P", snippet: LONG_BODY }],
     });
     await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
 
@@ -514,12 +562,12 @@ describe("AC: tests — composite scenarios", () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async (q) => [
-        { url: `https://fc.example/${q}`, title: `FC ${q}`, snippet: `# FC ${q}\n\nbody for ${q}` },
+        { url: `https://fc.example/${q}`, title: `FC ${q}`, snippet: `# FC ${q}\n\n${LONG_BODY}` },
       ],
     });
     const apify = makeApify({
       ragWebBrowser: async (q) => [
-        { url: `https://ap.example/${q}`, title: `AP ${q}`, text: `# AP ${q}\n\napify body ${q}` },
+        { url: `https://ap.example/${q}`, title: `AP ${q}`, text: `# AP ${q}\n\n${LONG_BODY}` },
       ],
     });
 
@@ -538,7 +586,7 @@ describe("AC: tests — composite scenarios", () => {
   it("Firecrawl succeeds, Apify adapter throws for all queries", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://fc.example/a", title: "A", snippet: "body" }],
+      search: async () => [{ url: "https://fc.example/a", title: "A", snippet: LONG_BODY }],
     });
     const apify = makeApify({
       ragWebBrowser: async () => {
@@ -560,7 +608,7 @@ describe("AC: tests — composite scenarios", () => {
   it("duplicate source_uri is suppressed on second sweep", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://example.com/dupe", title: "D", snippet: "body" }],
+      search: async () => [{ url: "https://example.com/dupe", title: "D", snippet: LONG_BODY }],
     });
 
     const first = await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
@@ -600,7 +648,7 @@ describe("AC: tests — composite scenarios", () => {
   it("firecrawlSweep and apifySweep can be called independently", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
-      search: async () => [{ url: "https://fc.example/solo", title: "Solo", snippet: "body" }],
+      search: async () => [{ url: "https://fc.example/solo", title: "Solo", snippet: LONG_BODY }],
     });
 
     const direct = await firecrawlSweep(vaultRoot, validBrief(), fc, {
@@ -613,7 +661,7 @@ describe("AC: tests — composite scenarios", () => {
 
     const vault2 = await makeVault();
     const apify = makeApify({
-      ragWebBrowser: async () => [{ url: "https://ap.example/solo", text: "body" }],
+      ragWebBrowser: async () => [{ url: "https://ap.example/solo", text: `# Solo\n\n${LONG_BODY}` }],
     });
     const directApify = await apifySweep(vault2, validBrief(), apify, {
       surface: "unit-test",
@@ -641,7 +689,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
-        { url: "https://example.com/only-one", title: "O", snippet: "body only" },
+        { url: "https://example.com/only-one", title: "O", snippet: LONG_BODY },
       ],
     });
     const perplexity: PerplexitySlot = {
@@ -669,8 +717,8 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
-        { url: "https://example.com/a", title: "A", snippet: "body a" },
-        { url: "https://example.com/b", title: "B", snippet: "body b" },
+        { url: "https://example.com/a", title: "A", snippet: LONG_BODY },
+        { url: "https://example.com/b", title: "B", snippet: LONG_BODY },
       ],
     });
     const perplexity: PerplexitySlot = {

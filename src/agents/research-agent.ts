@@ -11,13 +11,19 @@ import {
 export const researchBriefSchema = z.object({
   topic: z.string().min(1),
   queries: z.array(z.string().min(1)).min(1).max(10),
-  depth: z.enum(["shallow", "standard", "deep"]),
+  depth: z.enum(["shallow", "standard", "deep"]).default("deep"),
   tags: z.array(z.string()).optional(),
 });
 
 export type ResearchBrief = z.infer<typeof researchBriefSchema>;
 
-export const skipReasonSchema = z.enum(["duplicate", "validation_error", "conflict", "fetch_error"]);
+export const skipReasonSchema = z.enum([
+  "duplicate",
+  "validation_error",
+  "conflict",
+  "fetch_error",
+  "quality_gate",
+]);
 export type SkipReason = z.infer<typeof skipReasonSchema>;
 
 export const researchSourceSchema = z.enum(["firecrawl", "apify", "perplexity"]);
@@ -56,6 +62,10 @@ export function firecrawlQueryAdapterFailureUri(query: string): string {
 /** Synthetic `source_uri` when the Apify rag-web-browser adapter throws for a query. */
 export function apifyQueryAdapterFailureUri(query: string): string {
   return `urn:cns:research-sweep:apify:query:${encodeURIComponent(query)}`;
+}
+
+function apifyQualityGateSnippetUri(query: string, index: number): string {
+  return `urn:cns:research-sweep:apify:snippet:${encodeURIComponent(query)}:${index}`;
 }
 
 /** Synthetic `source_uri` / provenance for a filed Perplexity answer (one per brief query). */
@@ -171,6 +181,11 @@ export async function firecrawlSweep(
         continue;
       }
 
+      if (body.trim().length < 200) {
+        skipped.push({ source_uri: hit.url, reason: "quality_gate" });
+        continue;
+      }
+
       const result = await runIngestPipeline(
         vaultRoot,
         {
@@ -221,16 +236,25 @@ export async function apifySweep(
       continue;
     }
 
-    for (const snippet of snippets) {
-      const hasUrl = typeof snippet.url === "string" && snippet.url.length > 0;
+    for (let i = 0; i < snippets.length; i++) {
+      const snippet = snippets[i];
+      const url = typeof snippet.url === "string" ? snippet.url.trim() : "";
+      const hasUrl = url.length > 0;
       const body = snippet.text;
       if (!body || body.trim().length === 0) {
-        if (hasUrl) skipped.push({ source_uri: snippet.url as string, reason: "fetch_error" });
+        const sourceUriForEmpty =
+          hasUrl ? url : apifyQualityGateSnippetUri(query, i);
+        skipped.push({ source_uri: sourceUriForEmpty, reason: "fetch_error" });
         continue;
       }
 
-      const input = hasUrl ? (snippet.url as string) : body;
-      const sourceUriForSkip = hasUrl ? (snippet.url as string) : "";
+      const input = hasUrl ? url : body;
+      const sourceUriForSkip = hasUrl ? url : apifyQualityGateSnippetUri(query, i);
+
+      if (body.trim().length < 200) {
+        skipped.push({ source_uri: sourceUriForSkip, reason: "quality_gate" });
+        continue;
+      }
 
       const ingestInput = hasUrl
         ? {
@@ -257,7 +281,7 @@ export async function apifySweep(
           pake_id: result.pake_id,
           source: "apify",
         };
-        if (hasUrl) created_entry.source_uri = snippet.url as string;
+        if (hasUrl) created_entry.source_uri = url;
         created.push(created_entry);
       } else {
         const source_uri =

@@ -102,6 +102,11 @@ describe("normalize helpers", () => {
     expect(result.source_uri).toBe("https://example.com");
     expect(result.title).toBe("Page Title");
   });
+
+  it("normalizeUrl prefers non-empty title_hint over derived title", () => {
+    const result = normalizeUrl("https://example.com", "# Body Heading\n\nContent.", "  Hint Title  ");
+    expect(result.title).toBe("Hint Title");
+  });
 });
 
 // ── AC: index — formatIndexRow ────────────────────────────────────────────────
