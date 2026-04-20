@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-04-18T23:59:00Z"
+last_updated: "2026-04-20T12:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -148,7 +148,7 @@ development_status:
   epic-16-retrospective: done
 
   epic-17: done # closed 2026-04-18: 17-1 Perplexity MCP carried to Epic 18; see epic-17-retro-2026-04-18.md
-  17-1-perplexity-mcp-install-and-live-tool-call-verification: deferred # carried to Epic 18 (API key); see epic-17-retro-2026-04-18.md
+  17-1-perplexity-mcp-install-and-live-tool-call-verification: done # AC2 live call verified 2026-04-20 in Claude Code (mcp__perplexity__search); key from env
   17-2-research-agent-firecrawl-apify-sweep: done
   17-3-synthesis-agent-patterns-gaps-opportunities: done
   17-4-hook-agent-4-options-3-iterations-gate: done
