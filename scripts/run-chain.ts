@@ -1,18 +1,26 @@
 /**
- * Live test runner for runResearchAgent() using real Firecrawl and Perplexity APIs.
- * Apify is skipped — no APIFY_TOKEN found in env.
+ * Live test runner for runChain() — wires Research → Synthesis → Hook → Boss
+ * with real Firecrawl + Perplexity (Research) and real Anthropic-backed
+ * LLM adapters (Synthesis, Hook, Boss).
  *
  * Usage:
  *   CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" \
- *   tsx scripts/run-research-agent.ts
+ *   FIRECRAWL_API_KEY=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \
+ *   tsx scripts/run-chain.ts
  */
 
+import { runChain } from "../src/agents/run-chain.js";
 import {
-  runResearchAgent,
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
 } from "../src/agents/research-agent.js";
-import { type PerplexitySlot, type PerplexityResult } from "../src/agents/perplexity-slot.js";
+import {
+  type PerplexitySlot,
+  type PerplexityResult,
+} from "../src/agents/perplexity-slot.js";
+import { createLlmSynthesisAdapter } from "../src/agents/synthesis-adapter-llm.js";
+import { createLlmHookGenerationAdapter } from "../src/agents/hook-adapter-llm.js";
+import { createLlmWeaponsCheckAdapter } from "../src/agents/boss-adapter-llm.js";
 
 // ---------------------------------------------------------------------------
 // Firecrawl adapter — calls api.firecrawl.dev v1
@@ -27,7 +35,9 @@ function buildFirecrawlAdapter(apiKey: string): FirecrawlAdapter {
         body: JSON.stringify({ query, limit: opts.limit }),
       });
       if (!res.ok) throw new Error(`Firecrawl search HTTP ${res.status}: ${await res.text()}`);
-      const data = (await res.json()) as { data?: Array<{ url: string; title?: string; description?: string }> };
+      const data = (await res.json()) as {
+        data?: Array<{ url: string; title?: string; description?: string }>;
+      };
       return (data.data ?? []).map((item) => ({
         url: item.url,
         title: item.title,
@@ -42,7 +52,9 @@ function buildFirecrawlAdapter(apiKey: string): FirecrawlAdapter {
         body: JSON.stringify({ url, formats: ["markdown"] }),
       });
       if (!res.ok) throw new Error(`Firecrawl scrape HTTP ${res.status}: ${await res.text()}`);
-      const data = (await res.json()) as { data?: { markdown?: string; metadata?: { title?: string } } };
+      const data = (await res.json()) as {
+        data?: { markdown?: string; metadata?: { title?: string } };
+      };
       return {
         markdown: data.data?.markdown ?? "",
         title: data.data?.metadata?.title,
@@ -91,13 +103,15 @@ async function main() {
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not set");
   if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY not set");
+  if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  console.log("=== Research Agent Live Test ===");
+  console.log("=== Chain Live Test (Research → Synthesis → Hook → Boss) ===");
   console.log(`Vault root: ${vaultRoot}`);
-  console.log(`Firecrawl: ✓   Perplexity: ✓   Apify: skipped (no token)\n`);
+  console.log(`Firecrawl: ✓   Perplexity: ✓   Anthropic: ✓\n`);
 
   const brief = {
     topic: "Creative Technologist remote roles and how to position for them in 2026",
@@ -110,41 +124,34 @@ async function main() {
   };
 
   console.log("Brief:", JSON.stringify(brief, null, 2), "\n");
-  console.log("Running sweep…\n");
+  console.log("Running chain…\n");
 
-  const result = await runResearchAgent(vaultRoot, brief, {
-    surface: "live-test",
+  const result = await runChain(vaultRoot, brief, {
+    research: {
+      surface: "live-test",
+      adapters: {
+        firecrawl: buildFirecrawlAdapter(firecrawlKey),
+        perplexity: buildPerplexitySlot(perplexityKey),
+      },
+    },
     adapters: {
-      firecrawl: buildFirecrawlAdapter(firecrawlKey),
-      perplexity: buildPerplexitySlot(perplexityKey),
+      synthesis: createLlmSynthesisAdapter(),
+      hookGeneration: createLlmHookGenerationAdapter(),
+      weaponsCheck: createLlmWeaponsCheckAdapter(),
     },
   });
 
-  console.log("=== ResearchSweepResult ===");
-  console.log(JSON.stringify(result, null, 2));
+  console.log("=== sweep: ResearchSweepResult ===");
+  console.log(JSON.stringify(result.sweep, null, 2));
 
-  console.log("\n=== Notes Created ===");
-  if (result.notes_created.length === 0) {
-    console.log("  (none)");
-  } else {
-    for (const note of result.notes_created) {
-      console.log(`  [${note.source}] ${note.vault_path}`);
-      if (note.source_uri) console.log(`         └─ ${note.source_uri}`);
-    }
-  }
+  console.log("\n=== synthesis: SynthesisRunResult ===");
+  console.log(JSON.stringify(result.synthesis, null, 2));
 
-  console.log("\n=== Notes Skipped ===");
-  if (result.notes_skipped.length === 0) {
-    console.log("  (none)");
-  } else {
-    for (const skip of result.notes_skipped) {
-      console.log(`  [${skip.reason}] ${skip.source_uri}`);
-    }
-  }
+  console.log("\n=== hooks: HookRunResult ===");
+  console.log(JSON.stringify(result.hooks, null, 2));
 
-  console.log(`\nPerplexity answers filed : ${result.perplexity_answers_filed}`);
-  console.log(`Perplexity skipped       : ${result.perplexity_skipped}`);
-  console.log(`Sweep timestamp          : ${result.sweep_timestamp}`);
+  console.log("\n=== weapons: BossRunResult (WeaponsCheck) ===");
+  console.log(JSON.stringify(result.weapons, null, 2));
 }
 
 main().catch((err) => {
