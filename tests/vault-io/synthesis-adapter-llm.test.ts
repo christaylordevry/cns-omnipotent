@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLlmSynthesisAdapter } from "../../src/agents/synthesis-adapter-llm.js";
 import type { SynthesisAdapterInput } from "../../src/agents/synthesis-agent.js";
+import { DEFAULT_OPERATOR_CONTEXT } from "../../src/agents/operator-context.js";
+import type { VaultContextPacket } from "../../src/agents/vault-context-builder.js";
 import { CnsError } from "../../src/errors.js";
 
 function makeAnthropicJsonResponse(bodyObj: unknown): Response {
@@ -28,6 +30,50 @@ function makeAnthropicEnvelopeResponse(envelope: unknown): Response {
   });
 }
 
+const populatedPacket: VaultContextPacket = {
+  notes: [
+    {
+      vault_path: "03-Resources/Operator-Profile.md",
+      title: "Operator Profile",
+      excerpt: "Chris is based in Sydney and operates solo.",
+      retrieval_reason: "operator-profile",
+      tags: ["operator"],
+    },
+    {
+      vault_path: "03-Resources/agent-architectures-primer.md",
+      title: "Agent Architectures Primer",
+      excerpt: "ReAct-style agents combine reasoning with tool use.",
+      retrieval_reason: "topic-match",
+      tags: ["agents"],
+    },
+  ],
+  total_notes: 2,
+  token_budget_used: 0,
+  retrieval_timestamp: "2026-04-22T00:00:00.000Z",
+};
+
+const emptyPacket: VaultContextPacket = {
+  notes: [],
+  total_notes: 0,
+  token_budget_used: 0,
+  retrieval_timestamp: "2026-04-22T00:00:00.000Z",
+};
+
+const noProfilePacket: VaultContextPacket = {
+  notes: [
+    {
+      vault_path: "03-Resources/agent-architectures-primer.md",
+      title: "Agent Architectures Primer",
+      excerpt: "ReAct-style agents combine reasoning with tool use.",
+      retrieval_reason: "topic-match",
+      tags: ["agents"],
+    },
+  ],
+  total_notes: 1,
+  token_budget_used: 0,
+  retrieval_timestamp: "2026-04-22T00:00:00.000Z",
+};
+
 const sampleInput: SynthesisAdapterInput = {
   topic: "AI agents",
   queries: ["what is an AI agent", "agent architectures"],
@@ -43,13 +89,90 @@ const sampleInput: SynthesisAdapterInput = {
       frontmatter: {},
     },
   ],
+  operator_context: DEFAULT_OPERATOR_CONTEXT,
+  vault_context_packet: populatedPacket,
 };
 
+const sampleBodyMarkdown = [
+  "> [!abstract]",
+  "> Findings converge on agentic orchestration.",
+  "",
+  "## What We Know",
+  "Agents connect perception to action through planning and tool use. See [[Operator-Profile]] for the operator context. The [[Agent-Architectures-Primer]] summarizes the field. Cross-check with [[Decision-Ledger]] for prior calls.",
+  "",
+  "> [!note] Signal vs Noise",
+  "",
+  "| Claim | Agree | Disagree | Implication |",
+  "| --- | --- | --- | --- |",
+  "| c1 | a1 | d1 | i1 |",
+  "| c2 | a2 | d2 | i2 |",
+  "| c3 | a3 | d3 | i3 |",
+  "",
+  "## The Gap Map",
+  "",
+  "| Known | Unknown | Why it matters |",
+  "| --- | --- | --- |",
+  "| k1 | u1 | w1 |",
+  "| k2 | u2 | w2 |",
+  "| k3 | u3 | w3 |",
+  "| k4 | u4 | w4 |",
+  "",
+  "> [!warning] Blind Spots",
+  "> Sources miss real-world durability.",
+  "",
+  "## Where Chris Has Leverage",
+  "Chris operates from Sydney, Australia, positioned as a Creative Technologist. Both active tracks — Escape Job and Build Agency — give compounding leverage because the same research stream feeds both. Escape Job benefits from narrative proof; Build Agency benefits from demonstrated capability. Chris can ship public artefacts quickly which doubles as distribution for either track.",
+  "",
+  "> [!tip] Highest-Leverage Move",
+  "> Ship a public weekly intelligence brief this Friday.",
+  "",
+  "## Connected Vault Notes",
+  "",
+  "| Note | Why relevant | Status |",
+  "| --- | --- | --- |",
+  "| [[Operator-Profile]] | context | active |",
+  "| [[Agent-Architectures-Primer]] | primer | active |",
+  "| [[Decision-Ledger]] | prior decisions | active |",
+  "| [[Weekly-Brief-Template]] | format | active |",
+  "| [[Distribution-Plan]] | channels | active |",
+  "",
+  "## Decisions Needed",
+  "",
+  "### Decision: pick architecture",
+  "- **Option A:** ReAct loop",
+  "- **Option B:** Planner-executor",
+  "- **Downstream consequence:** affects latency vs reliability tradeoff",
+  "",
+  "### Decision: publish cadence",
+  "- **Option A:** weekly",
+  "- **Option B:** biweekly",
+  "- **Downstream consequence:** pipeline pressure vs reach",
+  "",
+  "### Decision: distribution channel",
+  "- **Option A:** LinkedIn",
+  "- **Option B:** newsletter",
+  "- **Downstream consequence:** audience fit",
+  "",
+  "### Decision: tooling stack",
+  "- **Option A:** TS-only",
+  "- **Option B:** polyglot",
+  "- **Downstream consequence:** build speed",
+  "",
+  "## Open Questions",
+  "1. Which retrieval strategy holds up at 100 notes?",
+  "2. How is latency measured across adapters?",
+  "3. What is the rollback path if a run corrupts the vault?",
+  "",
+  "## Version / Run Metadata",
+  "",
+  "| Date | Brief topic | Sources ingested | Queries run |",
+  "| --- | --- | --- | --- |",
+  "| 2026-04-22 | AI agents | 2 | 2 |",
+].join("\n");
+
 const validSynthesisOutput = {
-  patterns: ["pattern 1", "pattern 2"],
-  gaps: ["gap 1"],
-  opportunities: ["opp 1"],
-  summary: "A concise executive summary of the research.",
+  body: sampleBodyMarkdown,
+  summary: "Agents converge on orchestration; Chris should ship a weekly brief.",
 };
 
 describe("createLlmSynthesisAdapter", () => {
@@ -91,9 +214,10 @@ describe("createLlmSynthesisAdapter", () => {
       messages: Array<{ role: string; content: string }>;
     };
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(800);
+    expect(body.max_tokens).toBe(4000);
     expect(typeof body.system).toBe("string");
-    expect(body.system.toLowerCase()).toContain("marketing");
+    expect(body.system).toContain("Chris Taylor");
+    expect(body.system).toContain("Sydney");
     expect(body.system.toLowerCase()).toContain("json");
 
     expect(Array.isArray(body.messages)).toBe(true);
@@ -108,10 +232,86 @@ describe("createLlmSynthesisAdapter", () => {
     expect(userText).toContain("03-Resources/note-b.md");
     expect(userText).toContain("Agents are systems that perceive and act.");
     expect(userText).toContain("ReAct pattern combines reasoning with tool use.");
-    expect(userText.toLowerCase()).toContain("patterns");
-    expect(userText.toLowerCase()).toContain("gaps");
-    expect(userText.toLowerCase()).toContain("opportunities");
-    expect(userText.toLowerCase()).toContain("summary");
+    // Operator context
+    expect(userText).toContain("Chris Taylor");
+    expect(userText).toContain("Sydney");
+    expect(userText).toContain("Creative Technologist");
+    // Track names verbatim
+    expect(userText).toContain("Escape Job");
+    expect(userText).toContain("Build Agency");
+    // PAKE++ section minimums mentioned
+    expect(userText).toContain("What We Know");
+    expect(userText).toContain("Contradiction Ledger");
+    expect(userText).toContain("Gap Map");
+    expect(userText).toContain("Where Chris Has Leverage");
+    expect(userText).toContain("Decisions Needed");
+    expect(userText).toContain("Connected Vault Notes");
+    expect(userText).toContain("Version / Run Metadata");
+    // Response contract
+    expect(userText).toContain('"body"');
+    expect(userText).toContain('"summary"');
+    // Abstract written last rule
+    expect(userText).toContain("Write the `[!abstract]` callout last");
+  });
+
+  it("includes vault context block when packet has notes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    await adapter.synthesize(sampleInput);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      messages: Array<{ content: string }>;
+    };
+    const userText = body.messages[0].content;
+
+    expect(userText).toContain("=== Vault Context ===");
+    expect(userText).toContain("03-Resources/Operator-Profile.md");
+    expect(userText).toContain("Operator Profile");
+    expect(userText).toContain("Chris is based in Sydney and operates solo.");
+    expect(userText).toContain("retrieval_reason: operator-profile");
+    expect(userText).toContain("retrieval_reason: topic-match");
+  });
+
+  it("empty vault_context_packet: prompt includes 'no vault context' instruction", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    await adapter.synthesize({ ...sampleInput, vault_context_packet: emptyPacket });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      messages: Array<{ content: string }>;
+    };
+    const userText = body.messages[0].content;
+
+    expect(userText).toContain("no vault context found");
+    expect(userText).toContain(
+      "> [!warning] No vault context found — this synthesis is grounded in external research only.",
+    );
+  });
+
+  it("missing operator-profile note: prompt includes no-vault warning instruction even with topic notes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    await adapter.synthesize({ ...sampleInput, vault_context_packet: noProfilePacket });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      messages: Array<{ content: string }>;
+    };
+    const userText = body.messages[0].content;
+
+    expect(userText).toContain("operator profile note missing");
+    expect(userText).toContain("03-Resources/agent-architectures-primer.md");
+    expect(userText).toContain(
+      "> [!warning] No vault context found — this synthesis is grounded in external research only.",
+    );
   });
 
   it("fetch rejects: throws CnsError IO_ERROR", async () => {
@@ -181,8 +381,8 @@ describe("createLlmSynthesisAdapter", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       makeAnthropicEnvelopeResponse({
         content: [
-          { type: "text", text: "{\"patterns\":[\"p\"],\"gaps\":[" },
-          { type: "text", text: "\"g\"],\"opportunities\":[\"o\"],\"summary\":\"s\"}" },
+          { type: "text", text: '{"body":"# partial' },
+          { type: "text", text: ' body","summary":"s"}' },
         ],
       }),
     );
@@ -190,12 +390,7 @@ describe("createLlmSynthesisAdapter", () => {
 
     const adapter = createLlmSynthesisAdapter();
     const result = await adapter.synthesize(sampleInput);
-    expect(result).toEqual({
-      patterns: ["p"],
-      gaps: ["g"],
-      opportunities: ["o"],
-      summary: "s",
-    });
+    expect(result).toEqual({ body: "# partial body", summary: "s" });
   });
 
   it("non-JSON response text: throws CnsError IO_ERROR with specific message", async () => {
@@ -215,11 +410,7 @@ describe("createLlmSynthesisAdapter", () => {
   });
 
   it("zod schema invalid: returns JSON missing summary -> throws CnsError SCHEMA_INVALID", async () => {
-    const invalidOutput = {
-      patterns: ["pattern 1"],
-      gaps: ["gap 1"],
-      opportunities: ["opp 1"],
-    };
+    const invalidOutput = { body: "# something" };
     const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(invalidOutput));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -231,6 +422,18 @@ describe("createLlmSynthesisAdapter", () => {
     expect((err as CnsError).message.length).toBeGreaterThan(0);
   });
 
+  it("zod schema invalid: empty body -> throws CnsError SCHEMA_INVALID", async () => {
+    const invalidOutput = { body: "", summary: "s" };
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(invalidOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+
+    const err = await adapter.synthesize(sampleInput).catch((e) => e);
+    expect(err).toBeInstanceOf(CnsError);
+    expect((err as CnsError).code).toBe("SCHEMA_INVALID");
+  });
+
   it("empty source_notes: still calls API and resolves", async () => {
     const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
     vi.stubGlobal("fetch", fetchMock);
@@ -240,6 +443,8 @@ describe("createLlmSynthesisAdapter", () => {
       topic: "empty-sources-topic",
       queries: ["q1"],
       source_notes: [],
+      operator_context: DEFAULT_OPERATOR_CONTEXT,
+      vault_context_packet: emptyPacket,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -262,6 +467,8 @@ describe("createLlmSynthesisAdapter", () => {
       topic: "capping",
       queries: [],
       source_notes: notes,
+      operator_context: DEFAULT_OPERATOR_CONTEXT,
+      vault_context_packet: emptyPacket,
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];

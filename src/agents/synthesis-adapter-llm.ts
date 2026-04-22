@@ -6,25 +6,135 @@ import {
   type SynthesisAdapterInput,
   type SynthesisAdapterOutput,
 } from "./synthesis-agent.js";
+import type { OperatorContext } from "./operator-context.js";
+import type {
+  VaultContextNote,
+  VaultContextPacket,
+} from "./vault-context-builder.js";
 
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 800;
+const MAX_TOKENS = 4000;
 const MAX_SOURCE_NOTES = 8;
 const MAX_SOURCE_NOTE_BODY_CHARS = 600;
+const MAX_VAULT_CONTEXT_NOTES = 3;
 
 const SYSTEM_PROMPT = [
-  "You are a content research synthesizer for a marketing/creative agency.",
-  "Analyze the provided research sources and distill them into actionable insights",
-  "for content strategy and creative direction.",
+  "You are a world-class content strategist and research synthesizer writing",
+  "for a specific named operator: Chris Taylor — a Sydney-based Creative",
+  "Technologist running two active tracks in parallel (Escape Job, Build Agency).",
   "",
-  "Respond ONLY with a single JSON object matching this shape:",
-  '{"patterns": string[], "gaps": string[], "opportunities": string[], "summary": string}',
+  "Your job is to distill research into an operator-ready intelligence artifact",
+  "Chris can act on in the same session — not a neutral summary, not a bullet",
+  "dump. Think: reasoned analysis, explicit tradeoffs, connected vault context,",
+  "decision-driving callouts.",
+  "",
+  "You produce one Obsidian-flavoured markdown note body (the PAKE++ structure",
+  "the user specifies) plus a short executive summary for frontmatter.",
+  "",
+  "Respond ONLY with a single JSON object of this exact shape:",
+  '{"body": "<full PAKE++ markdown body>", "summary": "<one-sentence executive summary>"}',
+  "",
   "Do not wrap the JSON in markdown code fences.",
   "Do not include any preamble, commentary, or trailing text.",
-  `Return JSON only. Keep each array to a maximum of 5 items. Each item must be under 30 words. The summary must be under 60 words.`,
+  "The body must be valid markdown (callouts, tables, wikilinks allowed).",
+  "The summary must be one sentence, non-empty, suitable for the ai_summary frontmatter field.",
 ].join("\n");
+
+function renderOperatorContextBlock(ctx: OperatorContext): string {
+  const tracks = ctx.tracks
+    .map((t) => `- ${t.name} (status: ${t.status}, priority: ${t.priority})`)
+    .join("\n");
+  const constraints =
+    ctx.constraints.length === 0
+      ? "(none)"
+      : ctx.constraints.map((c) => `- ${c}`).join("\n");
+  const profileLink = ctx.vault_profile_note
+    ? `\nVault profile note: ${ctx.vault_profile_note}`
+    : "";
+
+  return [
+    "=== Operator Context ===",
+    `Name: ${ctx.name}`,
+    `Location: ${ctx.location}`,
+    `Positioning: ${ctx.positioning}`,
+    "Tracks:",
+    tracks,
+    "Constraints:",
+    constraints,
+    profileLink.trim().length > 0 ? profileLink.trimStart() : "",
+  ]
+    .filter((s) => s.length > 0)
+    .join("\n");
+}
+
+function renderVaultContextNote(note: VaultContextNote): string {
+  const tagList = note.tags.length > 0 ? note.tags.join(", ") : "(none)";
+  return [
+    "---",
+    `vault_path: ${note.vault_path}`,
+    `title: ${note.title}`,
+    `retrieval_reason: ${note.retrieval_reason}`,
+    `tags: ${tagList}`,
+    "excerpt:",
+    note.excerpt,
+  ].join("\n");
+}
+
+function renderVaultContextBlock(packet: VaultContextPacket): string {
+  const missingProfileInstruction = [
+    "Because the operator profile note is absent, you MUST include this callout",
+    "verbatim in the body:",
+    "",
+    "> [!warning] No vault context found — this synthesis is grounded in external research only.",
+  ].join("\n");
+
+  if (packet.notes.length === 0) {
+    return [
+      "=== Vault Context ===",
+      "(no vault context found)",
+      "",
+      missingProfileInstruction,
+    ].join("\n");
+  }
+  const capped = packet.notes.slice(0, MAX_VAULT_CONTEXT_NOTES);
+  const blocks = capped.map(renderVaultContextNote).join("\n");
+  const hasOperatorProfile = packet.notes.some(
+    (note) => note.retrieval_reason === "operator-profile",
+  );
+  return [
+    "=== Vault Context ===",
+    `(${capped.length} of ${packet.total_notes} notes shown)`,
+    hasOperatorProfile
+      ? ""
+      : [
+          "(operator profile note missing; topic-match vault context is still shown)",
+          "",
+          missingProfileInstruction,
+          "",
+        ].join("\n"),
+    blocks,
+  ]
+    .filter((s) => s.length > 0)
+    .join("\n");
+}
+
+function renderSourceNotesBlock(input: SynthesisAdapterInput): string {
+  const capped = input.source_notes.slice(0, MAX_SOURCE_NOTES);
+  if (capped.length === 0) return "(no source notes provided)";
+  return capped
+    .map((note) => {
+      const truncatedBody = note.body.slice(0, MAX_SOURCE_NOTE_BODY_CHARS);
+      return [
+        "---",
+        `vault_path: ${note.vault_path}`,
+        "body:",
+        truncatedBody,
+      ].join("\n");
+    })
+    .join("\n");
+}
 
 function buildUserPrompt(input: SynthesisAdapterInput): string {
   const queryList =
@@ -32,21 +142,15 @@ function buildUserPrompt(input: SynthesisAdapterInput): string {
       ? "(none)"
       : input.queries.map((q) => `- ${q}`).join("\n");
 
-  const cappedNotes = input.source_notes.slice(0, MAX_SOURCE_NOTES);
-  const sourceBlocks =
-    cappedNotes.length === 0
-      ? "(no source notes provided)"
-      : cappedNotes
-          .map((note) => {
-            const truncatedBody = note.body.slice(0, MAX_SOURCE_NOTE_BODY_CHARS);
-            return [
-              "---",
-              `vault_path: ${note.vault_path}`,
-              "body:",
-              truncatedBody,
-            ].join("\n");
-          })
-          .join("\n");
+  const trackNames = input.operator_context.tracks.map((t) => t.name);
+  const trackNamesVerbatim =
+    trackNames.length === 0
+      ? "(no tracks configured)"
+      : trackNames.map((n) => `"${n}"`).join(", ");
+
+  const operatorBlock = renderOperatorContextBlock(input.operator_context);
+  const vaultBlock = renderVaultContextBlock(input.vault_context_packet);
+  const sourcesBlock = renderSourceNotesBlock(input);
 
   return [
     `Topic: ${input.topic}`,
@@ -54,16 +158,61 @@ function buildUserPrompt(input: SynthesisAdapterInput): string {
     "Queries run:",
     queryList,
     "",
-    "Sources:",
-    sourceBlocks,
+    operatorBlock,
     "",
-    "Analyze these sources and produce:",
-    "- patterns: recurring themes observed across multiple sources",
-    "- gaps: areas that are underexplored or missing coverage",
-    "- opportunities: angles a marketing/creative team could pursue originally",
-    "- summary: a concise executive summary (non-empty)",
+    vaultBlock,
     "",
-    'Return a JSON object with keys "patterns", "gaps", "opportunities", "summary".',
+    "=== Source Research Notes ===",
+    sourcesBlock,
+    "",
+    "=== Output Contract (PAKE++ body) ===",
+    "Write a full markdown body with these sections in this order:",
+    "",
+    "1. `## What We Know` — ≥180 words of prose reasoning. NO BULLETS. Include",
+    "   ≥3 wikilinks of the form `[[Note-Title]]` that connect to vault notes",
+    "   (prefer vault_context_packet notes; otherwise reference source notes by",
+    "   a plausible wikilink target derived from the vault_path basename).",
+    "2. `> [!note] Signal vs Noise` — short callout introducing the ledger,",
+    "   immediately followed by a Contradiction Ledger markdown table with",
+    "   ≥3 rows and exactly these columns: Claim | Agree | Disagree | Implication.",
+    "3. `## The Gap Map` — a markdown table with ≥4 rows and exactly these",
+    "   columns: Known | Unknown | Why it matters.",
+    "4. `> [!warning] Blind Spots` — callout naming the biggest things the",
+    "   sources collectively miss.",
+    "5. `## Where Chris Has Leverage` — ≥150 words of prose. NO BULLETS. Must",
+    `   name these tracks verbatim: ${trackNamesVerbatim}. Must reference the`,
+    `   operator location (${input.operator_context.location}) and positioning`,
+    `   (${input.operator_context.positioning}).`,
+    "6. `> [!tip] Highest-Leverage Move` — one specific, timeable, vault-",
+    "   connected action.",
+    "7. `## Connected Vault Notes` — a markdown table with ≥5 rows and exactly",
+    "   these columns: Note | Why relevant | Status. Use wikilinks in the Note",
+    "   column.",
+    "8. `## Decisions Needed` — ≥4 decisions. For each decision use the",
+    "   structure:",
+    "      ### Decision: <short title>",
+    "      - **Option A:** …",
+    "      - **Option B:** …",
+    "      - **Downstream consequence:** …",
+    "9. `## Open Questions` — ≥3 numbered questions. Decision-blocking only.",
+    "10. `## Version / Run Metadata` — a markdown table with the columns",
+    "    Date | Brief topic | Sources ingested | Queries run.",
+    "11. `> [!abstract]` callout — 2–3 sentences summarizing the single most",
+    "    important finding and the highest-leverage action. This must be the",
+    "    final required PAKE++ section in the body.",
+    "",
+    "=== Voice & Depth Rules (non-negotiable) ===",
+    '- Write all sections first. Write the `[!abstract]` callout last.',
+    "- No thin bullet-summary mode. Meet or exceed every minimum above.",
+    "- No bullets in What We Know or Where Chris Has Leverage — prose only.",
+    `- Where Chris Has Leverage must name these tracks verbatim: ${trackNamesVerbatim}.`,
+    "- Contradiction Ledger table must have ≥3 rows.",
+    "- Decisions Needed must have ≥4 decisions, each with Option A / Option B",
+    "  and a downstream consequence.",
+    "",
+    "=== Response Format ===",
+    'Respond ONLY with a JSON object: {"body": "<full PAKE++ markdown>", "summary": "<one sentence>"}',
+    "No markdown fences. No preamble. No trailing text.",
   ].join("\n");
 }
 

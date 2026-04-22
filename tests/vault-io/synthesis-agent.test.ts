@@ -12,6 +12,8 @@ import {
   type SynthesisRunResult,
   type VaultReadAdapter,
 } from "../../src/agents/synthesis-agent.js";
+import { DEFAULT_OPERATOR_CONTEXT } from "../../src/agents/operator-context.js";
+import type { VaultContextPacket } from "../../src/agents/vault-context-builder.js";
 import type { ResearchSweepResult } from "../../src/agents/research-agent.js";
 import { CnsError } from "../../src/errors.js";
 
@@ -54,6 +56,15 @@ function validSweep(overrides: Partial<ResearchSweepResult> = {}): ResearchSweep
   };
 }
 
+function emptyPacket(): VaultContextPacket {
+  return {
+    notes: [],
+    total_notes: 0,
+    token_budget_used: 0,
+    retrieval_timestamp: "2026-04-18T22:00:00.000Z",
+  };
+}
+
 function makeVaultRead(behavior: {
   readNote?: (vaultPath: string) => ReturnType<VaultReadAdapter["readNote"]>;
 }): VaultReadAdapter {
@@ -65,6 +76,111 @@ function makeVaultRead(behavior: {
         frontmatter: { pake_id: `fm-${vaultPath}` },
       })),
   };
+}
+
+function repeatSentence(sentence: string, count: number): string {
+  return Array.from({ length: count }, () => sentence).join(" ");
+}
+
+const NO_VAULT_CONTEXT_WARNING =
+  "> [!warning] No vault context found — this synthesis is grounded in external research only.";
+
+function validPakeBody(): string {
+  const whatWeKnow = [
+    "The source set points toward agent orchestration as the practical layer where research becomes action for [[note-a]], [[note-b]], [[note-c]], and [[real-note]].",
+    repeatSentence(
+      "The important pattern is that operators do not need a generic summary; they need a connected readout that explains what changed, why it matters, where confidence is uneven, and which vault notes should shape the next move.",
+      10,
+    ),
+  ].join(" ");
+  const leverage = [
+    "Chris Taylor is operating from Sydney, Australia as a Creative Technologist, which makes the research useful only if it can be turned into a visible asset and a decision in the same session.",
+    "Escape Job and Build Agency should both be named because the same intelligence stream can serve employment escape velocity and agency proof at once.",
+    repeatSentence(
+      "Escape Job benefits when the synthesis clarifies the fastest path to runway, while Build Agency benefits when the same analysis becomes public evidence of taste, systems thinking, and execution quality.",
+      8,
+    ),
+  ].join(" ");
+
+  return [
+    "## What We Know",
+    whatWeKnow,
+    "",
+    "> [!note] Signal vs Noise",
+    "> Strong sources agree on orchestration, but they differ on how much autonomy is durable.",
+    "",
+    "| Claim | Agree | Disagree | Implication |",
+    "| --- | --- | --- | --- |",
+    "| Agents need tools | Multiple sources show tool use | Some sources frame chat as enough | Prioritize workflows, not summaries |",
+    "| Planning matters | Architectures emphasize decomposition | Simple tasks may not need it | Match complexity to task size |",
+    "| Evaluation is hard | Reliability is repeatedly flagged | Benchmarks stay shallow | Keep decisions reversible |",
+    "",
+    "## The Gap Map",
+    "",
+    "| Known | Unknown | Why it matters |",
+    "| --- | --- | --- |",
+    "| Agents can call tools | Which tools matter first | Tool choice determines operator leverage |",
+    "| Research can be filed | Which notes compound | Vault links shape reuse |",
+    "| Prompt rules guide output | Which rules fail live | Validation protects quality |",
+    "| Decisions can be listed | Which decision blocks action | Open questions should be practical |",
+    "",
+    "> [!warning] Blind Spots",
+    "> The sources still understate cost, latency, failure recovery, and the amount of operator judgment required.",
+    "",
+    "## Where Chris Has Leverage",
+    leverage,
+    "",
+    "> [!tip] Highest-Leverage Move",
+    "> Turn the synthesis into one time-boxed decision memo connected to [[note-a]] and ship it before starting another research sweep.",
+    "",
+    "## Connected Vault Notes",
+    "",
+    "| Note | Why relevant | Status |",
+    "| --- | --- | --- |",
+    "| [[note-a]] | Source evidence | active |",
+    "| [[note-b]] | Architecture signal | active |",
+    "| [[note-c]] | Comparison point | active |",
+    "| [[real-note]] | Fixture-backed note | active |",
+    "| [[Operator-Profile]] | Operator constraints | active |",
+    "",
+    "## Decisions Needed",
+    "",
+    "### Decision: pick architecture",
+    "- **Option A:** ReAct loop",
+    "- **Option B:** Planner-executor",
+    "- **Downstream consequence:** The choice changes latency, observability, and failure handling.",
+    "",
+    "### Decision: pick cadence",
+    "- **Option A:** Weekly synthesis",
+    "- **Option B:** Per-brief synthesis",
+    "- **Downstream consequence:** The choice changes workload and compounding cadence.",
+    "",
+    "### Decision: pick distribution",
+    "- **Option A:** Public memo",
+    "- **Option B:** Private vault note",
+    "- **Downstream consequence:** The choice changes proof creation and feedback speed.",
+    "",
+    "### Decision: pick validation gate",
+    "- **Option A:** Strict PAKE++ validation",
+    "- **Option B:** Prompt-only guidance",
+    "- **Downstream consequence:** The choice changes rejection rate and output consistency.",
+    "",
+    "## Open Questions",
+    "1. Which source should drive the first operator decision?",
+    "2. Which vault note should become the canonical reference?",
+    "3. Which next action is blocked by missing evidence?",
+    "",
+    "## Version / Run Metadata",
+    "",
+    "| Date | Brief topic | Sources ingested | Queries run |",
+    "| --- | --- | --- | --- |",
+    "| 2026-04-22 | AI agents | 3 | 2 |",
+    "",
+    "> [!abstract]",
+    "> The synthesis shows that agent orchestration matters most when it becomes an operator decision, not a generic summary.",
+    "> The highest-leverage action is to turn the research into one connected decision memo before running another sweep.",
+    NO_VAULT_CONTEXT_WARNING,
+  ].join("\n");
 }
 
 function makeSynthesis(
@@ -81,7 +197,7 @@ function makeSynthesis(
     behavior &&
     typeof behavior === "object" &&
     "summary" in behavior &&
-    "patterns" in behavior
+    "body" in behavior
   ) {
     const canned = behavior as SynthesisAdapterOutput;
     return { synthesize: async () => canned };
@@ -92,12 +208,11 @@ function makeSynthesis(
     ) => Promise<SynthesisAdapterOutput> | Promise<unknown>;
   };
   return {
-    synthesize: (b.synthesize ?? (async () => ({
-      patterns: ["pattern one"],
-      gaps: ["gap one"],
-      opportunities: ["opp one"],
-      summary: "a concise summary",
-    }))) as SynthesisAdapter["synthesize"],
+    synthesize: (b.synthesize ??
+      (async () => ({
+        body: validPakeBody(),
+        summary: "a concise summary",
+      }))) as SynthesisAdapter["synthesize"],
   };
 }
 
@@ -142,12 +257,7 @@ describe("AC: input-validation — schema guard on sweep input", () => {
             synthesis: makeSynthesis({
               synthesize: async () => {
                 synthCalled = true;
-                return {
-                  patterns: [],
-                  gaps: [],
-                  opportunities: [],
-                  summary: "s",
-                };
+                return { body: "# x", summary: "s" };
               },
             }),
           },
@@ -174,12 +284,7 @@ describe("AC: empty-sweep — short-circuit when no notes_created", () => {
           synthesis: makeSynthesis({
             synthesize: async () => {
               synthCalled = true;
-              return {
-                patterns: [],
-                gaps: [],
-                opportunities: [],
-                summary: "s",
-              };
+              return { body: "# x", summary: "s" };
             },
           }),
         },
@@ -224,9 +329,7 @@ describe("AC: vault-reads — per-note read errors do not abort", () => {
           },
         }),
         synthesis: makeSynthesis({
-          patterns: ["p1"],
-          gaps: [],
-          opportunities: [],
+          body: validPakeBody(),
           summary: "partial summary",
         }),
       },
@@ -254,12 +357,7 @@ describe("AC: vault-reads — per-note read errors do not abort", () => {
         synthesis: makeSynthesis({
           synthesize: async () => {
             synthCalled = true;
-            return {
-              patterns: [],
-              gaps: [],
-              opportunities: [],
-              summary: "s",
-            };
+            return { body: "# x", summary: "s" };
           },
         }),
       },
@@ -280,22 +378,33 @@ describe("AC: vault-reads — per-note read errors do not abort", () => {
 // ── AC: synthesis ───────────────────────────────────────────────────────────
 
 describe("AC: synthesis — adapter invocation and output validation", () => {
-  it("passes topic, queries, and source_notes to the synthesis adapter", async () => {
+  it("passes topic, queries, source_notes, operator_context, vault_context_packet to the synthesis adapter", async () => {
     const vaultRoot = await makeVault();
     let captured: Parameters<SynthesisAdapter["synthesize"]>[0] | null = null;
+    const packet: VaultContextPacket = {
+      notes: [
+        {
+          vault_path: "03-Resources/Operator-Profile.md",
+          title: "Operator Profile",
+          excerpt: "Chris based in Sydney.",
+          retrieval_reason: "operator-profile",
+          tags: ["operator"],
+        },
+      ],
+      total_notes: 1,
+      token_budget_used: 0,
+      retrieval_timestamp: "2026-04-18T22:00:00.000Z",
+    };
     await runSynthesisAgent(vaultRoot, validSweep(), {
       queries: ["q1", "q2"],
+      operator_context: DEFAULT_OPERATOR_CONTEXT,
+      vault_context_packet: packet,
       adapters: {
         vaultRead: makeVaultRead({}),
         synthesis: {
           synthesize: async (input) => {
             captured = input;
-            return {
-              patterns: ["p"],
-              gaps: [],
-              opportunities: [],
-              summary: "s",
-            };
+            return { body: validPakeBody(), summary: "s" };
           },
         },
       },
@@ -307,6 +416,35 @@ describe("AC: synthesis — adapter invocation and output validation", () => {
     expect(captured!.source_notes[0].vault_path).toBe("03-Resources/note-a.md");
     expect(captured!.source_notes[0].body).toContain("Body of 03-Resources/note-a.md");
     expect(captured!.source_notes[2].vault_path).toBe("03-Resources/note-c.md");
+    expect(captured!.operator_context.name).toBe("Chris Taylor");
+    expect(captured!.operator_context.tracks.map((t) => t.name)).toEqual([
+      "Escape Job",
+      "Build Agency",
+    ]);
+    expect(captured!.vault_context_packet.total_notes).toBe(1);
+    expect(captured!.vault_context_packet.notes[0].retrieval_reason).toBe(
+      "operator-profile",
+    );
+  });
+
+  it("defaults operator_context and vault_context_packet when not supplied", async () => {
+    const vaultRoot = await makeVault();
+    let captured: Parameters<SynthesisAdapter["synthesize"]>[0] | null = null;
+    await runSynthesisAgent(vaultRoot, validSweep(), {
+      adapters: {
+        vaultRead: makeVaultRead({}),
+        synthesis: {
+          synthesize: async (input) => {
+            captured = input;
+            return { body: validPakeBody(), summary: "s" };
+          },
+        },
+      },
+    });
+    expect(captured).not.toBeNull();
+    expect(captured!.operator_context.name).toBe("Chris Taylor");
+    expect(captured!.vault_context_packet.total_notes).toBe(0);
+    expect(captured!.vault_context_packet.notes).toEqual([]);
   });
 
   it("throws SCHEMA_INVALID when adapter returns malformed output", async () => {
@@ -318,9 +456,7 @@ describe("AC: synthesis — adapter invocation and output validation", () => {
           synthesis: {
             synthesize: async () =>
               ({
-                patterns: ["p"],
-                gaps: [],
-                // missing opportunities, missing summary
+                body: "# only body, missing summary",
               }) as unknown as SynthesisAdapterOutput,
           },
         },
@@ -336,9 +472,7 @@ describe("AC: synthesis — adapter invocation and output validation", () => {
           vaultRead: makeVaultRead({}),
           synthesis: {
             synthesize: async () => ({
-              patterns: [],
-              gaps: [],
-              opportunities: [],
+              body: "# body",
               summary: "",
             }),
           },
@@ -347,22 +481,109 @@ describe("AC: synthesis — adapter invocation and output validation", () => {
     ).rejects.toMatchObject({ code: "SCHEMA_INVALID" });
   });
 
+  it("throws SCHEMA_INVALID when adapter returns empty body", async () => {
+    const vaultRoot = await makeVault();
+    await expect(
+      runSynthesisAgent(vaultRoot, validSweep(), {
+        adapters: {
+          vaultRead: makeVaultRead({}),
+          synthesis: {
+            synthesize: async () => ({ body: "", summary: "s" }),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: "SCHEMA_INVALID" });
+  });
+
+  it("throws SCHEMA_INVALID when adapter returns a non-empty but non-PAKE body", async () => {
+    const vaultRoot = await makeVault();
+    await expect(
+      runSynthesisAgent(vaultRoot, validSweep(), {
+        adapters: {
+          vaultRead: makeVaultRead({}),
+          synthesis: {
+            synthesize: async () => ({ body: "# b", summary: "s" }),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      message: expect.stringContaining("PAKE++ body"),
+    });
+  });
+
+  it("throws SCHEMA_INVALID when operator profile is absent and body omits the no-vault warning", async () => {
+    const vaultRoot = await makeVault();
+    await expect(
+      runSynthesisAgent(vaultRoot, validSweep(), {
+        vault_context_packet: emptyPacket(),
+        adapters: {
+          vaultRead: makeVaultRead({}),
+          synthesis: {
+            synthesize: async () => ({
+              body: validPakeBody().replace(NO_VAULT_CONTEXT_WARNING, ""),
+              summary: "s",
+            }),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      message: expect.stringContaining("no-vault-context warning"),
+    });
+  });
+
+  it("throws SCHEMA_INVALID when abstract is not 2-3 sentences", async () => {
+    const vaultRoot = await makeVault();
+    const body = validPakeBody().replace(
+      "\n> The highest-leverage action is to turn the research into one connected decision memo before running another sweep.",
+      "",
+    );
+    await expect(
+      runSynthesisAgent(vaultRoot, validSweep(), {
+        adapters: {
+          vaultRead: makeVaultRead({}),
+          synthesis: {
+            synthesize: async () => ({ body, summary: "s" }),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      message: expect.stringContaining("Abstract must contain 2-3 sentences"),
+    });
+  });
+
+  it("throws SCHEMA_INVALID when Highest-Leverage Move is not specific, timeable, and vault-connected", async () => {
+    const vaultRoot = await makeVault();
+    const body = validPakeBody().replace(
+      "> Turn the synthesis into one time-boxed decision memo connected to [[note-a]] and ship it before starting another research sweep.",
+      "> Move faster.",
+    );
+    await expect(
+      runSynthesisAgent(vaultRoot, validSweep(), {
+        adapters: {
+          vaultRead: makeVaultRead({}),
+          synthesis: {
+            synthesize: async () => ({ body, summary: "s" }),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      message: expect.stringContaining("Highest-Leverage Move"),
+    });
+  });
+
   it("validates output schema with synthesisAdapterOutputSchema", () => {
     expect(() =>
-      synthesisAdapterOutputSchema.parse({
-        patterns: [],
-        gaps: [],
-        opportunities: [],
-        summary: "ok",
-      }),
+      synthesisAdapterOutputSchema.parse({ body: "# ok", summary: "ok" }),
     ).not.toThrow();
     expect(() =>
-      synthesisAdapterOutputSchema.parse({
-        patterns: [],
-        gaps: [],
-        opportunities: [],
-        summary: "",
-      }),
+      synthesisAdapterOutputSchema.parse({ body: "# ok", summary: "" }),
+    ).toThrow();
+    expect(() =>
+      synthesisAdapterOutputSchema.parse({ body: "", summary: "ok" }),
     ).toThrow();
   });
 });
@@ -370,15 +591,14 @@ describe("AC: synthesis — adapter invocation and output validation", () => {
 // ── AC: insight-note ────────────────────────────────────────────────────────
 
 describe("AC: insight-note — ingest via pipeline as InsightNote", () => {
-  it("writes an InsightNote with synthesis tag and structured body", async () => {
+  it("writes an InsightNote whose body is the adapter-authored markdown", async () => {
     const vaultRoot = await makeVault();
+    const adapterBody = validPakeBody();
     const result = await runSynthesisAgent(vaultRoot, validSweep(), {
       adapters: {
         vaultRead: makeVaultRead({}),
         synthesis: makeSynthesis({
-          patterns: ["pattern one", "pattern two"],
-          gaps: ["gap one"],
-          opportunities: ["opp one", "opp two"],
+          body: adapterBody,
           summary: "everything converges on agent orchestration",
         }),
       },
@@ -391,43 +611,13 @@ describe("AC: insight-note — ingest via pipeline as InsightNote", () => {
     const content = await readFile(abs, "utf8");
 
     expect(content).toContain("pake_type: InsightNote");
-    expect(content).toContain("# Synthesis: AI agents");
-    expect(content).toContain("## Patterns");
-    expect(content).toContain("- pattern one");
-    expect(content).toContain("## Gaps");
-    expect(content).toContain("- gap one");
-    expect(content).toContain("## Opportunities");
-    expect(content).toContain("- opp one");
-    expect(content).toContain("## Sources");
+    expect(content).toContain("> [!abstract]");
+    expect(content).toContain("## What We Know");
     expect(content).toContain("[[note-a]]");
-    expect(content).toContain("[[note-b]]");
-    expect(content).toContain("[[note-c]]");
     expect(content).toMatch(/tags:[\s\S]*synthesis/);
     expect(content).toMatch(/tags:[\s\S]*AI agents/);
     expect(content).toContain("ai_summary:");
     expect(content).toContain("everything converges on agent orchestration");
-  });
-
-  it("renders '_none identified_' for empty sections", async () => {
-    const vaultRoot = await makeVault();
-    const result = await runSynthesisAgent(vaultRoot, validSweep(), {
-      adapters: {
-        vaultRead: makeVaultRead({}),
-        synthesis: makeSynthesis({
-          patterns: [],
-          gaps: [],
-          opportunities: ["only opp"],
-          summary: "thin synthesis",
-        }),
-      },
-    });
-    expect(result.status).toBe("ok");
-    if (result.status !== "ok") throw new Error("expected ok");
-    const abs = path.join(vaultRoot, result.insight_note.vault_path);
-    const content = await readFile(abs, "utf8");
-    expect(content).toContain("## Patterns\n\n- _none identified_");
-    expect(content).toContain("## Gaps\n\n- _none identified_");
-    expect(content).toContain("- only opp");
   });
 });
 
@@ -440,9 +630,7 @@ describe("AC: result — typed SynthesisRunResult shape", () => {
       adapters: {
         vaultRead: makeVaultRead({}),
         synthesis: makeSynthesis({
-          patterns: ["p"],
-          gaps: [],
-          opportunities: [],
+          body: validPakeBody(),
           summary: "s",
         }),
       },
@@ -467,9 +655,7 @@ describe("AC: audit — sweep-level record emitted", () => {
       adapters: {
         vaultRead: makeVaultRead({}),
         synthesis: makeSynthesis({
-          patterns: ["p"],
-          gaps: [],
-          opportunities: [],
+          body: validPakeBody(),
           summary: "s",
         }),
       },
@@ -506,9 +692,7 @@ describe("AC: audit — sweep-level record emitted", () => {
       adapters: {
         vaultRead: makeVaultRead({}),
         synthesis: makeSynthesis({
-          patterns: ["p"],
-          gaps: [],
-          opportunities: [],
+          body: validPakeBody(),
           summary: "s",
         }),
       },
@@ -527,7 +711,13 @@ describe("AC: tests — default adapters behavior", () => {
   it("default synthesis adapter throws UNSUPPORTED when not configured", async () => {
     const adapter = createDefaultSynthesisAdapter();
     await expect(
-      adapter.synthesize({ topic: "t", queries: [], source_notes: [] }),
+      adapter.synthesize({
+        topic: "t",
+        queries: [],
+        source_notes: [],
+        operator_context: DEFAULT_OPERATOR_CONTEXT,
+        vault_context_packet: emptyPacket(),
+      }),
     ).rejects.toMatchObject({ code: "UNSUPPORTED" });
   });
 
@@ -575,9 +765,7 @@ describe("AC: tests — default adapters behavior", () => {
     const result = await runSynthesisAgent(vaultRoot, sweep, {
       adapters: {
         synthesis: makeSynthesis({
-          patterns: ["default-path-pattern"],
-          gaps: [],
-          opportunities: [],
+          body: validPakeBody(),
           summary: "default path summary",
         }),
       },

@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-04-15
+modified: 2026-04-22
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -292,7 +292,13 @@ Run `bash scripts/verify.sh` before claiming any story done. It is the completio
 4. Verify the note appears in the **Research Tracker** panel (`_meta/bases/research-tracker.base`).
 5. Optionally run `scripts/export-vault-for-notebooklm.sh` and add the export as a NotebookLM source.
 
-### c. Daily agent log
+### c. CNS research chain synthesis
+
+The end-to-end research chain creates operator-ready SynthesisNotes from source notes. Synthesis output must use the PAKE++ body contract: abstract callout, What We Know, Signal vs Noise with Contradiction Ledger, Gap Map, Blind Spots, Where Chris Has Leverage, Highest-Leverage Move, Connected Vault Notes, Decisions Needed, Open Questions, and Version / Run Metadata.
+
+The synthesis agent is personalized to Chris Taylor in Sydney as a Creative Technologist. Its leverage section must reference active tracks such as Escape Job and Build Agency when those tracks are in the operator context. Vault context is pulled from `03-Resources/Operator-Profile.md` plus topic-relevant `03-Resources/` notes; if the operator profile is missing, the synthesis must warn that it is grounded in external research only.
+
+### d. Daily agent log
 
 1. Use `vault_append_daily` targeting section `## Agent Log`.
 2. The tool creates `DailyNotes/YYYY-MM-DD.md` if it does not exist, using the daily note template.
@@ -319,6 +325,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-14 | 1.5.0 | Added read-only index query command (`npm run brain:query`) and documented provenance warnings + stale-path trust model | 12-6-retrieval-query-api-read-only |
 | 2026-04-14 | 1.6.0 | Documented PAKE quality-weighted retrieval ranking and `--no-quality-weighting` opt-out | 12-7-pake-quality-weighting-for-retrieval |
 | 2026-04-15 | 1.7.0 | Added model routing section: overview, operator override rules, version guard, audit trail | 15-6-operator-override-governance-controls |
+| 2026-04-22 | 1.8.0 | Documented PAKE++ synthesis output contract, operator personalization, and missing-profile warning behavior | 18-9-synthesis-quality-redesign |
 
 ---
 

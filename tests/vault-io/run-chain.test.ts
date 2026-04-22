@@ -65,6 +65,15 @@ import {
 import { createLlmSynthesisAdapter } from "../../src/agents/synthesis-adapter-llm.js";
 import { createLlmHookGenerationAdapter } from "../../src/agents/hook-adapter-llm.js";
 import { createLlmWeaponsCheckAdapter } from "../../src/agents/boss-adapter-llm.js";
+import { DEFAULT_OPERATOR_CONTEXT } from "../../src/agents/operator-context.js";
+import type { VaultContextPacket } from "../../src/agents/vault-context-builder.js";
+
+const fixedPacket: VaultContextPacket = {
+  notes: [],
+  total_notes: 0,
+  token_budget_used: 0,
+  retrieval_timestamp: "2026-04-22T00:00:00.000Z",
+};
 
 const brief: ResearchBrief = {
   topic: "AI agents",
@@ -220,7 +229,10 @@ describe("runChain orchestrator (wiring only)", () => {
     vi.mocked(runHookAgent).mockResolvedValue(hooksOk);
     vi.mocked(runBossAgent).mockResolvedValue(weaponsOk);
 
-    const result = await runChain(vaultRoot, brief, { adapters: injectedAdapters() });
+    const result = await runChain(vaultRoot, brief, {
+      adapters: injectedAdapters(),
+      vault_context_packet: fixedPacket,
+    });
 
     expect(Object.keys(result).sort()).toEqual(
       ["hooks", "sweep", "synthesis", "weapons"].sort(),
@@ -234,7 +246,10 @@ describe("runChain orchestrator (wiring only)", () => {
     vi.mocked(runBossAgent).mockResolvedValue(weaponsOk);
 
     const adapters = injectedAdapters();
-    const result = await runChain(vaultRoot, brief, { adapters });
+    const result = await runChain(vaultRoot, brief, {
+      adapters,
+      vault_context_packet: fixedPacket,
+    });
 
     expect(result.sweep).toBe(sweepOk);
     expect(result.synthesis).toBe(synthesisOk);
@@ -250,6 +265,9 @@ describe("runChain orchestrator (wiring only)", () => {
     expect(vi.mocked(runSynthesisAgent)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runSynthesisAgent)).toHaveBeenCalledWith(vaultRoot, sweepOk, {
       adapters: { synthesis: adapters.synthesis },
+      queries: brief.queries,
+      operator_context: DEFAULT_OPERATOR_CONTEXT,
+      vault_context_packet: fixedPacket,
     });
 
     expect(vi.mocked(runHookAgent)).toHaveBeenCalledTimes(1);
@@ -269,7 +287,10 @@ describe("runChain orchestrator (wiring only)", () => {
     vi.mocked(runHookAgent).mockResolvedValue(hooksSkipped);
     vi.mocked(runBossAgent).mockResolvedValue(weaponsSkipped);
 
-    const result = await runChain(vaultRoot, brief, { adapters: injectedAdapters() });
+    const result = await runChain(vaultRoot, brief, {
+      adapters: injectedAdapters(),
+      vault_context_packet: fixedPacket,
+    });
 
     expect(result.synthesis.status).toBe("skipped");
     expect(result.hooks.status).toBe("skipped");
@@ -299,7 +320,7 @@ describe("runChain orchestrator (wiring only)", () => {
     vi.mocked(runHookAgent).mockResolvedValue(hooksOk);
     vi.mocked(runBossAgent).mockResolvedValue(weaponsOk);
 
-    await runChain(vaultRoot, brief);
+    await runChain(vaultRoot, brief, { vault_context_packet: fixedPacket });
 
     expect(vi.mocked(createLlmSynthesisAdapter)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(createLlmHookGenerationAdapter)).toHaveBeenCalledTimes(1);
@@ -312,10 +333,33 @@ describe("runChain orchestrator (wiring only)", () => {
     vi.mocked(runHookAgent).mockResolvedValue(hooksOk);
     vi.mocked(runBossAgent).mockResolvedValue(weaponsOk);
 
-    await runChain(vaultRoot, brief, { adapters: injectedAdapters() });
+    await runChain(vaultRoot, brief, {
+      adapters: injectedAdapters(),
+      vault_context_packet: fixedPacket,
+    });
 
     expect(vi.mocked(createLlmSynthesisAdapter)).not.toHaveBeenCalled();
     expect(vi.mocked(createLlmHookGenerationAdapter)).not.toHaveBeenCalled();
     expect(vi.mocked(createLlmWeaponsCheckAdapter)).not.toHaveBeenCalled();
+  });
+
+  it("AC5: builds vault context packet from vault when not supplied via opts", async () => {
+    vi.mocked(runResearchAgent).mockResolvedValue(sweepOk);
+    vi.mocked(runSynthesisAgent).mockResolvedValue(synthesisOk);
+    vi.mocked(runHookAgent).mockResolvedValue(hooksOk);
+    vi.mocked(runBossAgent).mockResolvedValue(weaponsOk);
+
+    await runChain(vaultRoot, brief, { adapters: injectedAdapters() });
+
+    expect(vi.mocked(runSynthesisAgent)).toHaveBeenCalledTimes(1);
+    const synthCall = vi.mocked(runSynthesisAgent).mock.calls[0];
+    const opts = synthCall[2] as {
+      queries: string[];
+      operator_context: { name: string };
+      vault_context_packet: { total_notes: number };
+    };
+    expect(opts.queries).toEqual(brief.queries);
+    expect(opts.operator_context.name).toBe("Chris Taylor");
+    expect(typeof opts.vault_context_packet.total_notes).toBe("number");
   });
 });
