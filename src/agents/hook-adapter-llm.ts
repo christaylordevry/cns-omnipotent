@@ -1,4 +1,5 @@
 import { CnsError } from "../errors.js";
+import { fetchWithRetry } from "./anthropic-fetch.js";
 import {
   hookGenerationAdapterOutputSchema,
   type HookGenerationAdapter,
@@ -9,7 +10,7 @@ import {
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 1000;
+const MAX_TOKENS = 150;
 
 const SYSTEM_PROMPT = [
   "You are a world-class copywriter for a marketing/creative agency.",
@@ -186,16 +187,21 @@ export function createLlmHookGenerationAdapter(): HookGenerationAdapter {
 
       let response: Response;
       try {
-        response = await fetch(ANTHROPIC_MESSAGES_URL, {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": ANTHROPIC_VERSION,
-            "content-type": "application/json",
+        response = await fetchWithRetry(
+          ANTHROPIC_MESSAGES_URL,
+          {
+            method: "POST",
+            headers: {
+              "x-api-key": apiKey,
+              "anthropic-version": ANTHROPIC_VERSION,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
           },
-          body: JSON.stringify(requestBody),
-        });
+          { adapterLabel: "hook" },
+        );
       } catch (err) {
+        if (err instanceof CnsError) throw err;
         const msg = err instanceof Error ? err.message : String(err);
         throw new CnsError("IO_ERROR", `Hook LLM fetch failed: ${msg}`);
       }

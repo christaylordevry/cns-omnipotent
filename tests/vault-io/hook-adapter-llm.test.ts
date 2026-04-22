@@ -103,7 +103,7 @@ describe("createLlmHookGenerationAdapter", () => {
 
     const body = getRequestBody(fetchMock);
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(1000);
+    expect(body.max_tokens).toBe(150);
     expect(typeof body.system).toBe("string");
     expect(body.system.toLowerCase()).toContain("copywriter");
     expect(body.system.toLowerCase()).toContain("json");
@@ -236,5 +236,98 @@ describe("createLlmHookGenerationAdapter", () => {
     expect(err).toBeInstanceOf(CnsError);
     expect((err as CnsError).code).toBe("SCHEMA_INVALID");
     expect((err as CnsError).message.length).toBeGreaterThan(0);
+  });
+
+  it("synthesis_body is NOT truncated to 1500 chars (full body passed through)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validHookOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const longBody = "A".repeat(4000);
+    const adapter = createLlmHookGenerationAdapter();
+    await adapter.generateOrRefine(generateInput({ synthesis_body: longBody }));
+
+    const body = getRequestBody(fetchMock);
+    const userText = body.messages[0].content;
+    expect(userText).toContain("A".repeat(4000));
+    expect(userText).not.toContain("[...truncated]");
+  });
+
+  it("refine mode: synthesis_body is NOT truncated to 1500 chars", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validHookOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const longBody = "B".repeat(4000);
+    const adapter = createLlmHookGenerationAdapter();
+    await adapter.generateOrRefine(refineInput({ synthesis_body: longBody }));
+
+    const body = getRequestBody(fetchMock);
+    const userText = body.messages[0].content;
+    expect(userText).toContain("B".repeat(4000));
+    expect(userText).not.toContain("[...truncated]");
+  });
+
+  it("429 then 200: retries once with clamped sleep and resolves with exactly 2 fetch calls", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: { retry_after: 3 } }), {
+            status: 429,
+            headers: { "content-type": "application/json" },
+          }),
+        )
+        .mockResolvedValueOnce(makeAnthropicJsonResponse(validHookOutput));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+      const adapter = createLlmHookGenerationAdapter();
+      const promise = adapter.generateOrRefine(generateInput());
+
+      // retry_after=3 is below min clamp (5s), so sleep should be 5000ms
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const result = await promise;
+      expect(result).toEqual(validHookOutput);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      const sleepCall = setTimeoutSpy.mock.calls.find(
+        (c) => typeof c[1] === "number" && c[1] >= 5_000 && c[1] <= 120_000,
+      );
+      expect(sleepCall).toBeDefined();
+      expect(sleepCall![1]).toBe(5_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("3 consecutive 429s: throws CnsError with hook-specific rate-limit message", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { retry_after: 5 } }), {
+          status: 429,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const adapter = createLlmHookGenerationAdapter();
+      const promise = adapter.generateOrRefine(generateInput()).catch((e) => e);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const err = (await promise) as CnsError;
+      expect(err).toBeInstanceOf(CnsError);
+      expect(err.code).toBe("IO_ERROR");
+      expect(err.message).toBe(
+        "Anthropic API rate limited after 3 attempts — hook",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

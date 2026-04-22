@@ -95,7 +95,7 @@ describe("createLlmWeaponsCheckAdapter", () => {
 
     const body = getRequestBody(fetchMock);
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(1500);
+    expect(body.max_tokens).toBe(300);
 
     expect(Array.isArray(body.messages)).toBe(true);
     expect(body.messages).toHaveLength(1);
@@ -227,5 +227,87 @@ describe("createLlmWeaponsCheckAdapter", () => {
     expect(err).toBeInstanceOf(CnsError);
     expect((err as CnsError).code).toBe("SCHEMA_INVALID");
     expect((err as CnsError).message.length).toBeGreaterThan(0);
+  });
+
+  it("429 then 200: retries once with clamped sleep (upper bound) and resolves with exactly 2 fetch calls", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: { retry_after: 500 } }), {
+            status: 429,
+            headers: { "content-type": "application/json" },
+          }),
+        )
+        .mockResolvedValueOnce(makeAnthropicJsonResponse(validWeaponsOutput));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+      const adapter = createLlmWeaponsCheckAdapter();
+      const promise = adapter.scoreAndRewrite(sampleInput());
+
+      // retry_after=500 should clamp to 120s
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      const result = await promise;
+      expect(result).toEqual(validWeaponsOutput);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      const sleepCall = setTimeoutSpy.mock.calls.find(
+        (c) => typeof c[1] === "number" && c[1] >= 5_000 && c[1] <= 120_000,
+      );
+      expect(sleepCall).toBeDefined();
+      expect(sleepCall![1]).toBe(120_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("3 consecutive 429s: throws CnsError with weapons-check-specific rate-limit message", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { retry_after: 5 } }), {
+          status: 429,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const adapter = createLlmWeaponsCheckAdapter();
+      const promise = adapter.scoreAndRewrite(sampleInput()).catch((e) => e);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const err = (await promise) as CnsError;
+      expect(err).toBeInstanceOf(CnsError);
+      expect(err.code).toBe("IO_ERROR");
+      expect(err.message).toBe(
+        "Anthropic API rate limited after 3 attempts — weapons check",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("non-429 non-2xx (500): throws immediately without retry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: "server error" } }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmWeaponsCheckAdapter();
+    await expect(adapter.scoreAndRewrite(sampleInput())).rejects.toMatchObject({
+      name: "CnsError",
+      code: "IO_ERROR",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

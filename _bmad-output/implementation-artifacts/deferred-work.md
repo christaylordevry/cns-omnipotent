@@ -237,6 +237,12 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of story 18-8 (2026-04-21)
+
+- Add jitter / backoff strategy to reduce thundering herd on 429s (avoid synchronized retries across parallel runs); current clamp+sleep is acceptable but could still cause repeat collisions.
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.

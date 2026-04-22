@@ -91,7 +91,7 @@ describe("createLlmSynthesisAdapter", () => {
       messages: Array<{ role: string; content: string }>;
     };
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(1000);
+    expect(body.max_tokens).toBe(800);
     expect(typeof body.system).toBe("string");
     expect(body.system.toLowerCase()).toContain("marketing");
     expect(body.system.toLowerCase()).toContain("json");
@@ -244,5 +244,107 @@ describe("createLlmSynthesisAdapter", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual(validSynthesisOutput);
+  });
+
+  it("caps source_notes at 8 and truncates each body to 600 chars before concat", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const longBody = "x".repeat(2000);
+    const notes = Array.from({ length: 12 }, (_, i) => ({
+      vault_path: `03-Resources/note-${i}.md`,
+      body: longBody,
+      frontmatter: {},
+    }));
+
+    const adapter = createLlmSynthesisAdapter();
+    await adapter.synthesize({
+      topic: "capping",
+      queries: [],
+      source_notes: notes,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      messages: Array<{ content: string }>;
+    };
+    const userText = body.messages[0].content;
+
+    // Only first 8 included
+    for (let i = 0; i < 8; i++) {
+      expect(userText).toContain(`03-Resources/note-${i}.md`);
+    }
+    expect(userText).not.toContain("03-Resources/note-8.md");
+    expect(userText).not.toContain("03-Resources/note-11.md");
+
+    // Each included body truncated to 600 chars (not 2000)
+    expect(userText).not.toContain("x".repeat(601));
+    expect(userText).toContain("x".repeat(600));
+  });
+
+  it("429 then 200: retries once with clamped sleep and resolves with exactly 2 fetch calls", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: { retry_after: 7 } }), {
+            status: 429,
+            headers: { "content-type": "application/json" },
+          }),
+        )
+        .mockResolvedValueOnce(makeAnthropicJsonResponse(validSynthesisOutput));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+      const adapter = createLlmSynthesisAdapter();
+      const promise = adapter.synthesize(sampleInput);
+
+      // Advance past retry-after (clamped to min 5s -> 7s used as-is)
+      await vi.advanceTimersByTimeAsync(7_000);
+
+      const result = await promise;
+      expect(result).toEqual(validSynthesisOutput);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // Verify clamp: sleep was exactly 7000ms (in [5000, 120000])
+      const sleepCall = setTimeoutSpy.mock.calls.find(
+        (c) => typeof c[1] === "number" && c[1] >= 5_000 && c[1] <= 120_000,
+      );
+      expect(sleepCall).toBeDefined();
+      expect(sleepCall![1]).toBe(7_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("3 consecutive 429s: throws CnsError with synthesis-specific rate-limit message", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { retry_after: 5 } }), {
+          status: 429,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const adapter = createLlmSynthesisAdapter();
+      const promise = adapter.synthesize(sampleInput).catch((e) => e);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const err = (await promise) as CnsError;
+      expect(err).toBeInstanceOf(CnsError);
+      expect(err.code).toBe("IO_ERROR");
+      expect(err.message).toBe(
+        "Anthropic API rate limited after 3 attempts — synthesis",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
