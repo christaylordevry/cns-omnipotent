@@ -156,12 +156,20 @@ development_status:
   17-6-answer-filing-insight-synthesis-notes: done
   epic-17-retrospective: done
 
-  epic-18: in-progress
+  epic-18: done
   18-1-research-agent-output-quality-fixes: done
   18-2-synthesis-adapter-real-claude-api-implementation: done
-  18-3-hook-generation-adapter-real-claude-api-implementation: review
+  18-3-hook-generation-adapter-real-claude-api-implementation: done
   18-4-weapons-check-adapter-real-claude-api-implementation: done
-  18-5-end-to-end-chain-orchestrator-and-integration-test: ready-for-dev
+  18-5-end-to-end-chain-orchestrator-and-integration-test: done
   18-6-perplexity-slot-real-direct-api-implementation: done
   18-8-production-adapter-hardening-token-budgeting-and-rate-limit-retry: done
   18-9-synthesis-quality-redesign: done
+  epic-18-retrospective: done
+
+  epic-19: backlog
+  19-1-live-chain-smoke-harness-and-evidence-record: in-progress # harness verified; live smoke evidence saved; Firecrawl/Perplexity credentials returned HTTP 401
+  19-2-operator-context-hydration-from-vault-profile: backlog
+  19-3-hybrid-vault-context-retrieval: backlog
+  19-4-context-aware-live-chain-smoke-and-quality-review: backlog
+  epic-19-retrospective: optional

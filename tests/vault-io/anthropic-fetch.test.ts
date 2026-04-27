@@ -173,7 +173,7 @@ describe("fetchWithRetry", () => {
     expect(sleepCall![1]).toBe(120_000);
   });
 
-  it("throws CnsError('IO_ERROR', 'Anthropic API rate limited after 3 attempts — <label>') after 3 consecutive 429s", async () => {
+  it("throws CnsError('IO_ERROR') with an exact exhausted message after 3 consecutive 429s", async () => {
     vi.useFakeTimers();
 
     const fetchMock = vi.fn().mockResolvedValue(
@@ -187,7 +187,10 @@ describe("fetchWithRetry", () => {
     const promise = fetchWithRetry(
       "https://x",
       { method: "POST" },
-      { adapterLabel: "synthesis" },
+      {
+        adapterLabel: "synthesis",
+        exhaustedMessage: "Synthesis API rate limited after 3 attempts",
+      },
     ).catch((e) => e);
 
     await vi.advanceTimersByTimeAsync(5_000);
@@ -197,7 +200,7 @@ describe("fetchWithRetry", () => {
     expect(err).toBeInstanceOf(CnsError);
     expect(err.code).toBe("IO_ERROR");
     expect(err.message).toBe(
-      "Anthropic API rate limited after 3 attempts — synthesis",
+      "Synthesis API rate limited after 3 attempts",
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });

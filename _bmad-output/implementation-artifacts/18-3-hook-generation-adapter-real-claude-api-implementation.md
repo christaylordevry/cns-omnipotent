@@ -1,6 +1,6 @@
 # Story 18.3: Hook Generation Adapter: Real Claude API Implementation
 
-Status: review
+Status: done
 
 Epic: 18 (Research quality + Perplexity carry)
 
@@ -284,4 +284,24 @@ Claude Code terminal (Opus)
 ### Change Log
 
 - 2026-04-20: Implemented Story 18-3 LLM-backed hook generation adapter. Added `createLlmHookGenerationAdapter()` (one new production file) with generate/refine mode branching, four distinct slot archetypes, honest-scoring rubric, and error mapping matching Story 18-2. Added 7 Vitest cases with mocked `fetch` (one new test file). All 10 acceptance criteria satisfied. Verify gate green at 475 tests (22 TAP + 453 Vitest).
+- 2026-04-22: BMAD code review closure. No patch items against the 18-3 implementation. Sprint status set to `done`. Note: current `hook-adapter-llm.ts` `MAX_TOKENS = 150` is an intentional Story 18-8 supersession of the original 18-3 `max_tokens: 1000` contract, not an 18-3 closure defect.
 
+### Review Findings
+
+_BMAD code review closure (2026-04-22). Focus: 18-3 acceptance criteria, adapter API request shape at the original 18-3 commit, prompt branching, slot divergence, strict JSON/Zod handling, mocked test coverage, and later Story 18-8 token-budget supersession. Verify: `npx vitest run --config vitest.config.ts tests/vault-io/hook-adapter-llm.test.ts` passed 12 tests; `bash scripts/verify.sh` passed 22 TAP + 506 Vitest, lint, typecheck, and build._
+
+#### `decision-needed`
+
+- [x] [Review][Decision] Current `src/agents/hook-adapter-llm.ts` sends `max_tokens: 150` while 18-3 AC2 says `1000` — **Resolved:** Verified original Story 18-3 commit `4307b52` used `MAX_TOKENS = 1000` and tests asserted `1000`. Later done Story 18-8 intentionally changed the hook adapter budget to `150` for production token budgeting. No 18-3 patch required.
+
+#### `patch`
+
+- [x] None.
+
+#### `defer`
+
+- [x] None.
+
+#### `dismissed-as-noise`
+
+- [x] None.

@@ -104,7 +104,10 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
             },
             body: JSON.stringify(requestBody),
           },
-          { adapterLabel: "weapons check" },
+          {
+            adapterLabel: "weapons check",
+            exhaustedMessage: "Weapons check API rate limited after 3 attempts",
+          },
         );
       } catch (err) {
         if (err instanceof CnsError) throw err;

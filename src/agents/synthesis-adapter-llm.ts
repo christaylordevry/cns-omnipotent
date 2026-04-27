@@ -266,7 +266,10 @@ export function createLlmSynthesisAdapter(): SynthesisAdapter {
             },
             body: JSON.stringify(requestBody),
           },
-          { adapterLabel: "synthesis" },
+          {
+            adapterLabel: "synthesis",
+            exhaustedMessage: "Synthesis API rate limited after 3 attempts",
+          },
         );
       } catch (err) {
         if (err instanceof CnsError) throw err;

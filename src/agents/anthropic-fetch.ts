@@ -7,6 +7,7 @@ const DEFAULT_RETRY_AFTER_SECONDS = 5;
 
 export type FetchWithRetryOptions = {
   adapterLabel: string;
+  exhaustedMessage?: string;
   maxAttempts?: number;
 };
 
@@ -60,6 +61,9 @@ export async function fetchWithRetry(
 ): Promise<Response> {
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const label = options.adapterLabel;
+  const exhaustedMessage =
+    options.exhaustedMessage ??
+    `Anthropic API rate limited after ${maxAttempts} attempts — ${label}`;
 
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
     throw new CnsError(
@@ -89,7 +93,7 @@ export async function fetchWithRetry(
 
   throw new CnsError(
     "IO_ERROR",
-    `Anthropic API rate limited after ${maxAttempts} attempts — ${label}`,
+    exhaustedMessage,
     { http_status: 429 },
   );
 }

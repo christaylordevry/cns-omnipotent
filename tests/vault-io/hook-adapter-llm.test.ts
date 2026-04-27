@@ -323,7 +323,7 @@ describe("createLlmHookGenerationAdapter", () => {
       expect(err).toBeInstanceOf(CnsError);
       expect(err.code).toBe("IO_ERROR");
       expect(err.message).toBe(
-        "Anthropic API rate limited after 3 attempts — hook",
+        "Hook API rate limited after 3 attempts",
       );
       expect(fetchMock).toHaveBeenCalledTimes(3);
     } finally {

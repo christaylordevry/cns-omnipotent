@@ -198,7 +198,10 @@ export function createLlmHookGenerationAdapter(): HookGenerationAdapter {
             },
             body: JSON.stringify(requestBody),
           },
-          { adapterLabel: "hook" },
+          {
+            adapterLabel: "hook",
+            exhaustedMessage: "Hook API rate limited after 3 attempts",
+          },
         );
       } catch (err) {
         if (err instanceof CnsError) throw err;
