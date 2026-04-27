@@ -251,11 +251,11 @@ async function main() {
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const brief = {
-    topic: "Creative Technologist remote roles and how to position for them in 2026",
+    topic: "how to price creative agency retainers in 2026",
     queries: [
-      "what do companies actually want when they hire a creative technologist",
-      "creative technologist remote job market 2026 salary expectations",
-      "how to position AI skills for creative director or creative technologist roles reddit",
+      "how to price creative agency retainer fees and packages",
+      "agency retainer pricing models monthly vs project based 2026",
+      "what should a small creative agency charge for a monthly retainer",
     ],
     depth: "deep" as const,
   };
