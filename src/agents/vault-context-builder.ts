@@ -2,6 +2,11 @@ import path from "node:path";
 import matter from "gray-matter";
 import { z } from "zod";
 import { CnsError } from "../errors.js";
+import {
+  DEFAULT_OPERATOR_CONTEXT,
+  operatorContextSchema,
+  type OperatorContext,
+} from "./operator-context.js";
 import { vaultReadFile } from "../tools/vault-read.js";
 import { vaultSearch } from "../tools/vault-search.js";
 
@@ -32,6 +37,34 @@ const OPERATOR_PROFILE_PATH = "03-Resources/Operator-Profile.md";
 const RESOURCES_SCOPE = "03-Resources";
 const EXCERPT_CHARS = 400;
 const MAX_TOPIC_MATCH_NOTES = 2;
+
+export async function loadOperatorContextFromVault(
+  vaultRoot: string,
+): Promise<OperatorContext> {
+  try {
+    const raw = await vaultReadFile(vaultRoot, OPERATOR_PROFILE_PATH);
+    const parsed = matter(raw);
+    const fm =
+      parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data)
+        ? (parsed.data as Record<string, unknown>)
+        : {};
+
+    const candidate: Partial<OperatorContext> = {
+      name: fm["operator_name"] as unknown as string,
+      location: fm["operator_location"] as unknown as string,
+      positioning: fm["operator_positioning"] as unknown as string,
+      tracks: fm["operator_tracks"] as unknown as OperatorContext["tracks"],
+      constraints: fm["operator_constraints"] as unknown as string[],
+    };
+
+    const validated = operatorContextSchema.safeParse(candidate);
+    if (!validated.success) return DEFAULT_OPERATOR_CONTEXT;
+
+    return validated.data;
+  } catch {
+    return DEFAULT_OPERATOR_CONTEXT;
+  }
+}
 
 function titleFromFrontmatterOrPath(fm: Record<string, unknown>, vaultPath: string): string {
   const t = fm["title"];

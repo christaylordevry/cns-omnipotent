@@ -28,6 +28,7 @@ import {
 } from "./operator-context.js";
 import {
   buildVaultContextPacket,
+  loadOperatorContextFromVault,
   type VaultContextPacket,
 } from "./vault-context-builder.js";
 
@@ -58,7 +59,10 @@ export async function runChain(
 ): Promise<ChainRunResult> {
   const sweep = await runResearchAgent(vaultRoot, brief, opts.research);
 
-  const operator_context = opts.operator_context ?? DEFAULT_OPERATOR_CONTEXT;
+  const operator_context =
+    opts.operator_context ??
+    (await loadOperatorContextFromVault(vaultRoot)) ??
+    DEFAULT_OPERATOR_CONTEXT;
   const vault_context_packet =
     opts.vault_context_packet ??
     (await buildVaultContextPacket(vaultRoot, brief.topic, brief.queries));

@@ -169,7 +169,7 @@ development_status:
 
   epic-19: in-progress
   19-1-live-chain-smoke-harness-and-evidence-record: done # harness verified; live smoke evidence saved; Firecrawl/Perplexity credentials returned HTTP 401
-  19-2-operator-context-hydration-from-vault-profile: in-progress
-  19-3-hybrid-vault-context-retrieval: backlog
+  19-2-operator-context-hydration-from-vault-profile: done
+  19-3-hybrid-vault-context-retrieval: in-progress
   19-4-context-aware-live-chain-smoke-and-quality-review: backlog
   epic-19-retrospective: optional

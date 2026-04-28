@@ -2,12 +2,55 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildVaultContextPacket } from "../../src/agents/vault-context-builder.js";
+import {
+  buildVaultContextPacket,
+  loadOperatorContextFromVault,
+} from "../../src/agents/vault-context-builder.js";
+import { DEFAULT_OPERATOR_CONTEXT } from "../../src/agents/operator-context.js";
 
 async function makeVault(): Promise<string> {
   const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-vctx-"));
   await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
   return vaultRoot;
+}
+
+function yamlScalar(v: unknown): string {
+  if (typeof v === "string") {
+    // Minimal quoting to avoid breaking on ':' and friends.
+    return JSON.stringify(v);
+  }
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v === null) return "null";
+  return JSON.stringify(v);
+}
+
+function yamlForFrontmatter(frontmatter: Record<string, unknown>): string {
+  return Object.entries(frontmatter)
+    .map(([k, v]) => {
+      if (Array.isArray(v)) {
+        if (v.every((x) => x && typeof x === "object" && !Array.isArray(x))) {
+          const items = v
+            .map((obj) => {
+              const entries = Object.entries(obj as Record<string, unknown>);
+              if (entries.length === 0) return `  - {}`;
+              const [firstKey, firstVal] = entries[0];
+              const rest = entries.slice(1);
+              const lines = [`  - ${firstKey}: ${yamlScalar(firstVal)}`];
+              for (const [rk, rv] of rest) {
+                lines.push(`    ${rk}: ${yamlScalar(rv)}`);
+              }
+              return lines.join("\n");
+            })
+            .join("\n");
+          return `${k}:\n${items}`;
+        }
+
+        return `${k}:\n${v.map((x) => `  - ${yamlScalar(x)}`).join("\n")}`;
+      }
+
+      return `${k}: ${yamlScalar(v)}`;
+    })
+    .join("\n");
 }
 
 async function writeNote(
@@ -18,14 +61,7 @@ async function writeNote(
 ): Promise<void> {
   const abs = path.join(vaultRoot, relPath);
   await mkdir(path.dirname(abs), { recursive: true });
-  const yaml = Object.entries(frontmatter)
-    .map(([k, v]) => {
-      if (Array.isArray(v)) {
-        return `${k}:\n${v.map((x) => `  - ${x}`).join("\n")}`;
-      }
-      return `${k}: ${String(v)}`;
-    })
-    .join("\n");
+  const yaml = yamlForFrontmatter(frontmatter);
   const content = `---\n${yaml}\n---\n\n${body}\n`;
   await writeFile(abs, content, "utf8");
 }
@@ -132,5 +168,85 @@ describe("buildVaultContextPacket", () => {
     expect(packet.notes).toEqual([]);
     expect(packet.token_budget_used).toBe(0);
     expect(typeof packet.retrieval_timestamp).toBe("string");
+  });
+});
+
+describe("loadOperatorContextFromVault", () => {
+  it("valid profile note → returns hydrated OperatorContext", async () => {
+    const vaultRoot = await makeVault();
+
+    await writeNote(
+      vaultRoot,
+      "03-Resources/Operator-Profile.md",
+      {
+        operator_name: "Jane Doe",
+        operator_location: "Berlin, Germany",
+        operator_positioning: "Independent Researcher",
+        operator_tracks: [
+          { name: "CNS Phase 1", status: "active", priority: "primary" },
+          { name: "Ops Hygiene", status: "maint", priority: "secondary" },
+        ],
+        operator_constraints: ["solo operator", "limited time"],
+      },
+      "Profile body is ignored for hydration.",
+    );
+
+    const ctx = await loadOperatorContextFromVault(vaultRoot);
+    expect(ctx).toEqual({
+      name: "Jane Doe",
+      location: "Berlin, Germany",
+      positioning: "Independent Researcher",
+      tracks: [
+        { name: "CNS Phase 1", status: "active", priority: "primary" },
+        { name: "Ops Hygiene", status: "maint", priority: "secondary" },
+      ],
+      constraints: ["solo operator", "limited time"],
+    });
+  });
+
+  it("missing file → returns DEFAULT_OPERATOR_CONTEXT", async () => {
+    const vaultRoot = await makeVault();
+    const ctx = await loadOperatorContextFromVault(vaultRoot);
+    expect(ctx).toEqual(DEFAULT_OPERATOR_CONTEXT);
+  });
+
+  it("invalid frontmatter (missing required field) → returns DEFAULT_OPERATOR_CONTEXT", async () => {
+    const vaultRoot = await makeVault();
+
+    await writeNote(
+      vaultRoot,
+      "03-Resources/Operator-Profile.md",
+      {
+        operator_name: "Jane Doe",
+        // operator_location missing
+        operator_positioning: "Independent Researcher",
+        operator_tracks: [{ name: "CNS", status: "active", priority: "primary" }],
+        operator_constraints: ["solo operator"],
+      },
+      "Missing operator_location should fail schema.",
+    );
+
+    const ctx = await loadOperatorContextFromVault(vaultRoot);
+    expect(ctx).toEqual(DEFAULT_OPERATOR_CONTEXT);
+  });
+
+  it("operator_tracks with bad shape → returns DEFAULT_OPERATOR_CONTEXT", async () => {
+    const vaultRoot = await makeVault();
+
+    await writeNote(
+      vaultRoot,
+      "03-Resources/Operator-Profile.md",
+      {
+        operator_name: "Jane Doe",
+        operator_location: "Berlin, Germany",
+        operator_positioning: "Independent Researcher",
+        operator_tracks: ["not-an-object"],
+        operator_constraints: ["solo operator"],
+      },
+      "Bad tracks shape should fail schema.",
+    );
+
+    const ctx = await loadOperatorContextFromVault(vaultRoot);
+    expect(ctx).toEqual(DEFAULT_OPERATOR_CONTEXT);
   });
 });
