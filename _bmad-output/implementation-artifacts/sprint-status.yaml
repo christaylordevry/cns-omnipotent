@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-04-28T00:00:00Z"
+last_updated: "2026-04-28T10:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -167,9 +167,9 @@ development_status:
   18-9-synthesis-quality-redesign: done
   epic-18-retrospective: done
 
-  epic-19: in-progress
+  epic-19: done
   19-1-live-chain-smoke-harness-and-evidence-record: done # harness verified; live smoke evidence saved; Firecrawl/Perplexity credentials returned HTTP 401
   19-2-operator-context-hydration-from-vault-profile: done
   19-3-hybrid-vault-context-retrieval: done
-  19-4-context-aware-live-chain-smoke-and-quality-review: in-progress
+  19-4-context-aware-live-chain-smoke-and-quality-review: done
   epic-19-retrospective: optional

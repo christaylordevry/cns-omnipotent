@@ -136,6 +136,12 @@ Update `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md` with **Symptom E** and
 
 - **Class:** (b) Phase 2 / operator workflow (documented workaround; Story 10-1 smoke verified).
 
+### Firecrawl URL result volatility (topic/search quality)
+
+Repeated runs of the same research prompt can yield **different source URLs** from Firecrawl, causing downstream note sets (and derived scoring/gates) to vary even when the chain architecture is stable. Treat this as a **topic/search result quality** issue (source selection / ranking / dedupe), not a chain correctness defect.
+
+- **Class:** (b) Phase 2 backlog (research source quality + stability / dedupe policy).
+
 ---
 
 ## Closed / resolved (detail)
