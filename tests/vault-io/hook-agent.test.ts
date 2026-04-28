@@ -71,7 +71,7 @@ function makeVaultRead(behavior: {
 function gateNeverPassesAdapter(): HookGenerationAdapter {
   return {
     async generateOrRefine() {
-      return { hook_text: "still weak", score: 9 };
+      return { hook_text: "still weak", score: 8 };
     },
   };
 }

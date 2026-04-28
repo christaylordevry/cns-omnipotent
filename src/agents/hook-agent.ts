@@ -209,7 +209,7 @@ async function runOneHookSlot(
     draft = parsed.data.hook_text;
     trace.push({ iteration, score: parsed.data.score });
 
-    if (iteration >= MIN_HOOK_ITERATIONS && parsed.data.score >= 10) {
+    if (iteration >= MIN_HOOK_ITERATIONS && parsed.data.score >= 9) {
       return { slot: ctx.hook_slot, final_hook: draft, iterations: iteration, trace };
     }
   }
@@ -217,7 +217,7 @@ async function runOneHookSlot(
   const last = trace[trace.length - 1];
   throw new CnsError(
     "IO_ERROR",
-    `Hook slot ${ctx.hook_slot} did not reach 10/10 within ${MAX_HOOK_ITERATIONS} iterations (last score: ${last?.score ?? 0})`,
+    `Hook slot ${ctx.hook_slot} did not reach 9+/10 within ${MAX_HOOK_ITERATIONS} iterations (last score: ${last?.score ?? 0})`,
   );
 }
 

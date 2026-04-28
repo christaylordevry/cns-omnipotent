@@ -251,11 +251,11 @@ async function main() {
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const brief = {
-    topic: "how to price creative agency retainers in 2026",
+    topic: "Obsidian personal knowledge management workflows 2026",
     queries: [
-      "how to price creative agency retainer fees and packages",
-      "agency retainer pricing models monthly vs project based 2026",
-      "what should a small creative agency charge for a monthly retainer",
+      "Obsidian PKM system setup best practices 2026",
+      "Obsidian linking notes zettelkasten second brain workflow",
+      "Obsidian plugins and templates for productivity system",
     ],
     depth: "deep" as const,
   };
