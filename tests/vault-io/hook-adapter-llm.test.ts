@@ -103,7 +103,7 @@ describe("createLlmHookGenerationAdapter", () => {
 
     const body = getRequestBody(fetchMock);
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(150);
+    expect(body.max_tokens).toBe(300);
     expect(typeof body.system).toBe("string");
     expect(body.system.toLowerCase()).toContain("copywriter");
     expect(body.system.toLowerCase()).toContain("json");
@@ -120,7 +120,7 @@ describe("createLlmHookGenerationAdapter", () => {
     // Scoring rubric must appear in both modes
     expect(userText.toLowerCase()).toContain("novelty");
     expect(userText.toLowerCase()).toContain("copy intensity");
-    expect(userText.toLowerCase()).toContain("honest");
+    expect(userText.toLowerCase()).toContain("grounded in the sources");
     expect(userText).toMatch(/1[\s\S]{0,5}10/); // 1–10 range
     // Generate mode MUST NOT include refine language or current_draft terms
     expect(userText.toLowerCase()).not.toContain("current_draft");
@@ -150,7 +150,7 @@ describe("createLlmHookGenerationAdapter", () => {
     // Scoring rubric still present
     expect(userText.toLowerCase()).toContain("novelty");
     expect(userText.toLowerCase()).toContain("copy intensity");
-    expect(userText.toLowerCase()).toContain("honest");
+    expect(userText.toLowerCase()).toContain("grounded in the sources");
   });
 
   it("hook_slot influences prompt: slot 1 vs slot 2 produce different prompts with distinct archetypes", async () => {

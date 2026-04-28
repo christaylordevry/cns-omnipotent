@@ -10,7 +10,7 @@ import {
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 150;
+const MAX_TOKENS = 300;
 
 const SYSTEM_PROMPT = [
   "You are a world-class copywriter for a marketing/creative agency.",
@@ -58,14 +58,14 @@ function archetypeFor(slot: number): { label: string; guidance: string } {
 }
 
 const SCORING_RUBRIC = [
-  "Scoring rubric (integer 1-10, honest):",
-  "- 10: genuinely exceptional — rare; reserve for hooks that would stop a scroll instantly.",
-  "- 7-9: strong but not yet exceptional.",
+  "Scoring rubric (integer 1-10):",
+  "- 10: specific, concrete, grounded in the sources, non-generic, would stop a scroll. Achievable — aim for it.",
+  "- 7-9: strong but not yet specific enough. Push harder on concrete detail.",
   "- 1-6: weak; rewrite it.",
   "Score based on:",
-  "- novelty: freshness, non-generic angle, no clichés.",
+  "- novelty: freshness, non-generic angle, no clichés — use numbers, mechanisms, named specifics from the synthesis.",
   "- copy intensity: direct, high-stakes, no filler, every word earns its place.",
-  "Be honest — do not inflate the score.",
+  "Score what you actually wrote. If it is specific, grounded in the sources, and non-generic, score it 10.",
 ].join("\n");
 
 function buildGeneratePrompt(input: HookGenerationAdapterInput): string {
