@@ -7,6 +7,7 @@ import {
   operatorContextSchema,
   type OperatorContext,
 } from "./operator-context.js";
+import { vaultListDirectory } from "../tools/vault-list.js";
 import { vaultReadFile } from "../tools/vault-read.js";
 import { vaultSearch } from "../tools/vault-search.js";
 
@@ -36,7 +37,26 @@ export type VaultContextPacket = z.infer<typeof vaultContextPacketSchema>;
 const OPERATOR_PROFILE_PATH = "03-Resources/Operator-Profile.md";
 const RESOURCES_SCOPE = "03-Resources";
 const EXCERPT_CHARS = 400;
-const MAX_TOPIC_MATCH_NOTES = 2;
+
+const DEFAULT_TOKEN_BUDGET = 2000;
+const MAX_TAG_LANE_NOTES = 2;
+const MAX_TOPIC_MATCH_NOTES = 3;
+const MAX_RECENCY_NOTES = 2;
+const TAG_LANE_SEARCH_RESULTS = 5;
+const TOPIC_SEARCH_RESULTS = 5;
+const RECENCY_LIST_LIMIT = 5;
+
+let tokenBudget = DEFAULT_TOKEN_BUDGET;
+
+/** @internal — test-only override for the per-packet token budget. */
+export function __setTokenBudgetForTests(n: number): void {
+  tokenBudget = n;
+}
+
+/** @internal — restore the production token budget. */
+export function __resetTokenBudgetForTests(): void {
+  tokenBudget = DEFAULT_TOKEN_BUDGET;
+}
 
 export async function loadOperatorContextFromVault(
   vaultRoot: string,
@@ -104,15 +124,58 @@ function buildExcerpt(body: string): string {
   return trimmed.slice(0, EXCERPT_CHARS);
 }
 
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function trackToTag(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+type BudgetState = { used: number; exhausted: boolean };
+
+type AddOutcome = "added" | "skipped-budget" | "skipped-other";
+
+async function tryAddNote(
+  vaultRoot: string,
+  vaultPath: string,
+  reason: VaultContextNote["retrieval_reason"],
+  notes: VaultContextNote[],
+  seen: Set<string>,
+  budget: BudgetState,
+): Promise<AddOutcome> {
+  if (seen.has(vaultPath)) return "skipped-other";
+  const read = await tryReadNote(vaultRoot, vaultPath);
+  if (read === null) return "skipped-other";
+  const excerpt = buildExcerpt(read.body);
+  const cost = estimateTokens(excerpt);
+  if (budget.used + cost > tokenBudget) {
+    budget.exhausted = true;
+    return "skipped-budget";
+  }
+  notes.push({
+    vault_path: vaultPath,
+    title: titleFromFrontmatterOrPath(read.frontmatter, vaultPath),
+    excerpt,
+    retrieval_reason: reason,
+    tags: tagsFromFrontmatter(read.frontmatter),
+  });
+  seen.add(vaultPath);
+  budget.used += cost;
+  return "added";
+}
+
 /**
- * Minimal VaultContextPacket builder (Story 18-9).
+ * Bounded hybrid VaultContextPacket retriever (Story 19-3).
  *
- * - Guarantees an operator profile slot at `03-Resources/Operator-Profile.md` when present.
- * - Adds up to 2 topic-relevant notes via `vault_search` scoped to `03-Resources/`.
- * - Swallows search / read failures: packet degrades to what is readable.
+ * Tier order (stops when token budget is exhausted):
+ *   1. operator-profile (1 slot) — `03-Resources/Operator-Profile.md`
+ *   2. tag-lane (max 2)         — vault_search per active operator track tag
+ *   3. topic-match (max 3)      — vault_search on topic
+ *   4. recency (max 2)          — vault_list entries sorted by modified ISO string desc
  *
- * The `queries` parameter is part of the forward-compatible signature for the full
- * hybrid retriever and is not used by this minimal builder.
+ * Each tier is wrapped in try/catch and skipped silently on failure.
+ * `queries` is accepted for forward-compat but unused.
  */
 export async function buildVaultContextPacket(
   vaultRoot: string,
@@ -122,53 +185,124 @@ export async function buildVaultContextPacket(
   void queries;
   const notes: VaultContextNote[] = [];
   const seen = new Set<string>();
+  const budget: BudgetState = { used: 0, exhausted: false };
 
-  const profile = await tryReadNote(vaultRoot, OPERATOR_PROFILE_PATH);
-  if (profile !== null) {
-    notes.push({
-      vault_path: OPERATOR_PROFILE_PATH,
-      title: titleFromFrontmatterOrPath(profile.frontmatter, OPERATOR_PROFILE_PATH),
-      excerpt: buildExcerpt(profile.body),
-      retrieval_reason: "operator-profile",
-      tags: tagsFromFrontmatter(profile.frontmatter),
-    });
-    seen.add(OPERATOR_PROFILE_PATH);
+  // Tier 1: operator-profile
+  try {
+    await tryAddNote(
+      vaultRoot,
+      OPERATOR_PROFILE_PATH,
+      "operator-profile",
+      notes,
+      seen,
+      budget,
+    );
+  } catch {
+    // tier failure → skip silently
   }
 
-  if (topic.trim().length > 0) {
+  // Tier 2: tag-lane (active track names → kebab-case tags)
+  if (!budget.exhausted) {
+    try {
+      const operatorContext = await loadOperatorContextFromVault(vaultRoot);
+      const tags = operatorContext.tracks
+        .filter((t) => t.status === "active")
+        .map((t) => trackToTag(t.name))
+        .filter((t) => t.length > 0);
+
+      let added = 0;
+      tagLoop: for (const tag of tags) {
+        if (added >= MAX_TAG_LANE_NOTES) break;
+        try {
+          const result = await vaultSearch(vaultRoot, {
+            query: tag,
+            scope: RESOURCES_SCOPE,
+            maxResults: TAG_LANE_SEARCH_RESULTS,
+          });
+          for (const hit of result.hits) {
+            if (added >= MAX_TAG_LANE_NOTES) break;
+            const outcome = await tryAddNote(
+              vaultRoot,
+              hit.path,
+              "tag-lane",
+              notes,
+              seen,
+              budget,
+            );
+            if (outcome === "added") added++;
+            if (outcome === "skipped-budget") break tagLoop;
+          }
+        } catch {
+          // single-tag failure → continue with the next tag
+        }
+      }
+    } catch {
+      // tier failure → skip silently
+    }
+  }
+
+  // Tier 3: topic-match
+  if (!budget.exhausted && topic.trim().length > 0) {
     try {
       const result = await vaultSearch(vaultRoot, {
         query: topic,
         scope: RESOURCES_SCOPE,
-        maxResults: 3,
+        maxResults: TOPIC_SEARCH_RESULTS,
       });
-      const picked: string[] = [];
+      let added = 0;
       for (const hit of result.hits) {
-        if (picked.length >= MAX_TOPIC_MATCH_NOTES) break;
-        if (seen.has(hit.path)) continue;
-        picked.push(hit.path);
-        seen.add(hit.path);
-      }
-      for (const vp of picked) {
-        const read = await tryReadNote(vaultRoot, vp);
-        if (read === null) continue;
-        notes.push({
-          vault_path: vp,
-          title: titleFromFrontmatterOrPath(read.frontmatter, vp),
-          excerpt: buildExcerpt(read.body),
-          retrieval_reason: "topic-match",
-          tags: tagsFromFrontmatter(read.frontmatter),
-        });
+        if (added >= MAX_TOPIC_MATCH_NOTES) break;
+        const outcome = await tryAddNote(
+          vaultRoot,
+          hit.path,
+          "topic-match",
+          notes,
+          seen,
+          budget,
+        );
+        if (outcome === "added") added++;
+        if (outcome === "skipped-budget") break;
       }
     } catch {
-      // Search failures (scope missing, etc.) → minimal packet continues.
+      // tier failure → skip silently
+    }
+  }
+
+  // Tier 4: recency
+  if (!budget.exhausted) {
+    try {
+      const result = await vaultListDirectory(vaultRoot, {
+        userPath: RESOURCES_SCOPE,
+        recursive: false,
+      });
+      const recent = result.entries
+        .filter((e) => e.type === "file" && e.name.endsWith(".md"))
+        .sort((a, b) => b.modified.localeCompare(a.modified))
+        .slice(0, RECENCY_LIST_LIMIT);
+
+      let added = 0;
+      for (const ent of recent) {
+        if (added >= MAX_RECENCY_NOTES) break;
+        const outcome = await tryAddNote(
+          vaultRoot,
+          ent.vaultPath,
+          "recency",
+          notes,
+          seen,
+          budget,
+        );
+        if (outcome === "added") added++;
+        if (outcome === "skipped-budget") break;
+      }
+    } catch {
+      // tier failure → skip silently
     }
   }
 
   return {
     notes,
     total_notes: notes.length,
-    token_budget_used: 0,
+    token_budget_used: budget.used,
     retrieval_timestamp: new Date().toISOString(),
   };
 }
