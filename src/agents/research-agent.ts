@@ -26,7 +26,7 @@ export const skipReasonSchema = z.enum([
 ]);
 export type SkipReason = z.infer<typeof skipReasonSchema>;
 
-export const researchSourceSchema = z.enum(["firecrawl", "apify", "perplexity"]);
+export const researchSourceSchema = z.enum(["firecrawl", "apify", "scrapling", "perplexity"]);
 export type ResearchSource = z.infer<typeof researchSourceSchema>;
 
 export const createdNoteSchema = z.object({
@@ -68,12 +68,24 @@ function apifyQualityGateSnippetUri(query: string, index: number): string {
   return `urn:cns:research-sweep:apify:snippet:${encodeURIComponent(query)}:${index}`;
 }
 
+/** Synthetic `source_uri` when the Scrapling stealthy-fetch adapter throws for a query. */
+export function scraplingQueryAdapterFailureUri(query: string): string {
+  return `urn:cns:research-sweep:scrapling:query:${encodeURIComponent(query)}`;
+}
+
+function scraplingQualityGateSnippetUri(query: string, index: number): string {
+  return `urn:cns:research-sweep:scrapling:snippet:${encodeURIComponent(query)}:${index}`;
+}
+
 /** Synthetic `source_uri` / provenance for a filed Perplexity answer (one per brief query). */
 export function perplexityAnswerSourceUri(query: string): string {
   return `urn:cns:research-sweep:perplexity:answer:${encodeURIComponent(query)}`;
 }
 
-function sweepBaseTags(brief: ResearchBrief, sweepLabel: "research-sweep" | "apify-sweep"): string[] {
+function sweepBaseTags(
+  brief: ResearchBrief,
+  sweepLabel: "research-sweep" | "apify-sweep" | "scrapling-sweep",
+): string[] {
   return [brief.topic, ...brief.queries, sweepLabel, ...(brief.tags ?? [])];
 }
 
@@ -148,9 +160,20 @@ export type ApifyAdapter = {
   ragWebBrowser(query: string, opts: { limit: number }): Promise<ApifyRagResult[]>;
 };
 
+export type ScraplingFetchResult = {
+  url?: string;
+  title?: string;
+  text: string;
+};
+
+export type ScraplingAdapter = {
+  stealthyFetch(query: string, opts: { limit: number }): Promise<ScraplingFetchResult[]>;
+};
+
 export type ResearchAgentAdapters = {
   firecrawl?: FirecrawlAdapter | undefined;
   apify?: ApifyAdapter | undefined;
+  scrapling?: ScraplingAdapter | undefined;
   perplexity?: PerplexitySlot | undefined;
 };
 
@@ -163,17 +186,18 @@ type DepthProfile = {
   firecrawlLimit: number;
   firecrawlScrape: boolean;
   apifyLimit: number;
+  scraplingLimit: number;
 };
 
 function profileForDepth(depth: ResearchBrief["depth"]): DepthProfile {
   switch (depth) {
     case "shallow":
-      return { firecrawlLimit: 2, firecrawlScrape: false, apifyLimit: 2 };
+      return { firecrawlLimit: 2, firecrawlScrape: false, apifyLimit: 2, scraplingLimit: 2 };
     case "deep":
-      return { firecrawlLimit: 5, firecrawlScrape: true, apifyLimit: 5 };
+      return { firecrawlLimit: 5, firecrawlScrape: true, apifyLimit: 5, scraplingLimit: 5 };
     case "standard":
     default:
-      return { firecrawlLimit: 5, firecrawlScrape: false, apifyLimit: 5 };
+      return { firecrawlLimit: 5, firecrawlScrape: false, apifyLimit: 5, scraplingLimit: 5 };
   }
 }
 
@@ -331,6 +355,83 @@ export async function apifySweep(
           vault_path: result.vault_path,
           pake_id: result.pake_id,
           source: "apify",
+        };
+        if (hasUrl) created_entry.source_uri = url;
+        created.push(created_entry);
+      } else {
+        const source_uri =
+          result.status === "duplicate" ? result.source_uri : sourceUriForSkip;
+        skipped.push({ source_uri, reason: classifyIngestSkip(result) });
+      }
+    }
+  }
+
+  return { created, skipped };
+}
+
+export async function scraplingSweep(
+  vaultRoot: string,
+  brief: ResearchBrief,
+  adapter: ScraplingAdapter,
+  opts: { surface: string; profile: DepthProfile },
+): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
+  const created: CreatedNote[] = [];
+  const skipped: SkippedNote[] = [];
+  const baseTags = sweepBaseTags(brief, "scrapling-sweep");
+
+  for (const query of brief.queries) {
+    let pages: ScraplingFetchResult[];
+    try {
+      pages = await adapter.stealthyFetch(query, { limit: opts.profile.scraplingLimit });
+    } catch {
+      skipped.push({ source_uri: scraplingQueryAdapterFailureUri(query), reason: "fetch_error" });
+      continue;
+    }
+
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      const url = typeof page.url === "string" ? page.url.trim() : "";
+      const hasUrl = url.length > 0;
+      const body = page.text;
+      if (!body || body.trim().length === 0) {
+        const sourceUriForEmpty =
+          hasUrl ? url : scraplingQualityGateSnippetUri(query, i);
+        skipped.push({ source_uri: sourceUriForEmpty, reason: "fetch_error" });
+        continue;
+      }
+
+      const input = hasUrl ? url : body;
+      const sourceUriForSkip = hasUrl ? url : scraplingQualityGateSnippetUri(query, i);
+
+      if (body.trim().length < 200) {
+        skipped.push({ source_uri: sourceUriForSkip, reason: "quality_gate" });
+        continue;
+      }
+
+      const ingestInput = hasUrl
+        ? {
+            input,
+            source_type: "url" as const,
+            fetched_content: body,
+            title_hint: page.title,
+            ingest_as: "SourceNote" as const,
+            tags: baseTags,
+          }
+        : {
+            input,
+            source_type: "text" as const,
+            title_hint: page.title,
+            ingest_as: "SourceNote" as const,
+            tags: baseTags,
+          };
+
+      const result = await runIngestPipeline(vaultRoot, ingestInput, { surface: opts.surface });
+
+      if (result.status === "ok") {
+        const created_entry: CreatedNote = {
+          vault_path: result.vault_path,
+          pake_id: result.pake_id,
+          source: "scrapling",
         };
         if (hasUrl) created_entry.source_uri = url;
         created.push(created_entry);
@@ -511,6 +612,7 @@ export async function runResearchAgent(
 
   const firecrawl = opts.adapters?.firecrawl;
   const apify = opts.adapters?.apify;
+  const scrapling = opts.adapters?.scrapling;
   const perplexity = opts.adapters?.perplexity ?? createPerplexitySlot();
 
   // Domain-aware routing (Story 20.1): when both adapters are configured,
@@ -522,6 +624,10 @@ export async function runResearchAgent(
     ? parsed.queries.filter((q) => !isSocialDomain(q))
     : parsed.queries;
 
+  const apifyPromise = apify
+    ? apifySweep(vaultRoot, parsed, apify, { surface, profile })
+    : Promise.resolve({ created: [], skipped: [] });
+
   const firecrawlPromise =
     firecrawl && firecrawlQueries.length > 0
       ? firecrawlSweep(vaultRoot, parsed, firecrawl, {
@@ -531,14 +637,14 @@ export async function runResearchAgent(
         })
       : Promise.resolve({ created: [], skipped: [] });
 
-  const apifyPromise = apify
-    ? apifySweep(vaultRoot, parsed, apify, { surface, profile })
-    : Promise.resolve({ created: [], skipped: [] });
+  const [firecrawlOut2, apifyOut] = await Promise.all([firecrawlPromise, apifyPromise]);
 
-  const [firecrawlOut, apifyOut] = await Promise.all([firecrawlPromise, apifyPromise]);
+  const scraplingOut = scrapling
+    ? await scraplingSweep(vaultRoot, parsed, scrapling, { surface, profile })
+    : { created: [], skipped: [] };
 
-  let notes_created = [...firecrawlOut.created, ...apifyOut.created];
-  const notes_skipped = [...firecrawlOut.skipped, ...apifyOut.skipped];
+  let notes_created = [...firecrawlOut2.created, ...apifyOut.created, ...scraplingOut.created];
+  const notes_skipped = [...firecrawlOut2.skipped, ...apifyOut.skipped, ...scraplingOut.skipped];
   const perplexity_skipped = await perplexityProbe(perplexity, parsed);
 
   const sweep_timestamp = new Date().toISOString();

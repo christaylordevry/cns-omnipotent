@@ -8,14 +8,17 @@ import {
   researchSweepResultSchema,
   firecrawlSweep,
   apifySweep,
+  scraplingSweep,
   firecrawlQueryAdapterFailureUri,
   apifyQueryAdapterFailureUri,
+  scraplingQueryAdapterFailureUri,
   perplexityAnswerSourceUri,
   isSocialDomain,
   SOCIAL_DOMAINS,
   type ApifyAdapter,
   type FirecrawlAdapter,
   type ResearchBrief,
+  type ScraplingAdapter,
 } from "../../src/agents/research-agent.js";
 import { createPerplexitySlot, type PerplexitySlot } from "../../src/agents/perplexity-slot.js";
 import { CnsError } from "../../src/errors.js";
@@ -54,6 +57,14 @@ function makeApify(behavior: {
 }): ApifyAdapter {
   return {
     ragWebBrowser: behavior.ragWebBrowser ?? (async () => []),
+  };
+}
+
+function makeScrapling(behavior: {
+  stealthyFetch?: (query: string) => ReturnType<ScraplingAdapter["stealthyFetch"]>;
+}): ScraplingAdapter {
+  return {
+    stealthyFetch: behavior.stealthyFetch ?? (async () => []),
   };
 }
 
@@ -359,6 +370,130 @@ describe("AC: apify — rag-web-browser + ingest", () => {
   });
 });
 
+// ── AC: scrapling — stealthy-fetch + ingest ────────────────────────────────
+
+describe("AC: scrapling — stealthy-fetch as third tier", () => {
+  it("runs Scrapling only after Firecrawl and Apify complete", async () => {
+    const vaultRoot = await makeVault();
+    const events: string[] = [];
+
+    const tick = async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    let releaseFirecrawl: (() => void) | undefined;
+    const firecrawlGate = new Promise<void>((resolve) => {
+      releaseFirecrawl = resolve;
+    });
+
+    let releaseApify: (() => void) | undefined;
+    const apifyGate = new Promise<void>((resolve) => {
+      releaseApify = resolve;
+    });
+
+    const fc = makeFirecrawl({
+      search: async () => {
+        events.push("firecrawl:start");
+        await firecrawlGate;
+        events.push("firecrawl:end");
+        return [];
+      },
+    });
+
+    const apify = makeApify({
+      ragWebBrowser: async () => {
+        events.push("apify:start");
+        await apifyGate;
+        events.push("apify:end");
+        return [];
+      },
+    });
+
+    const scrapling = makeScrapling({
+      stealthyFetch: async (query) => {
+        events.push(`scrapling:${query}`);
+        return [
+          {
+            url: `https://scrapling.example/${encodeURIComponent(query)}`,
+            text: `# ${query}\n\n${LONG_BODY}`,
+          },
+        ];
+      },
+    });
+
+    const run = runResearchAgent(vaultRoot, validBrief({ queries: ["tier-order"] }), {
+      adapters: { firecrawl: fc, apify, scrapling },
+    });
+
+    await tick();
+    expect(events).toContain("firecrawl:start");
+    expect(events).toContain("apify:start");
+    expect(events.some((e) => e.startsWith("scrapling:"))).toBe(false);
+
+    releaseFirecrawl?.();
+    await tick();
+    expect(events).toContain("firecrawl:end");
+    expect(events.some((e) => e.startsWith("scrapling:"))).toBe(false);
+
+    releaseApify?.();
+    const result = await run;
+
+    const fcEnd = events.indexOf("firecrawl:end");
+    const apEnd = events.indexOf("apify:end");
+    const scrap = events.indexOf("scrapling:tier-order");
+    expect(fcEnd).toBeGreaterThanOrEqual(0);
+    expect(apEnd).toBeGreaterThanOrEqual(0);
+    expect(scrap).toBeGreaterThan(Math.max(fcEnd, apEnd));
+    expect(result.notes_created[0].source).toBe("scrapling");
+  });
+
+  it("skips short Scrapling bodies via quality gate", async () => {
+    const vaultRoot = await makeVault();
+    const scrapling = makeScrapling({
+      stealthyFetch: async (query) => [
+        { url: `https://scrapling.example/${query}`, text: "too short" },
+      ],
+    });
+
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q"] }), {
+      adapters: { scrapling },
+    });
+
+    expect(result.notes_created.length).toBe(0);
+    expect(result.notes_skipped).toEqual([
+      { source_uri: "https://scrapling.example/q", reason: "quality_gate" },
+    ]);
+  });
+
+  it("continues Scrapling sweep when one query throws", async () => {
+    const vaultRoot = await makeVault();
+    const scrapling = makeScrapling({
+      stealthyFetch: async (query) => {
+        if (query === "bad") throw new Error("scrapling broke");
+        return [
+          {
+            url: `https://scrapling.example/${query}`,
+            text: `# ${query}\n\n${LONG_BODY}`,
+          },
+        ];
+      },
+    });
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["good", "bad"], depth: "standard" }),
+      { adapters: { scrapling } },
+    );
+
+    expect(result.notes_created.length).toBe(1);
+    expect(result.notes_created[0].source).toBe("scrapling");
+    expect(result.notes_skipped).toEqual([
+      { source_uri: scraplingQueryAdapterFailureUri("bad"), reason: "fetch_error" },
+    ]);
+  });
+});
+
 // ── AC: perplexity-stub ──────────────────────────────────────────────────────
 
 describe("AC: perplexity-stub — graceful degradation", () => {
@@ -655,7 +790,12 @@ describe("AC: tests — composite scenarios", () => {
 
     const direct = await firecrawlSweep(vaultRoot, validBrief(), fc, {
       surface: "unit-test",
-      profile: { firecrawlLimit: 5, firecrawlScrape: false, apifyLimit: 5 },
+      profile: {
+        firecrawlLimit: 5,
+        firecrawlScrape: false,
+        apifyLimit: 5,
+        scraplingLimit: 5,
+      },
     });
 
     expect(direct.created.length).toBe(1);
@@ -667,11 +807,35 @@ describe("AC: tests — composite scenarios", () => {
     });
     const directApify = await apifySweep(vault2, validBrief(), apify, {
       surface: "unit-test",
-      profile: { firecrawlLimit: 5, firecrawlScrape: false, apifyLimit: 5 },
+      profile: {
+        firecrawlLimit: 5,
+        firecrawlScrape: false,
+        apifyLimit: 5,
+        scraplingLimit: 5,
+      },
     });
 
     expect(directApify.created.length).toBe(1);
     expect(directApify.created[0].source).toBe("apify");
+
+    const vault3 = await makeVault();
+    const scrapling = makeScrapling({
+      stealthyFetch: async () => [
+        { url: "https://scrapling.example/solo", text: `# Solo\n\n${LONG_BODY}` },
+      ],
+    });
+    const directScrapling = await scraplingSweep(vault3, validBrief(), scrapling, {
+      surface: "unit-test",
+      profile: {
+        firecrawlLimit: 5,
+        firecrawlScrape: false,
+        apifyLimit: 5,
+        scraplingLimit: 5,
+      },
+    });
+
+    expect(directScrapling.created.length).toBe(1);
+    expect(directScrapling.created[0].source).toBe("scrapling");
   });
 });
 

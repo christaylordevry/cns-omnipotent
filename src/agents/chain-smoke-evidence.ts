@@ -28,6 +28,8 @@ export type ChainSmokeEvidence = {
   };
   services: {
     firecrawl: "configured";
+    apify: "configured";
+    scrapling: "configured";
     perplexity: "configured";
     anthropic: "configured";
   };
@@ -46,7 +48,7 @@ export function sanitizeEvidenceString(input: string, maxLength = 500): string {
   let out = input;
   out = out.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]");
   out = out.replace(
-    /\b(FIRECRAWL_API_KEY|PERPLEXITY_API_KEY|ANTHROPIC_API_KEY)\s*[:=]\s*["']?[^"',\s)]+/gi,
+    /\b(FIRECRAWL_API_KEY|APIFY_API_TOKEN|PERPLEXITY_API_KEY|ANTHROPIC_API_KEY)\s*[:=]\s*["']?[^"',\s)]+/gi,
     "$1=[REDACTED]",
   );
   out = out.replace(/\bsk-ant-[A-Za-z0-9_-]+/g, "[REDACTED_ANTHROPIC_KEY]");
@@ -85,6 +87,8 @@ export function safeCommandShape(): string {
   return [
     'CNS_VAULT_ROOT="<staging-vault-root>"',
     "FIRECRAWL_API_KEY=[REDACTED]",
+    "APIFY_API_TOKEN=[REDACTED]",
+    'SCRAPLING_COMMAND="scrapling"',
     "PERPLEXITY_API_KEY=[REDACTED]",
     "ANTHROPIC_API_KEY=[REDACTED]",
     "tsx scripts/run-chain.ts",
@@ -263,6 +267,8 @@ export function buildChainSmokeEvidence(args: {
     },
     services: {
       firecrawl: "configured",
+      apify: "configured",
+      scrapling: "configured",
       perplexity: "configured",
       anthropic: "configured",
     },
@@ -302,6 +308,8 @@ export function buildFatalChainSmokeEvidence(args: {
     },
     services: {
       firecrawl: "configured",
+      apify: "configured",
+      scrapling: "configured",
       perplexity: "configured",
       anthropic: "configured",
     },
@@ -373,7 +381,7 @@ export function formatChainSmokeEvidenceMarkdown(evidence: ChainSmokeEvidence): 
     `- Vault root class: ${evidence.vault_root.class} (${evidence.vault_root.basename})`,
     `- Brief topic: ${evidence.brief.topic}`,
     `- Depth/query count: ${evidence.brief.depth} / ${evidence.brief.query_count}`,
-    "- Services: Firecrawl configured, Perplexity configured, Anthropic configured",
+    "- Services: Firecrawl configured, Apify configured, Scrapling configured, Perplexity configured, Anthropic configured",
     "",
     "| Stage | Status | Counts |",
     "| --- | --- | --- |",

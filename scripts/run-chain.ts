@@ -1,7 +1,7 @@
 /**
  * Live test runner for runChain() — wires Research → Synthesis → Hook → Boss
- * with real Firecrawl + Apify + Perplexity (Research) and real Anthropic-backed
- * LLM adapters (Synthesis, Hook, Boss).
+ * with real Firecrawl + Apify + Scrapling + Perplexity (Research) and real
+ * Anthropic-backed LLM adapters (Synthesis, Hook, Boss).
  *
  * Usage:
  *   CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" \
@@ -21,6 +21,7 @@ import {
   type FirecrawlSearchResult,
 } from "../src/agents/research-agent.js";
 import { buildApifyAdapter } from "../src/adapters/apify-adapter.js";
+import { buildScraplingAdapter } from "../src/adapters/scrapling-adapter.js";
 import {
   type PerplexitySlot,
   type PerplexityResult,
@@ -245,6 +246,7 @@ async function main() {
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const apifyToken = process.env.APIFY_API_TOKEN ?? "";
+  const scraplingCommand = process.env.SCRAPLING_COMMAND ?? "scrapling";
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
@@ -266,7 +268,7 @@ async function main() {
   console.log("=== Chain Live Smoke (Research -> Synthesis -> Hook -> Boss) ===");
   console.log(`Vault root class: ${vaultRootClass}`);
   console.log(`Brief topic: ${brief.topic}`);
-  console.log("Services configured: Firecrawl, Apify, Perplexity, Anthropic");
+  console.log("Services configured: Firecrawl, Apify, Scrapling, Perplexity, Anthropic");
   console.log("Running chain. Default output will be compact safe evidence.\n");
 
   const startedAt = Date.now();
@@ -278,6 +280,7 @@ async function main() {
         adapters: {
           firecrawl: buildFirecrawlAdapter(firecrawlKey, serviceErrors.record),
           apify: buildApifyAdapter(apifyToken, serviceErrors.record),
+          scrapling: buildScraplingAdapter(scraplingCommand, serviceErrors.record),
           perplexity: buildPerplexitySlot(perplexityKey, serviceErrors.record),
         },
       },
