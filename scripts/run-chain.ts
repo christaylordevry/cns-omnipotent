@@ -1,11 +1,11 @@
 /**
  * Live test runner for runChain() — wires Research → Synthesis → Hook → Boss
- * with real Firecrawl + Perplexity (Research) and real Anthropic-backed
+ * with real Firecrawl + Apify + Perplexity (Research) and real Anthropic-backed
  * LLM adapters (Synthesis, Hook, Boss).
  *
  * Usage:
  *   CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" \
- *   FIRECRAWL_API_KEY=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \
+ *   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \
  *   tsx scripts/run-chain.ts
  *
  * Default output is compact, secret-safe smoke evidence. Use --raw-json only
@@ -17,6 +17,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runChain } from "../src/agents/run-chain.js";
 import {
+  type ApifyAdapter,
+  type ApifyRagResult,
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
 } from "../src/agents/research-agent.js";
@@ -101,7 +103,7 @@ function parseArgs(argv: string[]): CliOptions {
 function printHelp(): void {
   console.log(`Usage:
   CNS_VAULT_ROOT=/path/to/staging-vault \\
-  FIRECRAWL_API_KEY=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \\
+  FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \\
   tsx scripts/run-chain.ts [--evidence-file path] [--operator-note text]
 
 Options:
@@ -191,6 +193,47 @@ function buildFirecrawlAdapter(
 }
 
 // ---------------------------------------------------------------------------
+// Apify adapter — calls api.apify.com rag-web-browser actor
+// ---------------------------------------------------------------------------
+
+function buildApifyAdapter(
+  apiToken: string,
+  recordServiceError: (error: string) => void,
+): ApifyAdapter {
+  return {
+    async ragWebBrowser(
+      query: string,
+      opts: { limit: number },
+    ): Promise<ApifyRagResult[]> {
+      const res = await fetch(
+        `https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=${apiToken}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, maxResults: opts.limit }),
+        },
+      );
+      if (!res.ok) {
+        const summary = await httpFailureSummary("Apify", "rag-web-browser", res);
+        recordServiceError(summary);
+        throw new Error(summary);
+      }
+      const data = (await res.json()) as Array<{
+        url?: string;
+        metadata?: { title?: string };
+        text?: string;
+        markdown?: string;
+      }>;
+      return data.map((item) => ({
+        url: item.url,
+        title: item.metadata?.title,
+        text: item.markdown ?? item.text ?? "",
+      }));
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Perplexity slot — calls api.perplexity.ai sonar model
 // ---------------------------------------------------------------------------
 
@@ -243,19 +286,21 @@ async function main() {
   const vaultRootClass = cli.vaultRootClass ?? classifyVaultRoot(vaultRoot);
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+  const apifyToken = process.env.APIFY_API_TOKEN ?? "";
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not set");
+  if (!apifyToken) throw new Error("APIFY_API_TOKEN not set");
   if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY not set");
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const brief = {
-    topic: "Obsidian personal knowledge management workflows 2026",
+    topic: "building a solo creative agency pricing strategy 2026",
     queries: [
-      "Obsidian PKM system setup best practices 2026",
-      "Obsidian linking notes zettelkasten second brain workflow",
-      "Obsidian plugins and templates for productivity system",
+      "solo creative agency retainer pricing and client acquisition 2026",
+      "how to get first clients for a creative agency 2026",
+      "creative agency positioning and niche selection strategy",
     ],
     depth: "deep" as const,
   };
@@ -263,7 +308,7 @@ async function main() {
   console.log("=== Chain Live Smoke (Research -> Synthesis -> Hook -> Boss) ===");
   console.log(`Vault root class: ${vaultRootClass}`);
   console.log(`Brief topic: ${brief.topic}`);
-  console.log("Services configured: Firecrawl, Perplexity, Anthropic");
+  console.log("Services configured: Firecrawl, Apify, Perplexity, Anthropic");
   console.log("Running chain. Default output will be compact safe evidence.\n");
 
   const startedAt = Date.now();
@@ -274,6 +319,7 @@ async function main() {
         surface: "live-test",
         adapters: {
           firecrawl: buildFirecrawlAdapter(firecrawlKey, serviceErrors.record),
+          apify: buildApifyAdapter(apifyToken, serviceErrors.record),
           perplexity: buildPerplexitySlot(perplexityKey, serviceErrors.record),
         },
       },

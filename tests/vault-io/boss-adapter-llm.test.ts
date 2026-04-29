@@ -95,7 +95,7 @@ describe("createLlmWeaponsCheckAdapter", () => {
 
     const body = getRequestBody(fetchMock);
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(300);
+    expect(body.max_tokens).toBe(600);
 
     expect(Array.isArray(body.messages)).toBe(true);
     expect(body.messages).toHaveLength(1);
