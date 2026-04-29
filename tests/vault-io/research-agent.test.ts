@@ -11,6 +11,8 @@ import {
   firecrawlQueryAdapterFailureUri,
   apifyQueryAdapterFailureUri,
   perplexityAnswerSourceUri,
+  isSocialDomain,
+  SOCIAL_DOMAINS,
   type ApifyAdapter,
   type FirecrawlAdapter,
   type ResearchBrief,
@@ -802,5 +804,241 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     );
     expect(result.perplexity_answers_filed).toBe(1);
     expect(result.notes_skipped.some((s) => s.reason === "fetch_error")).toBe(true);
+  });
+});
+
+// ── AC: social-domain routing (Story 20.1) ──────────────────────────────────
+
+describe("AC: social-domain routing — classifier", () => {
+  it("exports the canonical social-domain list", () => {
+    expect([...SOCIAL_DOMAINS].sort()).toEqual(
+      [
+        "instagram.com",
+        "linkedin.com",
+        "reddit.com",
+        "twitter.com",
+        "x.com",
+        "youtu.be",
+        "youtube.com",
+      ].sort(),
+    );
+  });
+
+  it("classifies plain hostnames as social", () => {
+    expect(isSocialDomain("linkedin.com")).toBe(true);
+    expect(isSocialDomain("reddit.com")).toBe(true);
+    expect(isSocialDomain("youtube.com")).toBe(true);
+    expect(isSocialDomain("youtu.be")).toBe(true);
+    expect(isSocialDomain("twitter.com")).toBe(true);
+    expect(isSocialDomain("x.com")).toBe(true);
+    expect(isSocialDomain("instagram.com")).toBe(true);
+  });
+
+  it("classifies full URLs with scheme + path as social", () => {
+    expect(isSocialDomain("https://linkedin.com/in/foo")).toBe(true);
+    expect(isSocialDomain("http://reddit.com/r/programming")).toBe(true);
+    expect(isSocialDomain("https://www.youtube.com/watch?v=abc")).toBe(true);
+    expect(isSocialDomain("https://x.com/bar")).toBe(true);
+    expect(isSocialDomain("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("classifies subdomains of social domains as social", () => {
+    expect(isSocialDomain("https://m.youtube.com/watch?v=1")).toBe(true);
+    expect(isSocialDomain("https://www.linkedin.com/in/foo")).toBe(true);
+    expect(isSocialDomain("https://old.reddit.com/r/x")).toBe(true);
+  });
+
+  it("is case-insensitive", () => {
+    expect(isSocialDomain("Reddit.COM/r/x")).toBe(true);
+    expect(isSocialDomain("HTTPS://X.COM/foo")).toBe(true);
+    expect(isSocialDomain("LinkedIn.com")).toBe(true);
+  });
+
+  it("recognises social domains embedded in freeform query strings", () => {
+    expect(isSocialDomain("Check x.com/foo for context")).toBe(true);
+    expect(isSocialDomain("look at twitter.com please")).toBe(true);
+    expect(isSocialDomain("see reddit.com/r/AskMe sometime")).toBe(true);
+  });
+
+  it("returns false for non-social URLs and freeform queries", () => {
+    expect(isSocialDomain("what is an AI agent")).toBe(false);
+    expect(isSocialDomain("https://example.com/foo")).toBe(false);
+    expect(isSocialDomain("https://medium.com/article")).toBe(false);
+    expect(isSocialDomain("")).toBe(false);
+    expect(isSocialDomain("   ")).toBe(false);
+  });
+
+  it("does not falsely match partial substrings or look-alike hostnames", () => {
+    expect(isSocialDomain("linkedin.combo")).toBe(false);
+    expect(isSocialDomain("youtubescript.com")).toBe(false);
+    expect(isSocialDomain("https://x.com.evil.com/")).toBe(false);
+    expect(isSocialDomain("xx.com")).toBe(false);
+  });
+
+  it("does not throw on malformed input", () => {
+    expect(() => isSocialDomain("https://[invalid")).not.toThrow();
+    expect(() => isSocialDomain("not a url at all   ")).not.toThrow();
+    expect(isSocialDomain("https://[invalid")).toBe(false);
+  });
+});
+
+describe("AC: social-domain routing — Firecrawl is skipped for social queries", () => {
+  function throwIfCalledFirecrawl(): FirecrawlAdapter {
+    return {
+      async search(query: string) {
+        throw new Error(`Firecrawl.search must not be called (called for: ${query})`);
+      },
+      async scrape(url: string) {
+        throw new Error(`Firecrawl.scrape must not be called (called for: ${url})`);
+      },
+    };
+  }
+
+  it("does not invoke Firecrawl.search for any social query when both adapters provided", async () => {
+    const vaultRoot = await makeVault();
+    const apifyCalls: string[] = [];
+    const apify = makeApify({
+      ragWebBrowser: async (q) => {
+        apifyCalls.push(q);
+        return [
+          { url: `https://apify.example/${encodeURIComponent(q)}`, text: `# ${q}\n\n${LONG_BODY}` },
+        ];
+      },
+    });
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({
+        queries: ["https://linkedin.com/in/foo", "https://x.com/bar"],
+        depth: "standard",
+      }),
+      { adapters: { firecrawl: throwIfCalledFirecrawl(), apify } },
+    );
+
+    expect(apifyCalls.sort()).toEqual(
+      ["https://linkedin.com/in/foo", "https://x.com/bar"].sort(),
+    );
+    expect(result.notes_created.length).toBe(2);
+    expect(result.notes_created.every((n) => n.source === "apify")).toBe(true);
+  });
+
+  it("routes only social queries away from Firecrawl; non-social queries still hit Firecrawl", async () => {
+    const vaultRoot = await makeVault();
+    const firecrawlSearchCalls: string[] = [];
+    const fc: FirecrawlAdapter = {
+      async search(query: string) {
+        if (isSocialDomain(query)) {
+          throw new Error(`Firecrawl called for social query: ${query}`);
+        }
+        firecrawlSearchCalls.push(query);
+        return [
+          {
+            url: `https://fc.example/${encodeURIComponent(query)}`,
+            title: "T",
+            snippet: LONG_BODY,
+          },
+        ];
+      },
+      async scrape() {
+        return { markdown: LONG_BODY };
+      },
+    };
+    const apify = makeApify({
+      ragWebBrowser: async (q) => [
+        { url: `https://apify.example/${encodeURIComponent(q)}`, text: `# ${q}\n\n${LONG_BODY}` },
+      ],
+    });
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({
+        queries: ["what is an AI agent", "https://reddit.com/r/AskMe"],
+        depth: "standard",
+      }),
+      { adapters: { firecrawl: fc, apify } },
+    );
+
+    expect(firecrawlSearchCalls).toEqual(["what is an AI agent"]);
+    // AC: source-provenance — note for social query is sourced from Apify
+    const socialNote = result.notes_created.find((n) =>
+      n.source_uri?.includes("reddit.com"),
+    );
+    expect(socialNote).toBeDefined();
+    expect(socialNote?.source).toBe("apify");
+  });
+});
+
+describe("AC: social-domain routing — fallback when Apify is missing", () => {
+  it("falls back to Firecrawl for social queries when no Apify adapter is provided", async () => {
+    const vaultRoot = await makeVault();
+    const firecrawlSearchCalls: string[] = [];
+    const fc: FirecrawlAdapter = {
+      async search(query: string) {
+        firecrawlSearchCalls.push(query);
+        return [
+          {
+            url: `https://fc.example/${encodeURIComponent(query)}`,
+            title: "T",
+            snippet: LONG_BODY,
+          },
+        ];
+      },
+      async scrape() {
+        return { markdown: LONG_BODY };
+      },
+    };
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({
+        queries: ["https://linkedin.com/in/foo"],
+        depth: "standard",
+      }),
+      { adapters: { firecrawl: fc } },
+    );
+
+    expect(firecrawlSearchCalls).toEqual(["https://linkedin.com/in/foo"]);
+    expect(result.notes_created.length).toBe(1);
+    expect(result.notes_created[0].source).toBe("firecrawl");
+  });
+});
+
+describe("AC: social-domain routing — audit semantics unchanged", () => {
+  it("emits exactly one research_sweep audit record when routing is active", async () => {
+    const vaultRoot = await makeVault();
+    const apify = makeApify({
+      ragWebBrowser: async (q) => [
+        { url: `https://apify.example/${encodeURIComponent(q)}`, text: `# ${q}\n\n${LONG_BODY}` },
+      ],
+    });
+    const fc: FirecrawlAdapter = {
+      async search(query: string) {
+        if (isSocialDomain(query)) throw new Error(`unexpected firecrawl call: ${query}`);
+        return [
+          {
+            url: `https://fc.example/${encodeURIComponent(query)}`,
+            title: "T",
+            snippet: LONG_BODY,
+          },
+        ];
+      },
+      async scrape() {
+        return { markdown: LONG_BODY };
+      },
+    };
+
+    await runResearchAgent(
+      vaultRoot,
+      validBrief({
+        queries: ["non-social query about AI", "https://x.com/foo"],
+        depth: "standard",
+      }),
+      { adapters: { firecrawl: fc, apify } },
+    );
+
+    const auditAbs = path.join(vaultRoot, "_meta", "logs", "agent-log.md");
+    const logBody = await readFile(auditAbs, "utf8");
+    const sweepLines = logBody.split("\n").filter((l) => l.includes("research_sweep"));
+    expect(sweepLines.length).toBe(1);
   });
 });

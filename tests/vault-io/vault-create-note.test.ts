@@ -146,7 +146,7 @@ describe("vaultCreateNote", () => {
     expect(out.file_path).toBe("01-Projects/P1/spec.md");
   });
 
-  it("fails with IO_ERROR when the target file already exists", async () => {
+  it("overwrites existing target file when title routes to same path", async () => {
     const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-create-"));
     await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
     await vaultCreateNote(vaultRoot, {
@@ -155,14 +155,14 @@ describe("vaultCreateNote", () => {
       pake_type: "InsightNote",
       tags: [],
     });
-    await expect(
-      vaultCreateNote(vaultRoot, {
-        title: "Dup",
-        content: "two",
-        pake_type: "InsightNote",
-        tags: [],
-      }),
-    ).rejects.toMatchObject({ code: "IO_ERROR" });
+    const out = await vaultCreateNote(vaultRoot, {
+      title: "Dup",
+      content: "two",
+      pake_type: "InsightNote",
+      tags: [],
+    });
+    const disk = await readFile(path.join(vaultRoot, out.file_path), "utf8");
+    expect(disk).toContain("two");
   });
 
   it("rejects invalid project segment with SCHEMA_INVALID", async () => {

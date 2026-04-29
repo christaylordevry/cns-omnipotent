@@ -17,11 +17,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runChain } from "../src/agents/run-chain.js";
 import {
-  type ApifyAdapter,
-  type ApifyRagResult,
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
 } from "../src/agents/research-agent.js";
+import { buildApifyAdapter } from "../src/adapters/apify-adapter.js";
 import {
   type PerplexitySlot,
   type PerplexityResult,
@@ -188,47 +187,6 @@ function buildFirecrawlAdapter(
         markdown: data.data?.markdown ?? "",
         title: data.data?.metadata?.title,
       };
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Apify adapter — calls api.apify.com rag-web-browser actor
-// ---------------------------------------------------------------------------
-
-function buildApifyAdapter(
-  apiToken: string,
-  recordServiceError: (error: string) => void,
-): ApifyAdapter {
-  return {
-    async ragWebBrowser(
-      query: string,
-      opts: { limit: number },
-    ): Promise<ApifyRagResult[]> {
-      const res = await fetch(
-        `https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=${apiToken}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, maxResults: opts.limit }),
-        },
-      );
-      if (!res.ok) {
-        const summary = await httpFailureSummary("Apify", "rag-web-browser", res);
-        recordServiceError(summary);
-        throw new Error(summary);
-      }
-      const data = (await res.json()) as Array<{
-        url?: string;
-        metadata?: { title?: string };
-        text?: string;
-        markdown?: string;
-      }>;
-      return data.map((item) => ({
-        url: item.url,
-        title: item.metadata?.title,
-        text: item.markdown ?? item.text ?? "",
-      }));
     },
   };
 }

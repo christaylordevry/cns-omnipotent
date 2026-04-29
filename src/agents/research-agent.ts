@@ -77,6 +77,56 @@ function sweepBaseTags(brief: ResearchBrief, sweepLabel: "research-sweep" | "api
   return [brief.topic, ...brief.queries, sweepLabel, ...(brief.tags ?? [])];
 }
 
+/**
+ * Social-network domains routed to Apify. Firecrawl is skipped for queries
+ * matching these domains when an Apify adapter is configured (Story 20.1).
+ */
+export const SOCIAL_DOMAINS = [
+  "linkedin.com",
+  "reddit.com",
+  "youtube.com",
+  "youtu.be",
+  "twitter.com",
+  "x.com",
+  "instagram.com",
+] as const;
+
+function hostnameMatchesSocial(host: string): boolean {
+  const h = host.toLowerCase();
+  for (const domain of SOCIAL_DOMAINS) {
+    if (h === domain || h.endsWith(`.${domain}`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Classifies a brief query as a social-domain query when it is a social URL
+ * or contains a social hostname (case-insensitive, scheme-optional).
+ * Never throws — malformed inputs return false.
+ */
+export function isSocialDomain(query: string): boolean {
+  if (typeof query !== "string") return false;
+  const trimmed = query.trim();
+  if (trimmed.length === 0) return false;
+
+  const hasScheme = /^https?:\/\//i.test(trimmed);
+  const candidate = hasScheme ? trimmed : `https://${trimmed}`;
+  try {
+    const u = new URL(candidate);
+    if (hostnameMatchesSocial(u.hostname)) return true;
+  } catch {
+    // fall through to substring scan
+  }
+
+  const lowered = trimmed.toLowerCase();
+  for (const domain of SOCIAL_DOMAINS) {
+    const escaped = domain.replace(/\./g, "\\.");
+    const re = new RegExp(`(^|[^a-z0-9-])${escaped}(/|\\?|#|\\s|$)`, "i");
+    if (re.test(lowered)) return true;
+  }
+  return false;
+}
+
 export type FirecrawlSearchResult = {
   url: string;
   title?: string;
@@ -144,13 +194,14 @@ export async function firecrawlSweep(
   vaultRoot: string,
   brief: ResearchBrief,
   adapter: FirecrawlAdapter,
-  opts: { surface: string; profile: DepthProfile },
+  opts: { surface: string; profile: DepthProfile; queries?: string[] },
 ): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
   const created: CreatedNote[] = [];
   const skipped: SkippedNote[] = [];
   const baseTags = sweepBaseTags(brief, "research-sweep");
+  const queries = opts.queries ?? brief.queries;
 
-  for (const query of brief.queries) {
+  for (const query of queries) {
     let results: FirecrawlSearchResult[];
     try {
       results = await adapter.search(query, { limit: opts.profile.firecrawlLimit });
@@ -462,9 +513,23 @@ export async function runResearchAgent(
   const apify = opts.adapters?.apify;
   const perplexity = opts.adapters?.perplexity ?? createPerplexitySlot();
 
-  const firecrawlPromise = firecrawl
-    ? firecrawlSweep(vaultRoot, parsed, firecrawl, { surface, profile })
-    : Promise.resolve({ created: [], skipped: [] });
+  // Domain-aware routing (Story 20.1): when both adapters are configured,
+  // social-domain queries are routed exclusively to Apify so Firecrawl never
+  // sees them. When Apify is unavailable, Firecrawl handles all queries
+  // (graceful fallback — no silent no-notes failure mode).
+  const routeSocialAway = !!firecrawl && !!apify;
+  const firecrawlQueries = routeSocialAway
+    ? parsed.queries.filter((q) => !isSocialDomain(q))
+    : parsed.queries;
+
+  const firecrawlPromise =
+    firecrawl && firecrawlQueries.length > 0
+      ? firecrawlSweep(vaultRoot, parsed, firecrawl, {
+          surface,
+          profile,
+          queries: firecrawlQueries,
+        })
+      : Promise.resolve({ created: [], skipped: [] });
 
   const apifyPromise = apify
     ? apifySweep(vaultRoot, parsed, apify, { surface, profile })
