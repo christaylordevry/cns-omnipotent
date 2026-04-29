@@ -80,19 +80,23 @@ export async function vaultCreateNoteFromMarkdown(
   try {
     await mkdir(dir, { recursive: true });
     await writeFile(tmpPath, fullMarkdown, "utf8");
-    try {
-      await link(tmpPath, canonicalTarget);
-    } catch (linkErr: unknown) {
-      await unlink(tmpPath).catch(() => {});
-      if (linkErr instanceof CnsError) throw linkErr;
-      const le = linkErr as NodeJS.ErrnoException;
-      if (le.code === "EEXIST") {
-        throw new CnsError("IO_ERROR", "Note already exists at target path.", { path: posixRel });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await link(tmpPath, canonicalTarget);
+        break;
+      } catch (linkErr: unknown) {
+        const le = linkErr as NodeJS.ErrnoException;
+        if (le.code === "EEXIST" && attempt === 0) {
+          // Replace stale target and retry once with the same staged temp file.
+          await unlink(canonicalTarget);
+          continue;
+        }
+        await unlink(tmpPath).catch(() => {});
+        throw new CnsError("IO_ERROR", "Failed to create note file.", {
+          path: posixRel,
+          errno: le.code,
+        });
       }
-      throw new CnsError("IO_ERROR", "Failed to create note file.", {
-        path: posixRel,
-        errno: le.code,
-      });
     }
     await unlink(tmpPath);
 
