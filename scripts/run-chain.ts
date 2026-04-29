@@ -20,7 +20,6 @@ import { pathToFileURL } from "node:url";
 import matter from "gray-matter";
 import { runChain } from "../src/agents/run-chain.js";
 import {
-  createPerplexitySlot,
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
   isSocialDomain,
@@ -30,6 +29,7 @@ import {
 import { buildApifyAdapter } from "../src/adapters/apify-adapter.js";
 import { buildScraplingAdapter } from "../src/adapters/scrapling-adapter.js";
 import {
+  createPerplexitySlot,
   type PerplexitySlot,
   type PerplexityResult,
 } from "../src/agents/perplexity-slot.js";
