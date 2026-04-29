@@ -7,7 +7,7 @@ import { resolveVaultPath } from "../paths.js";
 import { assertWriteAllowed } from "../write-gate.js";
 import { vaultCreateNote } from "../tools/vault-create-note.js";
 import { classifySource, resolvePakeType } from "./classify.js";
-import { governedNoteExistsWithSourceUri } from "./duplicate.js";
+import { findGovernedResourceNotesByTitle, governedNoteExistsWithSourceUri } from "./duplicate.js";
 import { normalizeInput } from "./normalize.js";
 import { appendIndexRow } from "./index-update.js";
 import type { IngestOptions, SourceType } from "./classify.js";
@@ -33,6 +33,11 @@ export type IngestInput = {
    * (e.g. synthetic URN for derived notes that are not URL-backed bodies).
    */
   provenance_uri?: string | undefined;
+  /**
+   * Optional provenance source tag to copy into governed note frontmatter.
+   * Example: "apify" for notes created via the Apify research tier.
+   */
+  source?: string | undefined;
 } & IngestOptions;
 
 export type IngestResult =
@@ -138,6 +143,27 @@ export async function runIngestPipeline(
     }
   }
 
+  const titleMatches = await findGovernedResourceNotesByTitle(vaultRoot, normalized.title);
+  if (titleMatches.length > 0) {
+    if (titleMatches.length > 1) {
+      const paths = titleMatches.map((m) => m.path).join(", ");
+      const newest = titleMatches[0]?.path ?? "(unknown)";
+      // Warning only, no audit record, no vault mutation.
+      console.warn(
+        `[vault-hygiene] Duplicate titles detected in 03-Resources for ${JSON.stringify(
+          normalized.title,
+        )}. Matches: ${paths}. Keeping newest: ${newest}`,
+      );
+    }
+
+    const newest = titleMatches[0];
+    const dupeKey =
+      newest?.source_uri ??
+      normalized.source_uri ??
+      `urn:cns:duplicate-title:${encodeURIComponent(normalized.title)}`;
+    return { status: "duplicate", source_uri: dupeKey };
+  }
+
   const tags = ["ingest", ...(input.tags ?? [])];
   const today = todayUtcYmd();
 
@@ -163,6 +189,7 @@ export async function runIngestPipeline(
         tags,
         confidence_score: input.confidence_score ?? 0.5,
         source_uri: normalized.source_uri,
+        source: input.source,
         ai_summary: input.ai_summary,
       },
       { surface, suppressAudit: true },

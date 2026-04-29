@@ -329,6 +329,11 @@ describe("AC: apify — rag-web-browser + ingest", () => {
     expect(ragCalls).toBe(2);
     expect(result.notes_created.length).toBe(2);
     expect(result.notes_created.every((n) => n.source === "apify")).toBe(true);
+
+    // Story 20.3: frontmatter provenance must include `source: "apify"`.
+    const noteAbs = path.join(vaultRoot, ...result.notes_created[0].vault_path.split("/"));
+    const raw = await readFile(noteAbs, "utf8");
+    expect(raw).toContain('source: "apify"');
   });
 
   it("skips short apify bodies via quality gate", async () => {

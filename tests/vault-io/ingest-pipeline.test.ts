@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, utimes } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -278,9 +278,9 @@ describe("runIngestPipeline end-to-end", () => {
 
   it("AC: validate — PAKE validation failure leaves inbox draft and returns validation_error", async () => {
     const vaultRoot = await makeVault();
-    // Same title twice triggers EEXIST from vaultCreateNote; second result is conflict (not PAKE validation).
-
-    // Ingest the same content twice to trigger EEXIST on the second attempt
+    // Trigger an EEXIST conflict via a slug collision with different titles.
+    // The pipeline now dedupes identical titles before attempting creation, so we
+    // use a different title that slugifies to the same filename.
     const content = "# Conflict Test Note\n\nBody.";
     const first = await runIngestPipeline(vaultRoot, {
       input: content,
@@ -289,11 +289,12 @@ describe("runIngestPipeline end-to-end", () => {
     });
     expect(first.status).toBe("ok");
 
-    // Second ingest with same title should hit EEXIST (IO_ERROR) from vaultCreateNote → conflict
+    // Second ingest with a different title that maps to the same slug should hit EEXIST
+    // (IO_ERROR) from vaultCreateNote → conflict.
     const second = await runIngestPipeline(vaultRoot, {
       input: content,
       source_type: "text",
-      title_hint: "Conflict Test Note",
+      title_hint: "Conflict Test Note!",
     });
     expect(second.status).toBe("conflict");
     if (second.status !== "conflict") return;
@@ -365,6 +366,69 @@ describe("runIngestPipeline end-to-end", () => {
     expect(second.status).toBe("duplicate");
     if (second.status !== "duplicate") return;
     expect(second.source_uri).toBe(uri);
+  });
+
+  it("AC: dedup-title — refuses to create a new note when title already exists (keeps newest)", async () => {
+    const vaultRoot = await makeVault();
+
+    const title = "Duplicate Title";
+    const olderPath = path.join(vaultRoot, "03-Resources", "dup-title-older.md");
+    const newerPath = path.join(vaultRoot, "03-Resources", "dup-title-newer.md");
+
+    const older = [
+      "---",
+      'pake_id: "550e8400-e29b-41d4-a716-446655440001"',
+      "pake_type: SourceNote",
+      `title: ${JSON.stringify(title)}`,
+      'created: "2026-04-01"',
+      'modified: "2026-04-01"',
+      'status: "draft"',
+      "confidence_score: 0.5",
+      'verification_status: "pending"',
+      'creation_method: "ai"',
+      "tags: []",
+      'source_uri: "https://older.example/source"',
+      "---",
+      "",
+      "# Older",
+      "",
+    ].join("\n");
+    const newer = [
+      "---",
+      'pake_id: "550e8400-e29b-41d4-a716-446655440002"',
+      "pake_type: SourceNote",
+      `title: ${JSON.stringify(title)}`,
+      'created: "2026-04-02"',
+      'modified: "2026-04-02"',
+      'status: "draft"',
+      "confidence_score: 0.5",
+      'verification_status: "pending"',
+      'creation_method: "ai"',
+      "tags: []",
+      'source_uri: "https://newest.example/source"',
+      "---",
+      "",
+      "# Newer",
+      "",
+    ].join("\n");
+
+    await writeFile(olderPath, older, "utf8");
+    await writeFile(newerPath, newer, "utf8");
+    // Ensure filesystem mtime does not accidentally invert our "newest" choice.
+    await utimes(olderPath, new Date("2026-04-01T00:00:00Z"), new Date("2026-04-01T00:00:00Z"));
+    await utimes(newerPath, new Date("2026-04-02T00:00:00Z"), new Date("2026-04-02T00:00:00Z"));
+
+    const result = await runIngestPipeline(vaultRoot, {
+      input: "# Body\n\nSome content.",
+      source_type: "text",
+      ingest_as: "SourceNote",
+      title_hint: title,
+      provenance_uri: "urn:cns:test:dupe-title",
+    });
+
+    expect(result.status).toBe("duplicate");
+    if (result.status !== "duplicate") return;
+    expect(result.source_uri).toBe("https://newest.example/source");
   });
 
   it("URL ingest without fetched_content rejects", async () => {

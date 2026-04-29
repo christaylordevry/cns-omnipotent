@@ -26,6 +26,12 @@ export type VaultCreateNoteInput = {
   tags: string[];
   confidence_score?: number;
   source_uri?: string;
+  /**
+   * Optional provenance source tag for downstream hygiene and routing.
+   * Not part of the Phase 1 MCP `vault_create_note` tool schema, but allowed
+   * as an internal field because PAKE frontmatter validation is passthrough.
+   */
+  source?: string | undefined;
   /** WorkflowNote: explicit project folder under 01-Projects/ */
   project?: string;
   /** WorkflowNote: area folder under 02-Areas/ when project is absent */
@@ -237,6 +243,9 @@ export function buildVaultCreateNoteMarkdown(input: VaultCreateNoteInput): {
   }
   if (input.source_uri !== undefined) {
     lines.push(`source_uri: ${yamlScalarString(input.source_uri)}`);
+  }
+  if (input.source !== undefined && input.source.trim().length > 0) {
+    lines.push(`source: ${yamlScalarString(input.source.trim())}`);
   }
   if (input.ai_summary !== undefined) {
     lines.push(`ai_summary: ${yamlScalarString(input.ai_summary)}`);

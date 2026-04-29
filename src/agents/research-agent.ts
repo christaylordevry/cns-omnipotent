@@ -338,6 +338,7 @@ export async function apifySweep(
             fetched_content: body,
             title_hint: snippet.title,
             ingest_as: "SourceNote" as const,
+            source: "apify",
             tags: baseTags,
           }
         : {
@@ -345,6 +346,7 @@ export async function apifySweep(
             source_type: "text" as const,
             title_hint: snippet.title,
             ingest_as: "SourceNote" as const,
+            source: "apify",
             tags: baseTags,
           };
 
