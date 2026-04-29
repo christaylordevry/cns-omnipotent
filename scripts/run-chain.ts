@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import matter from "gray-matter";
 import { runChain } from "../src/agents/run-chain.js";
 import {
+  createPerplexitySlot,
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
   isSocialDomain,
@@ -68,6 +69,7 @@ type CliOptions = {
   topic: string | undefined;
   queries: string[];
   depth: ResearchBrief["depth"] | undefined;
+  verboseCleanup: boolean;
   help: boolean;
 };
 
@@ -98,6 +100,7 @@ function parseArgs(argv: string[]): CliOptions {
     topic: undefined,
     queries: [],
     depth: undefined,
+    verboseCleanup: false,
     help: false,
   };
 
@@ -106,6 +109,9 @@ function parseArgs(argv: string[]): CliOptions {
     switch (arg) {
       case "--raw-json":
         opts.rawJson = true;
+        break;
+      case "--verbose-cleanup":
+        opts.verboseCleanup = true;
         break;
       case "--evidence-file": {
         const value = argv[++i];
@@ -181,6 +187,7 @@ Options:
   --evidence-file path        Write compact safe evidence markdown to a file.
   --operator-note text        Add a sanitized operator note to the evidence.
   --vault-root-class value    staging, active, or unknown. Overrides auto-detect.
+  --verbose-cleanup           Print removed/skipped paths for pre-run cleanup.
   --raw-json                  Also print full raw ChainRunResult JSON for local debugging.
   --help                      Show this help.
 `);
@@ -336,6 +343,54 @@ export async function cleanStaleChainNotes(
       generatedTitles.has(title) && frontmatter.creation_method === "ai";
     if (!generatedTitleMatch && !isStaleChainNote(frontmatter, brief)) continue;
 
+    const absPath = resolveVaultPath(vaultRoot, relPath);
+    try {
+      assertWriteAllowed(vaultRoot, absPath, { operation: "delete" });
+      await rm(absPath, { force: true });
+      removed.push(relPath);
+    } catch {
+      skipped.push(relPath);
+    }
+  }
+
+  return { removed, skipped };
+}
+
+export function assertRequiredEnvKeys(
+  keys: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const missing = keys.filter((key) => (env[key]?.trim() ?? "").length === 0);
+  if (missing.length === 0) return;
+  throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+}
+
+export async function cleanStaleOutputNotesByPrefix(
+  vaultRoot: string,
+  opts: { prefixes?: readonly string[]; relDir?: string } = {},
+): Promise<{ removed: string[]; skipped: string[] }> {
+  const relDir = opts.relDir ?? "03-Resources";
+  const prefixes = opts.prefixes ?? ["synthesis-", "hooks-", "weapons-check-"];
+
+  const absDir = resolveVaultPath(vaultRoot, relDir);
+  let entries: Awaited<ReturnType<typeof readdir>>;
+  try {
+    entries = await readdir(absDir, { withFileTypes: true });
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined;
+    if (code === "ENOENT") return { removed: [], skipped: [] };
+    throw err;
+  }
+
+  const removed: string[] = [];
+  const skipped: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith(".md")) continue;
+    if (!prefixes.some((prefix) => entry.name.startsWith(prefix))) continue;
+
+    const relPath = `${relDir}/${entry.name}`;
     const absPath = resolveVaultPath(vaultRoot, relPath);
     try {
       assertWriteAllowed(vaultRoot, absPath, { operation: "delete" });
@@ -524,26 +579,43 @@ async function main() {
   const brief = await loadBriefForRun(cli);
   let operatorNotes = [...cli.operatorNotes];
 
-  const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+  assertRequiredEnvKeys(["FIRECRAWL_API_KEY", "APIFY_API_TOKEN", "ANTHROPIC_API_KEY"]);
+
+  const firecrawlKey = process.env.FIRECRAWL_API_KEY ?? "";
   const apifyToken = process.env.APIFY_API_TOKEN ?? "";
   const scraplingCommand = process.env.SCRAPLING_COMMAND ?? "scrapling";
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not set");
-  if (!apifyToken) throw new Error("APIFY_API_TOKEN not set");
-  if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY not set");
-  if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const startedAt = Date.now();
   const serviceErrors = serviceErrorRecorder();
+  const perplexitySlot =
+    (perplexityKey?.trim() ?? "").length > 0
+      ? buildPerplexitySlot(perplexityKey!, serviceErrors.record)
+      : createPerplexitySlot();
   console.log("=== Chain Live Smoke (Research -> Synthesis -> Hook -> Boss) ===");
   console.log(`Vault root class: ${vaultRootClass}`);
   console.log(`Brief topic: ${brief.topic}`);
   console.log(`Brief query count: ${brief.queries.length}`);
-  console.log("Services configured: Firecrawl, Apify, Scrapling, Perplexity, Anthropic");
+  console.log(
+    `Services configured: Firecrawl, Apify, Scrapling, Anthropic, Perplexity=${perplexitySlot.available ? "enabled" : "disabled"}`,
+  );
 
   try {
+    const prefixCleanup = await cleanStaleOutputNotesByPrefix(vaultRoot);
+    console.log(
+      `Stale output notes cleaned: removed=${prefixCleanup.removed.length} skipped=${prefixCleanup.skipped.length}`,
+    );
+    if (cli.verboseCleanup) {
+      if (prefixCleanup.removed.length > 0) {
+        console.log("Removed output notes:");
+        for (const relPath of prefixCleanup.removed) console.log(`- ${relPath}`);
+      }
+      if (prefixCleanup.skipped.length > 0) {
+        console.log("Skipped output notes:");
+        for (const relPath of prefixCleanup.skipped) console.log(`- ${relPath}`);
+      }
+    }
+
     const cleanup = await cleanStaleChainNotes(vaultRoot, brief);
     operatorNotes = [...operatorNotes, routingOperatorNote(brief, cleanup)];
     console.log(`Stale generated chain notes cleaned: ${cleanup.removed.length}`);
@@ -563,7 +635,7 @@ async function main() {
           firecrawl: buildFirecrawlAdapter(firecrawlKey, serviceErrors.record),
           apify: buildApifyAdapter(apifyToken, serviceErrors.record),
           scrapling: buildScraplingAdapter(scraplingCommand, serviceErrors.record),
-          perplexity: buildPerplexitySlot(perplexityKey, serviceErrors.record),
+          perplexity: perplexitySlot,
         },
       },
       adapters: {

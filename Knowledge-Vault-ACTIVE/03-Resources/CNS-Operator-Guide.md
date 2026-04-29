@@ -300,6 +300,10 @@ The synthesis agent is personalized to Chris Taylor in Sydney as a Creative Tech
 
 For live evidence runs, use `scripts/run-chain.ts`. The brief topic can be selected with `CNS_BRIEF_TOPIC`; if unset, the fallback topic is freelance consulting day rate calculation methodology. Operators can also pass a strict ResearchBrief JSON with `--brief-file`, or use `--topic`, repeated `--query`, and `--depth`. The harness cleans stale AI-generated chain notes for the selected topic before starting a live run, then writes compact evidence with brief topic, query count, generated vault paths, and an explicit `PAKE++ validation: PASS` or `PAKE++ validation: FAIL` line based on read-back validation of the persisted InsightNote.
 
+Before the chain begins, the harness also performs **pre-run hygiene**:
+- **Output-note cleanup:** deletes stale `03-Resources/synthesis-*.md`, `03-Resources/hooks-*.md`, and `03-Resources/weapons-check-*.md` files (non-recursive) so each run starts with a clean slate.
+- **Fail-fast env validation:** requires `FIRECRAWL_API_KEY`, `APIFY_API_TOKEN`, and `ANTHROPIC_API_KEY` to be present; if any are missing, it fails with a single aggregated message listing all missing keys. (Perplexity remains optional; when `PERPLEXITY_API_KEY` is absent, Perplexity is treated as unavailable and the sweep continues without filing Perplexity answers.)
+
 ### d. Daily agent log
 
 1. Use `vault_append_daily` targeting section `## Agent Log`.
@@ -329,6 +333,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-15 | 1.7.0 | Added model routing section: overview, operator override rules, version guard, audit trail | 15-6-operator-override-governance-controls |
 | 2026-04-22 | 1.8.0 | Documented PAKE++ synthesis output contract, operator personalization, and missing-profile warning behavior | 18-9-synthesis-quality-redesign |
 | 2026-04-29 | 1.9.0 | Documented runtime-selectable live-chain briefs, stale generated note cleanup, and persisted PAKE++ evidence validation | 21-1-live-chain-real-brief-epic-20-stack-pake-quality-evidence |
+| 2026-04-29 | 1.10.0 | Documented live-chain pre-run hygiene: prefix-based output cleanup + aggregated env-key validation | 21-2-pre-run-hygiene-automation |
 
 ---
 

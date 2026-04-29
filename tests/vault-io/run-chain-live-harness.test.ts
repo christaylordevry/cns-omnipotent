@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   cleanStaleChainNotes,
+  cleanStaleOutputNotesByPrefix,
   DEFAULT_BRIEF_TOPIC,
+  assertRequiredEnvKeys,
   loadBriefForRun,
   validatePersistedSynthesisPake,
 } from "../../scripts/run-chain.js";
@@ -226,5 +228,62 @@ describe("run-chain live harness helpers", () => {
     await expect(readFile(path.join(vaultRoot, "03-Resources/stale.md"), "utf8")).rejects.toThrow();
     await expect(readFile(path.join(vaultRoot, "03-Resources/keeper.md"), "utf8")).resolves.toContain("Keeper");
     await expect(readFile(path.join(vaultRoot, "03-Resources/title-keeper.md"), "utf8")).resolves.toContain("Synthesis");
+  });
+
+  it("cleans stale output notes by filename prefix only within 03-Resources (non-recursive)", async () => {
+    const vaultRoot = await makeVault();
+    await writeNote(vaultRoot, "03-Resources/synthesis-a.md", "a");
+    await writeNote(vaultRoot, "03-Resources/hooks-b.md", "b");
+    await writeNote(vaultRoot, "03-Resources/weapons-check-c.md", "c");
+    await writeNote(vaultRoot, "03-Resources/synthesis.md", "keeper");
+    await writeNote(vaultRoot, "03-Resources/sub/synthesis-d.md", "nested keeper");
+    await writeNote(vaultRoot, "03-Resources/not-markdown.txt", "keeper");
+
+    const cleanup = await cleanStaleOutputNotesByPrefix(vaultRoot);
+
+    expect(cleanup.removed.sort()).toEqual(
+      [
+        "03-Resources/hooks-b.md",
+        "03-Resources/synthesis-a.md",
+        "03-Resources/weapons-check-c.md",
+      ].sort(),
+    );
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/synthesis-a.md"), "utf8"),
+    ).rejects.toThrow();
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/hooks-b.md"), "utf8"),
+    ).rejects.toThrow();
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/weapons-check-c.md"), "utf8"),
+    ).rejects.toThrow();
+
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/synthesis.md"), "utf8"),
+    ).resolves.toContain("keeper");
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/sub/synthesis-d.md"), "utf8"),
+    ).resolves.toContain("nested keeper");
+    await expect(
+      readFile(path.join(vaultRoot, "03-Resources/not-markdown.txt"), "utf8"),
+    ).resolves.toContain("keeper");
+  });
+
+  it("fails fast with a single aggregated message listing all missing required keys", () => {
+    expect(() =>
+      assertRequiredEnvKeys(
+        ["FIRECRAWL_API_KEY", "APIFY_API_TOKEN", "ANTHROPIC_API_KEY"],
+        {},
+      ),
+    ).toThrow(
+      "Missing required environment variables: FIRECRAWL_API_KEY, APIFY_API_TOKEN, ANTHROPIC_API_KEY",
+    );
+
+    expect(() =>
+      assertRequiredEnvKeys(
+        ["FIRECRAWL_API_KEY", "APIFY_API_TOKEN", "ANTHROPIC_API_KEY"],
+        { FIRECRAWL_API_KEY: "x", APIFY_API_TOKEN: "y", ANTHROPIC_API_KEY: "" },
+      ),
+    ).toThrow("Missing required environment variables: ANTHROPIC_API_KEY");
   });
 });

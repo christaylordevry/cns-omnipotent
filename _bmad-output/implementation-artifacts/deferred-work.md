@@ -243,6 +243,13 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 21-2-pre-run-hygiene-automation (2026-04-29)
+
+- Prefix-cleanup casing/separator quirks (`.MD`, case-sensitive prefixes, `relDir` separator mixing) — behavior is acceptable per current ACs but may surprise operators on Windows/WSL
+- Windows/WSL file-lock (`EPERM`) cleanup failures are recorded only as “skipped” without reasons — consider richer skipped diagnostics under an opt-in verbose mode
+
+---
+
 ## Deferred from: code review of story 18-8 (2026-04-21)
 
 - Add jitter / backoff strategy to reduce thundering herd on 429s (avoid synchronized retries across parallel runs); current clamp+sleep is acceptable but could still cause repeat collisions.
