@@ -214,7 +214,7 @@ describe("createLlmSynthesisAdapter", () => {
       messages: Array<{ role: string; content: string }>;
     };
     expect(body.model).toBe("claude-sonnet-4-6");
-    expect(body.max_tokens).toBe(4000);
+    expect(body.max_tokens).toBe(8000);
     expect(typeof body.system).toBe("string");
     expect(body.system).toContain("Chris Taylor");
     expect(body.system).toContain("Sydney");

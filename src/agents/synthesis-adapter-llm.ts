@@ -15,7 +15,7 @@ import type {
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 4000;
+const MAX_TOKENS = 8000;
 const MAX_SOURCE_NOTES = 8;
 const MAX_SOURCE_NOTE_BODY_CHARS = 600;
 const MAX_VAULT_CONTEXT_NOTES = 3;
