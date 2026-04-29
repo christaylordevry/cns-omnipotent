@@ -1,6 +1,6 @@
 # Story 20.3: Vault hygiene — Apify source frontmatter + duplicate title detection
 #
-Status: ready-for-dev
+Status: done
 #
 Epic: 20 (Research agent routing hardening)
 #

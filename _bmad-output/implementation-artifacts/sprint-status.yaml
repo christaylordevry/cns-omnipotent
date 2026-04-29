@@ -174,7 +174,8 @@ development_status:
   19-4-context-aware-live-chain-smoke-and-quality-review: done
   epic-19-retrospective: optional
 
-  epic-20: in-progress
-  20-1-domain-aware-url-routing-in-the-research-agent: review
-  20-2-scrapling-mcp-as-third-research-tier: review
-  20-3-vault-hygiene: review
+  epic-20: done
+  20-1-domain-aware-url-routing-in-the-research-agent: done
+  20-2-scrapling-mcp-as-third-research-tier: done
+  20-3-vault-hygiene: done
+  epic-20-retrospective: done

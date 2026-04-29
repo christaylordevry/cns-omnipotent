@@ -1,6 +1,6 @@
 # Story 20.1: Research Agent — Domain-aware URL routing (social domains → Apify)
 
-Status: review
+Status: done
 
 Epic: 20 (Research agent routing hardening)
 

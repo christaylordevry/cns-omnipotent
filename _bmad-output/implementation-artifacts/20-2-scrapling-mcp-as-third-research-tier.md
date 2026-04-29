@@ -1,6 +1,6 @@
 # Story 20.2: Research Agent - Scrapling MCP as third research tier
 #
-Status: review
+Status: done
 
 Epic: 20 (Research agent routing hardening)
 
