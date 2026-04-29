@@ -80,18 +80,33 @@ export async function vaultCreateNoteFromMarkdown(
   try {
     await mkdir(dir, { recursive: true });
     await writeFile(tmpPath, fullMarkdown, "utf8");
+    // Default behavior is "overwrite on EEXIST" (unit-tested). In the ingest pipeline,
+    // callers pass `suppressAudit: true`; in that mode we preserve conflict semantics
+    // so duplicate ingests return `{ status: "conflict" }` instead of silently
+    // replacing existing content.
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         await link(tmpPath, canonicalTarget);
         break;
       } catch (linkErr: unknown) {
         const le = linkErr as NodeJS.ErrnoException;
-        if (le.code === "EEXIST" && attempt === 0) {
-          // Replace stale target and retry once with the same staged temp file.
-          await unlink(canonicalTarget);
+
+        const shouldOverwrite =
+          le.code === "EEXIST" && attempt === 0 && options.suppressAudit !== true;
+        if (shouldOverwrite) {
+          await unlink(canonicalTarget).catch(() => {});
           continue;
         }
+
         await unlink(tmpPath).catch(() => {});
+        if (linkErr instanceof CnsError) throw linkErr;
+
+        if (le.code === "EEXIST") {
+          throw new CnsError("IO_ERROR", "Note already exists at target path.", {
+            path: posixRel,
+          });
+        }
+
         throw new CnsError("IO_ERROR", "Failed to create note file.", {
           path: posixRel,
           errno: le.code,

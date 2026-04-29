@@ -149,7 +149,7 @@ function renderWeaponsCheckBody(args: {
     `Hook set: ${hookLink}`,
     `Synthesis: ${synLink}`,
     "",
-    "_All four hooks cleared the weapons gate (novelty >= 8 AND copy intensity >= 9)._",
+    "_All four hooks cleared the weapons gate (novelty >= 9 AND copy intensity >= 9)._",
     "",
     "## Rubric",
     "",
@@ -211,7 +211,7 @@ async function runOneWeaponsSlot(
       rationale: parsed.data.scores.rationale,
     });
     if (
-      parsed.data.scores.novelty >= 8 &&
+      parsed.data.scores.novelty >= 9 &&
       parsed.data.scores.copy_intensity >= 9
     ) {
       return {
