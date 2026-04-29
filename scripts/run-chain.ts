@@ -296,11 +296,11 @@ async function main() {
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const brief = {
-    topic: "building a solo creative agency pricing strategy 2026",
+    topic: "freelance consulting day rate calculation methodology 2026",
     queries: [
-      "solo creative agency retainer pricing and client acquisition 2026",
-      "how to get first clients for a creative agency 2026",
-      "creative agency positioning and niche selection strategy",
+      "how to calculate your freelance day rate consulting fees",
+      "freelance consultant pricing strategy value based vs hourly 2026",
+      "independent consultant rate card positioning premium pricing",
     ],
     depth: "deep" as const,
   };

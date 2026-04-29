@@ -11,7 +11,7 @@ import {
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 600;
+const MAX_TOKENS = 1200;
 
 const SYSTEM_PROMPT = [
   "You are a weapons-check judge and rewrite engine for marketing/creative hooks.",
