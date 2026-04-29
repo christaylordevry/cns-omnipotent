@@ -156,7 +156,8 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
 
       let parsedJson: unknown;
       try {
-        parsedJson = JSON.parse(assistantText);
+        const stripped = assistantText.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+        parsedJson = JSON.parse(stripped);
       } catch {
         throw new CnsError(
           "IO_ERROR",
