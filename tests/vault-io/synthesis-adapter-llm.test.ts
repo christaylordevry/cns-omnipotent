@@ -409,6 +409,24 @@ describe("createLlmSynthesisAdapter", () => {
     );
   });
 
+  it("assistant text with preface and fenced JSON: parses the fenced object", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeAnthropicTextResponse(
+        [
+          "Here is the requested object:",
+          "```json",
+          JSON.stringify(validSynthesisOutput),
+          "```",
+        ].join("\n"),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    const result = await adapter.synthesize(sampleInput);
+    expect(result).toEqual(validSynthesisOutput);
+  });
+
   it("zod schema invalid: returns JSON missing summary -> throws CnsError SCHEMA_INVALID", async () => {
     const invalidOutput = { body: "# something" };
     const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(invalidOutput));

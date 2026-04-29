@@ -1,5 +1,6 @@
 import { CnsError } from "../errors.js";
 import { fetchWithRetry } from "./anthropic-fetch.js";
+import { parseLlmJsonText } from "./llm-json.js";
 import {
   hookGenerationAdapterOutputSchema,
   type HookGenerationAdapter,
@@ -247,8 +248,7 @@ export function createLlmHookGenerationAdapter(): HookGenerationAdapter {
 
       let parsedJson: unknown;
       try {
-        const stripped = assistantText.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
-        parsedJson = JSON.parse(stripped);
+        parsedJson = parseLlmJsonText(assistantText);
       } catch {
         throw new CnsError("IO_ERROR", "Hook LLM returned non-JSON response");
       }

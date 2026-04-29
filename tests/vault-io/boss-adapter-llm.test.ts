@@ -209,6 +209,24 @@ describe("createLlmWeaponsCheckAdapter", () => {
     );
   });
 
+  it("assistant text with preface and fenced JSON: parses the fenced object", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeAnthropicTextResponse(
+        [
+          "Here is the JSON:",
+          "```json",
+          JSON.stringify(validWeaponsOutput),
+          "```",
+        ].join("\n"),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmWeaponsCheckAdapter();
+    const result = await adapter.scoreAndRewrite(sampleInput());
+    expect(result).toEqual(validWeaponsOutput);
+  });
+
   it("schema invalid (novelty as string): SCHEMA_INVALID with Zod message preserved", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       makeAnthropicJsonResponse({

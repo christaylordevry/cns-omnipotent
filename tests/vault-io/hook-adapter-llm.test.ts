@@ -225,6 +225,24 @@ describe("createLlmHookGenerationAdapter", () => {
     expect((err as CnsError).message).toBe("Hook LLM returned non-JSON response");
   });
 
+  it("assistant text with preface and fenced JSON: parses the fenced object", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeAnthropicTextResponse(
+        [
+          "Sure, here is the JSON:",
+          "```json",
+          JSON.stringify(validHookOutput),
+          "```",
+        ].join("\n"),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmHookGenerationAdapter();
+    const result = await adapter.generateOrRefine(generateInput());
+    expect(result).toEqual(validHookOutput);
+  });
+
   it("schema invalid (score as string): throws CnsError SCHEMA_INVALID with Zod message preserved", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       makeAnthropicJsonResponse({ hook_text: "x", score: "10" }),

@@ -1,5 +1,6 @@
 import { CnsError } from "../errors.js";
 import { fetchWithRetry } from "./anthropic-fetch.js";
+import { parseLlmJsonText } from "./llm-json.js";
 import {
   synthesisAdapterOutputSchema,
   type SynthesisAdapter,
@@ -318,11 +319,7 @@ export function createLlmSynthesisAdapter(): SynthesisAdapter {
 
       let parsedJson: unknown;
       try {
-        const clean = assistantText
-          .replace(/^```[\w]*\n?/m, "")
-          .replace(/\n?```$/m, "")
-          .trim();
-        parsedJson = JSON.parse(clean);
+        parsedJson = parseLlmJsonText(assistantText);
       } catch {
         throw new CnsError("IO_ERROR", "Synthesis LLM returned non-JSON response");
       }

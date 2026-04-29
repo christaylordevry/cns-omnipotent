@@ -1,5 +1,6 @@
 import { CnsError } from "../errors.js";
 import { fetchWithRetry } from "./anthropic-fetch.js";
+import { parseLlmJsonText } from "./llm-json.js";
 import {
   WEAPONS_RUBRIC,
   weaponsCheckAdapterOutputSchema,
@@ -156,11 +157,7 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
 
       let parsedJson: unknown;
       try {
-        const clean = assistantText
-          .replace(/^```[\w]*\n?/m, "")
-          .replace(/\n?```$/m, "")
-          .trim();
-        parsedJson = JSON.parse(clean);
+        parsedJson = parseLlmJsonText(assistantText);
       } catch {
         throw new CnsError(
           "IO_ERROR",
