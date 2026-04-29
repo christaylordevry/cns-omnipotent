@@ -327,7 +327,7 @@ export async function runBossAgent(
       ingest_as: "WeaponsCheckNote",
       title_hint: titleHint,
       tags: [topicTagSlug(topic), "weapons-check", "research-sweep"],
-      ai_summary: `Four hooks passed the weapons gate (novelty >= 8 AND copy intensity >= 9) for: ${topic}`,
+      ai_summary: `Four hooks passed the weapons gate (novelty >= 9 AND copy intensity >= 9) for: ${topic}`,
       confidence_score: 0.7,
     },
     { surface },
