@@ -212,7 +212,7 @@ describe("AC: weapons-gate + weapons-note + audit (happy path)", () => {
     expect(content).toContain("[[synth-insight]]");
     // Rubric is embedded verbatim
     expect(content).toContain(WEAPONS_RUBRIC);
-    expect(content).toContain("novelty 10/10 \u00b7 copy intensity 10/10");
+    expect(content).toContain("novelty 9+/10 \u00b7 copy intensity 9+/10");
     expect(content).toContain("tags:");
     expect(content).toContain("- \"weapons-check\"");
     expect(content).toContain("- \"research-sweep\"");
@@ -226,17 +226,17 @@ describe("AC: weapons-gate + weapons-note + audit (happy path)", () => {
 });
 
 describe("AC: weapons-gate — both dimensions required", () => {
-  it("does NOT accept novelty 10 alone (copy_intensity 9 still triggers iterate)", async () => {
+  it("does NOT accept novelty 10 alone (copy_intensity 8 still triggers iterate)", async () => {
     const vaultRoot = await makeVault();
     let calls = 0;
     const adapter: WeaponsCheckAdapter = {
       async scoreAndRewrite(input) {
         calls++;
-        // First pass: 10 novelty, 9 copy. Second pass: 10/10.
+        // First pass: 10 novelty, 8 copy (below gate). Second pass: 10/10.
         if (input.iteration === 1) {
           return {
             revised_hook: `${input.current_hook}-i1`,
-            scores: { novelty: 10, copy_intensity: 9, rationale: "novelty pins but copy soft" },
+            scores: { novelty: 10, copy_intensity: 8, rationale: "novelty pins but copy soft" },
           };
         }
         return {
@@ -250,23 +250,23 @@ describe("AC: weapons-gate — both dimensions required", () => {
     });
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("expected ok");
-    // Each slot iterates twice: first 10+9, then 10+10.
+    // Each slot iterates twice: first 10+8, then 10+10.
     expect(calls).toBe(8);
     for (const o of result.options) {
       expect(o.iterations).toBe(2);
-      expect(o.trace[0]?.copy_intensity).toBe(9);
+      expect(o.trace[0]?.copy_intensity).toBe(8);
       expect(o.trace[1]?.copy_intensity).toBe(10);
     }
   });
 
-  it("does NOT accept copy_intensity 10 alone (novelty 9 still triggers iterate)", async () => {
+  it("does NOT accept copy_intensity 10 alone (novelty 8 still triggers iterate)", async () => {
     const vaultRoot = await makeVault();
     const adapter: WeaponsCheckAdapter = {
       async scoreAndRewrite(input) {
         if (input.iteration === 1) {
           return {
             revised_hook: `${input.current_hook}-i1`,
-            scores: { novelty: 9, copy_intensity: 10, rationale: "copy peaks but novelty near" },
+            scores: { novelty: 8, copy_intensity: 10, rationale: "copy peaks but novelty near" },
           };
         }
         return {
@@ -282,7 +282,7 @@ describe("AC: weapons-gate — both dimensions required", () => {
     if (result.status !== "ok") throw new Error("expected ok");
     for (const o of result.options) {
       expect(o.iterations).toBe(2);
-      expect(o.trace[0]?.novelty).toBe(9);
+      expect(o.trace[0]?.novelty).toBe(8);
     }
   });
 });
@@ -296,7 +296,7 @@ describe("AC: max-iteration fail-closed", () => {
         calls++;
         return {
           revised_hook: `${input.current_hook}-i${input.iteration}`,
-          scores: { novelty: 9, copy_intensity: 9, rationale: "close but no" },
+          scores: { novelty: 8, copy_intensity: 8, rationale: "close but no" },
         };
       },
     };

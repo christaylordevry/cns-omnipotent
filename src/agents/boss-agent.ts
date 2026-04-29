@@ -149,7 +149,7 @@ function renderWeaponsCheckBody(args: {
     `Hook set: ${hookLink}`,
     `Synthesis: ${synLink}`,
     "",
-    "_All four hooks cleared the weapons gate (novelty = 10 AND copy intensity = 10)._",
+    "_All four hooks cleared the weapons gate (novelty >= 9 AND copy intensity >= 9)._",
     "",
     "## Rubric",
     "",
@@ -160,7 +160,7 @@ function renderWeaponsCheckBody(args: {
     lines.push(`## Hook option ${opt.slot}`, "");
     lines.push(`**Final hook:** ${opt.final_hook}`, "");
     lines.push(
-      `**Final scores:** novelty 10/10 · copy intensity 10/10 · iterations ${opt.iterations}`,
+      `**Final scores:** novelty 9+/10 · copy intensity 9+/10 · iterations ${opt.iterations}`,
       "",
     );
     lines.push("### Iteration trace", "");
@@ -211,8 +211,8 @@ async function runOneWeaponsSlot(
       rationale: parsed.data.scores.rationale,
     });
     if (
-      parsed.data.scores.novelty === 10 &&
-      parsed.data.scores.copy_intensity === 10
+      parsed.data.scores.novelty >= 9 &&
+      parsed.data.scores.copy_intensity >= 9
     ) {
       return {
         slot: ctx.hook_slot,
@@ -226,7 +226,7 @@ async function runOneWeaponsSlot(
   const last = trace[trace.length - 1];
   throw new CnsError(
     "IO_ERROR",
-    `Weapons slot ${ctx.hook_slot} failed the novelty+copy_intensity gate within ${MAX_WEAPONS_ITERATIONS} iterations (last scores: novelty ${last?.novelty ?? 0}, copy_intensity ${last?.copy_intensity ?? 0})`,
+    `Weapons slot ${ctx.hook_slot} failed the novelty+copy_intensity gate (9+/10 required) within ${MAX_WEAPONS_ITERATIONS} iterations (last scores: novelty ${last?.novelty ?? 0}, copy_intensity ${last?.copy_intensity ?? 0})`,
   );
 }
 
@@ -327,7 +327,7 @@ export async function runBossAgent(
       ingest_as: "WeaponsCheckNote",
       title_hint: titleHint,
       tags: [topicTagSlug(topic), "weapons-check", "research-sweep"],
-      ai_summary: `Four hooks passed the weapons gate (novelty = 10 AND copy intensity = 10) for: ${topic}`,
+      ai_summary: `Four hooks passed the weapons gate (novelty >= 9 AND copy intensity >= 9) for: ${topic}`,
       confidence_score: 0.7,
     },
     { surface },
