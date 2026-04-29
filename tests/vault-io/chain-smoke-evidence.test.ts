@@ -123,6 +123,7 @@ describe("chain smoke evidence formatting", () => {
 
     expect(evidence.vault_root.class).toBe("staging");
     expect(rendered).toContain("| Research | partial |");
+    expect(rendered).toContain("PAKE++ validation: UNKNOWN");
     expect(rendered).toContain("03-Resources/synthesis.md");
     expect(rendered).toContain("03-Resources/hooks.md");
     expect(rendered).toContain("03-Resources/weapons.md");
@@ -149,6 +150,7 @@ describe("chain smoke evidence formatting", () => {
     const rendered = formatChainSmokeEvidenceMarkdown(evidence);
 
     expect(rendered).toContain("Fatal Error");
+    expect(rendered).toContain("PAKE++ validation: UNKNOWN");
     expect(rendered).toContain("429");
     expect(rendered).toContain("Rate-Limit");
     expect(rendered).toContain("Bearer [REDACTED]");

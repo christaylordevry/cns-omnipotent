@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-04-22
+modified: 2026-04-29
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -298,6 +298,8 @@ The end-to-end research chain creates operator-ready SynthesisNotes from source 
 
 The synthesis agent is personalized to Chris Taylor in Sydney as a Creative Technologist. Its leverage section must reference active tracks such as Escape Job and Build Agency when those tracks are in the operator context. Vault context is pulled from `03-Resources/Operator-Profile.md` plus topic-relevant `03-Resources/` notes; if the operator profile is missing, the synthesis must warn that it is grounded in external research only.
 
+For live evidence runs, use `scripts/run-chain.ts`. The brief topic can be selected with `CNS_BRIEF_TOPIC`; if unset, the fallback topic is freelance consulting day rate calculation methodology. Operators can also pass a strict ResearchBrief JSON with `--brief-file`, or use `--topic`, repeated `--query`, and `--depth`. The harness cleans stale AI-generated chain notes for the selected topic before starting a live run, then writes compact evidence with brief topic, query count, generated vault paths, and an explicit `PAKE++ validation: PASS` or `PAKE++ validation: FAIL` line based on read-back validation of the persisted InsightNote.
+
 ### d. Daily agent log
 
 1. Use `vault_append_daily` targeting section `## Agent Log`.
@@ -326,6 +328,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-14 | 1.6.0 | Documented PAKE quality-weighted retrieval ranking and `--no-quality-weighting` opt-out | 12-7-pake-quality-weighting-for-retrieval |
 | 2026-04-15 | 1.7.0 | Added model routing section: overview, operator override rules, version guard, audit trail | 15-6-operator-override-governance-controls |
 | 2026-04-22 | 1.8.0 | Documented PAKE++ synthesis output contract, operator personalization, and missing-profile warning behavior | 18-9-synthesis-quality-redesign |
+| 2026-04-29 | 1.9.0 | Documented runtime-selectable live-chain briefs, stale generated note cleanup, and persisted PAKE++ evidence validation | 21-1-live-chain-real-brief-epic-20-stack-pake-quality-evidence |
 
 ---
 

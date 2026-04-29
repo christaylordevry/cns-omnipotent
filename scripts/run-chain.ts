@@ -8,17 +8,23 @@
  *   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \
  *   tsx scripts/run-chain.ts
  *
+ * Select a brief with CNS_BRIEF_TOPIC, --brief-file, or --topic/--query.
+ *
  * Default output is compact, secret-safe smoke evidence. Use --raw-json only
  * for local debugging when full stage result payloads are acceptable.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import matter from "gray-matter";
 import { runChain } from "../src/agents/run-chain.js";
 import {
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
+  isSocialDomain,
+  researchBriefSchema,
+  type ResearchBrief,
 } from "../src/agents/research-agent.js";
 import { buildApifyAdapter } from "../src/adapters/apify-adapter.js";
 import { buildScraplingAdapter } from "../src/adapters/scrapling-adapter.js";
@@ -30,20 +36,49 @@ import { createLlmSynthesisAdapter } from "../src/agents/synthesis-adapter-llm.j
 import { createLlmHookGenerationAdapter } from "../src/agents/hook-adapter-llm.js";
 import { createLlmWeaponsCheckAdapter } from "../src/agents/boss-adapter-llm.js";
 import {
+  createDefaultVaultReadAdapter,
+  validatePakeSynthesisBody,
+  type SynthesisRunResult,
+} from "../src/agents/synthesis-agent.js";
+import { DEFAULT_OPERATOR_CONTEXT } from "../src/agents/operator-context.js";
+import {
+  buildVaultContextPacket,
+  loadOperatorContextFromVault,
+  type VaultContextPacket,
+} from "../src/agents/vault-context-builder.js";
+import {
   buildChainSmokeEvidence,
   buildFatalChainSmokeEvidence,
   classifyVaultRoot,
   formatChainSmokeEvidenceMarkdown,
+  sanitizeEvidenceString,
+  type PakeValidationEvidence,
   type VaultRootClass,
 } from "../src/agents/chain-smoke-evidence.js";
+import { resolveVaultPath } from "../src/paths.js";
+import { assertWriteAllowed } from "../src/write-gate.js";
+import type { OperatorContext } from "../src/agents/operator-context.js";
 
 type CliOptions = {
   rawJson: boolean;
   evidenceFile: string | undefined;
   operatorNotes: string[];
   vaultRootClass: VaultRootClass | undefined;
+  briefFile: string | undefined;
+  topic: string | undefined;
+  queries: string[];
+  depth: ResearchBrief["depth"] | undefined;
   help: boolean;
 };
+
+export const DEFAULT_BRIEF_TOPIC =
+  "freelance consulting day rate calculation methodology 2026";
+
+const DEFAULT_BRIEF_QUERIES = [
+  "freelance consulting day rate calculation methodology 2026",
+  "reddit.com freelance consultant day rate pricing 2026",
+  "freelance consultant pricing strategy value based vs hourly 2026 bot protected pricing guide",
+] as const;
 
 function parseVaultRootClass(value: string): VaultRootClass {
   if (value === "staging" || value === "active" || value === "unknown") return value;
@@ -59,6 +94,10 @@ function parseArgs(argv: string[]): CliOptions {
       process.env.CHAIN_VAULT_ROOT_CLASS !== undefined
         ? parseVaultRootClass(process.env.CHAIN_VAULT_ROOT_CLASS)
         : undefined,
+    briefFile: undefined,
+    topic: undefined,
+    queries: [],
+    depth: undefined,
     help: false,
   };
 
@@ -78,6 +117,33 @@ function parseArgs(argv: string[]): CliOptions {
         const value = argv[++i];
         if (value === undefined) throw new Error("--operator-note requires text");
         opts.operatorNotes.push(value);
+        break;
+      }
+      case "--brief-file": {
+        const value = argv[++i];
+        if (value === undefined) throw new Error("--brief-file requires a path");
+        opts.briefFile = value;
+        break;
+      }
+      case "--topic": {
+        const value = argv[++i];
+        if (value === undefined) throw new Error("--topic requires text");
+        opts.topic = value;
+        break;
+      }
+      case "--query": {
+        const value = argv[++i];
+        if (value === undefined) throw new Error("--query requires text");
+        opts.queries.push(value);
+        break;
+      }
+      case "--depth": {
+        const value = argv[++i];
+        if (value === undefined) throw new Error("--depth requires shallow, standard, or deep");
+        if (value !== "shallow" && value !== "standard" && value !== "deep") {
+          throw new Error("--depth requires shallow, standard, or deep");
+        }
+        opts.depth = value;
         break;
       }
       case "--vault-root-class": {
@@ -103,16 +169,228 @@ function parseArgs(argv: string[]): CliOptions {
 function printHelp(): void {
   console.log(`Usage:
   CNS_VAULT_ROOT=/path/to/staging-vault \\
+  CNS_BRIEF_TOPIC="freelance consulting day rate calculation methodology 2026" \\
   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \\
-  tsx scripts/run-chain.ts [--evidence-file path] [--operator-note text]
+  tsx scripts/run-chain.ts [--brief-file brief.json] [--evidence-file path] [--operator-note text]
 
 Options:
+  --brief-file path          Read a ResearchBrief JSON file: topic, queries, depth, optional tags.
+  --topic text               Override the brief topic without editing source.
+  --query text               Add a query. Repeat for multiple queries.
+  --depth value              shallow, standard, or deep. Defaults to deep.
   --evidence-file path        Write compact safe evidence markdown to a file.
   --operator-note text        Add a sanitized operator note to the evidence.
   --vault-root-class value    staging, active, or unknown. Overrides auto-detect.
   --raw-json                  Also print full raw ChainRunResult JSON for local debugging.
   --help                      Show this help.
 `);
+}
+
+function defaultQueriesForTopic(topic: string): string[] {
+  if (topic === DEFAULT_BRIEF_TOPIC) return [...DEFAULT_BRIEF_QUERIES];
+  return [
+    topic,
+    `reddit.com ${topic}`,
+    `${topic} bot protected pricing guide`,
+  ];
+}
+
+function formatBriefError(message: string): Error {
+  return new Error(`${message}. Expected ResearchBrief JSON shape: {"topic":"...","queries":["..."],"depth":"deep"}`);
+}
+
+export async function loadBriefForRun(
+  cli: Pick<CliOptions, "briefFile" | "topic" | "queries" | "depth">,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ResearchBrief> {
+  if (cli.briefFile !== undefined) {
+    if (cli.topic !== undefined || cli.queries.length > 0 || cli.depth !== undefined) {
+      throw formatBriefError("--brief-file cannot be combined with --topic, --query, or --depth");
+    }
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(await readFile(cli.briefFile, "utf8"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw formatBriefError(`Failed to read or parse --brief-file ${cli.briefFile}: ${msg}`);
+    }
+    const parsed = researchBriefSchema.strict().safeParse(parsedJson);
+    if (!parsed.success) {
+      throw formatBriefError(`Invalid --brief-file ${cli.briefFile}: ${parsed.error.message}`);
+    }
+    return parsed.data;
+  }
+
+  const envTopic = env.CNS_BRIEF_TOPIC?.trim();
+  const topic = cli.topic?.trim() || envTopic || DEFAULT_BRIEF_TOPIC;
+  const queries = cli.queries.length > 0 ? cli.queries : defaultQueriesForTopic(topic);
+  const parsed = researchBriefSchema.strict().safeParse({
+    topic,
+    queries,
+    depth: cli.depth ?? "deep",
+  });
+  if (!parsed.success) {
+    throw formatBriefError(`Invalid runtime brief: ${parsed.error.message}`);
+  }
+  return parsed.data;
+}
+
+function todayUtcYmd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function topicTagSlug(topic: string): string {
+  const s = topic
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s.length > 0 ? s : "research-topic";
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function frontmatterRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
+async function listMarkdownFiles(root: string, relDir: string): Promise<string[]> {
+  const absDir = resolveVaultPath(root, relDir);
+  let entries: Awaited<ReturnType<typeof readdir>>;
+  try {
+    entries = await readdir(absDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const out: string[] = [];
+  for (const entry of entries) {
+    const rel = `${relDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      out.push(...(await listMarkdownFiles(root, rel)));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+function generatedPerplexityTitle(brief: ResearchBrief, query: string, dateYmd: string): string {
+  return `Perplexity: ${brief.topic.slice(0, 80)} — ${query.slice(0, 80)} (${dateYmd})`;
+}
+
+function generatedTitlesForBrief(brief: ResearchBrief, dateYmd: string): Set<string> {
+  return new Set([
+    `Synthesis: ${brief.topic} (${dateYmd})`,
+    `Hooks: ${brief.topic} (${dateYmd})`,
+    `Weapons check: ${brief.topic} (${dateYmd})`,
+    ...brief.queries.map((query) => generatedPerplexityTitle(brief, query, dateYmd)),
+  ]);
+}
+
+function isStaleChainNote(frontmatter: Record<string, unknown>, brief: ResearchBrief): boolean {
+  if (frontmatter.creation_method !== "ai") return false;
+  const tags = asStringArray(frontmatter.tags);
+  if (!tags.includes("research-sweep")) return false;
+
+  const topicSlug = topicTagSlug(brief.topic);
+  const hasTopicTag = tags.includes(brief.topic) || tags.includes(topicSlug);
+  if (!hasTopicTag) return false;
+
+  const pakeType = frontmatter.pake_type;
+  return (
+    pakeType === "SourceNote" ||
+    pakeType === "InsightNote" ||
+    pakeType === "SynthesisNote" ||
+    pakeType === "HookSetNote" ||
+    pakeType === "WeaponsCheckNote"
+  );
+}
+
+export async function cleanStaleChainNotes(
+  vaultRoot: string,
+  brief: ResearchBrief,
+  opts: { dateYmd?: string } = {},
+): Promise<{ removed: string[]; skipped: string[] }> {
+  const dateYmd = opts.dateYmd ?? todayUtcYmd();
+  const generatedTitles = generatedTitlesForBrief(brief, dateYmd);
+  const removed: string[] = [];
+  const skipped: string[] = [];
+
+  for (const relPath of await listMarkdownFiles(vaultRoot, "03-Resources")) {
+    let raw: string;
+    try {
+      raw = await readFile(resolveVaultPath(vaultRoot, relPath), "utf8");
+    } catch {
+      skipped.push(relPath);
+      continue;
+    }
+    const frontmatter = frontmatterRecord(matter(raw).data);
+    const title = typeof frontmatter.title === "string" ? frontmatter.title : "";
+    const generatedTitleMatch =
+      generatedTitles.has(title) && frontmatter.creation_method === "ai";
+    if (!generatedTitleMatch && !isStaleChainNote(frontmatter, brief)) continue;
+
+    const absPath = resolveVaultPath(vaultRoot, relPath);
+    try {
+      assertWriteAllowed(vaultRoot, absPath, { operation: "delete" });
+      await rm(absPath, { force: true });
+      removed.push(relPath);
+    } catch {
+      skipped.push(relPath);
+    }
+  }
+
+  return { removed, skipped };
+}
+
+export async function validatePersistedSynthesisPake(args: {
+  vaultRoot: string;
+  synthesis: SynthesisRunResult;
+  operatorContext: OperatorContext;
+  vaultContextPacket: VaultContextPacket;
+}): Promise<PakeValidationEvidence> {
+  if (args.synthesis.status !== "ok") {
+    return {
+      status: "unknown",
+      failures: ["Synthesis did not produce a persisted InsightNote."],
+    };
+  }
+
+  const insight_note_path = args.synthesis.insight_note.vault_path;
+  try {
+    const read = await createDefaultVaultReadAdapter(args.vaultRoot).readNote(insight_note_path);
+    const failures = validatePakeSynthesisBody({
+      body: read.body,
+      operator_context: args.operatorContext,
+      vault_context_packet: args.vaultContextPacket,
+    });
+    return {
+      status: failures.length === 0 ? "pass" : "fail",
+      insight_note_path,
+      failures: failures.map((failure) => sanitizeEvidenceString(failure, 220)),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      status: "fail",
+      insight_note_path,
+      failures: [`Persisted InsightNote read-back failed: ${sanitizeEvidenceString(msg, 220)}`],
+    };
+  }
+}
+
+function routingOperatorNote(brief: ResearchBrief, cleanup: { removed: string[]; skipped: string[] }): string {
+  const socialCount = brief.queries.filter((query) => isSocialDomain(query)).length;
+  return [
+    `Brief routing triggers: social-domain query count=${socialCount}; Scrapling tier configured for post-Firecrawl/Apify acquisition attempts.`,
+    `Stale generated chain notes cleaned before run: removed=${cleanup.removed.length}, skipped=${cleanup.skipped.length}.`,
+  ].join(" ");
 }
 
 // ---------------------------------------------------------------------------
@@ -243,6 +521,8 @@ async function main() {
     process.env.CNS_VAULT_ROOT ??
     "/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE";
   const vaultRootClass = cli.vaultRootClass ?? classifyVaultRoot(vaultRoot);
+  const brief = await loadBriefForRun(cli);
+  let operatorNotes = [...cli.operatorNotes];
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const apifyToken = process.env.APIFY_API_TOKEN ?? "";
@@ -255,25 +535,27 @@ async function main() {
   if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY not set");
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  const brief = {
-    topic: "freelance consulting day rate calculation methodology 2026",
-    queries: [
-      "how to calculate your freelance day rate consulting fees",
-      "freelance consultant pricing strategy value based vs hourly 2026",
-      "independent consultant rate card positioning premium pricing",
-    ],
-    depth: "deep" as const,
-  };
-
+  const startedAt = Date.now();
+  const serviceErrors = serviceErrorRecorder();
   console.log("=== Chain Live Smoke (Research -> Synthesis -> Hook -> Boss) ===");
   console.log(`Vault root class: ${vaultRootClass}`);
   console.log(`Brief topic: ${brief.topic}`);
+  console.log(`Brief query count: ${brief.queries.length}`);
   console.log("Services configured: Firecrawl, Apify, Scrapling, Perplexity, Anthropic");
-  console.log("Running chain. Default output will be compact safe evidence.\n");
 
-  const startedAt = Date.now();
-  const serviceErrors = serviceErrorRecorder();
   try {
+    const cleanup = await cleanStaleChainNotes(vaultRoot, brief);
+    operatorNotes = [...operatorNotes, routingOperatorNote(brief, cleanup)];
+    console.log(`Stale generated chain notes cleaned: ${cleanup.removed.length}`);
+    console.log("Running chain. Default output will be compact safe evidence.\n");
+
+    const operator_context =
+      (await loadOperatorContextFromVault(vaultRoot)) ?? DEFAULT_OPERATOR_CONTEXT;
+    const vault_context_packet = await buildVaultContextPacket(
+      vaultRoot,
+      brief.topic,
+      brief.queries,
+    );
     const result = await runChain(vaultRoot, brief, {
       research: {
         surface: "live-test",
@@ -289,6 +571,14 @@ async function main() {
         hookGeneration: createLlmHookGenerationAdapter(),
         weaponsCheck: createLlmWeaponsCheckAdapter(),
       },
+      operator_context,
+      vault_context_packet,
+    });
+    const pakeValidation = await validatePersistedSynthesisPake({
+      vaultRoot,
+      synthesis: result.synthesis,
+      operatorContext: operator_context,
+      vaultContextPacket: vault_context_packet,
     });
 
     const evidence = buildChainSmokeEvidence({
@@ -298,8 +588,9 @@ async function main() {
       brief,
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      operatorNotes: cli.operatorNotes,
+      operatorNotes,
       externalServiceErrors: serviceErrors.errors,
+      pakeValidation,
     });
     const rendered = formatChainSmokeEvidenceMarkdown(evidence);
     console.log(rendered);
@@ -314,6 +605,9 @@ async function main() {
       console.log("\n=== raw ChainRunResult JSON (--raw-json requested) ===");
       console.log(JSON.stringify(result, null, 2));
     }
+    if (pakeValidation.status === "fail") {
+      process.exitCode = 1;
+    }
   } catch (err) {
     const evidence = buildFatalChainSmokeEvidence({
       error: err,
@@ -322,7 +616,7 @@ async function main() {
       brief,
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      operatorNotes: cli.operatorNotes,
+      operatorNotes,
     });
     const rendered = formatChainSmokeEvidenceMarkdown(evidence);
     console.error(rendered);

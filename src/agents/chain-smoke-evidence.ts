@@ -12,6 +12,12 @@ export type ChainSmokeStageEvidence = {
   observations: string[];
 };
 
+export type PakeValidationEvidence = {
+  status: "pass" | "fail" | "unknown";
+  insight_note_path?: string | undefined;
+  failures: string[];
+};
+
 export type ChainSmokeEvidence = {
   schema: "cns.chain-smoke-evidence.v1";
   generated_at: string;
@@ -40,6 +46,7 @@ export type ChainSmokeEvidence = {
     weapons: ChainSmokeStageEvidence;
   };
   rate_limit_observations: string[];
+  pake_validation: PakeValidationEvidence;
   operator_notes: string[];
   fatal_error?: string;
 };
@@ -86,12 +93,13 @@ export function classifyVaultRoot(vaultRoot: string): VaultRootClass {
 export function safeCommandShape(): string {
   return [
     'CNS_VAULT_ROOT="<staging-vault-root>"',
+    'CNS_BRIEF_TOPIC="<brief-topic>"',
     "FIRECRAWL_API_KEY=[REDACTED]",
     "APIFY_API_TOKEN=[REDACTED]",
     'SCRAPLING_COMMAND="scrapling"',
     "PERPLEXITY_API_KEY=[REDACTED]",
     "ANTHROPIC_API_KEY=[REDACTED]",
-    "tsx scripts/run-chain.ts",
+    "tsx scripts/run-chain.ts [--brief-file path] [--evidence-file path] [--operator-note text]",
   ].join(" ");
 }
 
@@ -236,6 +244,7 @@ export function buildChainSmokeEvidence(args: {
   durationMs?: number;
   operatorNotes?: string[];
   externalServiceErrors?: string[];
+  pakeValidation?: PakeValidationEvidence;
 }): ChainSmokeEvidence {
   const stages = {
     research: researchStage(args.result),
@@ -274,6 +283,7 @@ export function buildChainSmokeEvidence(args: {
     },
     stages,
     rate_limit_observations: detectRateLimitObservations(serviceErrorText),
+    pake_validation: sanitizePakeValidationEvidence(args.pakeValidation),
     operator_notes: (args.operatorNotes ?? []).map((note) =>
       sanitizeEvidenceString(note, 700),
     ),
@@ -288,6 +298,7 @@ export function buildFatalChainSmokeEvidence(args: {
   generatedAt: string;
   durationMs?: number;
   operatorNotes?: string[];
+  pakeValidation?: PakeValidationEvidence;
 }): ChainSmokeEvidence {
   const errorText =
     args.error instanceof Error ? args.error.message : String(args.error);
@@ -344,11 +355,31 @@ export function buildFatalChainSmokeEvidence(args: {
       },
     },
     rate_limit_observations: detectRateLimitObservations([sanitizedError]),
+    pake_validation: sanitizePakeValidationEvidence(args.pakeValidation),
     operator_notes: (args.operatorNotes ?? []).map((note) =>
       sanitizeEvidenceString(note, 700),
     ),
     fatal_error: sanitizedError,
   };
+}
+
+function sanitizePakeValidationEvidence(
+  value: PakeValidationEvidence | undefined,
+): PakeValidationEvidence {
+  if (value === undefined) {
+    return {
+      status: "unknown",
+      failures: ["PAKE++ persisted-note validation was not run."],
+    };
+  }
+  const out: PakeValidationEvidence = {
+    status: value.status,
+    failures: value.failures.map((failure) => sanitizeEvidenceString(failure, 220)),
+  };
+  if (value.insight_note_path !== undefined) {
+    out.insight_note_path = sanitizeEvidenceString(value.insight_note_path, 220);
+  }
+  return out;
 }
 
 function renderCounts(counts: Record<string, number>): string {
@@ -371,6 +402,21 @@ function renderStage(name: string, stage: ChainSmokeStageEvidence): string[] {
   return lines;
 }
 
+function renderPakeValidation(evidence: PakeValidationEvidence): string[] {
+  const renderedStatus =
+    evidence.status === "pass" ? "PASS" : evidence.status === "fail" ? "FAIL" : "UNKNOWN";
+  const lines = [`- PAKE++ validation: ${renderedStatus}`];
+  if (evidence.insight_note_path !== undefined) {
+    lines.push(`- InsightNote path: ${evidence.insight_note_path}`);
+  }
+  if (evidence.failures.length > 0) {
+    for (const failure of evidence.failures) {
+      lines.push(`- Failure: ${failure}`);
+    }
+  }
+  return lines;
+}
+
 export function formatChainSmokeEvidenceMarkdown(evidence: ChainSmokeEvidence): string {
   const lines: string[] = [
     "## Live Chain Smoke Evidence",
@@ -389,6 +435,9 @@ export function formatChainSmokeEvidenceMarkdown(evidence: ChainSmokeEvidence): 
     ...renderStage("Synthesis", evidence.stages.synthesis),
     ...renderStage("Hook", evidence.stages.hooks),
     ...renderStage("Boss", evidence.stages.weapons),
+    "",
+    "### Synthesis Quality Contract (PAKE++)",
+    ...renderPakeValidation(evidence.pake_validation),
     "",
     "### Retry / Rate-Limit Observations",
   ];

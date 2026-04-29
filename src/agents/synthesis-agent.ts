@@ -204,7 +204,7 @@ function countMarkdownTableRows(body: string, header: string): number {
   return count;
 }
 
-function validatePakeSynthesisBody(args: {
+export function validatePakeSynthesisBody(args: {
   body: string;
   operator_context: OperatorContext;
   vault_context_packet: VaultContextPacket;
