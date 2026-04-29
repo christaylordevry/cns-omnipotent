@@ -17,6 +17,7 @@
     "test:node": "node --test tests/*.test.mjs",
     "test:vitest": "vitest run --config vitest.config.ts",
     "test": "npm run -s test:node && npm run -s test:vitest",
+    "chain": "tsx scripts/run-chain.ts",
     "brain:index": "tsx src/brain/build-index-cli.ts",
     "brain:query": "tsx src/brain/query-index-cli.ts"
   },

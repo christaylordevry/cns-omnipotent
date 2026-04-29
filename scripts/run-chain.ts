@@ -255,6 +255,132 @@ function topicTagSlug(topic: string): string {
   return s.length > 0 ? s : "research-topic";
 }
 
+type OutputNoteKind = "synthesis" | "hooks" | "weapons";
+
+export type OutputNoteReadback = {
+  kind: OutputNoteKind;
+  vault_path: string;
+  status: "ok" | "fail";
+  failure_summary?: string;
+};
+
+export type ChainRunSummary = {
+  status: "pass" | "fail";
+  output_notes: OutputNoteReadback[];
+  pake_validation: Pick<PakeValidationEvidence, "status" | "insight_note_path">;
+};
+
+export function computeChainRunSummary(args: {
+  outputNotes: OutputNoteReadback[];
+  pakeValidation: PakeValidationEvidence;
+}): ChainRunSummary {
+  const okReads = args.outputNotes.every((n) => n.status === "ok");
+  const pakeStatus = args.pakeValidation.status;
+  const status: ChainRunSummary["status"] =
+    okReads && pakeStatus === "pass" ? "pass" : "fail";
+  return {
+    status,
+    output_notes: args.outputNotes,
+    pake_validation: {
+      status: pakeStatus,
+      insight_note_path: args.pakeValidation.insight_note_path,
+    },
+  };
+}
+
+export function exitCodeForChainRunSummary(summary: ChainRunSummary): 0 | 1 {
+  return summary.status === "pass" ? 0 : 1;
+}
+
+// Story 21.3 naming (wrapper aliases for testability / story alignment)
+export function computeChainPassFail(args: {
+  outputNotes: OutputNoteReadback[];
+  pakeValidation: PakeValidationEvidence;
+}): { status: "pass" | "fail"; exitCode: 0 | 1 } {
+  const summary = computeChainRunSummary(args);
+  return { status: summary.status, exitCode: exitCodeForChainRunSummary(summary) };
+}
+
+export function formatChainRunSummaryForTerminal(summary: ChainRunSummary): string {
+  const lines: string[] = [];
+  lines.push("");
+  lines.push("=== Summary (read-back validation) ===");
+  lines.push(`Result: ${summary.status === "pass" ? "PASS" : "FAIL"}`);
+  lines.push("Output note read-back:");
+  for (const note of summary.output_notes) {
+    const base = `- ${note.kind}: ${note.vault_path} (${note.status})`;
+    lines.push(
+      note.status === "ok" ? base : `${base} — ${note.failure_summary ?? "read failed"}`,
+    );
+  }
+  const pakeLine =
+    summary.pake_validation.status === "pass"
+      ? "PASS"
+      : summary.pake_validation.status === "fail"
+        ? "FAIL"
+        : "UNKNOWN";
+  lines.push(`PAKE++ validation (persisted synthesis): ${pakeLine}`);
+  return lines.join("\n");
+}
+
+export async function readBackChainOutputNotes(args: {
+  vaultRoot: string;
+  synthesis: SynthesisRunResult;
+  hooks: { status: string; hook_set_note?: { vault_path: string } };
+  weapons: { status: string; weapons_check_note?: { vault_path: string } };
+}): Promise<OutputNoteReadback[]> {
+  const vaultRead = createDefaultVaultReadAdapter(args.vaultRoot);
+  const out: OutputNoteReadback[] = [];
+
+  const candidates: Array<{ kind: OutputNoteKind; vault_path: string }> = [];
+  if (args.synthesis.status === "ok") {
+    candidates.push({ kind: "synthesis", vault_path: args.synthesis.insight_note.vault_path });
+  } else {
+    candidates.push({ kind: "synthesis", vault_path: "unknown" });
+  }
+  if (args.hooks.status === "ok" && args.hooks.hook_set_note?.vault_path !== undefined) {
+    candidates.push({ kind: "hooks", vault_path: args.hooks.hook_set_note.vault_path });
+  } else {
+    candidates.push({ kind: "hooks", vault_path: "unknown" });
+  }
+  if (args.weapons.status === "ok" && args.weapons.weapons_check_note?.vault_path !== undefined) {
+    candidates.push({ kind: "weapons", vault_path: args.weapons.weapons_check_note.vault_path });
+  } else {
+    candidates.push({ kind: "weapons", vault_path: "unknown" });
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.vault_path === "unknown") {
+      out.push({
+        kind: candidate.kind,
+        vault_path: candidate.vault_path,
+        status: "fail",
+        failure_summary: "No vault path produced for this stage.",
+      });
+      continue;
+    }
+    try {
+      await vaultRead.readNote(candidate.vault_path);
+      out.push({ kind: candidate.kind, vault_path: candidate.vault_path, status: "ok" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      out.push({
+        kind: candidate.kind,
+        vault_path: candidate.vault_path,
+        status: "fail",
+        failure_summary: sanitizeEvidenceString(msg, 220),
+      });
+    }
+  }
+
+  return out;
+}
+
+// Story 21.3 naming (wrapper alias)
+export async function readBackChainOutputs(args: Parameters<typeof readBackChainOutputNotes>[0]) {
+  return readBackChainOutputNotes(args);
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
@@ -580,6 +706,9 @@ async function main() {
   let operatorNotes = [...cli.operatorNotes];
 
   assertRequiredEnvKeys(["FIRECRAWL_API_KEY", "APIFY_API_TOKEN", "ANTHROPIC_API_KEY"]);
+  console.log(
+    "Env validation: OK (required: FIRECRAWL_API_KEY, APIFY_API_TOKEN, ANTHROPIC_API_KEY)",
+  );
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY ?? "";
   const apifyToken = process.env.APIFY_API_TOKEN ?? "";
@@ -667,6 +796,15 @@ async function main() {
     const rendered = formatChainSmokeEvidenceMarkdown(evidence);
     console.log(rendered);
 
+    const outputNotes = await readBackChainOutputNotes({
+      vaultRoot,
+      synthesis: result.synthesis,
+      hooks: result.hooks,
+      weapons: result.weapons,
+    });
+    const summary = computeChainRunSummary({ outputNotes, pakeValidation });
+    console.log(formatChainRunSummaryForTerminal(summary));
+
     if (cli.evidenceFile !== undefined) {
       await mkdir(path.dirname(cli.evidenceFile), { recursive: true });
       await writeFile(cli.evidenceFile, rendered, "utf8");
@@ -677,9 +815,7 @@ async function main() {
       console.log("\n=== raw ChainRunResult JSON (--raw-json requested) ===");
       console.log(JSON.stringify(result, null, 2));
     }
-    if (pakeValidation.status === "fail") {
-      process.exitCode = 1;
-    }
+    process.exitCode = exitCodeForChainRunSummary(summary);
   } catch (err) {
     const evidence = buildFatalChainSmokeEvidence({
       error: err,

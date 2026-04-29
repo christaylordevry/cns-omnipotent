@@ -7,6 +7,8 @@ import {
   cleanStaleOutputNotesByPrefix,
   DEFAULT_BRIEF_TOPIC,
   assertRequiredEnvKeys,
+  computeChainRunSummary,
+  exitCodeForChainRunSummary,
   loadBriefForRun,
   validatePersistedSynthesisPake,
 } from "../../scripts/run-chain.js";
@@ -50,6 +52,58 @@ async function writeNote(vaultRoot: string, relPath: string, body: string): Prom
 }
 
 describe("run-chain live harness helpers", () => {
+  it("derives pass/fail summary and exit code from output read-back + PAKE++ status", () => {
+    const outputNotes = [
+      { kind: "synthesis", vault_path: "03-Resources/synthesis.md", status: "ok" as const },
+      { kind: "hooks", vault_path: "03-Resources/hooks.md", status: "ok" as const },
+      { kind: "weapons", vault_path: "03-Resources/weapons.md", status: "ok" as const },
+    ];
+
+    const pass = computeChainRunSummary({
+      outputNotes,
+      pakeValidation: { status: "pass", failures: [], insight_note_path: "03-Resources/synthesis.md" },
+    });
+    expect(pass.status).toBe("pass");
+    expect(exitCodeForChainRunSummary(pass)).toBe(0);
+
+    const readFail = computeChainRunSummary({
+      outputNotes: [
+        ...outputNotes.slice(0, 2),
+        {
+          kind: "weapons",
+          vault_path: "03-Resources/weapons.md",
+          status: "fail" as const,
+          failure_summary: "ENOENT",
+        },
+      ],
+      pakeValidation: { status: "pass", failures: [], insight_note_path: "03-Resources/synthesis.md" },
+    });
+    expect(readFail.status).toBe("fail");
+    expect(exitCodeForChainRunSummary(readFail)).toBe(1);
+
+    const pakeFail = computeChainRunSummary({
+      outputNotes,
+      pakeValidation: {
+        status: "fail",
+        failures: ["missing marker"],
+        insight_note_path: "03-Resources/synthesis.md",
+      },
+    });
+    expect(pakeFail.status).toBe("fail");
+    expect(exitCodeForChainRunSummary(pakeFail)).toBe(1);
+
+    const pakeUnknown = computeChainRunSummary({
+      outputNotes,
+      pakeValidation: {
+        status: "unknown",
+        failures: ["Synthesis did not produce a persisted InsightNote."],
+        insight_note_path: undefined,
+      },
+    });
+    expect(pakeUnknown.status).toBe("fail");
+    expect(exitCodeForChainRunSummary(pakeUnknown)).toBe(1);
+  });
+
   it("exports and reuses the PAKE++ validator for a known-good body", () => {
     const failures = validatePakeSynthesisBody({
       body: validPakeSynthesisBody(DEFAULT_OPERATOR_CONTEXT),
