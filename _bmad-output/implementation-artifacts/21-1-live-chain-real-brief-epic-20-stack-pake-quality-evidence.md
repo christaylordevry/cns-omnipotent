@@ -1,6 +1,6 @@
 # Story 21.1: Live chain real brief (Epic 20 stack) + PAKE++ quality evidence
 
-Status: ready-for-review
+Status: done
 
 Epic: 21 (Live chain verification hardening)
 
@@ -104,8 +104,8 @@ This story is about **closing the loop under live conditions** with **evidence c
   - [x] Unit test: harness read-back path records `fail` on a known-bad body with sanitized failure list.
   - [x] Run `bash scripts/verify.sh`.
 
-- [ ] 5. Operator run procedure + captured evidence (AC: epic-20-stack, evidence)
-  - [ ] Create at least one new evidence markdown artifact under `_bmad-output/implementation-artifacts/` for this story run:
+- [x] 5. Operator run procedure + captured evidence (AC: epic-20-stack, evidence)
+  - [x] Create at least one new evidence markdown artifact under `_bmad-output/implementation-artifacts/` for this story run:
     - includes operator notes describing the real brief and how it triggers domain routing + Scrapling tier
     - includes generated vault paths for Research + Synthesis (if credentials valid)
     - includes “PAKE++ validation: pass”
@@ -152,7 +152,9 @@ GPT-5 Codex
 - The existing PAKE++ body validator is exported from `src/agents/synthesis-agent.ts` and reused for persisted InsightNote read-back validation in the harness.
 - Evidence now includes a `Synthesis Quality Contract (PAKE++)` section that renders an explicit `PAKE++ validation: PASS` or `PAKE++ validation: FAIL` line.
 - Operator guide updated for runtime-selectable briefs, stale note cleanup, and persisted PAKE++ evidence validation.
-- Live evidence artifact remains operator-run only because this environment did not run with real external credentials.
+- Final operator-run evidence captured at `_bmad-output/implementation-artifacts/21-1-live-chain-green-evidence-2026-04-30.md`.
+- The final run used the real brief `creative technologist consulting rates Sydney 2026`; all four stages reported `ok`; persisted Synthesis PAKE++ validation passed.
+- Scrapling command was not installed on PATH during the final run, so the live harness disabled the Scrapling adapter and recorded that fact in the operator notes.
 
 ### File List
 
@@ -164,3 +166,8 @@ GPT-5 Codex
 - `tests/vault-io/chain-smoke-evidence.test.ts`
 - `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/21-1-live-chain-green-evidence-2026-04-30.md`
+
+## Change Log
+
+- 2026-04-30: Final live chain evidence captured with Research, Synthesis, Hook, and Boss all `ok`; PAKE++ persisted synthesis validation PASS; story closed.

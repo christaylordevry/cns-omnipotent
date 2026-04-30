@@ -1,6 +1,6 @@
 # Story 21.3: Single repeatable run script
 
-Status: review
+Status: done
 
 Epic: 21 (Live chain verification hardening)
 
@@ -144,6 +144,8 @@ GPT-5 (Cursor)
 ### Debug Log References
 
  - `PERPLEXITY_API_KEY="" bash scripts/verify.sh` (PASS)
+ - `bash scripts/verify.sh` (PASS, 2026-04-30)
+ - `source .env.live-chain && CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" npx tsx --no-cache scripts/run-chain.ts --topic "creative technologist consulting rates Sydney 2026"` (PASS, 2026-04-30)
 
 ### Completion Notes List
 
@@ -163,3 +165,4 @@ GPT-5 (Cursor)
 ## Change Log
 
 - 2026-04-29: Added `npm run chain` entrypoint and end-of-run read-back summary with pass/fail + PAKE++ status; added unit tests; verify gate green.
+- 2026-04-30: Final live chain command produced a PASS summary with Synthesis, Hooks, and Weapons read-back all ok and PAKE++ validation PASS; story closed.
