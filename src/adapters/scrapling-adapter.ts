@@ -31,6 +31,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function looksLikeAbsoluteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function normalizeScraplingUrlInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Scrapling url must be non-empty");
+  }
+
+  // Fast-path: already a full URL.
+  if (looksLikeAbsoluteHttpUrl(trimmed)) return trimmed;
+
+  // Common failure mode: a URL was accidentally reduced to just its querystring.
+  // Try to recover if it contains a nested URL parameter (e.g. "?url=https://...").
+  if (trimmed.startsWith("?") || trimmed.startsWith("&")) {
+    const params = new URLSearchParams(trimmed.replace(/^[?&]+/, ""));
+    for (const key of ["url", "u", "target", "dest", "destination"]) {
+      const candidate = params.get(key);
+      if (candidate && looksLikeAbsoluteHttpUrl(candidate.trim())) {
+        return candidate.trim();
+      }
+    }
+    throw new Error(`Scrapling url was a bare querystring: ${trimmed.slice(0, 120)}`);
+  }
+
+  // Scheme-less URL inputs are common in research briefs; normalize the safe ones.
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  if (!/\s/.test(trimmed) && /^[a-z0-9.-]+\.[a-z]{2,}(\/|$|\?)/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+
+  return trimmed;
+}
+
 function compactFailure(message: string): string {
   let out = message;
   out = out.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]");
@@ -115,10 +151,11 @@ export function buildScraplingAdapter(
 
       try {
         await client.connect(transport);
+        const url = normalizeScraplingUrlInput(query);
         const result = await client.callTool({
           name: toolName,
           arguments: {
-            url: query,
+            url,
             extraction_type: extractionType,
             main_content_only: mainContentOnly,
             headless: true,
