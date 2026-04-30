@@ -189,3 +189,6 @@ development_status:
   epic-22: done
   22-1-perplexity-formal-mcp: done
   epic-22-retrospective: done
+
+  epic-24: in-progress
+  24-1-mcp-operator-runbook-env-rotation-smoke-parity: ready-for-dev
