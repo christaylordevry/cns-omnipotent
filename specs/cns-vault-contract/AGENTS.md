@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.9.1 | Last updated: 2026-04-18  
+> Version: 1.9.2 | Last updated: 2026-04-29  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -202,7 +202,7 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
 | Context7            | MCP tool (auto-invoked)                     | Any code generation, library usage, API docs, setup or configuration steps |
 | Firecrawl           | MCP tool (Tier 1)                           | Scrape, crawl, map, or extract web content for research ingestion or source capture                 |
-| Perplexity          | MCP tool (Tier 1)                           | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
+| Perplexity          | MCP tool (Tier 1, tool: `mcp__perplexity__search`) | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
 | Apify               | MCP tool (Tier 1)                           | Apify Actors, RAG web browser, Apify Store scrapers; runs, datasets, and docs via hosted MCP      |
 
 ### How to Load a Module
@@ -286,6 +286,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-04-29 | 1.9.2 | Perplexity MCP tool naming made explicit (`mcp__perplexity__search`); Perplexity slot wiring is MCP-first. |
 | 2026-04-18 | 1.9.1 | **Section 5:** Tier 1 MCP routing for Nexus (same rules as IDE). **Section 9:** Perplexity negative guard (vault and established docs first). **Section 8:** Epic 16 story pointers; live tool-call bar for Tier 1 MCP. |
 | 2026-04-18 | 1.9.0 | **Section 7:** Tier 1 MCP rows (Firecrawl, Perplexity, Apify). **Section 9:** Perplexity routing rule. **Section 8:** Phase 4 in progress; priorities aligned to MCP verification and ingest pipeline spec. |
 | 2026-04-16 | 1.8.0 | Phase 3 complete; Context7 on all surfaces; Nexus model-pin fix documented |

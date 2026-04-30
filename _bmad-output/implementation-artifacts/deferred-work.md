@@ -250,6 +250,12 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 22-1-perplexity-formal-mcp (2026-04-30)
+
+- `perplexityProbe()` tries only the first query; a single transient Perplexity failure marks `perplexity_skipped=true` for the entire sweep. Consider retrying, probing more than one query, or treating probe failure as “service degraded” while still attempting filing for other queries.
+
+---
+
 ## Deferred from: code review of story 18-8 (2026-04-21)
 
 - Add jitter / backoff strategy to reduce thundering herd on 429s (avoid synchronized retries across parallel runs); current clamp+sleep is acceptable but could still cause repeat collisions.

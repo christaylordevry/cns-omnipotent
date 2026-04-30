@@ -304,6 +304,22 @@ Before the chain begins, the harness also performs **pre-run hygiene**:
 - **Output-note cleanup:** deletes stale `03-Resources/synthesis-*.md`, `03-Resources/hooks-*.md`, and `03-Resources/weapons-check-*.md` files (non-recursive) so each run starts with a clean slate.
 - **Fail-fast env validation:** requires `FIRECRAWL_API_KEY`, `APIFY_API_TOKEN`, and `ANTHROPIC_API_KEY` to be present; if any are missing, it fails with a single aggregated message listing all missing keys. (Perplexity remains optional; when `PERPLEXITY_API_KEY` is absent, Perplexity is treated as unavailable and the sweep continues without filing Perplexity answers.)
 
+Perplexity is invoked via the Perplexity MCP server (Tier 1). Ensure Cursor has a Perplexity MCP server entry in `~/.cursor/mcp.json` and that the Perplexity key is provided via environment variable wiring (do not hardcode keys in JSON). Example:
+
+```json
+{
+  "mcpServers": {
+    "perplexity": {
+      "command": "npx",
+      "args": ["-y", "perplexity-mcp"],
+      "env": {
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"
+      }
+    }
+  }
+}
+```
+
 ### d. Daily agent log
 
 1. Use `vault_append_daily` targeting section `## Agent Log`.
@@ -334,6 +350,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-22 | 1.8.0 | Documented PAKE++ synthesis output contract, operator personalization, and missing-profile warning behavior | 18-9-synthesis-quality-redesign |
 | 2026-04-29 | 1.9.0 | Documented runtime-selectable live-chain briefs, stale generated note cleanup, and persisted PAKE++ evidence validation | 21-1-live-chain-real-brief-epic-20-stack-pake-quality-evidence |
 | 2026-04-29 | 1.10.0 | Documented live-chain pre-run hygiene: prefix-based output cleanup + aggregated env-key validation | 21-2-pre-run-hygiene-automation |
+| 2026-04-29 | 1.11.0 | Documented Perplexity Tier 1 MCP registration in Cursor (`~/.cursor/mcp.json`) and env-based key wiring | 22-1-perplexity-formal-mcp |
 
 ---
 

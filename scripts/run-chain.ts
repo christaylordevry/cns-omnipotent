@@ -31,8 +31,6 @@ import { buildApifyAdapter } from "../src/adapters/apify-adapter.js";
 import { buildScraplingAdapter } from "../src/adapters/scrapling-adapter.js";
 import {
   createPerplexitySlot,
-  type PerplexitySlot,
-  type PerplexityResult,
 } from "../src/agents/perplexity-slot.js";
 import { createLlmSynthesisAdapter } from "../src/agents/synthesis-adapter-llm.js";
 import { createLlmHookGenerationAdapter } from "../src/agents/hook-adapter-llm.js";
@@ -672,40 +670,8 @@ function buildFirecrawlAdapter(
 }
 
 // ---------------------------------------------------------------------------
-// Perplexity slot — calls api.perplexity.ai sonar model
+// Perplexity slot — MCP-backed (perplexity-mcp stdio server)
 // ---------------------------------------------------------------------------
-
-function buildPerplexitySlot(
-  apiKey: string,
-  recordServiceError: (error: string) => void,
-): PerplexitySlot {
-  return {
-    available: true,
-    async search(query: string): Promise<PerplexityResult> {
-      const res = await fetch("https://api.perplexity.ai/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: "sonar",
-          messages: [{ role: "user", content: query }],
-        }),
-      });
-      if (!res.ok) {
-        const summary = await httpFailureSummary("Perplexity", "search", res);
-        recordServiceError(summary);
-        throw new Error(summary);
-      }
-      const data = (await res.json()) as {
-        choices: Array<{ message: { content: string } }>;
-        citations?: string[];
-      };
-      return {
-        answer: data.choices?.[0]?.message?.content ?? "",
-        citations: data.citations ?? [],
-      };
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Main
@@ -734,14 +700,10 @@ async function main() {
   const apifyToken = normalizeSecretEnv(process.env.APIFY_API_TOKEN);
   const scraplingCommand = (process.env.SCRAPLING_COMMAND?.trim() || "scrapling");
   const scraplingAvailable = commandAvailable(scraplingCommand);
-  const perplexityKey = normalizeSecretEnv(process.env.PERPLEXITY_API_KEY);
 
   const startedAt = Date.now();
   const serviceErrors = serviceErrorRecorder();
-  const perplexitySlot =
-    (perplexityKey?.trim() ?? "").length > 0
-      ? buildPerplexitySlot(perplexityKey!, serviceErrors.record)
-      : createPerplexitySlot();
+  const perplexitySlot = createPerplexitySlot();
   console.log("=== Chain Live Smoke (Research -> Synthesis -> Hook -> Boss) ===");
   console.log(`Vault root class: ${vaultRootClass}`);
   console.log(`Brief topic: ${brief.topic}`);

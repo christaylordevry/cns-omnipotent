@@ -1,5 +1,5 @@
 /**
- * Live test runner for runResearchAgent() using real Firecrawl and Perplexity APIs.
+ * Live test runner for runResearchAgent() using real Firecrawl and Perplexity (MCP) adapters.
  * Apify is skipped — no APIFY_TOKEN found in env.
  *
  * Usage:
@@ -12,7 +12,7 @@ import {
   type FirecrawlAdapter,
   type FirecrawlSearchResult,
 } from "../src/agents/research-agent.js";
-import { type PerplexitySlot, type PerplexityResult } from "../src/agents/perplexity-slot.js";
+import { createPerplexitySlot } from "../src/agents/perplexity-slot.js";
 
 // ---------------------------------------------------------------------------
 // Firecrawl adapter — calls api.firecrawl.dev v1
@@ -52,35 +52,6 @@ function buildFirecrawlAdapter(apiKey: string): FirecrawlAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Perplexity slot — calls api.perplexity.ai sonar model
-// ---------------------------------------------------------------------------
-
-function buildPerplexitySlot(apiKey: string): PerplexitySlot {
-  return {
-    available: true,
-    async search(query: string): Promise<PerplexityResult> {
-      const res = await fetch("https://api.perplexity.ai/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: "sonar",
-          messages: [{ role: "user", content: query }],
-        }),
-      });
-      if (!res.ok) throw new Error(`Perplexity HTTP ${res.status}: ${await res.text()}`);
-      const data = (await res.json()) as {
-        choices: Array<{ message: { content: string } }>;
-        citations?: string[];
-      };
-      return {
-        answer: data.choices?.[0]?.message?.content ?? "",
-        citations: data.citations ?? [],
-      };
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -112,11 +83,18 @@ async function main() {
   console.log("Brief:", JSON.stringify(brief, null, 2), "\n");
   console.log("Running sweep…\n");
 
+  const perplexity = createPerplexitySlot();
+  if (!perplexity.available) {
+    throw new Error(
+      "Perplexity is not available. Ensure PERPLEXITY_API_KEY is set and the Perplexity MCP server is runnable (defaults: PERPLEXITY_MCP_COMMAND=npx, PERPLEXITY_MCP_ARGS=[\"-y\",\"perplexity-mcp\"]).",
+    );
+  }
+
   const result = await runResearchAgent(vaultRoot, brief, {
     surface: "live-test",
     adapters: {
       firecrawl: buildFirecrawlAdapter(firecrawlKey),
-      perplexity: buildPerplexitySlot(perplexityKey),
+      perplexity,
     },
   });
 
