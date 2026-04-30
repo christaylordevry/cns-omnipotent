@@ -4,9 +4,10 @@ import { z } from "zod";
 import { CnsError } from "../../errors.js";
 import type { Embedder, EmbedderMetadata } from "../embedder.js";
 import type { QualityMetadata } from "../quality.js";
-import { computeQualityMultiplier } from "./quality-weighting.js";
+import { computeQualityMultiplierComponents, type QualityMultiplierComponents } from "./quality-weighting.js";
 
 const MAX_TOPK = 50;
+const FRESHNESS_STALE_SAMPLE_PENALTY = 0.85;
 
 const IndexArtifactSchema = z.object({
   schema_version: z.literal(1),
@@ -40,6 +41,7 @@ const SiblingManifestSchema = z.object({
     .object({
       last_build_utc: z.string().optional(),
       estimated_stale_count: z.number().optional(),
+      estimated_stale_sample: z.array(z.string()).optional(),
     })
     .optional(),
 });
@@ -53,8 +55,10 @@ type QueryWarningCode =
   | "INDEX_ESTIMATED_STALE"
   | "ZERO_VECTOR_QUERY"
   | "ZERO_VECTOR_RECORD"
+  | "UNSAFE_RECORD_PATH"
   | "DIMENSION_MISMATCH"
-  | "TOPK_CAPPED";
+  | "TOPK_CAPPED"
+  | "FRESHNESS_PENALTY_APPLIED";
 
 export type QueryBrainIndexWarning = {
   code: QueryWarningCode;
@@ -70,14 +74,25 @@ export type QueryBrainIndexParams = {
   /** Default: true. When false, ranking is pure cosine similarity. */
   qualityWeighting?: boolean;
   includeScores?: boolean;
+  explain?: boolean;
   includeEmbedderMetadata?: boolean;
   /** Embedder instance (tests can inject deterministic fakes; production can inject real adapters). */
   embedder: Embedder;
 };
 
+export type QueryBrainIndexScoreComponents = {
+  rawSimilarity: number;
+  qualityMultiplier: number;
+  quality: QualityMultiplierComponents;
+  freshnessPenalty: number;
+  staleSampleMatch: boolean;
+  finalScore: number;
+};
+
 export type QueryBrainIndexResultItem = {
   path: string;
   score?: number;
+  components?: QueryBrainIndexScoreComponents;
 };
 
 export type QueryBrainIndexOutput = {
@@ -91,6 +106,26 @@ export type QueryBrainIndexOutput = {
 };
 
 type SimilarityFailReason = "ZERO_VECTOR" | "DIMENSION_MISMATCH" | "NON_FINITE";
+
+function normalizeVaultRelPath(input: string): string {
+  // Normalize basic manifest/index path variations to a POSIX-ish vault-relative form.
+  // (We still validate safety separately.)
+  let p = input.replaceAll("\\", "/");
+  if (p.startsWith("./")) {
+    p = p.slice(2);
+  }
+  return p;
+}
+
+function isSafeVaultRelPath(p: string): boolean {
+  // Disallow absolute paths, traversal, and Windows drive roots.
+  if (p.length === 0) return false;
+  if (p.startsWith("/")) return false;
+  if (/^[A-Za-z]:\//.test(p)) return false;
+  if (p.includes("\0")) return false;
+  if (p.split("/").some((seg) => seg === ".." || seg === "." || seg.length === 0)) return false;
+  return true;
+}
 
 function cosineSimilarity(
   a: number[],
@@ -122,10 +157,16 @@ function cosineSimilarity(
   return { ok: true, score };
 }
 
-function stableSortByScoreThenPath(
-  items: Array<{ path: string; score: number }>,
-): Array<{ path: string; score: number }> {
+function stableSortByScoreThenPath<T extends { path: string; score: number }>(items: T[]): T[] {
   return items.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path, "en"));
+}
+
+function staleSamplePathsFromManifest(manifest: Awaited<ReturnType<typeof tryLoadSiblingManifest>>): Set<string> {
+  if (!manifest.ok) {
+    return new Set();
+  }
+  const raw = manifest.manifest.freshness?.estimated_stale_sample ?? [];
+  return new Set(raw.map(normalizeVaultRelPath));
 }
 
 async function loadIndexArtifact(indexPath: string): Promise<IndexArtifact> {
@@ -226,8 +267,9 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   const rawTopK = params.topK ?? 10;
   const topK = Math.max(0, Math.min(MAX_TOPK, Math.floor(rawTopK)));
   const includeScores = params.includeScores ?? true;
+  const explain = params.explain ?? false;
   const includeEmbedderMetadata = params.includeEmbedderMetadata ?? true;
-  const minScore = params.minScore;
+  const minScore = typeof params.minScore === "number" && Number.isFinite(params.minScore) ? params.minScore : undefined;
   const qualityWeighting = params.qualityWeighting ?? true;
 
   const warnings: QueryBrainIndexWarning[] = [];
@@ -244,22 +286,30 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   const manifest = await tryLoadSiblingManifest(params.indexPath);
   const provenance: NonNullable<QueryBrainIndexOutput["provenance"]> = {};
   collectManifestWarnings(manifest, warnings, provenance);
+  const staleSamplePaths = staleSamplePathsFromManifest(manifest);
 
   const queryVec = await params.embedder.embed(params.query);
   const queryNorm = cosineSimilarity(queryVec, queryVec);
   if (!queryNorm.ok) {
     warnings.push({
       code: "ZERO_VECTOR_QUERY",
-      message: "Query embedding is empty or zero; no results returned.",
+      message: "Query embedding is empty, zero, or non-finite; no results returned.",
     });
     return buildOutput(index, [], warnings, provenance, includeEmbedderMetadata);
   }
 
-  const scored: Array<{ path: string; score: number }> = [];
+  const scored: Array<{ path: string; score: number; components: QueryBrainIndexScoreComponents }> = [];
   let zeroRecordCount = 0;
   let dimensionMismatchCount = 0;
+  let freshnessPenaltyCount = 0;
+  let unsafePathCount = 0;
 
   for (const rec of index.records) {
+    const normalizedPath = normalizeVaultRelPath(rec.path);
+    if (!isSafeVaultRelPath(normalizedPath)) {
+      unsafePathCount++;
+      continue;
+    }
     const sim = cosineSimilarity(queryVec, rec.embedding);
     if (!sim.ok) {
       if (sim.reason === "DIMENSION_MISMATCH") dimensionMismatchCount++;
@@ -269,14 +319,45 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
     if (qualityWeighting && rec.quality?.status === "archived") {
       continue;
     }
-    const qualityMult = qualityWeighting ? computeQualityMultiplier(rec.quality as QualityMetadata | undefined) : 1;
-    const finalScore = sim.score * qualityMult;
+    const quality = qualityWeighting
+      ? computeQualityMultiplierComponents(rec.quality as QualityMetadata | undefined)
+      : {
+          statusWeight: 1,
+          confidenceWeight: 1,
+          verificationWeight: 1,
+          typeWeight: 1,
+          flatPenaltyApplied: false,
+          multiplier: 1,
+        };
+    const staleSampleMatch = qualityWeighting && staleSamplePaths.has(normalizedPath);
+    const freshnessPenalty = staleSampleMatch ? FRESHNESS_STALE_SAMPLE_PENALTY : 1;
+    const finalScore = sim.score * quality.multiplier * freshnessPenalty;
     if (minScore !== undefined && finalScore < minScore) {
       continue;
     }
-    scored.push({ path: rec.path, score: finalScore });
+    if (staleSampleMatch) {
+      freshnessPenaltyCount++;
+    }
+    scored.push({
+      path: normalizedPath,
+      score: finalScore,
+      components: {
+        rawSimilarity: sim.score,
+        qualityMultiplier: quality.multiplier,
+        quality,
+        freshnessPenalty,
+        staleSampleMatch,
+        finalScore,
+      },
+    });
   }
 
+  if (unsafePathCount > 0) {
+    warnings.push({
+      code: "UNSAFE_RECORD_PATH",
+      message: `Skipped ${unsafePathCount} record(s) with unsafe or non-vault-relative paths.`,
+    });
+  }
   if (zeroRecordCount > 0) {
     warnings.push({
       code: "ZERO_VECTOR_RECORD",
@@ -289,9 +370,19 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
       message: `Skipped ${dimensionMismatchCount} record(s) with embedding dimension mismatch.`,
     });
   }
+  if (freshnessPenaltyCount > 0) {
+    warnings.push({
+      code: "FRESHNESS_PENALTY_APPLIED",
+      message: `Applied freshness penalty to ${freshnessPenaltyCount} result candidate(s) from the manifest stale sample.`,
+    });
+  }
 
   const ordered = stableSortByScoreThenPath(scored).slice(0, topK);
-  const results: QueryBrainIndexResultItem[] = ordered.map((r) => (includeScores ? r : { path: r.path }));
+  const results: QueryBrainIndexResultItem[] = ordered.map((r) => ({
+    path: r.path,
+    ...(includeScores ? { score: r.score } : {}),
+    ...(explain ? { components: r.components } : {}),
+  }));
 
   return buildOutput(index, results, warnings, provenance, includeEmbedderMetadata);
 }

@@ -36,6 +36,7 @@ async function writeManifest(params: {
   outcome: "success" | "failed";
   last_build_utc: string;
   estimated_stale_count: number;
+  estimated_stale_sample?: string[];
 }): Promise<string> {
   const manifestPath = path.join(params.dir, "brain-index-manifest.json");
   const obj = {
@@ -56,7 +57,7 @@ async function writeManifest(params: {
     freshness: {
       last_build_utc: params.last_build_utc,
       estimated_stale_count: params.estimated_stale_count,
-      estimated_stale_sample: [],
+      estimated_stale_sample: params.estimated_stale_sample ?? [],
     },
   };
   await writeFile(manifestPath, `${JSON.stringify(obj, null, 2)}\n`, "utf8");
@@ -103,6 +104,150 @@ describe("queryBrainIndex", () => {
 
     const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
     expect(out.results.map((r) => r.path)).toEqual(["notes/has-quality.md", "notes/no-quality.md"]);
+  });
+
+  it("uses PAKE type weighting to promote reference-grade records when cosine ties", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-type-"));
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        {
+          path: "notes/a-workflow.md",
+          embedding: [1, 0],
+          quality: {
+            status: "reviewed",
+            confidence_score: 1,
+            verification_status: "verified",
+            pake_type: "WorkflowNote",
+          },
+        },
+        {
+          path: "notes/z-source.md",
+          embedding: [1, 0],
+          quality: {
+            status: "reviewed",
+            confidence_score: 1,
+            verification_status: "verified",
+            pake_type: "SourceNote",
+          },
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/z-source.md", "notes/a-workflow.md"]);
+  });
+
+  it("applies manifest stale-sample freshness penalty when quality weighting is enabled", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-fresh-"));
+    const quality = {
+      status: "reviewed",
+      confidence_score: 1,
+      verification_status: "verified",
+      pake_type: "SourceNote",
+    };
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        { path: "notes/a-stale.md", embedding: [1, 0], quality },
+        { path: "notes/z-fresh.md", embedding: [1, 0], quality },
+      ],
+    });
+    await writeManifest({
+      dir,
+      outcome: "success",
+      last_build_utc: "2026-04-14T00:00:00.000Z",
+      estimated_stale_count: 1,
+      estimated_stale_sample: ["notes/a-stale.md"],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/z-fresh.md", "notes/a-stale.md"]);
+    const codes = (out.warnings ?? []).map((w) => w.code);
+    expect(codes).toContain("INDEX_ESTIMATED_STALE");
+    expect(codes).toContain("FRESHNESS_PENALTY_APPLIED");
+  });
+
+  it("does not apply manifest stale-sample freshness penalty when quality weighting is disabled", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-fresh-off-"));
+    const quality = {
+      status: "reviewed",
+      confidence_score: 1,
+      verification_status: "verified",
+      pake_type: "SourceNote",
+    };
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        { path: "notes/a-stale.md", embedding: [1, 0], quality },
+        { path: "notes/z-fresh.md", embedding: [1, 0], quality },
+      ],
+    });
+    await writeManifest({
+      dir,
+      outcome: "success",
+      last_build_utc: "2026-04-14T00:00:00.000Z",
+      estimated_stale_count: 1,
+      estimated_stale_sample: ["notes/a-stale.md"],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder, qualityWeighting: false });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/a-stale.md", "notes/z-fresh.md"]);
+    const codes = (out.warnings ?? []).map((w) => w.code);
+    expect(codes).not.toContain("FRESHNESS_PENALTY_APPLIED");
+  });
+
+  it("returns safe explain components without absolute paths or note body fragments", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-explain-"));
+    const marker = "BODY_MARKER_UNIQUE_EXPLAIN_12345";
+    await writeFile(path.join(dir, "body.md"), marker, "utf8");
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        {
+          path: "notes/a.md",
+          embedding: [1, 0],
+          quality: {
+            status: "reviewed",
+            confidence_score: 0.9,
+            verification_status: "verified",
+            pake_type: "SourceNote",
+          },
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder, explain: true });
+    const first = out.results[0];
+    expect(first?.components?.rawSimilarity).toBeCloseTo(1);
+    expect(first?.components?.qualityMultiplier).toBeCloseTo(0.9);
+    expect(first?.components?.quality.typeWeight).toBeCloseTo(1);
+    expect(first?.components?.freshnessPenalty).toBe(1);
+    expect(first?.components?.finalScore).toBeCloseTo(first?.score ?? 0);
+
+    const serialized = JSON.stringify(out);
+    expect(serialized).not.toContain(dir);
+    expect(serialized).not.toContain(marker);
   });
 
   it("preserves pure cosine ordering when qualityWeighting is false (even if quality differs)", async () => {
@@ -215,6 +360,27 @@ describe("queryBrainIndex", () => {
     expect(codes).toContain("ZERO_VECTOR_QUERY");
   });
 
+  it("skips records with unsafe/absolute paths and emits UNSAFE_RECORD_PATH warning", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-unsafe-"));
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        { path: "/abs/secret.md", embedding: [1, 0] },
+        { path: "notes/good.md", embedding: [1, 0] },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/good.md"]);
+    const codes = (out.warnings ?? []).map((w) => w.code);
+    expect(codes).toContain("UNSAFE_RECORD_PATH");
+  });
+
   it("skips zero-vector stored records and emits ZERO_VECTOR_RECORD warning", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-zr-"));
     const indexPath = await writeIndex({
@@ -317,7 +483,7 @@ describe("query-index CLI", () => {
       ],
     });
 
-    const res = spawnSync("npx", ["tsx", entry, "--index-path", indexPath, "--query", "q", "--top-k", "2"], {
+    const res = spawnSync("npx", ["tsx", entry, "--index-path", indexPath, "--query", "q", "--top-k", "2", "--explain"], {
       encoding: "utf8",
       env: { ...process.env },
     });
@@ -326,8 +492,9 @@ describe("query-index CLI", () => {
     expect(res.stdout).not.toContain(dir);
     expect(res.stdout).not.toContain(marker);
 
-    const parsed = JSON.parse(res.stdout) as { results: Array<{ path: string }> };
+    const parsed = JSON.parse(res.stdout) as { results: Array<{ path: string; components?: { rawSimilarity?: number } }> };
     expect(parsed.results.map((r) => r.path)).toEqual(["notes/a.md", "notes/b.md"]);
+    expect(typeof parsed.results[0]?.components?.rawSimilarity).toBe("number");
   });
 
   it("exits non-zero when required args are missing (no stack traces)", () => {
@@ -337,4 +504,3 @@ describe("query-index CLI", () => {
     expect(res.stderr).not.toMatch(/at\s+\w+/);
   });
 });
-

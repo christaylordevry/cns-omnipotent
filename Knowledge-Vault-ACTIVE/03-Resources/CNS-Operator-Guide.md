@@ -373,6 +373,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-29 | 1.10.0 | Documented live-chain pre-run hygiene: prefix-based output cleanup + aggregated env-key validation | 21-2-pre-run-hygiene-automation |
 | 2026-04-29 | 1.11.0 | Documented Perplexity Tier 1 MCP registration in Cursor (`~/.cursor/mcp.json`) and env-based key wiring | 22-1-perplexity-formal-mcp |
 | 2026-04-30 | 1.12.0 | Added pointer to MCP operator runbook, standard smoke procedure, and key rotation checklist | 24-1-mcp-operator-runbook-env-rotation-smoke-parity |
+| 2026-04-30 | 1.13.0 | Documented Brain deeper retrieval ranking: PAKE type preference, manifest stale-sample penalty, and `--explain` score components | 23-1-brain-service-deeper-retrieval |
 
 ---
 
@@ -442,9 +443,26 @@ Where:
   - `status` weight: `reviewed` → 1.0, `in-progress` → 0.85, `draft` → 0.65, `archived` → 0.4, missing/unknown → 0.5
   - `confidence_score` weight: if present and in [0, 1], use it; if missing/invalid → 0.5
   - `verification_status` weight: `verified` → 1.0, `pending` → 0.8, `disputed` → 0.5, missing/unknown → 0.6
+  - `pake_type` weight: `SourceNote` → 1.0, `SynthesisNote`/`ValidationNote` → 0.95, `InsightNote` → 0.9, `WorkflowNote` → 0.85, `HookSetNote`/`WeaponsCheckNote` → 0.8, missing/unknown → 0.7
   - If a record has **no quality metadata at all** (no `quality` field in the index record), it receives a flat multiplier of **0.25**.
 
 This is a **safe default posture**: notes created via ungoverned surfaces (e.g. Nexus captures lacking PAKE quality signals) are down-ranked and never silently promoted into top results.
+
+### Deeper retrieval ranking (Story 23.1)
+
+When quality weighting is enabled, Brain retrieval now also applies manifest freshness signals:
+
+```
+final_score = cosine_similarity * quality_multiplier * freshness_penalty
+```
+
+If the sibling `brain-index-manifest.json` has `freshness.estimated_stale_sample` and a candidate result path appears in that sample, the candidate receives a bounded freshness penalty of **0.85**. The query output includes `FRESHNESS_PENALTY_APPLIED` when this penalty affects ranked candidates.
+
+For score explainability, add `--explain`:
+
+- `npm run brain:query -- --index-path <abs> --query "q" --top-k 10 --explain`
+
+Explain mode adds `components` per result with raw cosine similarity, quality multiplier, PAKE quality weights, freshness penalty, stale-sample match, and final score. It still returns only vault-relative paths and numeric metadata, never note bodies or absolute index paths.
 
 **Opt out (pure cosine ranking):**
 

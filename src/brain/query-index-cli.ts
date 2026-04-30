@@ -18,6 +18,7 @@ async function main(): Promise<void> {
       "no-quality-weighting": { type: "boolean" },
       "include-scores": { type: "boolean" },
       "no-include-scores": { type: "boolean" },
+      explain: { type: "boolean" },
       "include-embedder-metadata": { type: "boolean" },
       "no-include-embedder-metadata": { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -30,11 +31,11 @@ async function main(): Promise<void> {
       [
         "brain:query — read-only Brain retrieval query over brain-index.json (Story 12.6).",
         "",
-        "Usage: tsx src/brain/query-index-cli.ts --index-path <abs-path> --query <text> [--top-k 10] [--min-score 0.2]",
+        "Usage: tsx src/brain/query-index-cli.ts --index-path <abs-path> --query <text> [--top-k 10] [--min-score 0.2] [--explain]",
         "",
         "Notes:",
         "- Reads only brain-index.json (and sibling brain-index-manifest.json if present).",
-        "- Does not read vault note bodies; returns vault-relative paths only.",
+        "- Does not read vault note bodies; returns vault-relative paths plus optional numeric score components.",
         "",
       ].join("\n"),
     );
@@ -83,6 +84,7 @@ async function main(): Promise<void> {
     minScore,
     qualityWeighting,
     includeScores,
+    explain: values.explain === true,
     includeEmbedderMetadata,
     embedder: new StubEmbedder(),
   });
@@ -96,4 +98,3 @@ main().catch((err) => {
   process.stderr.write(`${msg}\n`);
   process.exitCode = 1;
 });
-

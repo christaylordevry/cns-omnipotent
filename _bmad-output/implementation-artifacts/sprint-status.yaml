@@ -190,6 +190,9 @@ development_status:
   22-1-perplexity-formal-mcp: done
   epic-22-retrospective: done
 
+  epic-23: in-progress
+  23-1-brain-service-deeper-retrieval: done
+
   epic-24: done
   24-1-mcp-operator-runbook-env-rotation-smoke-parity: done
   epic-24-retrospective: done
