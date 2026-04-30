@@ -13,6 +13,7 @@ const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 2000;
+const OUTPUT_TOOL_NAME = "score_and_rewrite_hook";
 
 const SYSTEM_PROMPT = [
   "You are a weapons-check judge and rewrite engine for marketing/creative hooks.",
@@ -25,6 +26,7 @@ const SYSTEM_PROMPT = [
   "Output contract:",
   "Respond ONLY with a single JSON object with these exact keys:",
   '{"revised_hook": string, "scores": {"novelty": integer 1-10, "copy_intensity": integer 1-10, "rationale": string}}',
+  "The scores MUST evaluate revised_hook, not the original hook.",
   "Do not wrap the JSON in markdown code fences.",
   "Do not include any preamble, commentary, or trailing text.",
   "novelty and copy_intensity MUST be integers (not strings, not floats).",
@@ -45,9 +47,10 @@ function buildUserPrompt(input: WeaponsCheckAdapterInput): string {
     "<<<END>>>",
     "",
     "Task:",
-    "1) Score the current hook on both rubric dimensions using integers 1-10.",
-    "2) Rewrite the hook to raise both scores (even if the current hook is already strong).",
-    "3) Provide a short rationale for the scores.",
+    "1) Rewrite the hook to raise both rubric dimensions (even if the current hook is already strong).",
+    "2) Score the revised hook on both rubric dimensions using integers 1-10.",
+    "3) Provide a short rationale for the revised hook scores.",
+    "The returned scores must describe revised_hook, not the original current hook.",
     "",
     'Return JSON with this exact shape: {"revised_hook": "...", "scores": {"novelty": <integer 1-10>, "copy_intensity": <integer 1-10>, "rationale": "..."}}',
   ].join("\n");
@@ -111,6 +114,26 @@ function extractAssistantText(payload: unknown): string | undefined {
   return textBlocks.length > 0 ? textBlocks.join("") : undefined;
 }
 
+function extractToolInput(payload: unknown): unknown | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const content = (payload as { content?: unknown }).content;
+  if (!Array.isArray(content)) return undefined;
+  for (const block of content) {
+    if (
+      block &&
+      typeof block === "object" &&
+      (block as { type?: unknown }).type === "tool_use" &&
+      (block as { name?: unknown }).name === OUTPUT_TOOL_NAME
+    ) {
+      const input = (block as { input?: unknown }).input;
+      if (typeof input === "object" && input !== null && !Array.isArray(input)) {
+        return input;
+      }
+    }
+  }
+  return undefined;
+}
+
 export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
   return {
     async scoreAndRewrite(
@@ -129,6 +152,41 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: SYSTEM_PROMPT,
+        tools: [
+          {
+            name: OUTPUT_TOOL_NAME,
+            description:
+              "Return the scored and rewritten hook using the exact weapons-check output contract.",
+            input_schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                revised_hook: { type: "string", minLength: 1 },
+                scores: {
+                  type: "object",
+                  description: "Scores for revised_hook, not the original hook.",
+                  additionalProperties: false,
+                  properties: {
+                    novelty: {
+                      type: "integer",
+                      minimum: 1,
+                      maximum: 10,
+                    },
+                    copy_intensity: {
+                      type: "integer",
+                      minimum: 1,
+                      maximum: 10,
+                    },
+                    rationale: { type: "string", minLength: 1 },
+                  },
+                  required: ["novelty", "copy_intensity", "rationale"],
+                },
+              },
+              required: ["revised_hook", "scores"],
+            },
+          },
+        ],
+        tool_choice: { type: "tool", name: OUTPUT_TOOL_NAME },
         messages: [{ role: "user", content: buildUserPrompt(input) }],
       };
 
@@ -187,30 +245,31 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
         );
       }
 
-      const assistantText = extractAssistantText(envelope);
-      if (typeof assistantText !== "string") {
-        const summary = summarizeAnthropicMessageForError(envelope);
-        throw new CnsError(
-          "IO_ERROR",
-          `Weapons check LLM response missing assistant content text (${summary})`,
-        );
-      }
-
-      console.error("DEBUG stop:", (envelope as { stop_reason?: unknown }).stop_reason, "len:", assistantText.length);
-
+      const toolInput = extractToolInput(envelope);
       const summary = summarizeAnthropicMessageForError(envelope);
       let parsedJson: unknown;
-      try {
-        parsedJson = parseLlmJsonText(assistantText);
-      } catch (err) {
-        const cause =
-          err instanceof Error ? err.message : `non-Error: ${String(err)}`;
-        const causeShort =
-          cause.length > 220 ? `${cause.slice(0, 217)}…` : cause;
-        throw new CnsError(
-          "IO_ERROR",
-          `Weapons check LLM returned non-JSON response (${summary}; text_len=${assistantText.length}; parse: ${causeShort})`,
-        );
+      if (toolInput !== undefined) {
+        parsedJson = toolInput;
+      } else {
+        const assistantText = extractAssistantText(envelope);
+        if (typeof assistantText !== "string") {
+          throw new CnsError(
+            "IO_ERROR",
+            `Weapons check LLM response missing assistant content text (${summary})`,
+          );
+        }
+        try {
+          parsedJson = parseLlmJsonText(assistantText);
+        } catch (err) {
+          const cause =
+            err instanceof Error ? err.message : `non-Error: ${String(err)}`;
+          const causeShort =
+            cause.length > 220 ? `${cause.slice(0, 217)}…` : cause;
+          throw new CnsError(
+            "IO_ERROR",
+            `Weapons check LLM returned non-JSON response (${summary}; text_len=${assistantText.length}; parse: ${causeShort})`,
+          );
+        }
       }
 
       const parsed = weaponsCheckAdapterOutputSchema.safeParse(parsedJson);

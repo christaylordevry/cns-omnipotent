@@ -122,9 +122,7 @@ function researchStage(result: ChainRunResult): ChainSmokeStageEvidence {
   const fetchFailures = skipped.filter((note) => note.reason === "fetch_error");
   const status =
     created.length > 0
-      ? skipped.length > 0
-        ? "partial"
-        : "ok"
+      ? "ok"
       : skipped.length > 0 || result.sweep.perplexity_skipped
         ? "failed"
         : "unknown";

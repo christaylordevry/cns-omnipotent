@@ -14,6 +14,7 @@
  * for local debugging when full stage result payloads are acceptable.
  */
 
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -591,6 +592,25 @@ function serviceErrorRecorder(): {
   };
 }
 
+function normalizeSecretEnv(value: string | undefined): string {
+  return (value ?? "").trim().replace(/;+$/g, "");
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function commandAvailable(command: string): boolean {
+  const trimmed = command.trim();
+  if (trimmed.length === 0) return false;
+  const result = spawnSync(
+    "sh",
+    ["-lc", `command -v -- ${shellSingleQuote(trimmed)} >/dev/null 2>&1`],
+    { stdio: "ignore" },
+  );
+  return result.status === 0;
+}
+
 async function httpFailureSummary(
   service: string,
   action: string,
@@ -710,10 +730,11 @@ async function main() {
     "Env validation: OK (required: FIRECRAWL_API_KEY, APIFY_API_TOKEN, ANTHROPIC_API_KEY)",
   );
 
-  const firecrawlKey = process.env.FIRECRAWL_API_KEY ?? "";
-  const apifyToken = process.env.APIFY_API_TOKEN ?? "";
-  const scraplingCommand = process.env.SCRAPLING_COMMAND ?? "scrapling";
-  const perplexityKey = process.env.PERPLEXITY_API_KEY;
+  const firecrawlKey = normalizeSecretEnv(process.env.FIRECRAWL_API_KEY);
+  const apifyToken = normalizeSecretEnv(process.env.APIFY_API_TOKEN);
+  const scraplingCommand = (process.env.SCRAPLING_COMMAND?.trim() || "scrapling");
+  const scraplingAvailable = commandAvailable(scraplingCommand);
+  const perplexityKey = normalizeSecretEnv(process.env.PERPLEXITY_API_KEY);
 
   const startedAt = Date.now();
   const serviceErrors = serviceErrorRecorder();
@@ -726,7 +747,7 @@ async function main() {
   console.log(`Brief topic: ${brief.topic}`);
   console.log(`Brief query count: ${brief.queries.length}`);
   console.log(
-    `Services configured: Firecrawl, Apify, Scrapling, Anthropic, Perplexity=${perplexitySlot.available ? "enabled" : "disabled"}`,
+    `Services configured: Firecrawl, Apify, Scrapling=${scraplingAvailable ? "enabled" : "disabled"}, Anthropic, Perplexity=${perplexitySlot.available ? "enabled" : "disabled"}`,
   );
 
   try {
@@ -747,6 +768,11 @@ async function main() {
 
     const cleanup = await cleanStaleChainNotes(vaultRoot, brief);
     operatorNotes = [...operatorNotes, routingOperatorNote(brief, cleanup)];
+    if (!scraplingAvailable) {
+      operatorNotes.push(
+        `Scrapling adapter disabled because command was not found on PATH: ${scraplingCommand}`,
+      );
+    }
     console.log(`Stale generated chain notes cleaned: ${cleanup.removed.length}`);
     console.log("Running chain. Default output will be compact safe evidence.\n");
 
@@ -763,7 +789,9 @@ async function main() {
         adapters: {
           firecrawl: buildFirecrawlAdapter(firecrawlKey, serviceErrors.record),
           apify: buildApifyAdapter(apifyToken, serviceErrors.record),
-          scrapling: buildScraplingAdapter(scraplingCommand, serviceErrors.record),
+          scrapling: scraplingAvailable
+            ? buildScraplingAdapter(scraplingCommand, serviceErrors.record)
+            : undefined,
           perplexity: perplexitySlot,
         },
       },

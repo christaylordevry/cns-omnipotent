@@ -15,6 +15,23 @@ function makeAnthropicJsonResponse(bodyObj: unknown): Response {
   );
 }
 
+function makeAnthropicToolResponse(bodyObj: unknown): Response {
+  return new Response(
+    JSON.stringify({
+      stop_reason: "tool_use",
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_test",
+          name: "score_and_rewrite_hook",
+          input: bodyObj,
+        },
+      ],
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
 function makeAnthropicTextResponse(rawAssistantText: string): Response {
   return new Response(
     JSON.stringify({
@@ -53,6 +70,8 @@ function getRequestBody(
   model: string;
   max_tokens: number;
   system: string;
+  tools: Array<{ name: string; input_schema: { required: string[] } }>;
+  tool_choice: { type: string; name: string };
   messages: Array<{ role: string; content: string }>;
 } {
   const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -73,7 +92,7 @@ describe("createLlmWeaponsCheckAdapter", () => {
   });
 
   it("happy path: single call returns validated output; request uses correct URL/method/headers/model/max_tokens", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validWeaponsOutput));
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicToolResponse(validWeaponsOutput));
     vi.stubGlobal("fetch", fetchMock);
 
     const adapter = createLlmWeaponsCheckAdapter();
@@ -96,6 +115,16 @@ describe("createLlmWeaponsCheckAdapter", () => {
     const body = getRequestBody(fetchMock);
     expect(body.model).toBe("claude-sonnet-4-6");
     expect(body.max_tokens).toBe(2000);
+    expect(body.tool_choice).toEqual({
+      type: "tool",
+      name: "score_and_rewrite_hook",
+    });
+    expect(body.tools).toHaveLength(1);
+    expect(body.tools[0].name).toBe("score_and_rewrite_hook");
+    expect(body.tools[0].input_schema.required).toEqual([
+      "revised_hook",
+      "scores",
+    ]);
 
     expect(Array.isArray(body.messages)).toBe(true);
     expect(body.messages).toHaveLength(1);
@@ -143,6 +172,9 @@ describe("createLlmWeaponsCheckAdapter", () => {
     // Instruction to score + rewrite
     expect(userText.toLowerCase()).toContain("score");
     expect(userText.toLowerCase()).toContain("rewrite");
+    expect(userText).toContain(
+      "The returned scores must describe revised_hook",
+    );
 
     // Output-schema key names surfaced in the instruction
     expect(userText).toContain("revised_hook");
@@ -260,9 +292,29 @@ describe("createLlmWeaponsCheckAdapter", () => {
     expect(result).toEqual(validWeaponsOutput);
   });
 
+  it("fallback text extraction preserves long JSON beyond 1007 characters", async () => {
+    const longOutput = {
+      revised_hook: `${"Sharp ".repeat(180)}hook`,
+      scores: {
+        novelty: 9,
+        copy_intensity: 9,
+        rationale: `${"Specific rationale. ".repeat(70)}Done.`,
+      },
+    };
+    const rawAssistantText = JSON.stringify(longOutput);
+    expect(rawAssistantText.length).toBeGreaterThan(1007);
+
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicTextResponse(rawAssistantText));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmWeaponsCheckAdapter();
+    const result = await adapter.scoreAndRewrite(sampleInput());
+    expect(result).toEqual(longOutput);
+  });
+
   it("schema invalid (novelty as string): SCHEMA_INVALID with Zod message preserved", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      makeAnthropicJsonResponse({
+      makeAnthropicToolResponse({
         revised_hook: "x",
         scores: {
           novelty: "10",
