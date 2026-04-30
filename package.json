@@ -19,7 +19,8 @@
     "test": "npm run -s test:node && npm run -s test:vitest",
     "chain": "tsx scripts/run-chain.ts",
     "brain:index": "tsx src/brain/build-index-cli.ts",
-    "brain:query": "tsx src/brain/query-index-cli.ts"
+    "brain:query": "tsx src/brain/query-index-cli.ts",
+    "archive:sources": "tsx scripts/archive-source-notes.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
