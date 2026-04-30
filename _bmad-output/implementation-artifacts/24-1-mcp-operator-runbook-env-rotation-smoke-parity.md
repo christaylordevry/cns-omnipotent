@@ -1,6 +1,6 @@
 # Story 24.1: MCP operator runbook — env patterns, key rotation, live-call smoke, Cursor vs Claude Code
 
-Status: ready-for-dev
+Status: done
 
 Epic: 24 (Operator MCP runbook + parity hardening)
 
@@ -143,32 +143,46 @@ If the runbook changes user-facing workflow (it does), update the operator guide
 
 ## Tasks / Subtasks
 
-- [ ] Create the runbook doc (AC: 1–4)
-  - [ ] Choose target location:
-    - [ ] Option A: `specs/cns-vault-contract/modules/mcp-operator-runbook.md` (preferred: module)
+- [x] Create the runbook doc (AC: 1–4)
+  - [x] Choose target location:
+    - [x] Option A: `specs/cns-vault-contract/modules/mcp-operator-runbook.md` (preferred: module)
     - [ ] Option B: `_bmad-output/implementation-artifacts/24-1-mcp-operator-runbook.md` (if keeping it implementation-side only)
-  - [ ] Include a “Never do this” section (hardcoded secrets in JSON, pasting keys in chat, using raw JSON evidence).
-  - [ ] Include a “Checklist: new MCP service” section (install, register both surfaces, live-call verify, record evidence).
+  - [x] Include a “Never do this” section (hardcoded secrets in JSON, pasting keys in chat, using raw JSON evidence).
+  - [x] Include a “Checklist: new MCP service” section (install, register both surfaces, live-call verify, record evidence).
 
-- [ ] Document Cursor vs Claude Code MCP differences (AC: 4)
-  - [ ] Table: config location, registration mechanism, restart requirements, tool-name appearance
-  - [ ] Note: host-prefixed aliases vs MCP protocol tool names (and where each applies)
+- [x] Document Cursor vs Claude Code MCP differences (AC: 4)
+  - [x] Table: config location, registration mechanism, restart requirements, tool-name appearance
+  - [x] Note: host-prefixed aliases vs MCP protocol tool names (and where each applies)
 
-- [ ] Add Perplexity reference case section (AC: 2)
-  - [ ] Registration snippet (Cursor + Claude Code) with placeholders
-  - [ ] Live-call smoke snippet + evidence-record template
-  - [ ] Pitfalls section: configured vs available, alias naming, interpreting failures
+- [x] Add Perplexity reference case section (AC: 2)
+  - [x] Registration snippet (Cursor + Claude Code) with placeholders
+  - [x] Live-call smoke snippet + evidence-record template
+  - [x] Pitfalls section: configured vs available, alias naming, interpreting failures
 
-- [ ] Add key rotation checklist (AC: 1)
-  - [ ] “If pasted in chat” procedure: rotate provider key, invalidate old tokens, re-register MCP, re-run smoke, update any local env files
-  - [ ] Include “do not paste” reminders and safe ways to read env values
+- [x] Add key rotation checklist (AC: 1)
+  - [x] “If pasted in chat” procedure: rotate provider key, invalidate old tokens, re-register MCP, re-run smoke, update any local env files
+  - [x] Include “do not paste” reminders and safe ways to read env values
 
-- [ ] Add live-call smoke procedure (AC: 3)
-  - [ ] Minimal smoke call for each Tier 1 MCP used by the chain (Firecrawl, Apify, Perplexity, Scrapling if configured)
-  - [ ] Evidence capture template aligned with Story 19.1 (safe markdown summary; no `--raw-json`)
+- [x] Add live-call smoke procedure (AC: 3)
+  - [x] Minimal smoke call for each Tier 1 MCP used by the chain (Firecrawl, Apify, Perplexity, Scrapling if configured)
+  - [x] Evidence capture template aligned with Story 19.1 (safe markdown summary; no `--raw-json`)
 
-- [ ] Wire discoverability: link from constitution or module (AC: 1, 5)
-  - [ ] If linking from `AGENTS.md`, apply the **dual-file sync rule** (both copies identical)
+- [x] Wire discoverability: link from constitution or module (AC: 1, 5)
+  - [x] Kept `AGENTS.md` unchanged by linking from an existing module (`vault-io.md`), so the dual-file sync rule was not triggered
+
+### Review Findings
+
+- [x] [Review][Decision] Runbook discoverability should be vault-first (not repo-path) — resolved: mirrored into `Knowledge-Vault-ACTIVE/AI-Context/modules/mcp-operator-runbook.md`, updated vault operator guide and vault `vault-io` module pointers.
+
+- [x] [Review][Patch] Fix misleading claim that `printenv` prevents key literals from entering commands (it expands to the literal secret) [`specs/cns-vault-contract/modules/mcp-operator-runbook.md:45`]
+- [x] [Review][Patch] Add explicit “where evidence lives” guidance to avoid violating “no secrets in repo or vault” while still capturing smoke evidence (recommend local git-ignored path) [`specs/cns-vault-contract/modules/mcp-operator-runbook.md:86`]
+- [x] [Review][Patch] Add explicit troubleshooting steps for missing env and missing auth (GUI env mismatch, “needs authentication”, `available=false`) to meet AC4’s “actionable” bar [`specs/cns-vault-contract/modules/mcp-operator-runbook.md:20`]
+- [x] [Review][Patch] Reference the existing live-chain smoke/evidence precedents (Story 19.1 and 21.3) so we extend rather than reinvent, as required by story context/AC3 intent [`specs/cns-vault-contract/modules/mcp-operator-runbook.md:86`]
+- [x] [Review][Patch] Soften tool-alias naming guidance and instruct operators to verify actual host tool names before running smoke (aliases vary by host/server) [`specs/cns-vault-contract/modules/mcp-operator-runbook.md:11`]
+
+- [x] [Review][Defer] Perplexity MCP adapter timeouts do not cancel/kill hung stdio processes [`src/adapters/perplexity-mcp-adapter.ts:45`] — deferred, pre-existing
+- [x] [Review][Defer] Apify env var naming inconsistency across scripts and docs (`APIFY_API_TOKEN` vs `APIFY_TOKEN`) can break operator wiring [`scripts/run-chain.ts:694`] — deferred, pre-existing
+- [x] [Review][Defer] Live harness usage examples encourage inline secret assignments that will land in shell history, conflicting with runbook posture [`scripts/run-chain.ts:6`] — deferred, pre-existing
 
 ## Dev Notes (prevent common mistakes)
 
@@ -199,8 +213,8 @@ If the runbook changes user-facing workflow (it does), update the operator guide
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [ ] If this story changes any user-facing behavior (new tool, new workflow, new constraint, new panel, new integration): update `03-Resources/CNS-Operator-Guide.md` via `vault_create_note` (full overwrite) or `vault_update_frontmatter` plus targeted section edit. Bump `modified` date and add a row to the Version History table in Section 12.
-- [ ] If no user-facing behavior changed: note "Operator guide: no update required" in Dev Agent Record.
+- [x] If this story changes any user-facing behavior (new tool, new workflow, new constraint, new panel, new integration): update `03-Resources/CNS-Operator-Guide.md` via `vault_create_note` (full overwrite) or `vault_update_frontmatter` plus targeted section edit. Bump `modified` date and add a row to the Version History table in Section 12.
+- [x] If no user-facing behavior changed: note "Operator guide: no update required" in Dev Agent Record. (N/A, operator guide updated.)
 
 ## Dev Agent Record
 
@@ -214,5 +228,20 @@ GPT-5.2
 
 ### Completion Notes List
 
+- Added a single authoritative MCP operator runbook module covering env wiring, key rotation hygiene, operator-run live-call smoke, and Cursor vs Claude Code differences.
+- Wired runbook discoverability via the existing Vault IO module pointer, avoiding constitution edits and the dual-file sync requirement.
+- Updated the vault-side `CNS-Operator-Guide.md` with a runbook pointer, standard smoke procedure, and key rotation checklist, including a Version History entry.
+- `bash scripts/verify.sh` passes.
+
 ### File List
+
+- `specs/cns-vault-contract/modules/mcp-operator-runbook.md`
+- `specs/cns-vault-contract/modules/vault-io.md`
+- `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/24-1-mcp-operator-runbook-env-rotation-smoke-parity.md`
+
+### Change Log
+
+- 2026-04-30: Added MCP operator runbook module, linked it from Vault IO module for discoverability, and updated operator guide with smoke and rotation checklists.
 

@@ -256,6 +256,14 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of story 24-1 (2026-04-30)
+
+- Perplexity MCP adapter: timeout wrapper rejects but does not cancel/kill the underlying stdio process, which can leave hung child processes (`src/adapters/perplexity-mcp-adapter.ts`).
+- Apify env var naming inconsistency across code/docs (`APIFY_API_TOKEN` vs `APIFY_TOKEN`) risks false “missing token” diagnoses in operator runs (`scripts/run-chain.ts`, `_bmad-output/implementation-artifacts/16-3-apify-mcp-install-and-live-tool-call-verification.md`).
+- Live runner usage strings include inline `FIRECRAWL_API_KEY=...` style assignments that land in shell history, conflicting with the “no secrets in pasted commands” posture (`scripts/run-chain.ts`).
+
+---
+
 ## Deferred from: code review of story 18-8 (2026-04-21)
 
 - Add jitter / backoff strategy to reduce thundering herd on 429s (avoid synchronized retries across parallel runs); current clamp+sleep is acceptable but could still cause repeat collisions.

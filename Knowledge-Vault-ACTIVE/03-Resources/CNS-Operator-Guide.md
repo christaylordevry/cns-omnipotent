@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-04-29
+modified: 2026-04-30
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -81,6 +81,27 @@ Modules load on demand when the task falls within a module's domain. The constit
 | `vault_log_action` | Write an entry to the agent action log | For operator-significant events; mutating tools already log on success |
 
 > [!warning] `vault_create_note` outside `00-Inbox` requires valid PAKE frontmatter or the write fails with `SCHEMA_INVALID`.
+
+### MCP operator runbook (env, rotation, smoke, Cursor parity)
+
+Use the MCP operator runbook when you are wiring or troubleshooting Tier 1 MCP services, rotating keys after an incident, or proving a live-call smoke:
+
+- Vault module: `AI-Context/modules/mcp-operator-runbook.md`
+
+**Standard smoke procedure (operator-run only):**
+
+1. Register the MCP server in both surfaces:
+   - Claude Code: `claude mcp add ... -e VAR="$(printenv VAR)" ...`
+   - Cursor: `~/.cursor/mcp.json` with `env` placeholders only, then restart Cursor
+2. Execute **one real tool call** that forces a remote request.
+3. Record evidence in Markdown with: date (UTC), surface, server, tool invoked, query summary, success or failure, high-level notes. Do not record raw payloads.
+
+**Key rotation checklist (post-incident):**
+
+1. Rotate at the provider, revoke the old key.
+2. Re-register MCP in Claude Code and confirm server health.
+3. Confirm Cursor config still uses env placeholders only, restart Cursor.
+4. Re-run one live-call smoke and record safe evidence.
 
 ---
 
@@ -351,6 +372,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-29 | 1.9.0 | Documented runtime-selectable live-chain briefs, stale generated note cleanup, and persisted PAKE++ evidence validation | 21-1-live-chain-real-brief-epic-20-stack-pake-quality-evidence |
 | 2026-04-29 | 1.10.0 | Documented live-chain pre-run hygiene: prefix-based output cleanup + aggregated env-key validation | 21-2-pre-run-hygiene-automation |
 | 2026-04-29 | 1.11.0 | Documented Perplexity Tier 1 MCP registration in Cursor (`~/.cursor/mcp.json`) and env-based key wiring | 22-1-perplexity-formal-mcp |
+| 2026-04-30 | 1.12.0 | Added pointer to MCP operator runbook, standard smoke procedure, and key rotation checklist | 24-1-mcp-operator-runbook-env-rotation-smoke-parity |
 
 ---
 
