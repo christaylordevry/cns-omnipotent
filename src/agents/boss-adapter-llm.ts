@@ -53,6 +53,46 @@ function buildUserPrompt(input: WeaponsCheckAdapterInput): string {
   ].join("\n");
 }
 
+/**
+ * Safe one-line context for errors (no model body text). Helps distinguish
+ * empty `text` blocks vs `tool_use` / malformed `content` vs `max_tokens` stop.
+ */
+function summarizeAnthropicMessageForError(payload: unknown): string {
+  if (typeof payload !== "object" || payload === null) {
+    return "payload=not-object";
+  }
+  const o = payload as Record<string, unknown>;
+  const parts: string[] = [];
+  if (o.type !== undefined) parts.push(`type=${String(o.type)}`);
+  if (o.stop_reason !== undefined) {
+    parts.push(`stop_reason=${String(o.stop_reason)}`);
+  }
+  const content = o.content;
+  if (!Array.isArray(content)) {
+    parts.push("content=not-array");
+  } else {
+    const types = content.map((b) => {
+      if (b && typeof b === "object" && "type" in b) {
+        return String((b as { type: unknown }).type);
+      }
+      return "?";
+    });
+    parts.push(`content_types=[${types.join(",")}]`);
+  }
+  if (o.error !== undefined && o.error !== null && typeof o.error === "object") {
+    const e = o.error as { type?: unknown; message?: unknown };
+    if (e.type !== undefined) parts.push(`error.type=${String(e.type)}`);
+    if (e.message !== undefined) {
+      const msg = String(e.message);
+      parts.push(
+        `error.message=${msg.length > 120 ? `${msg.slice(0, 120)}…` : msg}`,
+      );
+    }
+  }
+  const s = parts.join("; ");
+  return s.length > 500 ? `${s.slice(0, 497)}…` : s;
+}
+
 function extractAssistantText(payload: unknown): string | undefined {
   if (typeof payload !== "object" || payload === null) return undefined;
   const content = (payload as { content?: unknown }).content;
@@ -149,19 +189,27 @@ export function createLlmWeaponsCheckAdapter(): WeaponsCheckAdapter {
 
       const assistantText = extractAssistantText(envelope);
       if (typeof assistantText !== "string") {
+        const summary = summarizeAnthropicMessageForError(envelope);
         throw new CnsError(
           "IO_ERROR",
-          "Weapons check LLM response missing assistant content text",
+          `Weapons check LLM response missing assistant content text (${summary})`,
         );
       }
 
+      console.error("DEBUG stop:", (envelope as { stop_reason?: unknown }).stop_reason, "len:", assistantText.length);
+
+      const summary = summarizeAnthropicMessageForError(envelope);
       let parsedJson: unknown;
       try {
         parsedJson = parseLlmJsonText(assistantText);
-      } catch {
+      } catch (err) {
+        const cause =
+          err instanceof Error ? err.message : `non-Error: ${String(err)}`;
+        const causeShort =
+          cause.length > 220 ? `${cause.slice(0, 217)}…` : cause;
         throw new CnsError(
           "IO_ERROR",
-          "Weapons check LLM returned non-JSON response",
+          `Weapons check LLM returned non-JSON response (${summary}; text_len=${assistantText.length}; parse: ${causeShort})`,
         );
       }
 

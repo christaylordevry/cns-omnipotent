@@ -196,17 +196,50 @@ describe("createLlmWeaponsCheckAdapter", () => {
     expect((err as CnsError).message).toContain("401");
   });
 
-  it("non-JSON assistant text: IO_ERROR with exact message", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicTextResponse("not json"));
+  it("non-JSON assistant text: IO_ERROR with context (stop_reason, parse cause)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stop_reason: "end_turn",
+          content: [{ type: "text", text: "not json" }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const adapter = createLlmWeaponsCheckAdapter();
     const err = await adapter.scoreAndRewrite(sampleInput()).catch((e) => e);
     expect(err).toBeInstanceOf(CnsError);
     expect((err as CnsError).code).toBe("IO_ERROR");
-    expect((err as CnsError).message).toBe(
-      "Weapons check LLM returned non-JSON response",
+    const msg = (err as CnsError).message;
+    expect(msg).toMatch(
+      /^Weapons check LLM returned non-JSON response \(/,
     );
+    expect(msg).toContain("text_len=");
+    expect(msg).toContain("parse:");
+  });
+
+  it("no text blocks (e.g. tool_use only): IO_ERROR lists content types", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stop_reason: "end_turn",
+          content: [{ type: "tool_use", id: "1", name: "x", input: {} }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmWeaponsCheckAdapter();
+    const err = await adapter.scoreAndRewrite(sampleInput()).catch((e) => e);
+    expect(err).toBeInstanceOf(CnsError);
+    expect((err as CnsError).code).toBe("IO_ERROR");
+    const msg = (err as CnsError).message;
+    expect(msg).toContain("missing assistant content text");
+    expect(msg).toContain("content_types");
+    expect(msg).toContain("tool_use");
   });
 
   it("assistant text with preface and fenced JSON: parses the fenced object", async () => {
