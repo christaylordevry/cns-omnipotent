@@ -312,6 +312,113 @@ describe("AC: empty-sweep — short-circuit when no notes_created", () => {
 
 // ── AC: vault-reads ─────────────────────────────────────────────────────────
 
+// ── AC: ephemeral-snapshot (Story 25.1) ─────────────────────────────────────
+
+describe("AC: ephemeral-snapshot — synthesis consumes inline body without reading vault", () => {
+  it("uses ephemeral_snapshot when present and never calls vaultReadAdapter", async () => {
+    const vaultRoot = await makeVault();
+    let readCalls = 0;
+    let captured: Parameters<SynthesisAdapter["synthesize"]>[0] | null = null;
+
+    const sweep: ResearchSweepResult = {
+      brief_topic: "AI agents",
+      notes_created: [
+        {
+          vault_path: "urn:cns:chain:ephemeral:firecrawl:11111111-1111-4111-1111-111111111111",
+          pake_id: "11111111-1111-4111-1111-111111111111",
+          source_uri: "https://example.com/x",
+          source: "firecrawl",
+          ephemeral_snapshot: {
+            body: "This is the inline ephemeral body for source X.",
+            frontmatter: { pake_id: "11111111-1111-4111-1111-111111111111", source: "firecrawl" },
+          },
+        },
+      ],
+      notes_skipped: [],
+      perplexity_skipped: true,
+      perplexity_answers_filed: 0,
+      sweep_timestamp: "2026-04-30T00:00:00.000Z",
+    };
+
+    const result = await runSynthesisAgent(vaultRoot, sweep, {
+      adapters: {
+        vaultRead: makeVaultRead({
+          readNote: async () => {
+            readCalls++;
+            throw new CnsError("NOT_FOUND", "vault read should not be invoked for ephemeral inputs");
+          },
+        }),
+        synthesis: {
+          synthesize: async (input) => {
+            captured = input;
+            return { body: validPakeBody(), summary: "ephemeral-driven summary" };
+          },
+        },
+      },
+    });
+
+    expect(readCalls).toBe(0);
+    expect(result.status).toBe("ok");
+    expect(captured).not.toBeNull();
+    expect(captured!.source_notes.length).toBe(1);
+    expect(captured!.source_notes[0].body).toBe("This is the inline ephemeral body for source X.");
+    expect(captured!.source_notes[0].vault_path).toMatch(/^urn:cns:chain:ephemeral:/);
+  });
+
+  it("mixes ephemeral and disk-backed notes correctly", async () => {
+    const vaultRoot = await makeVault();
+    const { writeFile: wf } = await import("node:fs/promises");
+    const diskRel = "03-Resources/disk-backed.md";
+    await wf(
+      path.join(vaultRoot, diskRel),
+      "---\npake_id: disk-id\ntitle: Disk\n---\n\ndisk body\n",
+      "utf8",
+    );
+
+    const sweep: ResearchSweepResult = {
+      brief_topic: "mixed",
+      notes_created: [
+        {
+          vault_path: "urn:cns:chain:ephemeral:firecrawl:abc",
+          pake_id: "abc",
+          source: "firecrawl",
+          ephemeral_snapshot: {
+            body: "ephemeral body content",
+            frontmatter: { pake_id: "abc", source: "firecrawl" },
+          },
+        },
+        {
+          vault_path: diskRel,
+          pake_id: "disk-id",
+          source: "apify",
+        },
+      ],
+      notes_skipped: [],
+      perplexity_skipped: true,
+      perplexity_answers_filed: 0,
+      sweep_timestamp: "2026-04-30T00:00:00.000Z",
+    };
+
+    let captured: Parameters<SynthesisAdapter["synthesize"]>[0] | null = null;
+    const result = await runSynthesisAgent(vaultRoot, sweep, {
+      adapters: {
+        synthesis: {
+          synthesize: async (input) => {
+            captured = input;
+            return { body: validPakeBody(), summary: "s" };
+          },
+        },
+      },
+    });
+
+    expect(result.status).toBe("ok");
+    expect(captured).not.toBeNull();
+    expect(captured!.source_notes.length).toBe(2);
+    expect(captured!.source_notes[0].body).toBe("ephemeral body content");
+    expect(captured!.source_notes[1].body.trim()).toBe("disk body");
+  });
+});
+
 describe("AC: vault-reads — per-note read errors do not abort", () => {
   it("collects partial failures and continues with remaining notes", async () => {
     const vaultRoot = await makeVault();

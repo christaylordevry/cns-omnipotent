@@ -403,6 +403,19 @@ export async function runSynthesisAgent(
   const pake_id_map = new Map<string, string>();
 
   for (const note of sweepResult.notes_created) {
+    // Story 25.1: ephemeral acquisition — when the sweep ran with
+    // `save_sources === false`, the body lives inline on the sweep result
+    // rather than on disk. Use it directly and skip the vault read.
+    if (note.ephemeral_snapshot) {
+      source_notes.push({
+        vault_path: note.vault_path,
+        body: note.ephemeral_snapshot.body,
+        frontmatter: note.ephemeral_snapshot.frontmatter,
+      });
+      const fmPakeId = pakeIdFromFrontmatter(note.ephemeral_snapshot.frontmatter);
+      pake_id_map.set(note.vault_path, fmPakeId ?? note.pake_id);
+      continue;
+    }
     try {
       const read = await vaultReadAdapter.readNote(note.vault_path);
       source_notes.push({
@@ -484,7 +497,7 @@ export async function runSynthesisAgent(
       ai_summary: output.summary,
       confidence_score: 0.6,
     },
-    { surface },
+    { surface, skipInboxDraft: true },
   );
 
   if (ingestResult.status !== "ok") {

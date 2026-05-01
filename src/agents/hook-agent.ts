@@ -320,7 +320,7 @@ export async function runHookAgent(
       ai_summary: `Four hook options (10/10 gate, ≥${MIN_HOOK_ITERATIONS} iterations each) for: ${topic}`,
       confidence_score: 0.65,
     },
-    { surface },
+    { surface, skipInboxDraft: true },
   );
 
   if (ingestResult.status !== "ok") {

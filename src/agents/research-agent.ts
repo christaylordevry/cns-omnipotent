@@ -1,4 +1,5 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { appendRecord } from "../audit/audit-logger.js";
 import { runIngestPipeline, type IngestResult } from "../ingest/pipeline.js";
@@ -29,13 +30,41 @@ export type SkipReason = z.infer<typeof skipReasonSchema>;
 export const researchSourceSchema = z.enum(["firecrawl", "apify", "scrapling", "perplexity"]);
 export type ResearchSource = z.infer<typeof researchSourceSchema>;
 
+/**
+ * Inline source body carried through `ResearchSweepResult` when the chain runs
+ * with `save_sources === false`. Synthesis consumes this directly instead of
+ * reading a vault-backed SourceNote (Story 25.1, Task 0). Frontmatter is a free
+ * record so research adapters can stamp lightweight provenance (pake_id, title,
+ * source_uri, source) without coupling to the full PAKE frontmatter schema —
+ * acquisition-tier writes are skipped, so no PAKE validation is required here.
+ */
+export const ephemeralSnapshotSchema = z.object({
+  body: z.string(),
+  frontmatter: z.record(z.unknown()),
+});
+export type EphemeralSnapshot = z.infer<typeof ephemeralSnapshotSchema>;
+
 export const createdNoteSchema = z.object({
   vault_path: z.string(),
   pake_id: z.string(),
   source_uri: z.string().optional(),
   source: researchSourceSchema,
+  /**
+   * Inline body+frontmatter for memory-only acquisition. When present,
+   * `vault_path` is a synthetic URN (no disk file) and synthesis MUST read the
+   * snapshot rather than calling `vaultReadAdapter.readNote(vault_path)`.
+   */
+  ephemeral_snapshot: ephemeralSnapshotSchema.optional(),
 });
 export type CreatedNote = z.infer<typeof createdNoteSchema>;
+
+/** Synthetic `vault_path` for an in-memory acquisition note (Story 25.1). */
+export function ephemeralVaultPath(
+  source: ResearchSource,
+  pakeId: string,
+): string {
+  return `urn:cns:chain:ephemeral:${source}:${pakeId}`;
+}
 
 export const skippedNoteSchema = z.object({
   source_uri: z.string(),
@@ -179,6 +208,14 @@ export type ResearchAgentAdapters = {
 
 export type ResearchAgentOptions = {
   surface?: string;
+  /**
+   * When true, persist acquisition-tier outputs (SourceNote per scrape, filed
+   * Perplexity InsightNote/SynthesisNote) via `runIngestPipeline` as before.
+   * When omitted or false (Story 25.1 default), the sweep returns
+   * `notes_created` entries with inline `ephemeral_snapshot` bodies and writes
+   * nothing to the vault for those tiers.
+   */
+  save_sources?: boolean;
   adapters?: ResearchAgentAdapters;
 };
 
@@ -218,12 +255,18 @@ export async function firecrawlSweep(
   vaultRoot: string,
   brief: ResearchBrief,
   adapter: FirecrawlAdapter,
-  opts: { surface: string; profile: DepthProfile; queries?: string[] },
+  opts: {
+    surface: string;
+    profile: DepthProfile;
+    queries?: string[];
+    save_sources?: boolean;
+  },
 ): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
   const created: CreatedNote[] = [];
   const skipped: SkippedNote[] = [];
   const baseTags = sweepBaseTags(brief, "research-sweep");
   const queries = opts.queries ?? brief.queries;
+  const saveSources = opts.save_sources === true;
 
   for (const query of queries) {
     let results: FirecrawlSearchResult[];
@@ -258,6 +301,27 @@ export async function firecrawlSweep(
 
       if (body.trim().length < 200) {
         skipped.push({ source_uri: hit.url, reason: "quality_gate" });
+        continue;
+      }
+
+      if (!saveSources) {
+        const pakeId = randomUUID();
+        created.push({
+          vault_path: ephemeralVaultPath("firecrawl", pakeId),
+          pake_id: pakeId,
+          source_uri: hit.url,
+          source: "firecrawl",
+          ephemeral_snapshot: {
+            body,
+            frontmatter: {
+              pake_id: pakeId,
+              title: titleHint ?? hit.url,
+              source_uri: hit.url,
+              source: "firecrawl",
+              tags: baseTags,
+            },
+          },
+        });
         continue;
       }
 
@@ -296,11 +360,12 @@ export async function apifySweep(
   vaultRoot: string,
   brief: ResearchBrief,
   adapter: ApifyAdapter,
-  opts: { surface: string; profile: DepthProfile },
+  opts: { surface: string; profile: DepthProfile; save_sources?: boolean },
 ): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
   const created: CreatedNote[] = [];
   const skipped: SkippedNote[] = [];
   const baseTags = sweepBaseTags(brief, "apify-sweep");
+  const saveSources = opts.save_sources === true;
 
   for (const query of brief.queries) {
     let snippets: ApifyRagResult[];
@@ -328,6 +393,29 @@ export async function apifySweep(
 
       if (body.trim().length < 200) {
         skipped.push({ source_uri: sourceUriForSkip, reason: "quality_gate" });
+        continue;
+      }
+
+      if (!saveSources) {
+        const pakeId = randomUUID();
+        const ephemeral_source_uri = hasUrl ? url : apifyQualityGateSnippetUri(query, i);
+        const created_entry: CreatedNote = {
+          vault_path: ephemeralVaultPath("apify", pakeId),
+          pake_id: pakeId,
+          source: "apify",
+          ephemeral_snapshot: {
+            body,
+            frontmatter: {
+              pake_id: pakeId,
+              title: snippet.title ?? (hasUrl ? url : `Apify result ${i + 1}`),
+              source_uri: ephemeral_source_uri,
+              source: "apify",
+              tags: baseTags,
+            },
+          },
+        };
+        if (hasUrl) created_entry.source_uri = url;
+        created.push(created_entry);
         continue;
       }
 
@@ -375,11 +463,12 @@ export async function scraplingSweep(
   vaultRoot: string,
   brief: ResearchBrief,
   adapter: ScraplingAdapter,
-  opts: { surface: string; profile: DepthProfile },
+  opts: { surface: string; profile: DepthProfile; save_sources?: boolean },
 ): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
   const created: CreatedNote[] = [];
   const skipped: SkippedNote[] = [];
   const baseTags = sweepBaseTags(brief, "scrapling-sweep");
+  const saveSources = opts.save_sources === true;
 
   for (const query of brief.queries) {
     let pages: ScraplingFetchResult[];
@@ -407,6 +496,31 @@ export async function scraplingSweep(
 
       if (body.trim().length < 200) {
         skipped.push({ source_uri: sourceUriForSkip, reason: "quality_gate" });
+        continue;
+      }
+
+      if (!saveSources) {
+        const pakeId = randomUUID();
+        const ephemeral_source_uri = hasUrl
+          ? url
+          : scraplingQualityGateSnippetUri(query, i);
+        const created_entry: CreatedNote = {
+          vault_path: ephemeralVaultPath("scrapling", pakeId),
+          pake_id: pakeId,
+          source: "scrapling",
+          ephemeral_snapshot: {
+            body,
+            frontmatter: {
+              pake_id: pakeId,
+              title: page.title ?? (hasUrl ? url : `Scrapling result ${i + 1}`),
+              source_uri: ephemeral_source_uri,
+              source: "scrapling",
+              tags: baseTags,
+            },
+          },
+        };
+        if (hasUrl) created_entry.source_uri = url;
+        created.push(created_entry);
         continue;
       }
 
@@ -543,10 +657,12 @@ async function filePerplexityAnswers(
   slot: PerplexitySlot,
   surface: string,
   dateYmd: string,
+  opts: { save_sources?: boolean } = {},
 ): Promise<{ created: CreatedNote[]; skipped: SkippedNote[] }> {
   const created: CreatedNote[] = [];
   const skipped: SkippedNote[] = [];
   const tagBase = [brief.topic, "perplexity-answer", "research-sweep", ...(brief.tags ?? [])];
+  const saveSources = opts.save_sources === true;
 
   for (const query of brief.queries) {
     let pr: PerplexityResult;
@@ -570,6 +686,29 @@ async function filePerplexityAnswers(
     });
     const prov = perplexityAnswerSourceUri(query);
     const title_hint = `Perplexity: ${brief.topic.slice(0, 80)} — ${query.slice(0, 80)} (${dateYmd})`;
+
+    if (!saveSources) {
+      const pakeId = randomUUID();
+      created.push({
+        vault_path: ephemeralVaultPath("perplexity", pakeId),
+        pake_id: pakeId,
+        source_uri: prov,
+        source: "perplexity",
+        ephemeral_snapshot: {
+          body,
+          frontmatter: {
+            pake_id: pakeId,
+            title: title_hint,
+            source_uri: prov,
+            source: "perplexity",
+            tags: [...tagBase, query],
+            ai_summary: answer.slice(0, 500),
+            ingest_as,
+          },
+        },
+      });
+      continue;
+    }
 
     const result = await runIngestPipeline(
       vaultRoot,
@@ -610,6 +749,7 @@ export async function runResearchAgent(
 ): Promise<ResearchSweepResult> {
   const parsed = researchBriefSchema.parse(brief);
   const surface = opts.surface ?? "research-agent";
+  const save_sources = opts.save_sources === true;
   const profile = profileForDepth(parsed.depth);
 
   const firecrawl = opts.adapters?.firecrawl;
@@ -627,7 +767,7 @@ export async function runResearchAgent(
     : parsed.queries;
 
   const apifyPromise = apify
-    ? apifySweep(vaultRoot, parsed, apify, { surface, profile })
+    ? apifySweep(vaultRoot, parsed, apify, { surface, profile, save_sources })
     : Promise.resolve({ created: [], skipped: [] });
 
   const firecrawlPromise =
@@ -636,13 +776,18 @@ export async function runResearchAgent(
           surface,
           profile,
           queries: firecrawlQueries,
+          save_sources,
         })
       : Promise.resolve({ created: [], skipped: [] });
 
   const [firecrawlOut2, apifyOut] = await Promise.all([firecrawlPromise, apifyPromise]);
 
   const scraplingOut = scrapling
-    ? await scraplingSweep(vaultRoot, parsed, scrapling, { surface, profile })
+    ? await scraplingSweep(vaultRoot, parsed, scrapling, {
+        surface,
+        profile,
+        save_sources,
+      })
     : { created: [], skipped: [] };
 
   let notes_created = [...firecrawlOut2.created, ...apifyOut.created, ...scraplingOut.created];
@@ -661,6 +806,7 @@ export async function runResearchAgent(
       perplexity,
       surface,
       dateYmd,
+      { save_sources },
     );
     notes_created = [...notes_created, ...filed.created];
     notes_skipped.push(...filed.skipped);
@@ -678,6 +824,7 @@ export async function runResearchAgent(
       notes_created_count: notes_created.length,
       perplexity_skipped,
       perplexity_answers_filed,
+      save_sources,
     },
     isoUtc: sweep_timestamp,
   });

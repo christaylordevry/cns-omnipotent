@@ -330,7 +330,7 @@ export async function runBossAgent(
       ai_summary: `Four hooks passed the weapons gate (novelty >= 9 AND copy intensity >= 9) for: ${topic}`,
       confidence_score: 0.7,
     },
-    { surface },
+    { surface, skipInboxDraft: true },
   );
 
   if (ingestResult.status !== "ok") {

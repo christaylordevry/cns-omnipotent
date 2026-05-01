@@ -12,6 +12,13 @@
  *
  * Default output is compact, secret-safe smoke evidence. Use --raw-json only
  * for local debugging when full stage result payloads are acceptable.
+ *
+ * Story 25.1 — vault footprint:
+ *   Default (no `--save-sources`) keeps acquisition-tier outputs (SourceNote
+ *   per scrape, filed Perplexity Insight/SynthesisNotes) in memory; only
+ *   synthesis, hook-set, and weapons-check notes land under `03-Resources/`.
+ *   Pass `--save-sources` to restore pre-25.1 behavior and persist every
+ *   acquisition-tier note to the vault as well.
  */
 
 import { spawnSync } from "node:child_process";
@@ -69,6 +76,15 @@ type CliOptions = {
   queries: string[];
   depth: ResearchBrief["depth"] | undefined;
   verboseCleanup: boolean;
+  /**
+   * Story 25.1 — opt-in vault persistence for acquisition-tier outputs (per-page
+   * SourceNotes from Firecrawl/Apify/Scrapling and filed Perplexity Insight/
+   * SynthesisNotes). When omitted, the chain runs with `save_sources === false`
+   * and acquisition tiers stay in memory; only governed synthesis/hook/weapons
+   * notes land under `03-Resources/`. With `--save-sources`, vault persistence
+   * for acquisition-tier outputs matches pre-25.1 behavior.
+   */
+  saveSources: boolean;
   help: boolean;
 };
 
@@ -100,6 +116,7 @@ function parseArgs(argv: string[]): CliOptions {
     queries: [],
     depth: undefined,
     verboseCleanup: false,
+    saveSources: false,
     help: false,
   };
 
@@ -108,6 +125,9 @@ function parseArgs(argv: string[]): CliOptions {
     switch (arg) {
       case "--raw-json":
         opts.rawJson = true;
+        break;
+      case "--save-sources":
+        opts.saveSources = true;
         break;
       case "--verbose-cleanup":
         opts.verboseCleanup = true;
@@ -187,6 +207,9 @@ Options:
   --operator-note text        Add a sanitized operator note to the evidence.
   --vault-root-class value    staging, active, or unknown. Overrides auto-detect.
   --verbose-cleanup           Print removed/skipped paths for pre-run cleanup.
+  --save-sources              Persist acquisition-tier notes (SourceNotes, filed
+                              Perplexity Insight/SynthesisNotes) to the vault.
+                              Default (omitted) is memory-only acquisition.
   --raw-json                  Also print full raw ChainRunResult JSON for local debugging.
   --help                      Show this help.
 `);
@@ -748,6 +771,7 @@ async function main() {
     const result = await runChain(vaultRoot, brief, {
       research: {
         surface: "live-test",
+        save_sources: cli.saveSources,
         adapters: {
           firecrawl: buildFirecrawlAdapter(firecrawlKey, serviceErrors.record),
           apify: buildApifyAdapter(apifyToken, serviceErrors.record),

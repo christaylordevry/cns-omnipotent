@@ -40,11 +40,18 @@ export type IngestInput = {
   source?: string | undefined;
 } & IngestOptions;
 
+/**
+ * `inbox_path` is the staging draft that backs an in-flight ingest. It is
+ * absent when the caller passes `skipInboxDraft: true` (Story 25.1) — finished
+ * synthesis/hook/weapons-check artifacts use a direct governed write so no
+ * `00-Inbox/*.md` orphan can be left behind on a successful run. Conflicts
+ * and validation errors still produce an inbox draft for human triage.
+ */
 export type IngestResult =
-  | { status: "ok"; pake_id: string; vault_path: string; inbox_path: string }
+  | { status: "ok"; pake_id: string; vault_path: string; inbox_path?: string }
   | { status: "duplicate"; source_uri: string }
-  | { status: "conflict"; error: string; inbox_path: string }
-  | { status: "validation_error"; error: string; inbox_path: string };
+  | { status: "conflict"; error: string; inbox_path?: string }
+  | { status: "validation_error"; error: string; inbox_path?: string };
 
 /** Vault-relative path for the inbox staging area. */
 const INBOX_DIR = "00-Inbox";
@@ -112,9 +119,10 @@ async function removeInboxDraft(vaultRoot: string, inboxRel: string): Promise<vo
 export async function runIngestPipeline(
   vaultRoot: string,
   input: IngestInput,
-  opts: { surface?: string } = {},
+  opts: { surface?: string; skipInboxDraft?: boolean } = {},
 ): Promise<IngestResult> {
   const surface = opts.surface ?? "ingest-pipeline";
+  const skipInboxDraft = opts.skipInboxDraft === true;
 
   // Stage 1 — Intent
   const sourceType = input.source_type ?? classifySource(input.input);
@@ -167,13 +175,23 @@ export async function runIngestPipeline(
   const tags = ["ingest", ...(input.tags ?? [])];
   const today = todayUtcYmd();
 
-  // Write inbox draft (no PAKE validation — 00-Inbox exempt)
-  let inboxPath: string;
-  try {
-    inboxPath = await writeInboxDraft(vaultRoot, normalized.title, normalized.body, normalized.source_uri);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new CnsError("IO_ERROR", `Failed to write inbox draft: ${msg}`);
+  // Write inbox draft (no PAKE validation — 00-Inbox exempt). Story 25.1:
+  // governed-only callers pass `skipInboxDraft: true` so a successful
+  // direct-write run leaves zero `00-Inbox/*.md` orphans. PAKE/WriteGate/
+  // secret-scan ordering is unchanged because they live in `vaultCreateNote`.
+  let inboxPath: string | undefined;
+  if (!skipInboxDraft) {
+    try {
+      inboxPath = await writeInboxDraft(
+        vaultRoot,
+        normalized.title,
+        normalized.body,
+        normalized.source_uri,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CnsError("IO_ERROR", `Failed to write inbox draft: ${msg}`);
+    }
   }
 
   // Stage 3/4 — PAKE gate + governed write
@@ -203,13 +221,19 @@ export async function runIngestPipeline(
       err.code === "IO_ERROR" &&
       msg.includes("already exists at target path")
     ) {
-      return { status: "conflict", error: msg, inbox_path: inboxPath };
+      return inboxPath !== undefined
+        ? { status: "conflict", error: msg, inbox_path: inboxPath }
+        : { status: "conflict", error: msg };
     }
-    return { status: "validation_error", error: msg, inbox_path: inboxPath };
+    return inboxPath !== undefined
+      ? { status: "validation_error", error: msg, inbox_path: inboxPath }
+      : { status: "validation_error", error: msg };
   }
 
   // Remove inbox draft after successful promotion
-  await removeInboxDraft(vaultRoot, inboxPath);
+  if (inboxPath !== undefined) {
+    await removeInboxDraft(vaultRoot, inboxPath);
+  }
 
   // Stage 5 — Index
   await appendIndexRow(vaultRoot, {
@@ -235,5 +259,7 @@ export async function runIngestPipeline(
     },
   });
 
-  return { status: "ok", pake_id, vault_path, inbox_path: inboxPath };
+  return inboxPath !== undefined
+    ? { status: "ok", pake_id, vault_path, inbox_path: inboxPath }
+    : { status: "ok", pake_id, vault_path };
 }

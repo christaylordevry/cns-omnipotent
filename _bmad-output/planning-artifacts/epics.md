@@ -834,3 +834,21 @@ So that **Phase 3 stories can be sliced without retrofitting security or secrets
 **And** it calls out **dependencies** on Brain or mobile epics if routing must know about retrieval context or device class (explicit “none / soft / hard” dependency statement)  
 **And** it ends with a **recommended epic breakdown** (ordered list of candidate Phase 3 epics or stories) without implementing code, daemons, or new MCP transports  
 **And** no OpenClaw, always-on daemon, or router implementation ships in this story; repo code may remain untouched.
+
+---
+
+## Implementation track — Epic 25: Chain vault footprint control
+
+**Goal:** Stop treating every chain scrape as a durable vault note by default, and ensure finished chain artifacts (synthesis, hooks, weapons-check) land only under governed **`03-Resources/`** with **no** stale **`00-Inbox`** drafts.
+
+**Tracked in sprint-status as:** `epic-25`.
+
+### Story 25.1: Stop writing SourceNotes to vault by default
+
+As an **operator**,
+
+I want **`scripts/run-chain.ts` to default to not persisting acquisition-tier notes** (`--save-sources` opt-in),
+
+So that **vault hygiene stays intact while synthesis, hooks, and weapons-check still receive full research context**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/25-1-stop-writing-sourcenotes-by-default.md` (default run: exactly three `03-Resources` outputs, zero SourceNotes, zero `00-Inbox` artifacts; `verify.sh` passes).

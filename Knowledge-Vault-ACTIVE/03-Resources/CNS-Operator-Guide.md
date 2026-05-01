@@ -325,6 +325,18 @@ Before the chain begins, the harness also performs **pre-run hygiene**:
 - **Output-note cleanup:** deletes stale `03-Resources/synthesis-*.md`, `03-Resources/hooks-*.md`, and `03-Resources/weapons-check-*.md` files (non-recursive) so each run starts with a clean slate.
 - **Fail-fast env validation:** requires `FIRECRAWL_API_KEY`, `APIFY_API_TOKEN`, and `ANTHROPIC_API_KEY` to be present; if any are missing, it fails with a single aggregated message listing all missing keys. (Perplexity remains optional; when `PERPLEXITY_API_KEY` is absent, Perplexity is treated as unavailable and the sweep continues without filing Perplexity answers.)
 
+#### Vault footprint and `--save-sources` (Story 25.1)
+
+By default, `scripts/run-chain.ts` runs with **memory-only acquisition**: per-page Firecrawl/Apify/Scrapling captures and Perplexity answers are passed directly into synthesis as inline ephemeral snapshots and **never** land in the vault. After a successful default run, the only new files in the vault are the three governed outputs in `03-Resources/`:
+
+- `synthesis-<topic>-<date>.md` (PAKE++ InsightNote)
+- `hooks-<topic>-<date>.md` (HookSetNote)
+- `weapons-check-<topic>-<date>.md` (WeaponsCheckNote)
+
+`00-Inbox/` stays empty for these governed writes — synthesis, hook, and boss agents call the ingest pipeline with `skipInboxDraft: true`, which still routes through PAKE/WriteGate/secret-scan validation but skips the staging draft so successful runs leave zero inbox orphans.
+
+Pass `--save-sources` to restore the pre-25.1 behavior and persist every acquisition-tier note to the vault as well: per-page SourceNotes from each scraping tier and filed Perplexity Insight/SynthesisNotes. Use this flag when you need durable per-source provenance, e.g. for audit reconstruction or for follow-up sweeps that should dedupe against the prior run's source URIs. The flag affects acquisition tiers only; the three governed synthesis/hook/weapons outputs are written either way.
+
 Perplexity is invoked via the Perplexity MCP server (Tier 1). Ensure Cursor has a Perplexity MCP server entry in `~/.cursor/mcp.json` and that the Perplexity key is provided via environment variable wiring (do not hardcode keys in JSON). Example:
 
 ```json
@@ -374,6 +386,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-29 | 1.11.0 | Documented Perplexity Tier 1 MCP registration in Cursor (`~/.cursor/mcp.json`) and env-based key wiring | 22-1-perplexity-formal-mcp |
 | 2026-04-30 | 1.12.0 | Added pointer to MCP operator runbook, standard smoke procedure, and key rotation checklist | 24-1-mcp-operator-runbook-env-rotation-smoke-parity |
 | 2026-04-30 | 1.13.0 | Documented Brain deeper retrieval ranking: PAKE type preference, manifest stale-sample penalty, and `--explain` score components | 23-1-brain-service-deeper-retrieval |
+| 2026-04-30 | 1.14.0 | Documented `--save-sources` opt-in flag, default memory-only acquisition, and the three-governed-note vault footprint (zero inbox orphans after a successful run) | 25-1-stop-writing-sourcenotes-by-default |
 
 ---
 

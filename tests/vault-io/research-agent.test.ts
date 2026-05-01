@@ -150,7 +150,7 @@ describe("AC: brief — schema validation", () => {
 // ── AC: firecrawl ───────────────────────────────────────────────────────────
 
 describe("AC: firecrawl — search + scrape + ingest", () => {
-  it("calls firecrawl_search per query and ingests results as URL SourceNotes", async () => {
+  it("calls firecrawl_search per query and ingests results as URL SourceNotes (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     let searchCalls = 0;
     const fc = makeFirecrawl({
@@ -169,7 +169,7 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
     const result = await runResearchAgent(
       vaultRoot,
       validBrief({ queries: ["alpha", "beta"], depth: "standard" }),
-      { adapters: { firecrawl: fc } },
+      { save_sources: true, adapters: { firecrawl: fc } },
     );
 
     expect(searchCalls).toBe(2);
@@ -304,7 +304,7 @@ describe("AC: firecrawl — search + scrape + ingest", () => {
 // ── AC: apify ───────────────────────────────────────────────────────────────
 
 describe("AC: apify — rag-web-browser + ingest", () => {
-  it("calls apify.ragWebBrowser per query and ingests URL snippets", async () => {
+  it("calls apify.ragWebBrowser per query and ingests URL snippets (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     let ragCalls = 0;
     const apify = makeApify({
@@ -323,7 +323,7 @@ describe("AC: apify — rag-web-browser + ingest", () => {
     const result = await runResearchAgent(
       vaultRoot,
       validBrief({ queries: ["alpha", "beta"], depth: "standard" }),
-      { adapters: { apify } },
+      { save_sources: true, adapters: { apify } },
     );
 
     expect(ragCalls).toBe(2);
@@ -583,7 +583,7 @@ describe("AC: perplexity-stub — graceful degradation", () => {
 // ── AC: vault-notes ─────────────────────────────────────────────────────────
 
 describe("AC: vault-notes — created via ingest pipeline as SourceNotes", () => {
-  it("creates SourceNote with topic tag and research-sweep tag", async () => {
+  it("creates SourceNote with topic tag and research-sweep tag (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
@@ -594,7 +594,7 @@ describe("AC: vault-notes — created via ingest pipeline as SourceNotes", () =>
     const result = await runResearchAgent(
       vaultRoot,
       validBrief({ topic: "hooks", queries: ["copywriting hooks"], tags: ["insight"] }),
-      { adapters: { firecrawl: fc } },
+      { save_sources: true, adapters: { firecrawl: fc } },
     );
 
     expect(result.notes_created.length).toBe(1);
@@ -637,12 +637,13 @@ describe("AC: manifest — ResearchSweepResult shape", () => {
     expect(researchSweepResultSchema.safeParse(result).success).toBe(true);
   });
 
-  it("notes_created entries include vault_path, pake_id, source_uri, source", async () => {
+  it("notes_created entries include vault_path, pake_id, source_uri, source (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [{ url: "https://example.com/shape", title: "S", snippet: LONG_BODY }],
     });
     const result = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
       adapters: { firecrawl: fc },
     });
     const created = result.notes_created[0];
@@ -684,12 +685,15 @@ describe("AC: audit — one sweep-level record + per-note ingest records", () =>
     expect(logBody).toContain("no-notes-created");
   });
 
-  it("per-note ingest audit lines are still emitted by the pipeline", async () => {
+  it("per-note ingest audit lines are emitted by the pipeline when save_sources: true", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [{ url: "https://example.com/per-note", title: "P", snippet: LONG_BODY }],
     });
-    await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
+    await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
+      adapters: { firecrawl: fc },
+    });
 
     const logBody = await readFile(path.join(vaultRoot, "_meta", "logs", "agent-log.md"), "utf8");
     expect(logBody).toContain("ingest");
@@ -747,16 +751,22 @@ describe("AC: tests — composite scenarios", () => {
     ]);
   });
 
-  it("duplicate source_uri is suppressed on second sweep", async () => {
+  it("duplicate source_uri is suppressed on second sweep when save_sources: true", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [{ url: "https://example.com/dupe", title: "D", snippet: LONG_BODY }],
     });
 
-    const first = await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
+    const first = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
+      adapters: { firecrawl: fc },
+    });
     expect(first.notes_created.length).toBe(1);
 
-    const second = await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
+    const second = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
+      adapters: { firecrawl: fc },
+    });
     expect(second.notes_created.length).toBe(0);
     expect(second.notes_skipped.length).toBe(1);
     expect(second.notes_skipped[0].reason).toBe("duplicate");
@@ -856,7 +866,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     expect(result.notes_created.filter((n) => n.source === "perplexity")).toEqual([]);
   });
 
-  it("files InsightNote when one sweep source matches citations", async () => {
+  it("files InsightNote when one sweep source matches citations (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
@@ -873,6 +883,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
       },
     };
     const result = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
       adapters: { firecrawl: fc, perplexity },
     });
     expect(result.perplexity_answers_filed).toBe(1);
@@ -884,7 +895,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     expect(raw).toMatch(/\[\[[^\]]+\]\]/);
   });
 
-  it("files SynthesisNote when two distinct sweep SourceNotes match citations", async () => {
+  it("files SynthesisNote when two distinct sweep SourceNotes match citations (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     const fc = makeFirecrawl({
       search: async () => [
@@ -902,6 +913,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
       },
     };
     const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["single-query"] }), {
+      save_sources: true,
       adapters: { firecrawl: fc, perplexity },
     });
     expect(result.perplexity_answers_filed).toBe(1);
@@ -924,7 +936,7 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
     expect(logBody).toContain("perplexity_answers_filed");
   });
 
-  it("second sweep surfaces duplicate for same Perplexity provenance_uri", async () => {
+  it("second sweep surfaces duplicate for same Perplexity provenance_uri (save_sources: true)", async () => {
     const vaultRoot = await makeVault();
     const perplexity: PerplexitySlot = {
       available: true,
@@ -932,9 +944,15 @@ describe("AC: answer-filing — Perplexity answers via runIngestPipeline", () =>
         return { answer: "Stable answer.", citations: [] };
       },
     };
-    const first = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    const first = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
+      adapters: { perplexity },
+    });
     expect(first.perplexity_answers_filed).toBe(1);
-    const second = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+    const second = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: true,
+      adapters: { perplexity },
+    });
     expect(second.perplexity_answers_filed).toBe(0);
     expect(
       second.notes_skipped.some(
@@ -1169,6 +1187,163 @@ describe("AC: social-domain routing — fallback when Apify is missing", () => {
     expect(firecrawlSearchCalls).toEqual(["https://linkedin.com/in/foo"]);
     expect(result.notes_created.length).toBe(1);
     expect(result.notes_created[0].source).toBe("firecrawl");
+  });
+});
+
+// ── AC: save_sources gating (Story 25.1) ───────────────────────────────────
+
+describe("AC: save_sources — default off keeps acquisition tiers in memory", () => {
+  async function readGovernedDir(vaultRoot: string): Promise<string[]> {
+    const { readdir } = await import("node:fs/promises");
+    try {
+      return await readdir(path.join(vaultRoot, "03-Resources"));
+    } catch {
+      return [];
+    }
+  }
+
+  async function readInboxDir(vaultRoot: string): Promise<string[]> {
+    const { readdir } = await import("node:fs/promises");
+    try {
+      return await readdir(path.join(vaultRoot, "00-Inbox"));
+    } catch {
+      return [];
+    }
+  }
+
+  it("Firecrawl sweep: default (save_sources omitted) emits ephemeral notes_created with no vault writes", async () => {
+    const vaultRoot = await makeVault();
+    const fc = makeFirecrawl({
+      search: async (query) => [
+        {
+          url: `https://example.com/${query}`,
+          title: `Title ${query}`,
+          snippet: `# Title ${query}\n\n${LONG_BODY}`,
+        },
+      ],
+    });
+
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["alpha", "beta"], depth: "standard" }),
+      { adapters: { firecrawl: fc } },
+    );
+
+    expect(result.notes_created.length).toBe(2);
+    for (const note of result.notes_created) {
+      expect(note.source).toBe("firecrawl");
+      expect(note.vault_path).toMatch(/^urn:cns:chain:ephemeral:firecrawl:/);
+      expect(note.ephemeral_snapshot).toBeDefined();
+      expect(note.ephemeral_snapshot!.body.length).toBeGreaterThan(0);
+      expect(note.ephemeral_snapshot!.frontmatter.source).toBe("firecrawl");
+    }
+    expect(await readGovernedDir(vaultRoot)).toEqual([]);
+    expect(await readInboxDir(vaultRoot)).toEqual([]);
+  });
+
+  it("Apify sweep: default emits ephemeral notes_created with no vault writes", async () => {
+    const vaultRoot = await makeVault();
+    const apify = makeApify({
+      ragWebBrowser: async (query) => [
+        {
+          url: `https://apify.example/${query}`,
+          title: `Apify ${query}`,
+          text: `# ${query}\n\n${LONG_BODY}`,
+        },
+      ],
+    });
+
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q1"] }), {
+      adapters: { apify },
+    });
+
+    expect(result.notes_created.length).toBe(1);
+    expect(result.notes_created[0].source).toBe("apify");
+    expect(result.notes_created[0].vault_path).toMatch(/^urn:cns:chain:ephemeral:apify:/);
+    expect(result.notes_created[0].ephemeral_snapshot).toBeDefined();
+    expect(await readGovernedDir(vaultRoot)).toEqual([]);
+    expect(await readInboxDir(vaultRoot)).toEqual([]);
+  });
+
+  it("Scrapling sweep: default emits ephemeral notes_created with no vault writes", async () => {
+    const vaultRoot = await makeVault();
+    const scrapling = makeScrapling({
+      stealthyFetch: async (query) => [
+        {
+          url: `https://scrapling.example/${query}`,
+          text: `# ${query}\n\n${LONG_BODY}`,
+        },
+      ],
+    });
+
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q"] }), {
+      adapters: { scrapling },
+    });
+
+    expect(result.notes_created.length).toBe(1);
+    expect(result.notes_created[0].source).toBe("scrapling");
+    expect(result.notes_created[0].vault_path).toMatch(/^urn:cns:chain:ephemeral:scrapling:/);
+    expect(await readGovernedDir(vaultRoot)).toEqual([]);
+    expect(await readInboxDir(vaultRoot)).toEqual([]);
+  });
+
+  it("Perplexity answer filing: default emits ephemeral perplexity entries with no vault writes", async () => {
+    const vaultRoot = await makeVault();
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search() {
+        return { answer: "Stable ephemeral answer.", citations: [] };
+      },
+    };
+
+    const result = await runResearchAgent(vaultRoot, validBrief(), { adapters: { perplexity } });
+
+    expect(result.perplexity_answers_filed).toBe(1);
+    const pNote = result.notes_created.find((n) => n.source === "perplexity");
+    expect(pNote).toBeDefined();
+    expect(pNote!.vault_path).toMatch(/^urn:cns:chain:ephemeral:perplexity:/);
+    expect(pNote!.ephemeral_snapshot?.body).toContain("Stable ephemeral answer.");
+    expect(await readGovernedDir(vaultRoot)).toEqual([]);
+    expect(await readInboxDir(vaultRoot)).toEqual([]);
+  });
+
+  it("explicit save_sources: false matches the default behavior", async () => {
+    const vaultRoot = await makeVault();
+    const fc = makeFirecrawl({
+      search: async () => [{ url: "https://example.com/a", title: "A", snippet: LONG_BODY }],
+    });
+
+    const result = await runResearchAgent(vaultRoot, validBrief(), {
+      save_sources: false,
+      adapters: { firecrawl: fc },
+    });
+
+    expect(result.notes_created.length).toBe(1);
+    expect(result.notes_created[0].vault_path).toMatch(/^urn:cns:chain:ephemeral:/);
+    expect(await readGovernedDir(vaultRoot)).toEqual([]);
+  });
+
+  it("does not call ingest pipeline when save_sources is false", async () => {
+    const vaultRoot = await makeVault();
+    let firecrawlSearchCalls = 0;
+    const fc = makeFirecrawl({
+      search: async () => {
+        firecrawlSearchCalls++;
+        return [{ url: "https://example.com/probe", title: "P", snippet: LONG_BODY }];
+      },
+    });
+
+    await runResearchAgent(vaultRoot, validBrief(), { adapters: { firecrawl: fc } });
+
+    // Audit log must not contain a per-note `ingest_pipeline` line because the
+    // ingest pipeline was never invoked for the (memory-only) acquisition tier.
+    const logBody = await readFile(
+      path.join(vaultRoot, "_meta", "logs", "agent-log.md"),
+      "utf8",
+    );
+    expect(logBody).toContain("research_sweep");
+    expect(logBody).not.toContain("ingest_pipeline");
+    expect(firecrawlSearchCalls).toBe(1);
   });
 });
 
