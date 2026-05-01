@@ -8,6 +8,9 @@
  *   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \
  *   tsx scripts/run-chain.ts
  *
+ * Apify: canonical env is APIFY_API_TOKEN. APIFY_TOKEN is accepted as a deprecated alias
+ * (e.g. Apify MCP / Claude `claude mcp add -e APIFY_TOKEN=…`).
+ *
  * Select a brief with CNS_BRIEF_TOPIC, --brief-file, or --topic/--query.
  *
  * Default output is compact, secret-safe smoke evidence. Use --raw-json only
@@ -197,6 +200,8 @@ function printHelp(): void {
   CNS_BRIEF_TOPIC="freelance consulting day rate calculation methodology 2026" \\
   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \\
   tsx scripts/run-chain.ts [--brief-file brief.json] [--evidence-file path] [--operator-note text]
+
+Apify token: set APIFY_API_TOKEN (canonical) or APIFY_TOKEN (deprecated alias).
 
 Options:
   --brief-file path          Read a ResearchBrief JSON file: topic, queries, depth, optional tags.
@@ -513,6 +518,28 @@ export function assertRequiredEnvKeys(
   throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
 }
 
+/**
+ * Apify bearer for live chain: canonical `APIFY_API_TOKEN`; `APIFY_TOKEN` is a deprecated
+ * alias (common in Apify MCP operator docs). If only the alias is set, its value is used.
+ */
+export function resolveApifyApiToken(env: NodeJS.ProcessEnv = process.env): string {
+  const canonical = normalizeSecretEnv(env.APIFY_API_TOKEN);
+  if (canonical.length > 0) return canonical;
+  return normalizeSecretEnv(env.APIFY_TOKEN);
+}
+
+/** Fail-fast env check for scripts/run-chain.ts (Firecrawl, Anthropic, Apify with alias). */
+export function assertChainLiveRequiredEnv(env: NodeJS.ProcessEnv = process.env): void {
+  const missing: string[] = [];
+  if ((env.FIRECRAWL_API_KEY?.trim() ?? "").length === 0) missing.push("FIRECRAWL_API_KEY");
+  if ((env.ANTHROPIC_API_KEY?.trim() ?? "").length === 0) missing.push("ANTHROPIC_API_KEY");
+  if (resolveApifyApiToken(env).length === 0) {
+    missing.push("APIFY_API_TOKEN (deprecated alias: APIFY_TOKEN)");
+  }
+  if (missing.length === 0) return;
+  throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+}
+
 export async function cleanStaleOutputNotesByPrefix(
   vaultRoot: string,
   opts: { prefixes?: readonly string[]; relDir?: string } = {},
@@ -714,13 +741,13 @@ async function main() {
   const brief = await loadBriefForRun(cli);
   let operatorNotes = [...cli.operatorNotes];
 
-  assertRequiredEnvKeys(["FIRECRAWL_API_KEY", "APIFY_API_TOKEN", "ANTHROPIC_API_KEY"]);
+  assertChainLiveRequiredEnv();
   console.log(
-    "Env validation: OK (required: FIRECRAWL_API_KEY, APIFY_API_TOKEN, ANTHROPIC_API_KEY)",
+    "Env validation: OK (required: FIRECRAWL_API_KEY, APIFY_API_TOKEN or APIFY_TOKEN alias, ANTHROPIC_API_KEY)",
   );
 
   const firecrawlKey = normalizeSecretEnv(process.env.FIRECRAWL_API_KEY);
-  const apifyToken = normalizeSecretEnv(process.env.APIFY_API_TOKEN);
+  const apifyToken = resolveApifyApiToken();
   const scraplingCommand = (process.env.SCRAPLING_COMMAND?.trim() || "scrapling");
   const scraplingAvailable = commandAvailable(scraplingCommand);
 

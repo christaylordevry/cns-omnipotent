@@ -552,6 +552,27 @@ describe("AC: perplexity-stub — graceful degradation", () => {
     expect(result.perplexity_answers_filed).toBe(0);
   });
 
+  it("perplexity probe tries later queries when earlier search throws", async () => {
+    const vaultRoot = await makeVault();
+    let calls = 0;
+    const perplexity: PerplexitySlot = {
+      available: true,
+      async search(q: string) {
+        calls += 1;
+        if (q === "first-fails") throw new CnsError("UNSUPPORTED", "bad");
+        return { answer: "ok", citations: [] };
+      },
+    };
+    const result = await runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["first-fails", "second-works"] }),
+      { adapters: { perplexity } },
+    );
+    expect(calls).toBe(4);
+    expect(result.perplexity_skipped).toBe(false);
+    expect(result.perplexity_answers_filed).toBe(1);
+  });
+
   it("orchestrator sets perplexity_skipped=false when slot succeeds", async () => {
     const vaultRoot = await makeVault();
     const perplexity: PerplexitySlot = {

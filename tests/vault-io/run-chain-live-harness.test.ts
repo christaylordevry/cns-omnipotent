@@ -6,8 +6,10 @@ import {
   cleanStaleChainNotes,
   cleanStaleOutputNotesByPrefix,
   DEFAULT_BRIEF_TOPIC,
+  assertChainLiveRequiredEnv,
   assertRequiredEnvKeys,
   computeChainRunSummary,
+  resolveApifyApiToken,
   exitCodeForChainRunSummary,
   loadBriefForRun,
   validatePersistedSynthesisPake,
@@ -339,5 +341,32 @@ describe("run-chain live harness helpers", () => {
         { FIRECRAWL_API_KEY: "x", APIFY_API_TOKEN: "y", ANTHROPIC_API_KEY: "" },
       ),
     ).toThrow("Missing required environment variables: ANTHROPIC_API_KEY");
+  });
+
+  it("assertChainLiveRequiredEnv accepts APIFY_TOKEN when APIFY_API_TOKEN is unset", () => {
+    expect(() =>
+      assertChainLiveRequiredEnv({
+        FIRECRAWL_API_KEY: "a",
+        ANTHROPIC_API_KEY: "b",
+        APIFY_TOKEN: "from-alias",
+      }),
+    ).not.toThrow();
+    expect(
+      resolveApifyApiToken({
+        APIFY_TOKEN: "from-alias",
+      }),
+    ).toBe("from-alias");
+    expect(
+      resolveApifyApiToken({
+        APIFY_API_TOKEN: "canonical",
+        APIFY_TOKEN: "alias-ignored",
+      }),
+    ).toBe("canonical");
+  });
+
+  it("assertChainLiveRequiredEnv aggregates missing keys including Apify canonical+alias", () => {
+    expect(() => assertChainLiveRequiredEnv({})).toThrow(
+      "Missing required environment variables: FIRECRAWL_API_KEY, ANTHROPIC_API_KEY, APIFY_API_TOKEN (deprecated alias: APIFY_TOKEN)",
+    );
   });
 });

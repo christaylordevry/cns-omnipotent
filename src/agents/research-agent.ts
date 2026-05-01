@@ -564,12 +564,15 @@ export async function scraplingSweep(
 
 async function perplexityProbe(slot: PerplexitySlot, brief: ResearchBrief): Promise<boolean> {
   if (!slot.available) return true;
-  try {
-    await slot.search(brief.queries[0]);
-    return false;
-  } catch {
-    return true;
+  for (const query of brief.queries) {
+    try {
+      await slot.search(query);
+      return false;
+    } catch {
+      /* try next query; perplexity_skipped only if all fail */
+    }
   }
+  return true;
 }
 
 function canonUrlKey(raw: string): string | null {

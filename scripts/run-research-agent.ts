@@ -1,6 +1,6 @@
 /**
  * Live test runner for runResearchAgent() using real Firecrawl and Perplexity (MCP) adapters.
- * Apify is skipped — no APIFY_TOKEN found in env.
+ * Apify is not wired here (use scripts/run-chain.ts with APIFY_API_TOKEN or deprecated APIFY_TOKEN).
  *
  * Usage:
  *   CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" \
