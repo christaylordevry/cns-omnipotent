@@ -12,6 +12,8 @@ import {
   firecrawlQueryAdapterFailureUri,
   apifyQueryAdapterFailureUri,
   scraplingQueryAdapterFailureUri,
+  scraplingSkippedNonUrlUri,
+  queryLooksLikeScraplingUrl,
   perplexityAnswerSourceUri,
   isSocialDomain,
   SOCIAL_DOMAINS,
@@ -427,9 +429,13 @@ describe("AC: scrapling — stealthy-fetch as third tier", () => {
       },
     });
 
-    const run = runResearchAgent(vaultRoot, validBrief({ queries: ["tier-order"] }), {
-      adapters: { firecrawl: fc, apify, scrapling },
-    });
+    const run = runResearchAgent(
+      vaultRoot,
+      validBrief({ queries: ["https://scrapling.example/tier-order"] }),
+      {
+        adapters: { firecrawl: fc, apify, scrapling },
+      },
+    );
 
     await tick();
     expect(events).toContain("firecrawl:start");
@@ -446,7 +452,7 @@ describe("AC: scrapling — stealthy-fetch as third tier", () => {
 
     const fcEnd = events.indexOf("firecrawl:end");
     const apEnd = events.indexOf("apify:end");
-    const scrap = events.indexOf("scrapling:tier-order");
+    const scrap = events.indexOf("scrapling:https://scrapling.example/tier-order");
     expect(fcEnd).toBeGreaterThanOrEqual(0);
     expect(apEnd).toBeGreaterThanOrEqual(0);
     expect(scrap).toBeGreaterThan(Math.max(fcEnd, apEnd));
@@ -455,30 +461,31 @@ describe("AC: scrapling — stealthy-fetch as third tier", () => {
 
   it("skips short Scrapling bodies via quality gate", async () => {
     const vaultRoot = await makeVault();
+    const shortUrl = "https://scrapling.example/q-short";
     const scrapling = makeScrapling({
-      stealthyFetch: async (query) => [
-        { url: `https://scrapling.example/${query}`, text: "too short" },
-      ],
+      stealthyFetch: async (query) => [{ url: query, text: "too short" }],
     });
 
-    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q"] }), {
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: [shortUrl] }), {
       adapters: { scrapling },
     });
 
     expect(result.notes_created.length).toBe(0);
     expect(result.notes_skipped).toEqual([
-      { source_uri: "https://scrapling.example/q", reason: "quality_gate" },
+      { source_uri: shortUrl, reason: "quality_gate" },
     ]);
   });
 
   it("continues Scrapling sweep when one query throws", async () => {
     const vaultRoot = await makeVault();
+    const goodUrl = "https://scrapling.example/good";
+    const badUrl = "https://scrapling.example/bad";
     const scrapling = makeScrapling({
       stealthyFetch: async (query) => {
-        if (query === "bad") throw new Error("scrapling broke");
+        if (query === badUrl) throw new Error("scrapling broke");
         return [
           {
-            url: `https://scrapling.example/${query}`,
+            url: query,
             text: `# ${query}\n\n${LONG_BODY}`,
           },
         ];
@@ -487,14 +494,42 @@ describe("AC: scrapling — stealthy-fetch as third tier", () => {
 
     const result = await runResearchAgent(
       vaultRoot,
-      validBrief({ queries: ["good", "bad"], depth: "standard" }),
+      validBrief({ queries: [goodUrl, badUrl], depth: "standard" }),
       { adapters: { scrapling } },
     );
 
     expect(result.notes_created.length).toBe(1);
     expect(result.notes_created[0].source).toBe("scrapling");
     expect(result.notes_skipped).toEqual([
-      { source_uri: scraplingQueryAdapterFailureUri("bad"), reason: "fetch_error" },
+      { source_uri: scraplingQueryAdapterFailureUri(badUrl), reason: "fetch_error" },
+    ]);
+  });
+
+  it("skips non-URL multi-word queries without calling Scrapling (SCRAPLING_SKIPPED_NON_URL)", async () => {
+    const vaultRoot = await makeVault();
+    const stealthyCalls: string[] = [];
+    const scrapling = makeScrapling({
+      stealthyFetch: async (query) => {
+        stealthyCalls.push(query);
+        return [{ url: "https://example.com/oops", text: `# ${query}\n\n${LONG_BODY}` }];
+      },
+    });
+
+    const query = "foo bar baz";
+    expect(queryLooksLikeScraplingUrl(query)).toBe(false);
+
+    const swept = await scraplingSweep(vaultRoot, validBrief({ queries: [query] }), scrapling, {
+      surface: "test",
+      profile: { firecrawlLimit: 5, firecrawlScrape: false, apifyLimit: 5, scraplingLimit: 5 },
+    });
+
+    expect(stealthyCalls).toEqual([]);
+    expect(swept.created).toEqual([]);
+    expect(swept.skipped).toEqual([
+      {
+        source_uri: scraplingSkippedNonUrlUri(query),
+        reason: "scrapling_skipped_non_url",
+      },
     ]);
   });
 });
@@ -860,15 +895,20 @@ describe("AC: tests — composite scenarios", () => {
         { url: "https://scrapling.example/solo", text: `# Solo\n\n${LONG_BODY}` },
       ],
     });
-    const directScrapling = await scraplingSweep(vault3, validBrief(), scrapling, {
-      surface: "unit-test",
-      profile: {
-        firecrawlLimit: 5,
-        firecrawlScrape: false,
-        apifyLimit: 5,
-        scraplingLimit: 5,
+    const directScrapling = await scraplingSweep(
+      vault3,
+      validBrief({ queries: ["https://scrapling.example/solo"] }),
+      scrapling,
+      {
+        surface: "unit-test",
+        profile: {
+          firecrawlLimit: 5,
+          firecrawlScrape: false,
+          apifyLimit: 5,
+          scraplingLimit: 5,
+        },
       },
-    });
+    );
 
     expect(directScrapling.created.length).toBe(1);
     expect(directScrapling.created[0].source).toBe("scrapling");
@@ -1291,13 +1331,14 @@ describe("AC: save_sources — default off keeps acquisition tiers in memory", (
     const scrapling = makeScrapling({
       stealthyFetch: async (query) => [
         {
-          url: `https://scrapling.example/${query}`,
+          url: query,
           text: `# ${query}\n\n${LONG_BODY}`,
         },
       ],
     });
 
-    const result = await runResearchAgent(vaultRoot, validBrief({ queries: ["q"] }), {
+    const scrapUrl = "https://scrapling.example/ephemeral-q";
+    const result = await runResearchAgent(vaultRoot, validBrief({ queries: [scrapUrl] }), {
       adapters: { scrapling },
     });
 

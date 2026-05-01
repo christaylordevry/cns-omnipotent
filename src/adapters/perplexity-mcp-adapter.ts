@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import process from "node:process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { PerplexityResult } from "../agents/perplexity-slot.js";
@@ -42,11 +43,32 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+/** Best-effort kill when connect/callTool times out so hung stdio children do not accumulate. */
+function killStdioTransportChild(transport: StdioClientTransport): void {
+  const pid = transport.pid;
+  if (pid != null && pid > 0) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* ESRCH or permission — ignore */
+    }
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+  onTimeout?: () => void,
+): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   return new Promise<T>((resolve, reject) => {
     const t = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+      try {
+        onTimeout?.();
+      } finally {
+        reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+      }
     }, timeoutMs);
     promise.then(
       (value) => {
@@ -158,7 +180,9 @@ export function buildPerplexityMcpAdapter(
       });
       const client = new Client({ name: "cns-perplexity-adapter", version: "0.0.0" });
       try {
-        await withTimeout(client.connect(transport), timeoutMs, "Perplexity MCP connect");
+        await withTimeout(client.connect(transport), timeoutMs, "Perplexity MCP connect", () =>
+          killStdioTransportChild(transport),
+        );
         const result = await withTimeout(
           client.callTool({
           name: toolName,
@@ -166,6 +190,7 @@ export function buildPerplexityMcpAdapter(
           }),
           timeoutMs,
           "Perplexity MCP callTool",
+          () => killStdioTransportChild(transport),
         );
 
         if ("isError" in result && result.isError === true) {
@@ -178,8 +203,7 @@ export function buildPerplexityMcpAdapter(
         const summary = compactFailure(errorMessage(err));
         throw new Error(summary, { cause: err });
       } finally {
-        await withTimeout(client.close().catch(() => undefined), timeoutMs, "Perplexity MCP close")
-          .catch(() => undefined);
+        await client.close().catch(() => undefined);
       }
     },
   };

@@ -24,6 +24,8 @@ export const skipReasonSchema = z.enum([
   "conflict",
   "fetch_error",
   "quality_gate",
+  /** Brief query is not URL-shaped; Scrapling tier skips without calling stealthy_fetch (PATCH 3). */
+  "scrapling_skipped_non_url",
 ]);
 export type SkipReason = z.infer<typeof skipReasonSchema>;
 
@@ -100,6 +102,35 @@ function apifyQualityGateSnippetUri(query: string, index: number): string {
 /** Synthetic `source_uri` when the Scrapling stealthy-fetch adapter throws for a query. */
 export function scraplingQueryAdapterFailureUri(query: string): string {
   return `urn:cns:research-sweep:scrapling:query:${encodeURIComponent(query)}`;
+}
+
+/**
+ * Synthetic provenance when a brief query is skipped as non-URL before Scrapling
+ * (`SCRAPLING_SKIPPED_NON_URL` sweep manifest entry).
+ */
+export function scraplingSkippedNonUrlUri(query: string): string {
+  return `urn:cns:research-sweep:scrapling:skipped-non-url:${encodeURIComponent(query)}`;
+}
+
+function looksLikeAbsoluteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+/**
+ * True when the string should be passed to Scrapling as a URL (matches positive branches of
+ * `normalizeScraplingUrlInput` in the adapter — multi-word topic strings return false).
+ */
+export function queryLooksLikeScraplingUrl(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return false;
+  if (looksLikeAbsoluteHttpUrl(trimmed)) return true;
+  if (trimmed.startsWith("?") || trimmed.startsWith("&")) return true;
+  if (trimmed.startsWith("//")) return true;
+  if (/^www\./i.test(trimmed)) return true;
+  if (!/\s/.test(trimmed) && /^[a-z0-9.-]+\.[a-z]{2,}(\/|$|\?)/i.test(trimmed)) {
+    return true;
+  }
+  return false;
 }
 
 function scraplingQualityGateSnippetUri(query: string, index: number): string {
@@ -471,6 +502,14 @@ export async function scraplingSweep(
   const saveSources = opts.save_sources === true;
 
   for (const query of brief.queries) {
+    if (!queryLooksLikeScraplingUrl(query)) {
+      skipped.push({
+        source_uri: scraplingSkippedNonUrlUri(query),
+        reason: "scrapling_skipped_non_url",
+      });
+      continue;
+    }
+
     let pages: ScraplingFetchResult[];
     try {
       pages = await adapter.stealthyFetch(query, { limit: opts.profile.scraplingLimit });
