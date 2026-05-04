@@ -13,6 +13,9 @@
 # generated export bundles (NotebookLM / operator artifacts)
 scripts/output/
 
+# Hermes morning digest Mode B inbox captures (operator-local; Story 26-7)
+Knowledge-Vault-ACTIVE/00-Inbox/hermes-morning-digest-*.md
+
 # node / python common
 node_modules/
 dist/

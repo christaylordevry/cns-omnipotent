@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-04-30
+modified: 2026-05-04
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -387,6 +387,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-30 | 1.12.0 | Added pointer to MCP operator runbook, standard smoke procedure, and key rotation checklist | 24-1-mcp-operator-runbook-env-rotation-smoke-parity |
 | 2026-04-30 | 1.13.0 | Documented Brain deeper retrieval ranking: PAKE type preference, manifest stale-sample penalty, and `--explain` score components | 23-1-brain-service-deeper-retrieval |
 | 2026-04-30 | 1.14.0 | Documented `--save-sources` opt-in flag, default memory-only acquisition, and the three-governed-note vault footprint (zero inbox orphans after a successful run) | 25-1-stop-writing-sourcenotes-by-default |
+| 2026-05-04 | 1.15.0 | Hermes Epic 26: `#hermes` Discord binding recap, morning digest (Mode B inbox), WSL `CRON_TZ=Australia/Sydney` launcher, Hermes cron job install, gateway failure posture | 26-5-hermes-discord-channel-and-bot, 26-7-hermes-daily-digest-cron-aedt |
 
 ---
 
@@ -516,3 +517,47 @@ Routing fallback events append to `AI-Context/agent-log.md` in the format:
 ```
 
 The file must pre-exist (the routing layer does not create it). Silent-tier events are still written to the audit log.
+
+---
+
+## 15. Hermes (Epic 26, operator)
+
+Hermes is a separate agent stack from Nexus. It uses the **Hermes Discord gateway** (`hermes gateway run`) for `#hermes`, not the Nexus bridge.
+
+### 15.1 Discord `#hermes` (HI-5 recap)
+
+| Item | Value (metadata only; not secrets) |
+|------|--------------------------------------|
+| Purpose | Dedicated Hermes traffic surface |
+| Server (guild) ID | `1484880486122913802` |
+| `#hermes` channel ID | `1500733488897462382` |
+| Token in `.env.live-chain` | `HERMES_DISCORD_TOKEN` (export `DISCORD_BOT_TOKEN="$HERMES_DISCORD_TOKEN"` before `hermes gateway run`) |
+| Listen scope | `~/.hermes/config.yaml`: `discord.allowed_channels` and `discord.free_response_channels` set to the `#hermes` channel ID |
+| Upstream docs | [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/) |
+
+Discord Developer Portal must enable **Message Content Intent** for the Hermes application when upstream returns `PrivilegedIntentsRequired`.
+
+### 15.2 Morning digest (HI-7, 07:00 Australia/Sydney)
+
+**Vault persistence mode:** **Mode B (inbox file).** `vault_append_daily` in the Vault IO MCP server keys the daily note filename from **UTC** `YYYY-MM-DD` only. At 07:00 civil time in `Australia/Sydney`, the Sydney calendar date can differ from the UTC date, so this digest uses **direct filesystem write** under `00-Inbox/` only: `00-Inbox/hermes-morning-digest-YYYY-MM-DD.md` where the date is computed in `Australia/Sydney`. Governed folders are not touched without Vault IO MCP.
+
+| Artifact | Path (under CNS implementation repo unless noted) |
+|----------|-----------------------------------------------------|
+| Digest prompt (normative text) | `scripts/hermes-morning-digest-prompt.md` |
+| Sydney date inject script (source) | `scripts/hermes-morning-digest-date-inject.py` (copied to `~/.hermes/scripts/` by install; Hermes `--script` requires filename-only under `~/.hermes/scripts/`) |
+| Launcher (WSL cron calls this) | `scripts/hermes-morning-digest.sh` |
+| One-time job registration | `scripts/install-hermes-morning-digest-job.sh` creates the Hermes cron job (`--deliver discord`, dummy Hermes schedule) and writes the job id to `~/.hermes/morning-digest-cron-job-id` |
+
+**Gateway dependency:** The digest job is delivered through Hermes with `--deliver discord`. If **`hermes gateway status`** does not show a running gateway, `scripts/hermes-morning-digest.sh` **exits 1** and does not run the job (no Discord delivery and no new digest run in that window). After a run, the launcher checks for the inbox file; if it is missing, the script **exits 2** (agent did not satisfy Mode B).
+
+**WSL limitation:** User `crontab` does not run when WSL or the host is off. Same class of limitation as other WSL automation; use tmux or systemd user units for gateway persistence per Hermes docs.
+
+**Exact WSL crontab line (env var names only; no secrets):**
+
+```cron
+0 7 * * * CRON_TZ=Australia/Sydney /usr/bin/env bash -lc 'mkdir -p "$HOME/.hermes/logs" && /home/christ/ai-factory/projects/Omnipotent.md/scripts/hermes-morning-digest.sh >>"$HOME/.hermes/logs/morning-digest-cron.log" 2>&1'
+```
+
+Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the Hermes job once before relying on cron: `bash scripts/install-hermes-morning-digest-job.sh` from the repo root (requires `.env.live-chain` with `HERMES_DISCORD_TOKEN`). **Re-run the install script** after editing `scripts/hermes-morning-digest-prompt.md` so the Hermes-stored job text picks up changes.
+
+**Evidence discipline:** Keep redacted Discord links or channel IDs only; never commit tokens or `.env` bodies.
