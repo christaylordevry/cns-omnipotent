@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-04
+modified: 2026-05-05
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -303,7 +303,7 @@ Run `bash scripts/verify.sh` before claiming any story done. It is the completio
 3. Determine the correct `pake_type` and destination folder.
 4. Create the governed note via `vault_create_note` with full PAKE frontmatter in the target directory.
 5. Confirm the audit log entry in `_meta/logs/agent-log.md`.
-6. Delete or archive the original inbox capture.
+6. Clean up the original inbox capture only through a safe path: governed relocation with `vault_move`, or human-only removal outside agent automation. Agents must not delete, discard, archive, run `rm`, or silently unlink Inbox captures.
 
 ### b. Research cycle
 
@@ -388,6 +388,12 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-04-30 | 1.13.0 | Documented Brain deeper retrieval ranking: PAKE type preference, manifest stale-sample penalty, and `--explain` score components | 23-1-brain-service-deeper-retrieval |
 | 2026-04-30 | 1.14.0 | Documented `--save-sources` opt-in flag, default memory-only acquisition, and the three-governed-note vault footprint (zero inbox orphans after a successful run) | 25-1-stop-writing-sourcenotes-by-default |
 | 2026-05-04 | 1.15.0 | Hermes Epic 26: `#hermes` Discord binding recap, morning digest (Mode B inbox), WSL `CRON_TZ=Australia/Sydney` launcher, Hermes cron job install, gateway failure posture | 26-5-hermes-discord-channel-and-bot, 26-7-hermes-daily-digest-cron-aedt |
+| 2026-05-04 | 1.16.0 | Hermes Epic 27: added `/triage` read-only entrypoint contract (bounded `00-Inbox/` previews, explicit “mutations disabled” default, no approvals in this slice) | 27-1-define-hermes-triage-skill-entrypoint-and-safe-defaults |
+| 2026-05-04 | 1.17.0 | Hermes `/triage`: recursive `00-Inbox/` listing, deterministic newest-first ordering, default page size 10 with `--offset` paging, optional scoped `vault_search` keyword narrowing (`scope`=`00-Inbox/`), paging footer copy | 27-2-candidate-discovery-for-00-inbox-with-scoped-listing |
+| 2026-05-04 | 1.18.0 | Hermes `/triage`: adds read-only routing suggestions per candidate using `pake_type` when present, filename/path heuristics when missing, and age buckets from `modified` timestamps | 27-3-routing-suggestions-via-heuristics-pake-type-filename-pattern-age |
+| 2026-05-04 | 1.19.0 | Hermes triage approvals: add non-mutating per-item approval command (`/approve <00-Inbox/path.md> --to <destination_dir>/`) with explicit “approved for later execution only” acknowledgment; overrides supported by editing destination | 27-4-discord-approval-interaction-pattern-per-item-approve-override |
+| 2026-05-04 | 1.20.0 | Hermes triage execution: add `/execute-approved <00-Inbox/path.md> --to <destination_dir>/`, deriving destination path and calling `vault_move` once so the existing audit trail records the move | 27-5-execute-approved-moves-via-vault-io-vault-move-with-audit-trail |
+| 2026-05-05 | 1.21.0 | Hermes triage discard safety: maps discard/delete/archive vocabulary to governed relocation via `/execute-approved` and `vault_move`, or human-only removal outside Hermes; no automated deletion, truncation, shell `rm`, or bulk unlink | 27-6-discard-policy-and-non-destructive-guarantees |
 
 ---
 
@@ -561,3 +567,48 @@ Discord Developer Portal must enable **Message Content Intent** for the Hermes a
 Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the Hermes job once before relying on cron: `bash scripts/install-hermes-morning-digest-job.sh` from the repo root (requires `.env.live-chain` with `HERMES_DISCORD_TOKEN`). **Re-run the install script** after editing `scripts/hermes-morning-digest-prompt.md` so the Hermes-stored job text picks up changes.
 
 **Evidence discipline:** Keep redacted Discord links or channel IDs only; never commit tokens or `.env` bodies.
+
+### 15.3 Inbox triage (`/triage`, Epic 27)
+
+`/triage` is the **read-only** Hermes entrypoint for Inbox review in `#hermes`.
+
+**Operator usage (Discord `#hermes`):**
+
+- **Browse (first page):** `/triage`
+- **Next page:** `/triage --offset <n>` where `<n>` is the start index after sorting (default page size **10**). The bot’s **Paging** footer repeats the exact command for the next slice.
+- **Keyword narrowing (optional):** `/triage <one literal phrase>` — may invoke **`vault_search`** with **`scope` exactly `00-Inbox/`** and `max_results` ≤ **50**, intersected with markdown files found under Inbox. Combine with paging: e.g. `/triage --offset 10 roadmap`.
+- **Approve one item for later move (non-mutating, Story 27.4):** `/approve <00-Inbox/path.md> --to <destination_dir>/`
+  - Override is done by editing `<destination_dir>/` in the command (it may differ from the routing suggestion).
+  - Approval is **not execution**: no notes are moved or edited.
+- **Execute one approved move (governed mutation, Story 27.5):** `/execute-approved <00-Inbox/path.md> --to <destination_dir>/`
+  - Hermes derives `destination_path` as `<destination_dir>/<basename(source_path)>`, then calls `vault_move` exactly once.
+  - On success, `vault_move` emits the audit line in `_meta/logs/agent-log.md`; Hermes must not call `vault_log_action` separately.
+  - The command must have exactly four ASCII-whitespace-split tokens; Hermes rejects extra text before any Vault IO call.
+- For `/triage`, Hermes replies with:
+  - session header (ISO 8601 UTC timestamp + per-run session id)
+  - a **page** of candidates from `00-Inbox/` **including subfolders** (recursive listing), paths + short excerpts (≤ **400** characters each)
+  - a read-only **routing suggestion** per candidate (advisory only, no moves)
+  - a **Paging** footer: total matching markdown count after filters, current offset, page size, whether more pages exist, and how to request the next page
+
+**Discovery rules (normative text lives in the skill mirror):**
+
+- **Recursive census:** `vault_list` with `path: "00-Inbox/"`, `recursive: true`; candidates are **markdown files only** (`.md`).
+- **Order:** newest **`modified`** first (ISO from `vault_list`); ties break by **`vaultPath`** ascending.
+- **Invalid `--offset`:** one clear error reply; **no** vault reads.
+- **Routing suggestions:** Hermes may call `vault_read_frontmatter` to read `pake_type` and suggest a destination (Phase 1 defaults). If `pake_type` is missing, Hermes applies deterministic filename/path heuristics and labels confidence (`low|medium|high`), plus an age bucket (`fresh|recent|stale`) derived from `modified`.
+
+**Guardrails (this slice):**
+
+- **Preview and approval are non-mutating.** No moves, renames, discards, frontmatter updates, daily appends, or audit writes occur during `/triage` or `/approve`.
+- **Approvals are non-mutating.** `/approve` records intent only and must respond with an explicit “approved for later execution only; no actions taken”.
+- **Execution is narrow.** `/execute-approved` can move exactly one Inbox markdown file through `vault_move`; there is no bulk move, delete, discard, or archive behavior.
+- **Discard / delete / archive vocabulary is safety-mapped.** In Hermes triage, those words never mean silent destruction. The automated path is governed relocation: `/execute-approved <00-Inbox/path.md> --to <destination_dir>/` calls exactly one `vault_move` to an explicit operator-chosen destination. Permanent removal is human-only outside Hermes.
+- **Scope is Inbox-only.** Listing and optional search stay within **`00-Inbox/`** (no full-vault scans for triage).
+
+**Skill install (operator filesystem):**
+
+- Repo mirror: `scripts/hermes-skill-examples/triage/`
+- Install helper: `bash scripts/install-hermes-skill-triage.sh`
+- Destination: `~/.hermes/skills/cns/triage/`
+
+**Routing note:** Hermes upstream supports per-channel skill bindings (see HI-6). Bind `#hermes` to skill `triage` in `~/.hermes/config.yaml` if needed; reference: `~/.hermes/skills/cns/triage/references/config-snippet.md`.
