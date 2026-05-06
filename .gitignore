@@ -10,6 +10,9 @@
 .ralph/loop.lock
 .ralph/**/loop.lock
 
+# local Claude worktrees
+.claude/worktrees/
+
 # generated export bundles (NotebookLM / operator artifacts)
 scripts/output/
 

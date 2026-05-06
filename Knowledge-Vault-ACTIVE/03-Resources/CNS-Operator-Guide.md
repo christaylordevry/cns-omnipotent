@@ -394,6 +394,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-04 | 1.19.0 | Hermes triage approvals: add non-mutating per-item approval command (`/approve <00-Inbox/path.md> --to <destination_dir>/`) with explicit “approved for later execution only” acknowledgment; overrides supported by editing destination | 27-4-discord-approval-interaction-pattern-per-item-approve-override |
 | 2026-05-04 | 1.20.0 | Hermes triage execution: add `/execute-approved <00-Inbox/path.md> --to <destination_dir>/`, deriving destination path and calling `vault_move` once so the existing audit trail records the move | 27-5-execute-approved-moves-via-vault-io-vault-move-with-audit-trail |
 | 2026-05-05 | 1.21.0 | Hermes triage discard safety: maps discard/delete/archive vocabulary to governed relocation via `/execute-approved` and `vault_move`, or human-only removal outside Hermes; no automated deletion, truncation, shell `rm`, or bulk unlink | 27-6-discard-policy-and-non-destructive-guarantees |
+| 2026-05-05 | 1.22.0 | Hermes session close: adds `/session-close` to refresh AGENTS.md Section 8 from sprint status and recent story artifacts, run the NotebookLM vault export, and fan out the export with `source_add` | 28-1-automate-agents-md-section-8-via-hermes-session-close |
 
 ---
 
@@ -612,3 +613,37 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
 - Destination: `~/.hermes/skills/cns/triage/`
 
 **Routing note:** Hermes upstream supports per-channel skill bindings (see HI-6). Bind `#hermes` to skill `triage` in `~/.hermes/config.yaml` if needed; reference: `~/.hermes/skills/cns/triage/references/config-snippet.md`.
+
+### 15.4 Session close (`/session-close`, Epic 28)
+
+`/session-close` is the Hermes closure command for keeping the operator-facing sprint narrative and NotebookLM sources fresh at the end of a work session.
+
+**Operator usage (Discord `#hermes`):**
+
+- **Real close:** `/session-close`
+- **Preview only:** `/session-close --dry-run`
+
+**What the skill does:**
+
+- Resolves the Omnipotent repo from absolute `OMNIPOTENT_REPO`; if unset, falls back to `/home/christ/ai-factory/projects/Omnipotent.md`.
+- Selects the three newest story artifacts matching `{epic}-{story}-*.md`, excluding handoffs and retros.
+- Rewrites `AGENTS.md` **Section 8** from `## 8. Current Focus` to just before `## 9. Agent Behavior Guidelines`.
+- Syncs the repo mirror and canonical vault constitution byte-for-byte:
+  - `specs/cns-vault-contract/AGENTS.md`
+  - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
+- Runs `bash scripts/export-vault-for-notebooklm.sh`.
+- Reads the NotebookLM project map and calls `source_add` once per active mapped notebook with `notebook_id`, `source_name: "My Knowledge Base"`, `source_type: "file"`, and `file_path` pointing at the fresh export file. If the active map lacks IDs, the live proof must record the connector-accepted fallback.
+
+**Guardrails:**
+
+- Do not use Vault IO mutators for `AI-Context/AGENTS.md`. WriteGate protects `AI-Context/**`, so the skill uses operator filesystem edits for the constitution sync and records that boundary in its reply.
+- Vault IO use is read-only for project map discovery: `vault_read`, `vault_search`, `vault_list`, and `vault_read_frontmatter`.
+- Dry-run never writes AGENTS files, runs export, or calls `source_add`.
+- If NotebookLM MCP tools are unavailable, the skill reports the fan-out as blocked and does not invent `source_add` results.
+
+**Skill install (operator filesystem):**
+
+- Repo mirror: `scripts/hermes-skill-examples/session-close/`
+- Install helper: `bash scripts/install-hermes-skill-session-close.sh`
+- Destination: `~/.hermes/skills/cns/session-close/`
+- Binding: add `session-close` to the existing `#hermes` `discord.channel_skill_bindings` list beside `hermes-url-ingest-vault` and `triage`.

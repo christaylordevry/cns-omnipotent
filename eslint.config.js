@@ -8,6 +8,7 @@ const ignores = [
   "node_modules/**",
   "Knowledge-Vault-ACTIVE/**",
   ".ralph/**",
+  ".claude/worktrees/**",
   "package-lock.json",
 ];
 

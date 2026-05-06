@@ -97,6 +97,7 @@ Notes:
 - Override the vault root with `CNS_VAULT_ROOT` when needed.
 - The script outputs: `scripts/output/vault-export-for-notebooklm.md`
 - Before uploading, check file size against current NotebookLM source limits in the product UI.
+- Upload vault-wide exports with `source_add` using `notebook_id` when available, `source_name: "My Knowledge Base"`, `source_type: "file"`, and an absolute `file_path` to `scripts/output/vault-export-for-notebooklm.md`.
 
 ## End to end smoke test (recommended)
 
@@ -106,4 +107,3 @@ For one mapped project:
 2. Create one InsightNote in the vault with citations.
 3. Verify PAKE frontmatter validity.
 4. Verify the Vault IO audit log line exists for the create (when using Vault IO MCP).
-

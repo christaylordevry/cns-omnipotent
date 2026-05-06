@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.9.1 | Last updated: 2026-04-18  
+> Version: 1.9.3 | Last updated: 2026-05-05  
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -202,7 +202,7 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
 | Context7            | MCP tool (auto-invoked)                     | Any code generation, library usage, API docs, setup or configuration steps |
 | Firecrawl           | MCP tool (Tier 1)                           | Scrape, crawl, map, or extract web content for research ingestion or source capture                 |
-| Perplexity          | MCP tool (Tier 1)                           | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
+| Perplexity          | MCP tool (Tier 1, tool: `mcp__perplexity__search`) | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
 | Apify               | MCP tool (Tier 1)                           | Apify Actors, RAG web browser, Apify Store scrapers; runs, datasets, and docs via hosted MCP      |
 
 ### How to Load a Module
@@ -222,16 +222,20 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Project Status
 
-- **CNS Phase 1: COMPLETE.** Epics 1–7.
-- **CNS Phase 2: COMPLETE.** Epics 8–13.
-- **CNS Phase 3: COMPLETE.** Epics 14–15. Multi-model routing layer shipped. 315 tests, verify.sh green as of 2026-04-16.
-- **CNS Phase 4: IN PROGRESS.** Tier 1 MCP stack (Firecrawl, Perplexity, Apify) and automated ingest pipeline (spec then implementation). Do not start agent chains or brand foundation until Tier 1 MCP is tested with real queries.
+- **CNS Phases 1–4: COMPLETE.** Epics 1–25 done. Tier 1 MCP (Firecrawl, Perplexity, Apify), automated ingest pipeline, multi-model routing, Brain service, NotebookLM integration, and research agent chain all shipped.
+- **CNS Phase 5: IN PROGRESS.** Hermes operator closure and session automation. Epic 26 (Hermes WSL2 install, Vault IO write path, Discord surface, daily digest, skill capture) and Epic 27 (Inbox triage skill, approve/execute-approved, non-destructive guarantees) are **done**. Epic 28 (automated AGENTS.md Section 8 via `/session-close`) is **in-progress**.
 
 ### Current Priorities
 
-1. **Epic 16 Tier 1 MCP (stories 16-1 to 16-3).** Install and configure Firecrawl, Perplexity, and Apify per story files in `_bmad-output/implementation-artifacts/`. Each story closes only after a **successful live tool call** through the MCP server (not only CLI registration or green `claude mcp list`). Keys: Perplexity API at [pplx.ai](https://pplx.ai) (not included in Pro subscription); `FIRECRAWL_API_KEY`; Apify token or OAuth for `https://mcp.apify.com`. Wire into Claude Code (`claude mcp` user scope) and Cursor (`~/.cursor/mcp.json`).
-2. **Epic 16 automated ingest (story 16-4).** Implement after 16-1 to 16-3: `specs/cns-vault-contract/CNS-Phase-4-Automated-Ingest-Pipeline-Spec.md` and vault routing for `00-Inbox/`, PAKE, master index.
-3. **AGENTS.md Section 8 maintenance.** Keep this section current after each session.
+1. **Story 28-1: Close `/session-close` review.** The Hermes session-close skill is built and this `/session-close` run constitutes its live verification. Close 28-1 after confirming AGENTS sync, export, and NotebookLM fan-out succeed. Skill package lives at `~/.hermes/skills/cns/session-close/`.
+2. **Epic 28 backlog.** No additional stories defined yet; scope future operator closure stories (e.g. dry-run polish, NotebookLM notebook ID persistence) once 28-1 is done.
+3. **AGENTS.md Section 8 and NotebookLM freshness.** Run `/session-close` at end of each session to keep this section current and vault sources in sync.
+
+### Recent Session Context
+
+- **28-1 (review):** `Automate AGENTS.md Section 8 via Hermes session-close` — skill package delivered (`~/.hermes/skills/cns/session-close/`), trigger surface wired to `#hermes`, task prompt covers sprint ingestion, artifact selection, filesystem AGENTS sync (both copies), export, and NotebookLM fan-out. In review pending live run evidence.
+- **27-7 (done):** `End-to-end verification: /triage -> approve -> execute -> move -> audit` — live Discord proof of full Epic 27 slice; `vault_move` governance and `_meta/logs/agent-log.md` correlation confirmed.
+- **27-4 (done):** `Discord approval interaction pattern (per-item approve + override)` — non-mutating `/approve` command defined; validation rules, acknowledgment shape, and Operator Guide §15.3 updated.
 
 ### Phase 2 Backlog (Sequenced, Not Active)
 
@@ -286,6 +290,8 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-05-05 | 1.9.3 | Story 28.1: Section 8 regenerated by Hermes `/session-close`; current focus now derives from sprint-status.yaml and recent story artifacts. Stale Phase 4/Epic 16 language replaced with Phase 5 / Epic 28 status. |
+| 2026-04-29 | 1.9.2 | Perplexity MCP tool naming made explicit (`mcp__perplexity__search`); Perplexity slot wiring is MCP-first. |
 | 2026-04-18 | 1.9.1 | **Section 5:** Tier 1 MCP routing for Nexus (same rules as IDE). **Section 9:** Perplexity negative guard (vault and established docs first). **Section 8:** Epic 16 story pointers; live tool-call bar for Tier 1 MCP. |
 | 2026-04-18 | 1.9.0 | **Section 7:** Tier 1 MCP rows (Firecrawl, Perplexity, Apify). **Section 9:** Perplexity routing rule. **Section 8:** Phase 4 in progress; priorities aligned to MCP verification and ingest pipeline spec. |
 | 2026-04-16 | 1.8.0 | Phase 3 complete; Context7 on all surfaces; Nexus model-pin fix documented |

@@ -852,3 +852,21 @@ I want **`scripts/run-chain.ts` to default to not persisting acquisition-tier no
 So that **vault hygiene stays intact while synthesis, hooks, and weapons-check still receive full research context**.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/25-1-stop-writing-sourcenotes-by-default.md` (default run: exactly three `03-Resources` outputs, zero SourceNotes, zero `00-Inbox` artifacts; `verify.sh` passes).
+
+---
+
+## Hermes track — Epic 28: Session-close automation (AGENTS §8 + NotebookLM export)
+
+**Goal:** One operator command at end of Hermes session refreshes constitution **Section 8** from sprint tracker + recent story artifacts, regenerates the NotebookLM vault export, and pushes it to all active notebooks per the vault project map.
+
+**Tracked in sprint-status as:** `epic-28`.
+
+### Story 28.1: Automate AGENTS.md Section 8 updates via Hermes session-close skill
+
+As an **operator**,
+
+I want **a `/session-close` Hermes skill under `~/.hermes/skills/cns/` that reads `sprint-status.yaml`, ingests the three most recent story artifacts, rewrites `AGENTS.md` §8 on both constitution paths, runs `scripts/export-vault-for-notebooklm.sh`, and calls `source_add` for each active notebook in `03-Resources/notebooklm-project-map.md`**,
+
+So that **session closure is repeatable**, **Current Focus stays truthful**, and **NotebookLM receives an up-to-date vault export without manual steps**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/28-1-automate-agents-md-section-8-via-hermes-session-close.md` (Hermes skill layout, WriteGate-aware AGENTS sync, export + NotebookLM fan-out, verification notes).
