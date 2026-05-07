@@ -629,7 +629,7 @@ Architecture selects a **TypeScript MCP package** scaffold. Per **user-value epi
 
 Epic 1 and Epic 2 are documentation- and vault-artifact–centric and do not require Vault IO code. Epic 3+ assume the TypeScript project exists (3.1). Epic 4–6 are code increments on the same server.
 
-**Workflow status:** Phase 1 (Epics 1–7) and Phase 2.0 (Epics 8–11) are tracked as **done** in `sprint-status.yaml` (2026-04-12). Epic **12** has Story **12.1** done and **12.2–12.8** in backlog for implementation after the Phase 2.1 Brain charter; Epics **13–14** remain planning-first slices. For the next workflow step, use **`/bmad:create-story`** for the next backlog slug under `epic-12` (see `sprint-status.yaml`), or **bmad-help** for a guided choice.
+**Workflow status:** Phase 1 (Epics 1–7) and Phase 2.0 (Epics 8–11) are tracked as **done** in `sprint-status.yaml` (2026-04-12). Epic **12** is also tracked as **done** (Stories **12.1–12.7** done; **12.8** recorded as superseded). Epics **13–14** remain planning-first slices. For the next workflow step, use **`/bmad:create-story`** for the next backlog slug under the current in-progress epic in `sprint-status.yaml`, or **bmad-help** for a guided choice.
 
 ---
 

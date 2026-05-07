@@ -155,6 +155,30 @@ The NotebookLM integration follows a six-step pipeline:
 5. **Perplexity fallback:** When `research_start` misses key sources, use Perplexity Deep Research to collect citation links, then feed them to NotebookLM via `source_add(source_type="url", url=...)`.
 6. **Cross-notebook:** Use `cross_notebook_query` for research that spans multiple projects. Route resulting InsightNotes to the correct project folder based on citation source.
 
+### Hermes (Discord `#hermes`) NotebookLM wiring
+
+Hermes uses MCP server registrations in `~/.hermes/config.yaml`. When the NotebookLM MCP server is registered under `mcp_servers.notebooklm`, Hermes exposes tools with the `mcp__notebooklm__...` prefix (for example: `mcp__notebooklm__notebook_query`, `mcp__notebooklm__source_add`).
+
+**Minimal registration (uvx):**
+
+```yaml
+mcp_servers:
+  notebooklm:
+    command: uvx
+    args:
+    - --from
+    - notebooklm-mcp-cli
+    - notebooklm-mcp
+    connect_timeout: 60
+    timeout: 120
+```
+
+**Smoke test (operator-run):**
+
+```bash
+hermes mcp test notebooklm
+```
+
 **Export script:** `scripts/export-vault-for-notebooklm.sh` compiles `03-Resources/` and `01-Projects/` markdown into a single file at `scripts/output/vault-export-for-notebooklm.md`. Excludes `_meta/`, `AI-Context/`, `00-Inbox/`, `04-Archives/`, `DailyNotes/`, and `_README` files.
 
 See [[NotebookLM-Project-Map]] for notebook-to-project mappings.

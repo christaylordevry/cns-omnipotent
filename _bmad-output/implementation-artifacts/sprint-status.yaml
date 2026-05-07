@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-07T06:58:00Z"
+last_updated: "2026-05-07T10:37:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -142,7 +142,7 @@ development_status:
 
   epic-16: done # closed 2026-04-18: 16-2 Perplexity MCP deferred; see epic-16-retro-2026-04-18.md
   16-1-firecrawl-mcp-install-and-live-tool-call-verification: done
-  16-2-perplexity-mcp-install-and-live-tool-call-verification: deferred
+  16-2-perplexity-mcp-install-and-live-tool-call-verification: deferred # superseded by 17-1 (live call verified) + 22-1 (formal MCP)
   16-3-apify-mcp-install-and-live-tool-call-verification: done
   16-4-automated-ingest-pipeline-inbox-classification-pake-index: done
   epic-16-retrospective: done
@@ -172,7 +172,7 @@ development_status:
   19-2-operator-context-hydration-from-vault-profile: done
   19-3-hybrid-vault-context-retrieval: done
   19-4-context-aware-live-chain-smoke-and-quality-review: done
-  epic-19-retrospective: optional
+  epic-19-retrospective: done
 
   epic-20: done
   20-1-domain-aware-url-routing-in-the-research-agent: done
@@ -211,6 +211,7 @@ development_status:
   26-6-url-ingest-hermes-vault: done
   26-7-hermes-daily-digest-cron-aedt: done
   26-8-hermes-skill-capture-workflow: done
+  epic-26-retrospective: done
 
   epic-27: done
   27-1-define-hermes-triage-skill-entrypoint-and-safe-defaults: done
@@ -220,6 +221,9 @@ development_status:
   27-5-execute-approved-moves-via-vault-io-vault-move-with-audit-trail: done
   27-6-discard-policy-and-non-destructive-guarantees: done
   27-7-end-to-end-verification-discord-candidates-approve-moves-audit: done
+  epic-27-retrospective: done
 
   epic-28: done
   28-1-automate-agents-md-section-8-via-hermes-session-close: done
+  28-2-register-notebooklm-mcp-server-in-hermes-config: done
+  epic-28-retrospective: done

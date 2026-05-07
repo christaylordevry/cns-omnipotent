@@ -3,7 +3,7 @@
 **Triaged:** 2026-04-02 (before Epic 6).  
 **Classification key:** **(a)** Epic 6 scope, **(b)** Phase 2 backlog (or operator-only docs), **(c)** closed or resolved by shipped work (Epics 4–5 and earlier).
 
-**For Epic 6 story authors:** Do not open Epic 6 implementation until the **Epic 6 intake** rows are mapped to stories (6.1–6.3 or explicit follow-ups). The two highest-impact items for an honest verification gate are **`IO_ERROR` / `CnsError` message hygiene** and **`vault_move` Obsidian CLI success-path verification** (source `ENOENT` after exit 0).
+**Note:** This document was originally written as a pre–Epic 6 triage queue. **Epic 6 has since shipped**, so the former “Epic 6 intake” items below are now either **closed** (moved to class **(c)**) or explicitly reclassified into **Phase 2** backlog (**(b)**) where applicable.
 
 ---
 
@@ -11,16 +11,16 @@
 
 | Item (short) | Class |
 |--------------|-------|
-| `vault_move` + Obsidian CLI: after exit 0, assert source gone (`ENOENT`) | (a) Epic 6 |
-| Intentional `IO_ERROR` / `CnsError` messages not sanitised (4-8) | (a) Epic 6 |
-| `vaultRootFromHost` not wired at stdio (3-1) | (a) Epic 6 (when host config exists) or document as known gap in 6.x |
-| `vault_append_daily` double `safeParse` in register handler | (a) Epic 6 (consistency / hygiene) |
-| Optional regression: two identical H2 headings, first-wins splice (4-6) | (a) Epic 6 optional (fixture / integration tests) |
-| `normalizeAbsolute` duplicated (`audit-logger` / `vault-move`) | (a) Epic 6 optional or (b) if timeboxed out |
+| `vault_move` + Obsidian CLI: after exit 0, assert source gone (`ENOENT`) | (c) Closed (Story 7-1) |
+| Intentional `IO_ERROR` / `CnsError` messages not sanitised (4-8) | (c) Closed (Story 6-4) |
+| `vaultRootFromHost` not wired at stdio (3-1) | (c) Closed (Story 6-5 env-only policy) |
+| `vault_append_daily` double `safeParse` in register handler | (c) Closed (Story 6-6 safeParse removal) |
+| Optional regression: two identical H2 headings, first-wins splice (4-6) | (c) Closed (Story 6-6 regression addressed) |
+| `normalizeAbsolute` duplicated (`audit-logger` / `vault-move`) | (b) Phase 2 hygiene (optional refactor) |
 | Error-path `vaultMove` tests omit `_meta/logs` pre-create | (c) Accepted Phase 1 risk; reopen if audit runs earlier |
 | `vault_move` wikilink repair O(n) per move | (b) Phase 2 at scale |
-| Duplicated PAKE type enums (register + tools) | (a) Epic 6 or (b) pre–Phase 2 hygiene |
-| Vault root at filesystem `/` (meaningless boundary) | (b) operator docs + optional hardening; (a) only if Epic 6 adds explicit rejection tests |
+| Duplicated PAKE type enums (register + tools) | (b) Phase 2 hygiene |
+| Vault root at filesystem `/` (meaningless boundary) | (b) operator docs + optional hardening |
 | Nexus trust-guard: detect `needs_configure` after Claude Code updates (NEXUS repo script) | (b) Phase 2 |
 | `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`: Symptom E + trust-guard post-update reconnection | (b) Phase 2 |
 | `vault_create_note` routes by `pake_type` only; ignores subdirectory path — use `vault_move` after creation for project subfolders | (b) Phase 2 / operator workflow |
@@ -58,43 +58,43 @@ path, with no Nexus staging path required.
 **Class:** (b) Phase 2 backlog — reopen only if Nexus write behaviour is formalised
 or silent-promotion complaints arise in practice.
 
-## Epic 6 intake (detail)
+## Epic 6 intake (detail) — archived
 
 ### `vault_move` Obsidian CLI success path (4-7 review)
 
 After CLI exit 0 and destination checks, **verify the source path no longer exists** (`stat` → `ENOENT`) so a broken CLI cannot leave a duplicate at the source while appearing successful.
 
-- **Class:** (a) Epic 6 (verification / move correctness; pair with integration or unit tests in 6.2).
+- **Class:** (c) Closed (Story 7-1).
 
 ### `IO_ERROR` / `CnsError` message sanitisation (4-8)
 
 `handleToolInvocationCatch` normalises non-`CnsError` throws; **domain `CnsError("IO_ERROR", …)` messages may still embed internal paths or backend detail**. Review before trusting the verification gate on “safe” error text for operators or future external surfaces.
 
-- **Class:** (a) Epic 6 (6.3 verification gate or a tight hygiene story).
+- **Class:** (c) Closed (Story 6-4).
 
 ### `vaultRootFromHost` not wired at stdio (3-1)
 
 Optional MCP host `vaultRoot`; defer until host/SDK exposes initialization config for the server process.
 
-- **Class:** (a) Epic 6 as config contract + docs when feasible; otherwise document “env-only” in gate docs and keep (b) for full host-driven root.
+- **Class:** (c) Closed (Story 6-5 documented env-only policy).
 
 ### `vault_append_daily` double `safeParse` (code review)
 
 Handler uses `vaultAppendDailyInputSchema.safeParse` while other tools rely on MCP/schema validation only.
 
-- **Class:** (a) Epic 6 (align on one validation pattern).
+- **Class:** (c) Closed (Story 6-6).
 
 ### Optional regression: `vault_append_daily` identical H2 headings (4-6)
 
 Assert first-wins splice when two level-2 headings share the same title.
 
-- **Class:** (a) Epic 6 optional (good fit for fixture integration tests).
+- **Class:** (c) Closed (Story 6-6).
 
 ### `normalizeAbsolute` duplication (5-1 review)
 
 Identical helper in `audit-logger.ts` and `vault-move.ts`; consolidate in a shared utility when touching either area.
 
-- **Class:** (a) Epic 6 optional or (b) if not picked up.
+- **Class:** (b) Phase 2 hygiene (optional refactor).
 
 ---
 
