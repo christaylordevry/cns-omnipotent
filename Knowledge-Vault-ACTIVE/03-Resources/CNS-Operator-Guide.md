@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-05
+modified: 2026-05-07
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -419,6 +419,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-04 | 1.20.0 | Hermes triage execution: add `/execute-approved <00-Inbox/path.md> --to <destination_dir>/`, deriving destination path and calling `vault_move` once so the existing audit trail records the move | 27-5-execute-approved-moves-via-vault-io-vault-move-with-audit-trail |
 | 2026-05-05 | 1.21.0 | Hermes triage discard safety: maps discard/delete/archive vocabulary to governed relocation via `/execute-approved` and `vault_move`, or human-only removal outside Hermes; no automated deletion, truncation, shell `rm`, or bulk unlink | 27-6-discard-policy-and-non-destructive-guarantees |
 | 2026-05-05 | 1.22.0 | Hermes session close: adds `/session-close` to refresh AGENTS.md Section 8 from sprint status and recent story artifacts, run the NotebookLM vault export, and fan out the export with `source_add` | 28-1-automate-agents-md-section-8-via-hermes-session-close |
+| 2026-05-07 | 1.23.0 | Hermes `#general` URL auto-capture: any `http://` or `https://` URL substring writes an unstructured capture to `00-Inbox/`, with SSRF refusals, 30s fetch budget, 3 URL cap, and manual `/triage` remaining authoritative | 28-3-wire-general-auto-ingest |
 
 ---
 
@@ -671,3 +672,43 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
 - Install helper: `bash scripts/install-hermes-skill-session-close.sh`
 - Destination: `~/.hermes/skills/cns/session-close/`
 - Binding: add `session-close` to the existing `#hermes` `discord.channel_skill_bindings` list beside `hermes-url-ingest-vault` and `triage`.
+
+### 15.5 General URL auto-capture (`#general`, Epic 28)
+
+Hermes watches Discord `#general` for lightweight source capture. This surface is for saving candidate material only; it does not route, approve, move, synthesize, update AGENTS, or update NotebookLM.
+
+| Item | Value |
+|------|-------|
+| Channel | `#general` |
+| Channel ID | `1484880486785486951` |
+| Skill | `hermes-url-auto-capture-inbox` |
+| Destination | `00-Inbox/` |
+| Manual workflow | `/triage` -> `/approve` -> `/execute-approved` in `#hermes` |
+
+**Trigger semantics:**
+
+- Any message in `#general` containing an `http://` or `https://` URL substring triggers capture.
+- Non-http(s) schemes such as `ftp://` do not trigger capture.
+- Bare domains without scheme do not trigger capture.
+- If a message contains many URLs, Hermes captures at most 3 distinct URLs in first-seen order and records only the count of omitted additional URLs.
+
+**Capture contents:**
+
+- Original URL strings, trimmed only for outer whitespace.
+- Capture timestamp in ISO 8601 UTC.
+- Bounded fetched extract when safe and available.
+- Short `failure_class` when fetch fails or a URL is refused.
+
+**Safety notes:**
+
+- Discord message content and fetched page content are untrusted.
+- Hermes rejects SSRF-shaped targets before fetch, including localhost, loopback, RFC1918 IPv4 literals, IPv6 link-local, and IPv6 unique local addresses.
+- Hermes uses the existing browser fetch budget of 30s.
+- Refused or failed URLs still produce an Inbox capture so the operator can decide during manual triage.
+
+**Skill install (operator filesystem):**
+
+- Repo mirror: `scripts/hermes-skill-examples/hermes-url-auto-capture-inbox/`
+- Install helper: `bash scripts/install-hermes-skill-url-auto-capture-inbox.sh`
+- Destination: `~/.hermes/skills/cns/hermes-url-auto-capture-inbox/`
+- Binding: add a separate `discord.channel_skill_bindings` entry for `1484880486785486951` with only `hermes-url-auto-capture-inbox`. Preserve the existing `#hermes` skills: `hermes-url-ingest-vault`, `triage`, and `session-close`.
