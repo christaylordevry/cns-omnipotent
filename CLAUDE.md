@@ -1,64 +1,80 @@
 # Project Rules — CNS (Central Nervous System)
 
-This file is **implementation-repo** project rules for the Omnipotent.md codebase. It is **not** the Obsidian vault `CLAUDE.md` shim; the deployable vault template lives at `specs/cns-vault-contract/shims/CLAUDE.md`.
+This file is **implementation-repo** rules for the Omnipotent.md codebase.
+Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/CLAUDE.md`.
 
-This repo builds the **Central Nervous System**: a unified control plane that orchestrates all AI agents, LLMs, CLIs, and IDEs from a single vault-based architecture.
+---
 
 ## System Context
 
-- **CNS** is the control layer: agent routing, context loading, vault IO, security gates, input surfaces.
-- **PAKE** is the knowledge layer (subsystem): note schemas, quality scoring, ingestion pipelines, retrieval.
-- The Obsidian vault at `Knowledge-Vault-ACTIVE/` is the single source of truth for all knowledge.
-- This repo contains the implementation code, specs, and tooling. It is separate from the vault.
+- **CNS** — control layer: agent routing, vault IO, security gates, input surfaces
+- **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
+- **Vault** — `Knowledge-Vault-ACTIVE/` (PARA structure) is the single source of truth
+- **Hermes** — `~/.hermes/` — Discord gateway, skills at `~/.hermes/skills/cns/`
+- **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v1.9.5, Phase 5 complete)
 
-## Current Phase: Phase 1 — Foundation Layer
+## Phase Status
 
-Three deliverables:
-1. **Vault Folder Contract** — locked directory structure with agent-readable manifests
-2. **AGENTS.md Constitution** — compact, always-on context file loaded by every tool (<500 lines)
-3. **Vault IO Layer** — MCP server exposing eight standardized vault read/write tools
+All phases complete through Phase 5. Epics 1–28 done.
+- Vault IO MCP: live (9 tools, WriteGate enforced)
+- Hermes: live (Discord, daily digest, triage, session-close, #general auto-ingest)
+- NotebookLM: live (4 notebooks, fan-out via session-close)
+- Next: Epic 29 (scope TBD)
 
-**Authoritative spec:** `specs/cns-vault-contract/CNS-Phase-1-Spec.md`
-**AGENTS.md reference:** `specs/cns-vault-contract/AGENTS.md`
+---
 
-## Scope Boundaries
+## Active MCPs
 
-Phase 1 ONLY. Do not implement, spec, or plan:
-- Brain service (RAG + vector index) — Phase 2
-- Discord / Nexus bridge — Phase 2
-- NotebookLM ingestion pipeline — Phase 2
-- Always-on daemon / OpenClaw — Phase 3
-- Mobile access — Phase 2
-- Multi-model routing — Phase 3
+| MCP | Tools | Notes |
+|-----|-------|-------|
+| `cns_vault_io` | 9 vault read/write tools | WriteGate on AI-Context/ |
+| `notebooklm` | source_add, notebook_query | Fan-out via session-close |
+| `context7` | resolve-library-id, query-docs | Always use before implementing |
+| `firecrawl` | scrape, extract, search, crawl, browser | Web content extraction |
+| `perplexity` | search, reason, deep_research | Live web research |
+| `discord` | reply, react, fetch_messages | Hermes Discord surface |
 
-## Tooling
+---
 
-This repo uses:
-- **BMAD Method** (`_bmad/`, `_bmad-output/`) for planning: PRD, architecture, epics, stories
-- **Ralph Orchestrator** (`ralph.*.yml`, `.ralph/`) for execution loops with backpressure gates
-- **Verification gate:** `bash scripts/verify.sh` must pass before any phase is complete
+## Workflow — BMAD Method
+
+1. `/bmad-create-story` → generates story file in `_bmad-output/implementation-artifacts/`
+2. `/bmad-dev-story` → implements the story (fresh chat)
+3. `bash scripts/verify.sh` → must pass before claiming done
+4. Commit: one logical change per commit
+
+Planning artifacts: `_bmad-output/planning-artifacts/`
+Stories: `_bmad-output/implementation-artifacts/`
+Sprint tracker: `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+---
 
 ## Non-Negotiables
 
-1. **Spec-first.** Create or confirm specs in `specs/<feature>/` before implementing.
-2. **BMAD artifacts are source-of-truth.** Planning docs live in `_bmad-output/planning-artifacts/`.
-3. **Verification is mandatory.** Run `bash scripts/verify.sh` before claiming done.
-4. **Small commits.** One logical change per commit.
-5. **Phase 1 scope only.** Do not build beyond the three deliverables listed above.
+1. **Spec-first.** Confirm `specs/cns-vault-contract/` before implementing
+2. **Verify gate.** `bash scripts/verify.sh` must pass before every commit
+3. **Small commits.** One logical change each
+4. **WriteGate.** Never directly edit `AI-Context/AGENTS.md` — route via Hermes session-close
+5. **Vault boundaries.** Never write outside vault path contract
 
-## Workflow
+---
 
-1. BMAD produces PRD, architecture, epics, and stories.
-2. Stories become Ralph specs (convert with `scripts/bmad_to_ralph.py`).
-3. Ralph executes implementation loops with backpressure gates (tests/lint/typecheck).
-4. `bash scripts/verify.sh` is the completion gate for every story.
+## Context7 — Always Required
+
+Before implementing against any library or tool API:
+1. `resolve-library-id` → get the Context7 ID
+2. `query-docs` → fetch current docs for your specific use case
+3. Implement from those docs — never from training data
+
+Priority IDs:
+- Hermes Agent: `/nousresearch/hermes-agent`
+
+---
 
 ## Key References
 
-- **MCP vault root (Phase 1 stdio):** the server reads the vault root **only** from **`CNS_VAULT_ROOT`**. `vaultRootFromHost` on `loadRuntimeConfig` is for programmatic use, tests, and future host wiring, not the current stdio entrypoint. Operators: `specs/cns-vault-contract/README.md` (**Vault IO MCP: vault root (Phase 1)**).
-- Phase 1 Spec: `specs/cns-vault-contract/CNS-Phase-1-Spec.md`
-- Mutation audit + `vault_log_action` (bound spec, reviewer checklist): `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md`
-- AGENTS.md (vault constitution): `specs/cns-vault-contract/AGENTS.md`
-- Operator index and **grounding parity checklist** (MCP, Cursor, Claude Code on WSL): `specs/cns-vault-contract/README.md`
-- BMAD artifacts: `_bmad-output/planning-artifacts/`
+- Constitution: `specs/cns-vault-contract/AGENTS.md`
+- Operator Guide: `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
+- Vault IO spec: `specs/cns-vault-contract/CNS-Phase-1-Spec.md`
+- Mutation audit: `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md`
 - Verify gate: `scripts/verify.sh`

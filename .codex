@@ -1,0 +1,41 @@
+# CNS — Omnipotent.md
+
+You are operating inside the Central Nervous System (CNS), a governed 
+AI agent infrastructure built around an Obsidian vault.
+
+## Stack
+- Vault: Knowledge-Vault-ACTIVE/ (PARA structure, PAKE schema)
+- Specs: specs/cns-vault-contract/
+- Planning: _bmad-output/planning-artifacts/
+- Stories: _bmad-output/implementation-artifacts/
+- Constitution: specs/cns-vault-contract/AGENTS.md (v1.9.5)
+- Hermes: ~/.hermes/ (Discord gateway, skills at ~/.hermes/skills/cns/)
+- Verify gate: bash scripts/verify.sh (must pass before any commit)
+
+## Workflow — BMAD Method
+- Stories live in _bmad-output/implementation-artifacts/
+- Use /bmad-create-story to create, /bmad-dev-story to implement
+- One logical change per commit
+- Spec-first: confirm specs/cns-vault-contract/ before implementing
+
+## Active MCPs
+- cns_vault_io: 9 vault read/write tools (WriteGate enforced)
+- notebooklm: source_add, notebook_query
+- context7: resolve-library-id, query-docs
+- firecrawl: scrape, extract, search, crawl, browser (web content extraction)
+- perplexity: search, reason, deep_research (live web research)
+- discord: reply, react, fetch_messages (Hermes Discord surface)
+
+## Context7 — Always Required
+Before implementing against any library or tool API:
+1. resolve-library-id → get the Context7 ID
+2. query-docs → get current docs for your specific use case
+3. Implement from those docs, never from training data
+
+Hermes Agent ID: /nousresearch/hermes-agent
+
+## Non-Negotiables
+- Never write outside vault boundaries
+- WriteGate protects AI-Context/AGENTS.md — no direct edits
+- bash scripts/verify.sh must pass before claiming done
+- Small commits — one logical change each

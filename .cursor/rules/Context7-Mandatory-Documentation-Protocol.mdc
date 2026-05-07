@@ -1,0 +1,18 @@
+---
+alwaysApply: true
+---
+
+## Context7 — Mandatory Documentation Protocol
+
+Use Context7 MCP for all library and tool documentation lookups in this project.
+
+Workflow (always in this order):
+1. resolve-library-id → pass the library name, get the Context7 ID
+2. query-docs → pass the ID + specific query, get current docs
+3. Implement from those docs — never from training data
+
+Priority IDs for this project:
+- Hermes Agent: /nousresearch/hermes-agent
+
+Use for: Hermes config schema, skill file format, gateway config, 
+MCP server registration, memory file structure, tool invocation.
