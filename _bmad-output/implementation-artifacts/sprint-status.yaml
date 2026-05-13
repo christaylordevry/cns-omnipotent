@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-04-20T00:00:00Z
+# last_updated: 2026-05-13T00:00:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-07T12:04:00Z"
+last_updated: "2026-05-13T00:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -228,3 +228,17 @@ development_status:
   28-2-register-notebooklm-mcp-server-in-hermes-config: done
   28-3-wire-general-auto-ingest: done
   epic-28-retrospective: done
+
+  epic-29: in-progress
+  29-0-token-audit-and-mcp-always-on-cleanup: done
+  29-1-user-md-write-and-wire-operator-identity: backlog
+  29-2-memory-md-schema-and-session-close-integration: backlog
+  29-3-cold-start-verification: backlog
+  29-4-vault-lint-rules-spec-and-output-format: backlog
+  29-5-vault-lint-hermes-skill-and-vault-log-write: backlog
+  29-6-dedup-guard-at-ingest-time: backlog
+  29-7-claude-md-shim-update-and-token-budget-policy-in-agents-md: backlog
+  29-8-vault-request-disambiguation-mcp-tool: backlog
+  29-9-fast-scan-index-and-session-close-integration: backlog
+  29-10-hermes-thinking-commands: backlog
+  epic-29-retrospective: optional
