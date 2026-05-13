@@ -235,7 +235,7 @@ development_status:
   29-2-memory-md-schema-and-session-close-integration: done
   29-3-cold-start-verification: done
   29-4-vault-lint-rules-spec-and-output-format: done
-  29-5-vault-lint-hermes-skill-and-vault-log-write: backlog
+  29-5-vault-lint-hermes-skill-and-vault-log-write: done
   29-6-dedup-guard-at-ingest-time: backlog
   29-7-claude-md-shim-update-and-token-budget-policy-in-agents-md: backlog
   29-8-vault-request-disambiguation-mcp-tool: backlog
