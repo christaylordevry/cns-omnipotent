@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-07
+modified: 2026-05-13
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -58,7 +58,7 @@ On both surfaces, opening the workspace at the vault root causes the shim to loa
 | `AGENTS.md` (constitution) | `AI-Context/modules/vault-io.md` |
 | Current focus (Section 8 of AGENTS.md) | `AI-Context/modules/security.md` |
 | Routing rules, formatting standards | `AI-Context/modules/notebooklm-workflow.md` |
-| | `AI-Context/modules/routing.md` |
+| `AI-Context/vault-fast-scan-index.md` (bounded governed-note catalog; refresh via `/session-close`) | `AI-Context/modules/routing.md` |
 
 Modules load on demand when the task falls within a module's domain. The constitution is the map; modules are the territory.
 
@@ -422,6 +422,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-05 | 1.21.0 | Hermes triage discard safety: maps discard/delete/archive vocabulary to governed relocation via `/execute-approved` and `vault_move`, or human-only removal outside Hermes; no automated deletion, truncation, shell `rm`, or bulk unlink | 27-6-discard-policy-and-non-destructive-guarantees |
 | 2026-05-05 | 1.22.0 | Hermes session close: adds `/session-close` to refresh AGENTS.md Section 8 from sprint status and recent story artifacts, run the NotebookLM vault export, and fan out the export with `source_add` | 28-1-automate-agents-md-section-8-via-hermes-session-close |
 | 2026-05-07 | 1.23.0 | Hermes `#general` URL auto-capture: any `http://` or `https://` URL substring writes an unstructured capture to `00-Inbox/`, with SSRF refusals, 30s fetch budget, 3 URL cap, and manual `/triage` remaining authoritative | 28-3-wire-general-auto-ingest |
+| 2026-05-13 | 1.24.0 | Session close: documents Step 6.6 `vault-fast-scan-index.md` regeneration (governed folders 01–03, token cap); §2 grounding table lists the index; repo helper `npm run vault:fast-scan` | 29-9-fast-scan-index-and-session-close-integration |
 
 ---
 
@@ -659,13 +660,14 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
   - `specs/cns-vault-contract/AGENTS.md`
   - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
 - Runs `bash scripts/export-vault-for-notebooklm.sh`.
+- Overwrites **`AI-Context/MEMORY.md`** (Step 6.5) and **`AI-Context/vault-fast-scan-index.md`** (Step 6.6) on each real close using operator filesystem writes (same WriteGate boundary as `AGENTS.md`; not `vault_create_note`). Dry-run skips both files.
 - Reads the NotebookLM project map and calls `source_add` once per active mapped notebook with `notebook_id`, `source_name: "My Knowledge Base"`, `source_type: "file"`, and `file_path` pointing at the fresh export file. If the active map lacks IDs, the live proof must record the connector-accepted fallback.
 
 **Guardrails:**
 
 - Do not use Vault IO mutators for `AI-Context/AGENTS.md`. WriteGate protects `AI-Context/**`, so the skill uses operator filesystem edits for the constitution sync and records that boundary in its reply.
 - Vault IO use is read-only for project map discovery: `vault_read`, `vault_search`, `vault_list`, and `vault_read_frontmatter`.
-- Dry-run never writes AGENTS files, runs export, or calls `source_add`.
+- Dry-run never writes AGENTS files, runs export, calls `source_add`, or writes `MEMORY.md` / `vault-fast-scan-index.md`.
 - If NotebookLM MCP tools are unavailable, the skill reports the fan-out as blocked and does not invent `source_add` results.
 
 **Skill install (operator filesystem):**

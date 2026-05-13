@@ -60,6 +60,17 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     }
   });
 
+  it("defines Step 6.6 vault-fast-scan index (Story 29-9)", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("## Step 6.6: Regenerate vault-fast-scan-index.md"));
+    assert.ok(body.includes("vault-fast-scan-index.md"));
+    assert.ok(body.includes("01-Projects/"));
+    assert.ok(body.includes("02-Areas/"));
+    assert.ok(body.includes("03-Resources/"));
+    assert.ok(body.includes("vault_fast_scan"));
+    assert.ok(body.includes("AI-Context/vault-fast-scan-index.md"));
+  });
+
   it("defines export and NotebookLM fan-out semantics", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("bash scripts/export-vault-for-notebooklm.sh"));

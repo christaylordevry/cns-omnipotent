@@ -8,7 +8,7 @@
    - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
 3. **Forbidden Vault IO mutators:** `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_log_action`.
 4. **Allowed Vault IO usage:** read-only project map discovery with `vault_read`, `vault_search`, `vault_list`, or `vault_read_frontmatter`.
-5. **Dry run:** `/session-close --dry-run` performs reads and synthesis only. It must not write AGENTS files, run the export script, or call `source_add`.
+5. **Dry run:** `/session-close --dry-run` performs reads and synthesis only. It must not write AGENTS files, run the export script, call `source_add`, or write `AI-Context/MEMORY.md` or `AI-Context/vault-fast-scan-index.md`.
 6. **No secrets:** Do not paste note bodies, export content, env values, or raw NotebookLM payloads into Discord.
 
 ## Preconditions
@@ -151,7 +151,7 @@ For real close only:
 
 If the script exits non-zero or output is missing, report `failure_class: export` and skip NotebookLM fan-out.
 
-## Step 6.5: Regenerate MEMORY.md (last write before NotebookLM fan-out)
+## Step 6.5: Regenerate MEMORY.md (before Step 6.6)
 
 Skip this entire step in dry-run mode.
 
@@ -190,6 +190,56 @@ Phase 6 active. Epic [N] [status]. Done: [completed story IDs].
 ## Next Session
 [Priority 1 from AGENTS.md §8 current priorities]
 ```
+
+## Step 6.6: Regenerate vault-fast-scan-index.md (after MEMORY.md, before NotebookLM)
+
+Skip this entire step in dry-run mode.
+
+After Step 6.5 completes, build the **vault fast-scan index** so agents can load a bounded catalog before deep reads.
+
+**Vault root:** `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/` (same tree as export and `MEMORY.md`).
+
+**Scan (recursive `*.md` only):**
+
+- `01-Projects/`
+- `02-Areas/`
+- `03-Resources/`
+
+**Do not** scan `00-Inbox/`, `DailyNotes/`, `04-Archives/`, `_meta/`, or `AI-Context/` except paths that genuinely live under the three roots above.
+
+For each file:
+
+1. Read frontmatter (operator filesystem read or read-only `vault_read_frontmatter`).
+2. Map `pake_type` to a line prefix: `SourceNote`→`SRC`, `InsightNote`→`INS`, `SynthesisNote`→`SYN`, `DailyNote`→`DLY`, anything else or missing→`OTH`.
+3. **Path:** vault-relative POSIX path (forward slashes), e.g. `03-Resources/CNS-Operator-Guide.md`.
+4. **Title:** frontmatter `title` (strip YAML quotes if present). If missing, use the filename without `.md`. Replace any `|` in the title with ` - `.
+5. **Created column:** `YYYY-MM-DD` from frontmatter `created`, else `date`, else `modified`, else format filesystem `mtime` as `YYYY-MM-DD`.
+6. **Sort key:** descending **modified** time: parse frontmatter `modified` (`YYYY-MM-DD`) when present, else use filesystem `mtime`.
+
+Sort all rows by that key (newest first). Start with cap **N = min(100, row count)**. Build the file **exactly** as:
+
+```markdown
+# Vault Fast-Scan Index (auto — /session-close)
+# Format: [TYPE] [path] | [title] | [created]
+# Token budget: ≤2,000 tokens | Cap: 100 most-recently-modified notes
+
+```
+
+Then one line per included row:
+
+`[TYPE] [path] | [title] | [YYYY-MM-DD]`
+
+**Token budget:** Let `chars` be the UTF-16 string length of the entire file (headers plus all body lines). Require `ceil(chars / 4) <= 2000`. If the file is too large, decrease `N` by **5** and rebuild until it fits (stop at `N = 0` if needed, headers only).
+
+**Write (operator filesystem only):** overwrite
+
+`/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md`
+
+Hard constraints:
+
+- **Do not** call `vault_create_note`, `vault_update_frontmatter`, or any Vault IO mutator for this path.
+- Deterministic for unchanged inputs (same bytes if nothing changed).
+- Optional: run `npm run vault:fast-scan` from `<resolved_repo_root>` when `CNS_VAULT_ROOT` points at the canonical vault, as a parity check; the Discord skill path still ends with the canonical file bytes above.
 
 ## Step 7: Resolve active NotebookLM notebooks
 
@@ -238,6 +288,7 @@ Use this shape:
 - **section8_version:** `<version or unchanged>`
 - **export:** `<path + bytes, skipped in dry-run, or failed>`
 - **notebooklm:** `<n succeeded, m failed, skipped if export failed>`
+- **vault_fast_scan:** `<wrote path + est tokens | skipped in dry-run | failed>`
 - **failure_class:** `<none | repo_root | invalid_input | agents_sync | export | notebooklm>`
 
 ### NotebookLM targets

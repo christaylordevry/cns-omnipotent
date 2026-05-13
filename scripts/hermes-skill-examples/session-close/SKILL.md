@@ -1,6 +1,6 @@
 ---
 name: session-close
-description: "Hermes CNS session closure for /session-close in #hermes. Rewrites AGENTS.md Section 8 from sprint status and recent story artifacts, syncs both constitution copies by filesystem, exports the vault for NotebookLM, and fans the export out with source_add."
+description: "Hermes CNS session closure for /session-close in #hermes. Rewrites AGENTS.md Section 8 from sprint status and recent story artifacts, syncs both constitution copies by filesystem, exports the vault for NotebookLM, regenerates MEMORY.md and vault-fast-scan-index.md by filesystem, and fans the export out with source_add."
 version: 1.0.0
 author: CNS Operator
 license: MIT
@@ -20,6 +20,7 @@ This skill implements the **`/session-close`** entrypoint in Discord **`#hermes`
 - Regenerate **`AGENTS.md` Section 8** with current priorities.
 - Sync the repo mirror and canonical vault copy byte-for-byte.
 - Run the NotebookLM vault export script.
+- Overwrite **`AI-Context/MEMORY.md`** and **`AI-Context/vault-fast-scan-index.md`** on each real close (operator filesystem, not Vault IO mutators).
 - Add the fresh export to each active NotebookLM notebook using **`source_add`**.
 
 The skill reconciles the stakeholder request for `vault_update_frontmatter` with WriteGate reality: **`AI-Context/**` is protected and returns `PROTECTED_PATH`, so AGENTS body edits are operator filesystem edits, not Vault IO mutator calls.
@@ -46,7 +47,7 @@ The skill reconciles the stakeholder request for `vault_update_frontmatter` with
 ## Steps
 
 1. Follow `references/trigger-pattern.md` to validate the command.
-2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, deterministic `MEMORY.md` overwrite, and NotebookLM fan-out.
+2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, deterministic `MEMORY.md` overwrite, deterministic `vault-fast-scan-index.md` overwrite (Step 6.6), and NotebookLM fan-out.
 3. Keep the Discord reply concise: result, AGENTS sync status, export path and size, NotebookLM per-target statuses, and any failure class.
 
 ## Tools

@@ -20,7 +20,8 @@
     "chain": "tsx scripts/run-chain.ts",
     "brain:index": "tsx src/brain/build-index-cli.ts",
     "brain:query": "tsx src/brain/query-index-cli.ts",
-    "archive:sources": "tsx scripts/archive-source-notes.ts"
+    "archive:sources": "tsx scripts/archive-source-notes.ts",
+    "vault:fast-scan": "node scripts/generate-vault-fast-scan-index.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
