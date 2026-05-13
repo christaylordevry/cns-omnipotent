@@ -151,6 +151,46 @@ For real close only:
 
 If the script exits non-zero or output is missing, report `failure_class: export` and skip NotebookLM fan-out.
 
+## Step 6.5: Regenerate MEMORY.md (last write before NotebookLM fan-out)
+
+Skip this entire step in dry-run mode.
+
+After the AGENTS Section 8 update (Step 5) and after export (Step 6), regenerate `MEMORY.md` by reading:
+
+- `<resolved_repo_root>/_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` (only §8: “### Current Priorities” item 1, and “### Recent Session Context” top 3 bullets)
+
+Then **overwrite** the canonical memory file at:
+
+`/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/MEMORY.md`
+
+Hard constraints:
+
+- Overwrite, never append. Running the step twice with unchanged inputs must produce byte-identical output.
+- Output must be **under 2,000 characters**.
+- Do not include timestamps, relative language, random IDs, or anything non-deterministic.
+- Do not call any Vault IO mutators for this file.
+
+Write **exactly** this template:
+
+```markdown
+## CNS State (auto — /session-close)
+Phase 6 active. Epic [N] [status]. Done: [completed story IDs].
+
+## Last Session Decisions
+- [decision 1 from AGENTS.md §8 recent context]
+- [decision 2]
+- [decision 3]
+
+## Environment
+- Gateway: manual start required (not systemd)
+- SOUL.md: remove after every hermes version/gateway start
+- Vault: /mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/
+
+## Next Session
+[Priority 1 from AGENTS.md §8 current priorities]
+```
+
 ## Step 7: Resolve active NotebookLM notebooks
 
 Use read-only vault tools to locate the project map:

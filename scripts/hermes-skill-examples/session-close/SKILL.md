@@ -46,7 +46,7 @@ The skill reconciles the stakeholder request for `vault_update_frontmatter` with
 ## Steps
 
 1. Follow `references/trigger-pattern.md` to validate the command.
-2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, and NotebookLM fan-out.
+2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, deterministic `MEMORY.md` overwrite, and NotebookLM fan-out.
 3. Keep the Discord reply concise: result, AGENTS sync status, export path and size, NotebookLM per-target statuses, and any failure class.
 
 ## Tools
