@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 1.9.7 | Last updated: 2026-05-13  
+> Version: 1.9.8 | Last updated: 2026-05-13
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -143,7 +143,7 @@ Summary:
 
 - Prefer frontmatter-only reads when metadata is enough; full reads when you need the body.
 - **Canonical read boundary (Vault IO):** `vault_read`, `vault_list`, `vault_search`, and `vault_read_frontmatter` resolve under the vault root, then use **`realpath`** before read IO (same idea as write tools). A path whose canonical target leaves the vault fails with **`VAULT_BOUNDARY`**; a missing or dangling target maps to **`NOT_FOUND`** when resolution stops on ENOENT. Full rules: `AI-Context/modules/security.md`.
-- **Phase 1 MCP tools (implementation):** `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, and `vault_log_action`. Parameters and behaviour are normative in `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`. Prefer these tools when the MCP server is configured (`CNS_VAULT_ROOT`, optional search scope and Obsidian CLI per `../../specs/cns-vault-contract/README.md`).
+- **Phase 1 MCP tools (implementation):** `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, and `vault_request_disambiguation` (read-only: posts a numbered disambiguation question to Discord `#hermes`, waits for an operator reply or a five minute timeout, never mutates the vault, and does not append audit lines). Parameters and behaviour are normative in `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`. Prefer these tools when the MCP server is configured (`CNS_VAULT_ROOT`, optional search scope and Obsidian CLI, and optional Discord env vars for disambiguation per `../../specs/cns-vault-contract/README.md`).
 - **Governed mutations:** WriteGate, PAKE checks on governed mutators, secret scanning where implemented for Vault IO, and append-only lines in `_meta/logs/agent-log.md` apply to **Vault IO (MCP) mutations** only. **Nexus** direct filesystem writes are described in **Section 5** and do not use this pipeline.
 - Search before you create; stay in project scope first, then widen.
 - **Search scope:** Default to the most relevant directory for the task. For project work, search `01-Projects/` first. For research and reference, search `03-Resources/`. When the user asks to "search the vault" or you need broad recall, search all directories. Choose scope by task context; optional operator defaults for MCP search (for example `CNS_VAULT_DEFAULT_SEARCH_SCOPE` in `../../specs/cns-vault-contract/README.md`) are a convenience, not a substitute for picking the right directory.
@@ -241,12 +241,13 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Current Priorities
 
-1. **Advance Epic 29 backlog.** Next stories: 29-7 (CLAUDE.md shim update + token budget policy in AGENTS.md), 29-8 (vault request disambiguation MCP tool), 29-9 (fast-scan index + session-close integration), 29-10 (Hermes thinking commands).
+1. **Advance Epic 29 backlog.** Next stories: 29-7 (CLAUDE.md shim update + token budget policy in AGENTS.md), 29-9 (fast-scan index + session-close integration), 29-10 (Hermes thinking commands).
 2. **Triage Epic 29 stories.** 29-6 (dedup guard) is in review — verify and close before advancing to 29-7.
 3. **NotebookLM freshness maintenance.** Run `/session-close` at end of each session to keep this section and vault sources in sync.
 
 ### Recent Session Context
 
+- **29-8 (done):** `vault_request_disambiguation` MCP tool — read-only Discord `#hermes` disambiguation with 5 minute timeout; no vault or audit side effects.
 - **29-6 (review):** `Dedup guard at ingest time` — URL-level duplicate prevention wired on governed ingest path (`vault_create_note` with `source_uri`). Currently in review.
 - **29-5 (done):** `/vault-lint` Hermes skill plus on-disk report write — read-only four-rule lint bound to `#hermes`; full dated report written to `_meta/reports/`; spec-exact Discord template live.
 - **29-4 (done):** Vault lint rules spec and output format — normative four-rule spec for `/vault-lint` (29-5); Discord + on-disk report shapes defined.
@@ -254,7 +255,6 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 ### Backlog (Epic 29, Sequenced)
 
 - **29-7:** CLAUDE.md shim update and token budget policy in AGENTS.md.
-- **29-8:** Vault request disambiguation MCP tool.
 - **29-9:** Fast-scan index and session-close integration.
 - **29-10:** Hermes thinking commands.
 
@@ -298,6 +298,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-05-13 | 1.9.8 | Story 29-8: Vault IO adds read-only `vault_request_disambiguation` (Discord `#hermes` operator choice); Section 4 tool list updated; Section 8 backlog reflects 29-8 shipped. |
 | 2026-05-13 | 1.9.7 | v1.9.7 — §6.5 Token Budget Policy added (Epic 29). |
 | 2026-05-13 | 1.9.6 | Story 28.1: Section 8 regenerated by Hermes `/session-close`; Epic 29 in-progress (29-0 to 29-6 done, 29-7 to 29-10 backlog); 29-6 in review. |
 | 2026-05-07 | 1.9.5 | Story 28.1: Section 8 regenerated by Hermes `/session-close`; CNS Phases 1–5 all complete (all epics 1–28 done); Epic 28 story 28-3 (#general auto-ingest) reflected; priorities updated to Epic 29 definition. |

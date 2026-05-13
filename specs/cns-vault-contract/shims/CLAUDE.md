@@ -10,7 +10,7 @@ If your Claude Code build uses a different attachment or include syntax for proj
 
 ## Vault IO MCP tool count (implementation repo)
 
-The CNS Vault IO MCP server currently exposes **9** tools: `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, and `vault_log_action`. Story **29-8** adds **`vault_request_disambiguation`**, which will bring the set to **10**; refresh this paragraph after that story ships.
+The CNS Vault IO MCP server exposes **10** tools: `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, and `vault_request_disambiguation` (read-only Discord `#hermes` disambiguation; optional env per `../../specs/cns-vault-contract/README.md`).
 
 Normative parameters and behaviour: `../../specs/cns-vault-contract/CNS-Phase-1-Spec.md` (path relative from `AI-Context/` when the vault lives next to the Omnipotent.md clone per the constitution header; adjust if your directory layout differs).
 

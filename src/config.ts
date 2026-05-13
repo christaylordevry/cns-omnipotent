@@ -9,6 +9,13 @@ export type RuntimeConfig = {
   defaultSearchScope?: string | undefined;
   /** Optional absolute path to Obsidian CLI binary (`CNS_OBSIDIAN_CLI`). */
   obsidianCliPath?: string | undefined;
+  /**
+   * Bot token for `vault_request_disambiguation` (Discord REST). First non-empty wins:
+   * `CNS_DISCORD_BOT_TOKEN`, `HERMES_DISCORD_TOKEN`, `DISCORD_BOT_TOKEN`.
+   */
+  discordBotToken?: string | undefined;
+  /** `#hermes` channel snowflake (`CNS_DISCORD_HERMES_CHANNEL_ID`). Required alongside token for disambiguation. */
+  discordHermesChannelId?: string | undefined;
 };
 
 /**
@@ -28,6 +35,14 @@ export type ConfigInputs = {
 const vaultRootPathSchema = z
   .string()
   .min(1, "Missing CNS_VAULT_ROOT. Set CNS_VAULT_ROOT to an existing vault directory.");
+
+function firstNonEmptyTrimmed(...candidates: (string | undefined)[]): string | undefined {
+  for (const c of candidates) {
+    const t = c?.trim();
+    if (t && t.length > 0) return t;
+  }
+  return undefined;
+}
 
 async function assertExistingDirectory(dirPath: string): Promise<void> {
   try {
@@ -83,6 +98,19 @@ export async function loadRuntimeConfig(inputs: ConfigInputs = {}): Promise<Runt
   const obsidianRaw = env.CNS_OBSIDIAN_CLI?.trim();
   const obsidianCliPath = obsidianRaw && obsidianRaw.length > 0 ? obsidianRaw : undefined;
 
-  return { vaultRoot, defaultSearchScope, obsidianCliPath };
+  const discordBotToken = firstNonEmptyTrimmed(
+    env.CNS_DISCORD_BOT_TOKEN,
+    env.HERMES_DISCORD_TOKEN,
+    env.DISCORD_BOT_TOKEN,
+  );
+  const discordHermesChannelId = firstNonEmptyTrimmed(env.CNS_DISCORD_HERMES_CHANNEL_ID);
+
+  return {
+    vaultRoot,
+    defaultSearchScope,
+    obsidianCliPath,
+    discordBotToken,
+    discordHermesChannelId,
+  };
 }
 

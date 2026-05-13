@@ -59,5 +59,31 @@ describe("loadRuntimeConfig", () => {
     });
     expect(cfg.defaultSearchScope).toBe("01-Projects");
   });
+
+  it("exposes Discord disambiguation env when set", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-config-discord-"));
+    const cfg = await loadRuntimeConfig({
+      env: {
+        CNS_VAULT_ROOT: dir,
+        CNS_DISCORD_HERMES_CHANNEL_ID: " 1500733488897462382 ",
+        HERMES_DISCORD_TOKEN: "fake-token",
+      } as NodeJS.ProcessEnv,
+    });
+    expect(cfg.discordHermesChannelId).toBe("1500733488897462382");
+    expect(cfg.discordBotToken).toBe("fake-token");
+  });
+
+  it("prefers CNS_DISCORD_BOT_TOKEN over HERMES_DISCORD_TOKEN", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-config-discord2-"));
+    const cfg = await loadRuntimeConfig({
+      env: {
+        CNS_VAULT_ROOT: dir,
+        CNS_DISCORD_BOT_TOKEN: "primary",
+        HERMES_DISCORD_TOKEN: "secondary",
+        CNS_DISCORD_HERMES_CHANNEL_ID: "1",
+      } as NodeJS.ProcessEnv,
+    });
+    expect(cfg.discordBotToken).toBe("primary");
+  });
 });
 

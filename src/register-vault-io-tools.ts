@@ -20,6 +20,10 @@ import {
   vaultLogAction,
   vaultLogActionInputSchema,
 } from "./tools/vault-log-action.js";
+import {
+  vaultRequestDisambiguation,
+  vaultRequestDisambiguationInputSchema,
+} from "./tools/vault-request-disambiguation.js";
 import { findFirstGovernedNotePathForDedupSourceUri } from "./ingest/duplicate.js";
 
 /**
@@ -36,6 +40,7 @@ export const PHASE1_VAULT_IO_TOOL_NAMES = [
   "vault_list",
   "vault_move",
   "vault_log_action",
+  "vault_request_disambiguation",
 ] as const;
 
 export type Phase1VaultIoToolName = (typeof PHASE1_VAULT_IO_TOOL_NAMES)[number];
@@ -359,6 +364,52 @@ export function registerVaultIoTools(server: McpServer, cfg: RuntimeConfig) {
     },
   );
 
+  const vault_request_disambiguation = server.registerTool(
+    "vault_request_disambiguation",
+    {
+      description:
+        "When routing is uncertain (folder, PAKE type, or target note), post a numbered disambiguation question to Discord #hermes and block until the operator replies with 1, 2, or 3 (or 1 or 2 for two candidates), or until a 5 minute timeout. Read-only: no vault writes and no audit log line. Requires CNS_DISCORD_HERMES_CHANNEL_ID and a bot token (CNS_DISCORD_BOT_TOKEN, HERMES_DISCORD_TOKEN, or DISCORD_BOT_TOKEN).",
+      inputSchema: vaultRequestDisambiguationInputSchema,
+    },
+    async (args) => {
+      try {
+        const parsed = vaultRequestDisambiguationInputSchema.safeParse(args);
+        if (!parsed.success) {
+          return callToolErrorFromCns(
+            new CnsError("SCHEMA_INVALID", "Invalid vault_request_disambiguation input.", {
+              issues: parsed.error.issues.map((i) => ({
+                path: i.path.length > 0 ? i.path.map(String).join(".") : "(root)",
+                message: i.message,
+                code: i.code,
+              })),
+            }),
+            { mcpVaultRoot: cfg.vaultRoot },
+          );
+        }
+        const token = cfg.discordBotToken?.trim();
+        const channelId = cfg.discordHermesChannelId?.trim();
+        if (!token || !channelId) {
+          return callToolErrorFromCns(
+            new CnsError(
+              "IO_ERROR",
+              "vault_request_disambiguation is not configured. Set CNS_DISCORD_HERMES_CHANNEL_ID and a bot token (CNS_DISCORD_BOT_TOKEN, HERMES_DISCORD_TOKEN, or DISCORD_BOT_TOKEN) on the MCP server process.",
+            ),
+            { mcpVaultRoot: cfg.vaultRoot },
+          );
+        }
+        const out = await vaultRequestDisambiguation(parsed.data, {
+          botToken: token,
+          channelId,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(out) }],
+        };
+      } catch (e) {
+        return handleToolInvocationCatch(e, { mcpVaultRoot: cfg.vaultRoot });
+      }
+    },
+  );
+
   const handles = {
     vault_search,
     vault_read,
@@ -369,6 +420,7 @@ export function registerVaultIoTools(server: McpServer, cfg: RuntimeConfig) {
     vault_list,
     vault_move,
     vault_log_action,
+    vault_request_disambiguation,
   };
   assertPhase1ToolSurface(handles);
   return handles;

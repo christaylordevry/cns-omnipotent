@@ -238,7 +238,7 @@ development_status:
   29-5-vault-lint-hermes-skill-and-vault-log-write: done
   29-6-dedup-guard-at-ingest-time: done
   29-7-claude-md-shim-update-and-token-budget-policy-in-agents-md: done
-  29-8-vault-request-disambiguation-mcp-tool: backlog
+  29-8-vault-request-disambiguation-mcp-tool: done
   29-9-fast-scan-index-and-session-close-integration: backlog
   29-10-hermes-thinking-commands: backlog
   epic-29-retrospective: optional

@@ -66,6 +66,14 @@ We ship a **Cursor rules** fragment (`*.mdc`) so rules stay versionable, can set
 2. **`vaultRootFromHost`** on `loadRuntimeConfig` is for **embedded use, tests, and future host wiring**. The current stdio entrypoint does **not** pass it.
 3. **Precedence:** when both could apply in programmatic calls, **`CNS_VAULT_ROOT` wins** over `vaultRootFromHost`. See `tests/vault-io/config.test.ts`.
 
+### Vault IO MCP: `vault_request_disambiguation` (Discord `#hermes`)
+
+Optional. When set on the MCP server process, the **`vault_request_disambiguation`** tool can post numbered routing questions and wait for a human operator reply in Discord.
+
+1. **`CNS_DISCORD_HERMES_CHANNEL_ID`** (required for this tool): snowflake ID of the `#hermes` text channel the bot can post in.
+2. **Bot token** (required for this tool), first non-empty wins: **`CNS_DISCORD_BOT_TOKEN`**, then **`HERMES_DISCORD_TOKEN`**, then **`DISCORD_BOT_TOKEN`**. The token must belong to a bot with **Send Messages** (and **Read Message History** for polling) in that channel.
+3. If either the channel ID or a token is missing, the tool remains registered but returns a clear **`IO_ERROR`** JSON payload explaining the missing configuration (no vault access).
+
 ---
 
 ## Grounding parity checklist

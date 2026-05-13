@@ -346,7 +346,7 @@ describe("fixture vault integration (Story 6.2)", () => {
     expect(logAfter).toBe(logBefore);
   });
 
-  it("all nine registered tool schemas reject unknown root keys (.strict sweep)", async () => {
+  it("all ten registered tool schemas reject unknown root keys (.strict sweep)", async () => {
     const vaultRoot = await prepareTestVault();
     const server = new McpServer({ name: "cns-fixture-it", version: "0.0.0" });
     const handles = registerVaultIoTools(server, cfgForVault(vaultRoot));
@@ -372,6 +372,10 @@ describe("fixture vault integration (Story 6.2)", () => {
         destination_path: "03-Resources/movable-note-renamed.md",
       },
       vault_log_action: { action: "probe", tool_used: "schema_sweep" },
+      vault_request_disambiguation: {
+        question: "Which route?",
+        candidates: ["A", "B"],
+      },
     };
 
     for (const [toolName, handle] of Object.entries(handles)) {
