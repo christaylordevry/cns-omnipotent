@@ -9,6 +9,7 @@ This directory holds the git **normative** mirror for CNS Phase 1: Foundation La
 | `CNS-Phase-1-Spec.md` | Complete Phase 1 specification: folder contract, `AGENTS.md` design, Vault IO MCP tool definitions, acceptance criteria |
 | `AGENTS.md` | Vault constitution; deploy to `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` |
 | `modules/*.md` | Vault IO and Security policy modules; deploy to `Knowledge-Vault-ACTIVE/AI-Context/modules/` |
+| `modules/vault-lint.md` | Normative four-rule vault lint contract for Epic 29 |
 | `AUDIT-PLAYBOOK.md` | Operator guide: reading `_meta/logs/agent-log.md`, correlating paths to log lines (FR23), human-only archive or trim (FR24, NFR-S3) |
 | `README.md` | This file: index, IDE shim summary, **grounding parity checklist** |
 | `shims/` | Templates for vault-root `CLAUDE.md` and Cursor rules (see below) |
