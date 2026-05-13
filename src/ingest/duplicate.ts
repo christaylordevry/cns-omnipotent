@@ -4,28 +4,97 @@ import { resolveVaultPath } from "../paths.js";
 import { vaultSearch } from "../tools/vault-search.js";
 
 /**
- * True when a governed note under `03-Resources/` already has this `source_uri` in frontmatter.
- * Uses a narrow full-text query then verifies YAML `source_uri` to avoid body-only matches.
+ * Ingest/MCP dedup-only: trim, iterative trailing `/` strip on the full string, and `http://` → `https://`.
+ * Not general-purpose URL canonicalization (queries, `www.`, fragments, punycode, host case-folding, etc.).
+ */
+export function normalizeSourceUriForDedup(uri: string): string {
+  let s = uri.trim();
+  if (/^http:\/\//i.test(s)) {
+    s = `https://${s.slice(7)}`;
+  }
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
+/** Literals that may appear in YAML `source_uri:` lines for the same dedup key (narrow vault_search queries). */
+function sourceUriVaultSearchLiteralsForDedup(trimmed: string): string[] {
+  const k = normalizeSourceUriForDedup(trimmed);
+  const literals = new Set<string>();
+  literals.add(trimmed);
+  literals.add(k);
+  if (!k.endsWith("/")) {
+    literals.add(`${k}/`);
+  }
+  if (/^https:\/\//i.test(k)) {
+    const rest = k.slice(8);
+    literals.add(`http://${rest}`);
+    literals.add(`http://${rest}/`);
+  }
+  return [...literals];
+}
+
+async function findAllGovernedPathsMatchingDedupSourceUri(
+  vaultRoot: string,
+  sourceUriTrimmed: string,
+): Promise<string[]> {
+  const seekKey = normalizeSourceUriForDedup(sourceUriTrimmed);
+  const literals = sourceUriVaultSearchLiteralsForDedup(sourceUriTrimmed);
+  const seenHitPaths = new Set<string>();
+  const matchingPaths: string[] = [];
+
+  for (const lit of literals) {
+    const query = `source_uri: ${JSON.stringify(lit)}`;
+    const res = await vaultSearch(vaultRoot, {
+      query,
+      scope: "03-Resources",
+      maxResults: 50,
+      forceNodeScanner: true,
+    });
+    for (const hit of res.hits) {
+      if (seenHitPaths.has(hit.path)) continue;
+      seenHitPaths.add(hit.path);
+      const absPath = resolveVaultPath(vaultRoot, hit.path);
+      const raw = await readFile(absPath, "utf8");
+      const { frontmatter } = parseNoteFrontmatter(raw);
+      const su = frontmatter.source_uri;
+      if (typeof su !== "string") continue;
+      if (normalizeSourceUriForDedup(su) === seekKey) {
+        matchingPaths.push(hit.path);
+      }
+    }
+  }
+  return [...new Set(matchingPaths)];
+}
+
+/**
+ * Vault-relative POSIX path to the first governed `03-Resources/` note whose PAKE `source_uri`
+ * matches `sourceUriTrimmed` under {@link normalizeSourceUriForDedup} (lexicographic tie-break).
+ */
+export async function findFirstGovernedNotePathForDedupSourceUri(
+  vaultRoot: string,
+  sourceUriTrimmed: string,
+): Promise<string | null> {
+  const t = sourceUriTrimmed.trim();
+  if (t.length === 0) return null;
+  const paths = await findAllGovernedPathsMatchingDedupSourceUri(vaultRoot, t);
+  if (paths.length === 0) return null;
+  paths.sort((a, b) => a.localeCompare(b));
+  return paths[0] ?? null;
+}
+
+/**
+ * True when a governed note under `03-Resources/` already has this `source_uri` in frontmatter
+ * (after {@link normalizeSourceUriForDedup} equivalence).
+ * Uses narrow full-text queries then verifies YAML `source_uri` to avoid body-only matches.
  */
 export async function governedNoteExistsWithSourceUri(
   vaultRoot: string,
   sourceUri: string,
 ): Promise<boolean> {
-  const query = `source_uri: ${JSON.stringify(sourceUri)}`;
-  const res = await vaultSearch(vaultRoot, {
-    query,
-    scope: "03-Resources",
-    maxResults: 50,
-    forceNodeScanner: true,
-  });
-  for (const hit of res.hits) {
-    const absPath = resolveVaultPath(vaultRoot, hit.path);
-    const raw = await readFile(absPath, "utf8");
-    const { frontmatter } = parseNoteFrontmatter(raw);
-    const su = frontmatter.source_uri;
-    if (typeof su === "string" && su === sourceUri) return true;
-  }
-  return false;
+  const paths = await findAllGovernedPathsMatchingDedupSourceUri(vaultRoot, sourceUri.trim());
+  return paths.length > 0;
 }
 
 type TitleDuplicateMatch = {

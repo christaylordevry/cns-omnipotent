@@ -20,6 +20,7 @@ import {
   vaultLogAction,
   vaultLogActionInputSchema,
 } from "./tools/vault-log-action.js";
+import { findFirstGovernedNotePathForDedupSourceUri } from "./ingest/duplicate.js";
 
 /**
  * Canonical Phase 1 Vault IO tool names (FR26 / CNS-Phase-1-Spec Tool Definitions).
@@ -214,6 +215,31 @@ export function registerVaultIoTools(server: McpServer, cfg: RuntimeConfig) {
     },
     async (args) => {
       try {
+        const trimmedSourceUri = args.source_uri?.trim();
+        if (trimmedSourceUri !== undefined && trimmedSourceUri.length > 0) {
+          const existingPath = await findFirstGovernedNotePathForDedupSourceUri(
+            cfg.vaultRoot,
+            trimmedSourceUri,
+          );
+          if (existingPath !== null) {
+            const displayUrl = trimmedSourceUri;
+            const baseMsg = `⚠️ Dedup: ${displayUrl} already exists at ${existingPath}. Skipping create.`;
+            const message = `${baseMsg} Use vault_update_frontmatter on the existing path, or other documented mutators such as vault_move and vault_append_daily (see CNS-Phase-1-Spec.md and AGENTS.md); Phase 1 has no vault_update_note tool.`;
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    dedup_warning: true,
+                    message,
+                    existing_path: existingPath,
+                  }),
+                },
+              ],
+            };
+          }
+        }
+
         const out = await vaultCreateNote(
           cfg.vaultRoot,
           {

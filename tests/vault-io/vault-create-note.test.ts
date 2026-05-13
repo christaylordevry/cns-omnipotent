@@ -1,8 +1,12 @@
-import { mkdir, mkdtemp, readFile, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { describe, expect, it } from "vitest";
+import type { RuntimeConfig } from "../../src/config.js";
+import { normalizeSourceUriForDedup } from "../../src/ingest/duplicate.js";
 import { parseNoteFrontmatter } from "../../src/pake/parse-frontmatter.js";
+import { registerVaultIoTools } from "../../src/register-vault-io-tools.js";
 import {
   buildVaultCreateNoteMarkdown,
   destinationDirectoryForCreate,
@@ -10,6 +14,43 @@ import {
   vaultCreateNote,
   vaultCreateNoteFromMarkdown,
 } from "../../src/tools/vault-create-note.js";
+
+function cfgForDedupVault(vaultRoot: string): RuntimeConfig {
+  return { vaultRoot, defaultSearchScope: "03-Resources" };
+}
+
+type ToolHandle = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  inputSchema?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: (args: any, extra: any) => Promise<unknown>;
+};
+
+async function callRegisteredTool(tool: ToolHandle, args: unknown) {
+  const data = tool.inputSchema ? tool.inputSchema.parse(args) : args;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return tool.handler(data, {} as any);
+}
+
+function governedSourceNoteWithUri(title: string, sourceUri: string): string {
+  return `---
+pake_id: "550e8400-e29b-41d4-a716-446655440099"
+pake_type: SourceNote
+title: ${JSON.stringify(title)}
+created: "2026-04-02"
+modified: "2026-04-02"
+status: draft
+confidence_score: 0.5
+verification_status: pending
+creation_method: ai
+tags: []
+source_uri: ${JSON.stringify(sourceUri)}
+---
+# ${title}
+
+Body.
+`;
+}
 
 const validBaseFm = `---
 pake_id: "550e8400-e29b-41d4-a716-446655440000"
@@ -261,5 +302,142 @@ describe("buildVaultCreateNoteMarkdown", () => {
     const { frontmatter } = parseNoteFrontmatter(markdown);
     expect(frontmatter.pake_id).toBe(pake_id);
     expect(frontmatter.source_uri).toBe("https://ex.com");
+  });
+});
+
+describe("normalizeSourceUriForDedup (Story 29.6)", () => {
+  it("strips trailing slashes iteratively and upgrades http to https", () => {
+    expect(normalizeSourceUriForDedup("  http://a.com/b//  ")).toBe("https://a.com/b");
+  });
+});
+
+describe("vault_create_note MCP dedup pre-flight (Story 29.6)", () => {
+  it("returns dedup_warning on exact source_uri match without create or audit", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-exact-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const uri = "https://example.com/story-29-6-exact";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-exact.md"),
+      governedSourceNoteWithUri("Seed Exact", uri),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Duplicate Exact",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: uri,
+    })) as { content: Array<{ type: string; text: string }>; isError?: boolean };
+
+    expect(out.isError).toBeUndefined();
+    const payload = JSON.parse(out.content[0].text) as {
+      dedup_warning?: boolean;
+      message: string;
+      existing_path: string;
+    };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-exact.md");
+    expect(payload.message.startsWith(`⚠️ Dedup: ${uri} already exists at 03-Resources/dedup-seed-exact.md. Skipping create.`)).toBe(
+      true,
+    );
+    await expect(readFile(path.join(vaultRoot, "_meta", "logs", "agent-log.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect((await readdir(path.join(vaultRoot, "03-Resources"))).filter((n) => n.endsWith(".md"))).toHaveLength(1);
+  });
+
+  it("treats trailing-slash variant as duplicate", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-slash-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const stored = "https://example.com/story-29-6-slash/";
+    const incoming = "https://example.com/story-29-6-slash";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-slash.md"),
+      governedSourceNoteWithUri("Seed Slash", stored),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Dup Slash",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: incoming,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as { dedup_warning?: boolean; existing_path: string };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-slash.md");
+  });
+
+  it("treats http/https variant as duplicate", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-scheme-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const stored = "https://example.com/story-29-6-scheme";
+    const incoming = "http://example.com/story-29-6-scheme/";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-scheme.md"),
+      governedSourceNoteWithUri("Seed Scheme", stored),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Dup Scheme",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: incoming,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as { dedup_warning?: boolean; existing_path: string };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-scheme.md");
+    expect(payload.message.startsWith(`⚠️ Dedup: ${incoming} already exists at 03-Resources/dedup-seed-scheme.md. Skipping create.`)).toBe(
+      true,
+    );
+  });
+
+  it("creates when source_uri is not a duplicate", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-new-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "other-uri.md"),
+      governedSourceNoteWithUri("Other", "https://other.example/only"),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const freshUri = "https://unique-new.example/story-29-6-nondupe";
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Brand New Dedup Note",
+      content: "# Fresh",
+      pake_type: "SourceNote",
+      tags: ["t"],
+      source_uri: freshUri,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as {
+      dedup_warning?: boolean;
+      file_path?: string;
+      pake_id?: string;
+    };
+    expect(payload.dedup_warning).toBeUndefined();
+    expect(payload.pake_id).toBeDefined();
+    expect(payload.file_path).toMatch(/^03-Resources\/brand-new-dedup-note\.md$/);
+    const disk = await readFile(path.join(vaultRoot, payload.file_path!), "utf8");
+    expect(disk).toContain(freshUri);
+    expect((await readdir(path.join(vaultRoot, "03-Resources"))).filter((n) => n.endsWith(".md"))).toHaveLength(2);
   });
 });
