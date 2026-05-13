@@ -16,6 +16,7 @@ discord:
       URL-only messages use hermes-url-ingest-vault. /triage, /approve, and /execute-approved use triage. /session-close and /session-close --dry-run use session-close.
       Do not route /session-close through URL ingest.
       Use vault-lint for /vault-lint.
+      Use vault-think for /challenge, /emerge, /ideas, /trace, /connect, /ghost, /drift.
     "1484880486785486951": |
       CNS #general auto-capture channel. For any message containing an http:// or https:// URL substring, use hermes-url-auto-capture-inbox.
       Capture only to 00-Inbox/. Do not route, move, approve, synthesize, update AGENTS, or update NotebookLM.
@@ -25,6 +26,8 @@ discord:
         - hermes-url-ingest-vault
         - triage
         - session-close
+        - vault-lint
+        - vault-think
     - id: "1484880486785486951"
       skills:
         - hermes-url-auto-capture-inbox
