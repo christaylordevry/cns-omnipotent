@@ -229,7 +229,7 @@ development_status:
   28-3-wire-general-auto-ingest: done
   epic-28-retrospective: done
 
-  epic-29: in-progress
+  epic-29: done
   29-0-token-audit-and-mcp-always-on-cleanup: done
   29-1-user-md-write-and-wire-operator-identity: done
   29-2-memory-md-schema-and-session-close-integration: done
@@ -241,4 +241,4 @@ development_status:
   29-8-vault-request-disambiguation-mcp-tool: done
   29-9-fast-scan-index-and-session-close-integration: done
   29-10-hermes-thinking-commands: done
-  epic-29-retrospective: optional
+  epic-29-retrospective: done

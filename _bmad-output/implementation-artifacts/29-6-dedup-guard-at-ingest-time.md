@@ -1,6 +1,6 @@
 # Story 29.6: Dedup guard at ingest time (MCP `vault_create_note`)
 
-Status: review
+Status: complete
 
 Epic: **29** (knowledge quality, agent memory)  
 Planning source: **`_bmad-output/planning-artifacts/epic-29-knowledge-quality-agent-memory-brief-and-story-cards.md`** (story card 29-6, appendix ingest snapshot).
