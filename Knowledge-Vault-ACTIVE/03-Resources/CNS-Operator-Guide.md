@@ -80,6 +80,8 @@ Modules load on demand when the task falls within a module's domain. The constit
 | `vault_move` | Move or rename a note, preserving backlinks | Prefers Obsidian CLI (`CNS_OBSIDIAN_CLI`) when available; falls back to filesystem move + wikilink rewrite |
 | `vault_log_action` | Write an entry to the agent action log | For operator-significant events; mutating tools already log on success |
 
+> [!note] `vault_create_note` **URL dedup (Story 29.6):** If `source_uri` is present and non-empty after trim, the tool checks governed `03-Resources/` notes first. When a duplicate is found (same URI after ingest-only normalization: trailing-slash strip and `http`→`https`), the response is JSON with `dedup_warning: true`, a message beginning `⚠️ Dedup:`, and `existing_path` — no new file and no `vault_create_note` audit line. Update the existing note with `vault_update_frontmatter` or use other documented mutators (`vault_move`, `vault_append_daily`, etc.); Phase 1 has no `vault_update_note` tool.
+
 > [!warning] `vault_create_note` outside `00-Inbox` requires valid PAKE frontmatter or the write fails with `SCHEMA_INVALID`.
 
 ### MCP operator runbook (env, rotation, smoke, Cursor parity)
