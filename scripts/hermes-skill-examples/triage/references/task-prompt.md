@@ -24,6 +24,11 @@
 - Execution handling must validate input first, derive `destination_path`, call `vault_move` exactly once, and stop.
 - Do not call `vault_log_action`. `vault_move` owns the audit line.
 
+### Story 30.1 addition: post-move synthesis gate (read-only)
+
+- After a **successful** `vault_move` on `/execute-approved`, the model runs **Post-move synthesis gate** (`## Post-move synthesis gate` below): **`vault_read_frontmatter`** on `destination_path`, then **`vault_search`** with **`scope` exactly `03-Resources/`** and **`query`** = trimmed frontmatter **`source_uri`**. No extra mutators.
+- This path is **not** `/triage` candidate discovery; it does **not** reuse the “list/search only under `00-Inbox/`” rule from step A/B.
+
 ### Story 27.6 addition: discard safety and non-destructive guarantees
 
 - Hermes must **not** delete, truncate, or “discard” notes via MCP delete tools (**Phase 1 does not expose `vault_delete` / `vault_trash`**—do not assume them), shell **`rm`**, or filesystem bypasses.
@@ -176,7 +181,18 @@ No vault tools were run; no actions taken.
 - **audit:** `vault_move` emitted the audit line in `_meta/logs/agent-log.md`.
 ```
 
-Then stop. Do not emit a triage session header and do not call any other mutating Vault IO tool.
+Then continue with **Post-move synthesis gate (Story 30.1)** below. Do not emit a triage session header. After the gate completes, **stop**; do not call any mutating Vault IO tool beyond the finished `vault_move`.
+
+## Post-move synthesis gate (Story 30.1)
+
+**When:** only immediately after step **6** succeeds (`vault_move` returned success and you emitted **Approved move executed**). **Skip entirely** on validation failure (step 5) or move failure (step 7).
+
+**Tools (read-only):** `vault_read_frontmatter` once, then optionally `vault_search` once. No `vault_move`, `vault_create_note`, `vault_log_action`, or other mutators.
+
+1. Call **`vault_read_frontmatter`** with `{ "path": "<destination_path>" }` (same path as step 6). Parse the JSON tool result; locate the frontmatter object for `destination_path` and read string fields **`source_uri`** and **`title`** (trim whitespace). If **`title`** is missing or empty, set **`title`** to the markdown basename of `destination_path`.
+2. If **`source_uri`** is missing, empty, or does **not** start with `http` (case-insensitive, so `http://` and `https://` qualify): post exactly `🔬 Synthesis skipped — no source_uri on destination note` to Discord and **stop** (do not call `vault_search`).
+3. Dedup: call **`vault_search`** with `{ "query": "<source_uri>", "scope": "03-Resources/", "max_results": 50 }`. If the parsed JSON includes **any** hit whose path is a non-empty vault-relative `.md` under `03-Resources/`, pick the **first** such path as **`existing_path`** and post exactly `⚠️ Synthesis skipped — SynthesisNote already exists for <source_uri>: <existing_path>` (substitute the real URI string and path; no angle brackets in the final message). Then **stop**.
+4. Otherwise post `🔬 Synthesis gate clear — queuing research for <title>` (substitute the resolved title). On the **same** Discord reply, add one trailing line for downstream automation (Story 30.2): `SYNTHESIS_CLEAR destination_path=<destination_path> source_uri=<source_uri> title=<title>` with the three values substituted (no literal angle brackets). Then **stop**.
 
 7. If `vault_move` returns or throws an error, emit only:
 

@@ -116,6 +116,17 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("exactly four tokens: `/execute-approved`, `source_path`, `--to`, `destination_dir`"));
   });
 
+  it("Story 30.1 post-move synthesis gate follows successful vault_move", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("## Post-move synthesis gate (Story 30.1)"));
+    assert.ok(body.includes("🔬 Synthesis skipped — no source_uri on destination note"));
+    assert.ok(body.includes("⚠️ Synthesis skipped — SynthesisNote already exists for"));
+    assert.ok(body.includes("🔬 Synthesis gate clear — queuing research for"));
+    assert.ok(body.includes("SYNTHESIS_CLEAR"));
+    assert.ok(body.includes('"scope": "03-Resources/"'));
+    assert.ok(body.includes("Story 30.1 addition: post-move synthesis gate"));
+  });
+
   it("task-prompt defines bounded execution failure posture", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("## Approved move failed"));
