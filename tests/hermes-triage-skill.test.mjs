@@ -123,7 +123,7 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("⚠️ Synthesis skipped — SynthesisNote already exists for"));
     assert.ok(body.includes("🔬 Synthesis gate clear — queuing research for"));
     assert.ok(body.includes("SYNTHESIS_CLEAR"));
-    assert.ok(body.includes('"scope": "03-Resources/"'));
+    assert.ok(body.includes("ignore self"));
     assert.ok(body.includes("Story 30.1 addition: post-move synthesis gate"));
   });
 
