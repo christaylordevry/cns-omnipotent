@@ -13,7 +13,7 @@ const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Op
 describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
   it("SKILL.md declares scoped discovery, approvals, execution, and version bump", () => {
     const body = readFileSync(join(skillDir, "SKILL.md"), "utf8");
-    assert.ok(body.includes("version: 1.5.0"));
+    assert.ok(body.includes("version: 1.6.0"));
     assert.ok(body.includes("recursive"));
     assert.ok(
       body.includes("vault_search") &&
@@ -26,10 +26,25 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("/approve"));
     assert.ok(body.includes("/execute-approved"));
     assert.ok(body.includes("vault_move"));
-    assert.ok(body.includes("Stories 27.1 to 27.6"));
+    assert.ok(body.includes("Stories 27.1 to 27.6 and 30.1 to 30.3"));
     assert.ok(body.includes("## Non-destructive guarantees (Story 27.6)"));
     assert.ok(body.includes("`vault_delete`"));
     assert.ok(body.includes("human-only"));
+  });
+
+  it("Story 30.3 SKILL.md declares post-move synthesis capability", () => {
+    const body = readFileSync(join(skillDir, "SKILL.md"), "utf8");
+    assert.ok(body.includes("## Post-move synthesis trigger"));
+    assert.ok(body.includes("auto-synthesis on approval"));
+    assert.ok(body.includes("run-chain.ts"));
+    assert.ok(body.includes("verification_status: pending"));
+    assert.ok(
+      body.includes(
+        "⚠️ Synthesis skipped — SynthesisNote already exists for <source_uri>: <existing_path>",
+      ),
+    );
+    assert.ok(body.includes("vault_update_frontmatter"));
+    assert.ok(body.includes("synthesis.insight_note.vault_path"));
   });
 
   it("task-prompt mandates recursive vault_list and sort rules", () => {

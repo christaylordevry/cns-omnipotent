@@ -250,6 +250,16 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: Epic 30 E2E (Story 30-3, 2026-05-16)
+
+- **`/approve` intercepted by Hermes gateway built-in** — triage skill `/approve` routing conflict; operator workaround required until gateway/skill routing is fixed. **Epic 31 candidate:** triage command routing.
+- **`/execute-approved` requires omitting leading `/`** — same gateway slash-command routing class as above.
+- **`vault_create_note` routes by `pake_type` only; ignores caller-specified path** — E2E Inbox test notes must be created via direct filesystem write under `00-Inbox/` (already noted in summary table row 26; reinforced by 30-3 live run).
+
+**Class:** (b) Phase 2 / Epic 31 backlog unless operator guide workaround is documented first.
+
+---
+
 ## Deferred from: code review of 22-1-perplexity-formal-mcp (2026-04-30)
 
 - `perplexityProbe()` tries only the first query; a single transient Perplexity failure marks `perplexity_skipped=true` for the entire sweep. Consider retrying, probing more than one query, or treating probe failure as “service degraded” while still attempting filing for other queries.
