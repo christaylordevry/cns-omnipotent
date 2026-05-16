@@ -2,12 +2,12 @@
 story_id: 32-1
 epic: 32
 title: vault-graduate-skill-daily-note-idea-promotion
-status: review
+status: done
 ---
 
 # Story 32.1: vault-graduate-skill-daily-note-idea-promotion
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide for Epic 32 graduate skill. -->
 
@@ -50,7 +50,7 @@ so that **half-formed ideas do not stay buried in daily logs**.
    - **e.** For each hit: **`vault_create_note`** an InsightNote in **`03-Resources/`** with:
      - **`pake_type`:** `InsightNote`
      - **`title`:** idea text with **`#graduate`** stripped (trimmed)
-     - **`source_uri`:** `vault://DailyNotes/<filename>` (e.g. `vault://DailyNotes/2026-05-17.md`)
+     - **`source_uri`:** `vault://DailyNotes/<filename>#<url-encoded-title-slug>` where title-slug is the idea title lowercased with spaces replaced by hyphens (e.g. `vault://DailyNotes/2026-05-17.md#my-idea-title`). This format ensures each InsightNote from the same daily note has a unique source_uri, bypassing vault_create_note dedup collision.
      - **`creation_method`:** `ai` (set by Vault IO create path — do not duplicate in body)
      - **`status`:** `draft` (set by Vault IO create path)
      - **`content` (body):** blockquote source line plus context:
@@ -144,7 +144,7 @@ Call with **body-only** `content` (no YAML in content). Tool auto-sets **`status
 |----------|--------|
 | `pake_type` | `InsightNote` |
 | `title` | Stripped idea text |
-| `source_uri` | `vault://DailyNotes/<filename>` |
+| `source_uri` | `vault://DailyNotes/<filename>#<url-encoded-title-slug>` (title lowercased, spaces → hyphens) |
 | `tags` | `["graduate", "daily-note", ...]` |
 | `confidence_score` | `0.5` unless operator policy says otherwise |
 
@@ -278,7 +278,7 @@ _(none)_
 ### Completion Notes List
 
 - Added Hermes **`vault-graduate`** skill mirror (`SKILL.md` v1.0.0 + `references/task-prompt.md`) with `/graduate` and `/graduate --days <n>` triggers, `#graduate` scan, InsightNote create mapping, title dedup, Option B **`vault_append_daily`** receipt, Discord templates.
-- Token budgets (bytes ÷ 4): **`SKILL.md`** 2657 → ~664 (≤800); **`task-prompt.md`** 3762 → ~940 (≤1200).
+- Token budgets (bytes ÷ 4): **`SKILL.md`** 2657 → ~664 (≤800); **`task-prompt.md`** 4276 → ~1069 (≤1200).
 - Installed to **`~/.hermes/skills/cns/vault-graduate/`**; wired **`vault-graduate`** in **`~/.hermes/config.yaml`** for `#hermes` bindings + channel prompt.
 - **`npm test`** and **`bash scripts/verify.sh`** pass. Standing operator-guide §15.x task remains for vault doc (not in repo File List).
 
@@ -289,7 +289,7 @@ _(none)_
 - `scripts/install-hermes-skill-vault-graduate.sh`
 - `tests/hermes-vault-graduate-skill.test.mjs`
 - `_bmad-output/implementation-artifacts/32-1-vault-graduate-skill-daily-note-idea-promotion.md` (this story)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (32-1 → review)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (32-1 → done)
 - `~/.hermes/skills/cns/vault-graduate/` (installed copy)
 - `~/.hermes/config.yaml` (channel binding + prompt; operator tree)
 
@@ -298,7 +298,7 @@ _(none)_
 | Check | Result |
 |-------|--------|
 | Story file created | done |
-| Token budgets (`wc -c ÷ 4`) | SKILL.md 2657 (~664); task-prompt.md 3762 (~940) — within AC4 |
+| Token budgets (`wc -c ÷ 4`) | SKILL.md 2657 (~664); task-prompt.md 4276 (~1069) — within AC4 |
 | `npm test` | pass |
 | `bash scripts/verify.sh` | pass |
 
@@ -308,3 +308,4 @@ _(none)_
 - 2026-05-17: AC2f locked to **Option B** — graduation receipt on today's daily only (`vault_append_daily` default); source daily cited in parentheses; no MCP extension.
 - 2026-05-17: dev-story complete — skill package, install script, regression tests, Hermes config wiring; status → review.
 - 2026-05-17: Code review patch — per-idea `source_uri` with `#<url-encoded-title-slug>` fragment (P1 dedup collision fix); reverted out-of-scope `AGENTS.md` to v2.0.2 with Epic 32 in-progress (P2).
+- 2026-05-17 — AC2e source_uri fragment documented; AC4 verification record updated to match patched task-prompt.md size.
