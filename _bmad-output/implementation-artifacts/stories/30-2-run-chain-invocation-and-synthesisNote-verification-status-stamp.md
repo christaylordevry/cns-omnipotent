@@ -2,7 +2,7 @@
 story_id: 30-2
 epic: 30
 title: run-chain invocation and SynthesisNote verification_status stamp
-status: review
+status: done
 ---
 
 ## Story
@@ -80,6 +80,7 @@ _(Filled by implementer.)_
 
 - **2026-05-16:** Story 30-2 implemented — gated `vault_update_frontmatter` + `run-chain.ts` synthesis section after `SYNTHESIS_CLEAR`; regressions + operator guide §15.3; Hermes mirror sync.
 - **2026-05-16:** Code review patch — corrected `ChainRunResult` JSON path from nonexistent `pake_validation.insight_note_path` / `candidates[].vault_path` fallback to `synthesis.insight_note.vault_path`; repo and live Hermes prompts synced; regression updated. Status remains `review` for second code-review pass.
+- **2026-05-16:** Operator Guide stale-path fix — version history now names `synthesis.insight_note.vault_path` as the raw `ChainRunResult` path and removes the old fallback wording.
 
 ## Dev Agent Record
 

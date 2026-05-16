@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-13
+modified: 2026-05-16
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -424,6 +424,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-07 | 1.23.0 | Hermes `#general` URL auto-capture: any `http://` or `https://` URL substring writes an unstructured capture to `00-Inbox/`, with SSRF refusals, 30s fetch budget, 3 URL cap, and manual `/triage` remaining authoritative | 28-3-wire-general-auto-ingest |
 | 2026-05-13 | 1.24.0 | Session close: documents Step 6.6 `vault-fast-scan-index.md` regeneration (governed folders 01–03, token cap); §2 grounding table lists the index; repo helper `npm run vault:fast-scan` | 29-9-fast-scan-index-and-session-close-integration |
 | 2026-05-13 | 1.25.0 | Hermes vault-think: `/challenge`, `/emerge`, `/ideas` read-only cognition via `vault_search` + `vault_read`; v1.1 stubs `/trace`, `/connect` (Obsidian Local REST API dependency), `/ghost`, `/drift`; install script and `#hermes` binding notes | 29-10-hermes-thinking-commands |
+| 2026-05-16 | 1.26.0 | Hermes Epic 30: `/execute-approved` success may run **`scripts/run-chain.ts`** post-`SYNTHESIS_CLEAR`; parse **`synthesis.insight_note.vault_path`** from the raw **`ChainRunResult`** JSON, then stamp **`verification_status: pending`** with **`vault_update_frontmatter`**; normative prompts in **`references/task-prompt.md`** | 30-2-run-chain-invocation-and-synthesisNote-verification-status-stamp |
 
 ---
 
@@ -613,6 +614,7 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
 - **Execute one approved move (governed mutation, Story 27.5):** `/execute-approved <00-Inbox/path.md> --to <destination_dir>/`
   - Hermes derives `destination_path` as `<destination_dir>/<basename(source_path)>`, then calls `vault_move` exactly once.
   - On success, `vault_move` emits the audit line in `_meta/logs/agent-log.md`; Hermes must not call `vault_log_action` separately.
+  - **Stories 30.1–30.2 (post-move):** Hermes optionally runs **`scripts/run-chain.ts`** (env from `.env.live-chain`, `--topic` / `--query` sourced from destination frontmatter **`source_uri`**) and may call **`vault_update_frontmatter`** **once** to set **`verification_status: pending`** on the new synthesis note; failures post warnings and halt without stray mutations.
   - The command must have exactly four ASCII-whitespace-split tokens; Hermes rejects extra text before any Vault IO call.
 - For `/triage`, Hermes replies with:
   - session header (ISO 8601 UTC timestamp + per-run session id)
@@ -631,7 +633,7 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
 
 - **Preview and approval are non-mutating.** No moves, renames, discards, frontmatter updates, daily appends, or audit writes occur during `/triage` or `/approve`.
 - **Approvals are non-mutating.** `/approve` records intent only and must respond with an explicit “approved for later execution only; no actions taken”.
-- **Execution is narrow.** `/execute-approved` can move exactly one Inbox markdown file through `vault_move`; there is no bulk move, delete, discard, or archive behavior.
+- **Execution stays narrow.** `/execute-approved` issues exactly **one** `vault_move`; **Story 30-2** may add **one** `vault_update_frontmatter` afterward on the generated synthesis note for `verification_status: pending` once `run-chain` succeeds. No bulk moves, deletes, inbox-wide frontmatter churn, or archival automation.
 - **Discard / delete / archive vocabulary is safety-mapped.** In Hermes triage, those words never mean silent destruction. The automated path is governed relocation: `/execute-approved <00-Inbox/path.md> --to <destination_dir>/` calls exactly one `vault_move` to an explicit operator-chosen destination. Permanent removal is human-only outside Hermes.
 - **Scope is Inbox-only.** Listing and optional search stay within **`00-Inbox/`** (no full-vault scans for triage).
 
