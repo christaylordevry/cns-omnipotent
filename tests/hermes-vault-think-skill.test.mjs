@@ -10,14 +10,14 @@ const skillPath = join(skillDir, "SKILL.md");
 const taskPromptPath = join(skillDir, "references/task-prompt.md");
 
 describe("Story 31-3 Hermes vault-think skill mirror", () => {
-  it("defines the skill package at v1.1.1 with live trace, connect, and today", () => {
+  it("defines the skill package at v1.2.0 with live trace, connect, today, ghost, and drift", () => {
     assert.ok(existsSync(skillPath));
     assert.ok(existsSync(taskPromptPath));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-vault-think.sh")));
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-think"));
-    assert.ok(body.includes("version: 1.1.1"));
+    assert.ok(body.includes("version: 1.2.0"));
     assert.ok(body.includes("## When to use"));
     assert.ok(body.includes("/challenge"));
     assert.ok(body.includes("/emerge"));
@@ -26,11 +26,12 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
     assert.ok(body.includes("/today --brief"));
     assert.ok(body.includes("/trace "));
     assert.ok(body.includes("/connect "));
+    assert.ok(body.includes("/ghost "));
+    assert.ok(body.includes("/drift"));
+    assert.ok(!body.includes("v1.1 stubs"));
+    assert.ok(!body.includes("No (v1.1)"));
     assert.ok(body.includes("OBSIDIAN_API_KEY"));
     assert.ok(body.includes("https://127.0.0.1:27124"));
-    assert.ok(!body.includes("No (v1.1)") || body.includes("ghost") && body.includes("drift"));
-    assert.ok(body.includes("/ghost"));
-    assert.ok(body.includes("/drift"));
     assert.ok(body.includes("Obsidian Local REST API"));
     assert.ok(body.includes("vault_list"));
   });
@@ -53,7 +54,7 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
     }
   });
 
-  it("documents v1.0 output templates and ghost/drift stub refusal only", () => {
+  it("documents v1.0 output templates without ghost/drift stub refusal", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("⚡ Challenge:"));
     assert.ok(body.includes("Supporting evidence from your vault:"));
@@ -66,12 +67,10 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
     assert.ok(body.includes("🤝 People to reach out to:"));
     assert.ok(body.includes("🔍 Topics to investigate:"));
     assert.ok(body.includes("✍️ Things to write:"));
-    assert.ok(body.includes("v1.1-not-active"));
+    assert.ok(!body.includes("v1.1-not-active"));
+    assert.ok(!body.includes("v1.1-not-active — /ghost and /drift"));
     assert.ok(body.includes("/ghost"));
     assert.ok(body.includes("/drift"));
-    assert.ok(body.includes("/trace, /connect, or /today"));
-    assert.ok(!body.includes("/trace, /connect, /ghost"));
-    assert.ok(!body.includes("/trace, /connect, /ghost, and /drift"));
   });
 
   it("documents trace and connect REST procedures with curl and Discord templates", () => {
@@ -98,11 +97,11 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
 });
 
 describe("Story 32-2 Hermes vault-think /today", () => {
-  it("documents /today triggers, procedure, and v1.1.1 carve-out for vault_list", () => {
+  it("documents /today triggers, procedure, and vault_list carve-out", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.1.1"));
+    assert.ok(skill.includes("version: 1.2.0"));
     assert.ok(skill.includes("/today"));
     assert.ok(skill.includes("/today --brief"));
 
@@ -122,7 +121,11 @@ describe("Story 32-2 Hermes vault-think /today", () => {
     assert.ok(task.includes("Brief (`--brief`) — exactly 3 lines"));
     assert.ok(task.includes("no project section"));
     assert.ok(task.match(/vault_list.*DailyNotes/s) || task.includes("`vault_list`** `DailyNotes/`"));
-    assert.ok(task.includes("**`/today` path only:** may call **`vault_list`**"));
+    assert.ok(
+      task.includes("**`/today` and `/drift` paths:**") ||
+        task.includes("**`/today`**, **`/drift`:**") ||
+        task.includes("**`/today`:**"),
+    );
   });
 
   it("keeps v1.0 challenge/emerge/ideas on vault_search without vault_list", () => {
@@ -135,5 +138,48 @@ describe("Story 32-2 Hermes vault-think /today", () => {
       assert.ok(section.includes("vault_search"), "v1.0 section must use vault_search");
       assert.ok(!section.includes("vault_list"), "v1.0 section must not use vault_list");
     }
+  });
+});
+
+describe("Story 32-3 Hermes vault-think /ghost and /drift", () => {
+  it("activates v1.2.0 ghost and drift procedures with MCP caps and templates", () => {
+    const skill = readFileSync(skillPath, "utf8");
+    const task = readFileSync(taskPromptPath, "utf8");
+
+    assert.ok(skill.includes("version: 1.2.0"));
+    assert.ok(skill.includes("/ghost "));
+    assert.ok(skill.includes("/drift"));
+
+    assert.ok(task.includes("### 1c) `/ghost`"));
+    assert.ok(task.includes("### 1d) `/drift`"));
+    assert.ok(task.includes("vault-think: ghost requires question"));
+    assert.ok(task.includes("### `/ghost`"));
+    assert.ok(task.includes("### `/drift`"));
+    assert.ok(task.includes("≤**6** search, ≤**8** read") || task.includes("caps ≤**6** search, ≤**8** read"));
+    assert.ok(task.includes("ghost: no vault writing found on this topic."));
+    assert.ok(task.includes("👻 Ghost —"));
+    assert.ok(task.includes("Sources: <comma-separated note titles>"));
+
+    const ghostSection = task.slice(task.indexOf("### `/ghost`"), task.indexOf("### `/drift`"));
+    assert.ok(ghostSection.includes("vault_search"));
+    assert.ok(ghostSection.includes("vault_read"));
+    assert.ok(!ghostSection.includes("vault_list"));
+
+    const driftSection = task.slice(task.indexOf("### `/drift`"), task.indexOf("### `/today`"));
+    assert.ok(driftSection.includes("vault_list"));
+    assert.ok(driftSection.includes("DailyNotes/"));
+    assert.ok(driftSection.includes("14"));
+    assert.ok(driftSection.includes("≥3"));
+    assert.ok(driftSection.includes("03-Resources/"));
+    assert.ok(driftSection.includes("SynthesisNote"));
+    assert.ok(driftSection.includes("vault_read_frontmatter"));
+    assert.ok(driftSection.includes("resolved only when a matching note has **`pake_type: SynthesisNote`**"));
+    assert.ok(driftSection.includes("non-`SynthesisNote` do **not** count as resolved"));
+    assert.ok(!driftSection.includes("unresolved if no `pake_type: SynthesisNote` hit and no title match"));
+    assert.ok(driftSection.includes("🌀 Drift"));
+    assert.ok(driftSection.includes("Circling without landing:"));
+    assert.ok(driftSection.match(/\/graduate|run-chain/));
+    assert.ok(task.includes("**`/ghost`:**") || task.includes("**`/ghost` path:**"));
+    assert.ok(task.includes("v1.2.0"));
   });
 });

@@ -3,7 +3,7 @@
 - **v1.0:** Vault IO MCP — `vault_search` + `vault_read` only.
 - **v1.1 live:** Obsidian Local REST API — **terminal `curl -k`** only (no new Node dependencies).
 - **v1.1.1:** `/today`, `/today --brief` — Vault IO **`vault_list`** + **`vault_read`** only.
-- **v1.1 stubs:** `/ghost`, `/drift` only.
+- **v1.2.0:** `/ghost`, `/drift` — Vault IO read-only (`vault_search` + `vault_read`; `/drift` also **`vault_list`** + **`vault_read_frontmatter`**).
 
 ## 0) Vault root, REST env, and clocks
 
@@ -11,7 +11,7 @@
 
    - If environment variable `CNS_VAULT_ROOT` is set and non-empty after trim, use it.
    - Else read `~/.hermes/config.yaml` as text, parse YAML mentally, and read `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
-   - If still unset on a v1.0 or **`/today`** command path: reply exactly `vault-think: no-vault-root` and **stop**.
+   - If still unset on a v1.0, **`/today`**, **`/ghost`**, or **`/drift`** command path: reply exactly `vault-think: no-vault-root` and **stop**.
 
 2. Resolve **Obsidian Local REST** (required for `/trace` and `/connect` only):
 
@@ -38,29 +38,30 @@
 
 Let **`raw`** = operator message with leading and trailing ASCII whitespace removed.
 
-### 1a) v1.1 stub triggers (handle before v1.0 and before trace/connect)
-
-If **`raw`** equals `/ghost`, starts with `/ghost `, or equals `/drift` (optional trailing spaces only for `/drift`), reply **exactly**:
-
-```text
-vault-think: v1.1-not-active — /ghost and /drift are documented stubs only. Use /challenge, /emerge, /ideas, /trace, /connect, or /today.
-```
-
-Then **stop** (no MCP calls, no REST calls).
-
 ### 1b) `/today` — route to §3
 
 - `/today` or `/today` + trailing spaces only → full briefing.
 - `/today --brief` (+ trailing spaces only) → 3-line brief.
 - Other `/today…` → `vault-think: bad-trigger`; no vault I/O.
 
-Needs **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
+### 1c) `/ghost` — route to §3
 
-### 1c) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
+- **`/ghost `** + non-empty remainder → **§3 `/ghost`** (`**question**` = remainder trimmed).
+- **`/ghost`** only (no question) → `vault-think: ghost requires question`; stop.
+- Other **`/ghost…`** → `vault-think: bad-trigger`; stop.
+
+### 1d) `/drift` — route to §3
+
+- **`/drift`** or **`/drift`** + trailing ASCII whitespace only → **§3 `/drift`**.
+- **`/drift`** + other args → `vault-think: bad-trigger`; stop.
+
+**§1b–1d:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
+
+### 1e) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
 
 If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, or starts with `/connect `, continue to **§3** (do not treat as bad-trigger).
 
-### 1d) v1.0 bad trigger
+### 1f) v1.0 bad trigger
 
 If **`raw`** does not match any v1.0 trigger in §2, reply exactly `vault-think: bad-trigger` and **stop** (no MCP calls).
 
@@ -277,6 +278,54 @@ Summary: [1-2 sentences]
 
 6. **No bridge** within caps: reply exactly `vault-think: connect no direct connection found`.
 
+### `/ghost`
+
+§1c. MCP **`vault_search`** + **`vault_read`** only; caps ≤**6** search, ≤**8** read. Cap hit → `vault-think: incomplete`.
+
+1. **2–4** search strings from **`question`** (≥3 chars; drop stopwords).
+2. **`vault_search`** `max_results: 50`; rotate `01-Projects/`, `02-Areas/`, `03-Resources/`, optional `DailyNotes/` (≤**6** calls).
+3. Dedupe POSIX paths; rank operator-voice relevance; **`vault_read`** ≤**8** paths.
+4. Synthesize first-person answer from read bodies only (no external facts).
+5. No operator-voice content → exactly `ghost: no vault writing found on this topic.`
+6. Else Discord **only**:
+
+```text
+👻 Ghost — <question>
+
+<synthesized answer in operator voice>
+
+Sources: <comma-separated note titles>
+```
+
+(`title` FM or basename)
+
+### `/drift`
+
+§1d. MCP **`vault_list`**, **`vault_read`**, **`vault_search`**, **`vault_read_frontmatter`**; caps ≤**1** list, ≤**14** daily reads, ≤**8** search, ≤**8** frontmatter reads. Cap hit → `vault-think: incomplete`.
+
+1. **`window_start_utc`** = **`today_utc`** − **14** UTC days (same as **`/emerge`**).
+2. **`vault_list`** `DailyNotes/`; pick `YYYY-MM-DD.md` in window, newest first (≤**14**).
+3. **`vault_read`** each; extract terms (headings, bold, Title Case). **≥3** mentions across corpus.
+4. Per recurring term (≤**8**): **`vault_search`** `03-Resources/`; inspect each candidate hit's frontmatter context, or call **`vault_read_frontmatter`** when `pake_type` is absent/ambiguous. A term is resolved only when a matching note has **`pake_type: SynthesisNote`** and its title or search context matches the term (case-insensitive). Title matches on `SourceNote`, `InsightNote`, or any non-`SynthesisNote` do **not** count as resolved.
+5. Discord **only** — empty:
+
+```text
+🌀 Drift
+
+No recurring concepts circling without synthesis in the last 14 days.
+```
+
+With unresolved (sort by **`n`** desc; ≤**8** bullets):
+
+```text
+🌀 Drift
+
+Circling without landing:
+• <concept> (<n> mentions, no synthesis)
+
+Consider /graduate or run-chain on these.
+```
+
 ### `/today`
 
 §1b match. MCP: **`vault_list`**, **`vault_read`** only. Caps: ≤3 list, ≤6 read (1 daily + ≤5 projects). Cap hit → `vault-think: incomplete`.
@@ -314,7 +363,7 @@ Summary: [1-2 sentences]
 
 ## 4) Forbidden tools reminder
 
-**`/today` path only:** may call **`vault_list`** and **`vault_read`** as in §3 **`/today`**.
+**`/today`:** **`vault_list`** + **`vault_read`** per §3. **`/drift`:** **`vault_list`**, **`vault_read`**, **`vault_search`** in **`03-Resources/`**, and **`vault_read_frontmatter`** only to verify candidate synthesis note PAKE type. **`/ghost`:** **`vault_search`** + **`vault_read`** only.
 
 **All other commands:** do **not** call **`vault_list`**, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
 
