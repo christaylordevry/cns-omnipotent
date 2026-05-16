@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-16
+modified: 2026-05-17
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -426,6 +426,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-13 | 1.25.0 | Hermes vault-think: `/challenge`, `/emerge`, `/ideas` read-only cognition via `vault_search` + `vault_read`; v1.1 stubs `/trace`, `/connect` (Obsidian Local REST API dependency), `/ghost`, `/drift`; install script and `#hermes` binding notes | 29-10-hermes-thinking-commands |
 | 2026-05-16 | 1.26.0 | Hermes Epic 30: `/execute-approved` success may run **`scripts/run-chain.ts`** post-`SYNTHESIS_CLEAR`; parse **`synthesis.insight_note.vault_path`** from the raw **`ChainRunResult`** JSON, then stamp **`verification_status: pending`** with **`vault_update_frontmatter`**; normative prompts in **`references/task-prompt.md`** | 30-2-run-chain-invocation-and-synthesisNote-verification-status-stamp |
 | 2026-05-16 | 1.27.0 | Hermes **`vault-think` v1.1.0:** `/trace` and `/connect` live via **Obsidian Local REST API** (`curl -k` to `https://127.0.0.1:27124`, env **`OBSIDIAN_API_KEY`**); `/ghost`, `/drift` remain stubs | 31-3-obsidian-local-rest-api-and-thinking-command-activation |
+| 2026-05-17 | 1.28.0 | Hermes **`vault-think` v1.1.1:** `/today` and `/today --brief` daily planning briefing via **`vault_list`** + **`vault_read`** (read-only; no inbox reads) | 32-2-vault-think-today-command-daily-planning-briefing |
 
 ---
 
@@ -721,9 +722,11 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Destination: `~/.hermes/skills/cns/hermes-url-auto-capture-inbox/`
 - Binding: add a separate `discord.channel_skill_bindings` entry for `1484880486785486951` with only `hermes-url-auto-capture-inbox`. Preserve the existing `#hermes` skills list in your live `~/.hermes/config.yaml` (see §15.3–15.4 and §15.6 for current CNS skills).
 
-### 15.6 Vault think (`vault-think`, Epic 29–31)
+### 15.6 Vault think (`vault-think`, Epic 29–32)
 
 **v1.0 (Vault IO MCP):** `/challenge`, `/emerge`, and `/ideas` are **read-only** Hermes commands in **`#hermes`** that ground replies via **`vault_search`** and **`vault_read`** only (no mutators, no `vault_list`, no Obsidian CLI).
+
+**v1.1.1 (Vault IO MCP):** `/today` and `/today --brief` produce a **daily planning briefing** from **`DailyNotes/{YYYY-MM-DD}.md`** (UTC), up to **5** recent **`01-Projects/`** notes (by list `modified`), and an **`00-Inbox/`** file count only. Allowed tools: **`vault_list`**, **`vault_read`** — **no mutators**, **no** `vault_read` on inbox items. Requires **`CNS_VAULT_ROOT`**; does **not** use Obsidian REST.
 
 **v1.1 (Obsidian Local REST API):** `/trace` and `/connect` query the **link graph** via terminal **`curl -k`** against the operator’s Local REST API (default **`https://127.0.0.1:27124`**). Required env: **`OBSIDIAN_API_KEY`**. Optional override: **`OBSIDIAN_LOCAL_REST_URL`**. Install the **Local REST API** plugin (Adam Coddington) in Obsidian on Windows; from WSL2, `curl -sk -H "Authorization: Bearer <api-key>" "${OBSIDIAN_LOCAL_REST_URL:-https://127.0.0.1:27124}/"` should return **HTTP 200**.
 
@@ -734,6 +737,8 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - **`/challenge `** + belief or topic (non-empty) — pressure-test the claim using supporting and contradicting lines from your notes, then a short synthesis (**The tension:**).
 - **`/emerge`** — scan governed folders (`01-Projects/`, `02-Areas/`, `03-Resources/`) for notes **modified in the last 60 days (UTC)** and surface an **unsynthesized** recurring theme across **≥2** notes (see skill task prompt for deterministic search seeds).
 - **`/ideas`** — fixed multi-query pass over governed scopes, then a four-quadrant **Vault Idea Report** (tools to build, people, topics to investigate, things to write).
+- **`/today`** — full briefing: today’s daily note summary, up to five active projects, inbox count, optional grounded theme line.
+- **`/today --brief`** — exactly three lines: date header, daily note summary, inbox count (no project list).
 - **`/trace `** + vault-relative path or note title — backlinks and forward wikilinks for that note (REST `GET /vault/{filename}`, `POST /search/simple/`).
 - **`/connect `** + concept A + space + concept B — bridging notes referencing both concepts (REST `POST /search/simple/` and optional `POST /search/` DQL/JsonLogic).
 
@@ -748,4 +753,4 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Repo mirror: `scripts/hermes-skill-examples/vault-think/`
 - Install helper: `bash scripts/install-hermes-skill-vault-think.sh`
 - Destination: `~/.hermes/skills/cns/vault-think/`
-- Binding: add **`vault-think`** to the **`#hermes`** `discord.channel_skill_bindings` entry beside the other CNS skills; extend `discord.channel_prompts` for that channel id so the model routes `/challenge`, `/emerge`, `/ideas`, `/trace`, `/connect`, `/ghost`, `/drift` through **vault-think**.
+- Binding: add **`vault-think`** to the **`#hermes`** `discord.channel_skill_bindings` entry beside the other CNS skills; extend `discord.channel_prompts` for that channel id so the model routes `/challenge`, `/emerge`, `/ideas`, `/today`, `/today --brief`, `/trace`, `/connect`, `/ghost`, `/drift` through **vault-think**.

@@ -2,15 +2,16 @@
 
 - **v1.0:** Vault IO MCP — `vault_search` + `vault_read` only.
 - **v1.1 live:** Obsidian Local REST API — **terminal `curl -k`** only (no new Node dependencies).
+- **v1.1.1:** `/today`, `/today --brief` — Vault IO **`vault_list`** + **`vault_read`** only.
 - **v1.1 stubs:** `/ghost`, `/drift` only.
 
 ## 0) Vault root, REST env, and clocks
 
-1. Resolve directory **`CNS_VAULT_ROOT`** (required for v1.0 commands only):
+1. Resolve directory **`CNS_VAULT_ROOT`** (required for v1.0 and **`/today`** commands):
 
    - If environment variable `CNS_VAULT_ROOT` is set and non-empty after trim, use it.
    - Else read `~/.hermes/config.yaml` as text, parse YAML mentally, and read `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
-   - If still unset on a v1.0 command path: reply exactly `vault-think: no-vault-root` and **stop**.
+   - If still unset on a v1.0 or **`/today`** command path: reply exactly `vault-think: no-vault-root` and **stop**.
 
 2. Resolve **Obsidian Local REST** (required for `/trace` and `/connect` only):
 
@@ -42,16 +43,24 @@ Let **`raw`** = operator message with leading and trailing ASCII whitespace remo
 If **`raw`** equals `/ghost`, starts with `/ghost `, or equals `/drift` (optional trailing spaces only for `/drift`), reply **exactly**:
 
 ```text
-vault-think: v1.1-not-active — /ghost and /drift are documented stubs only. Use /challenge, /emerge, /ideas, /trace, or /connect.
+vault-think: v1.1-not-active — /ghost and /drift are documented stubs only. Use /challenge, /emerge, /ideas, /trace, /connect, or /today.
 ```
 
 Then **stop** (no MCP calls, no REST calls).
 
-### 1b) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
+### 1b) `/today` — route to §3
+
+- `/today` or `/today` + trailing spaces only → full briefing.
+- `/today --brief` (+ trailing spaces only) → 3-line brief.
+- Other `/today…` → `vault-think: bad-trigger`; no vault I/O.
+
+Needs **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
+
+### 1c) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
 
 If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, or starts with `/connect `, continue to **§3** (do not treat as bad-trigger).
 
-### 1c) v1.0 bad trigger
+### 1d) v1.0 bad trigger
 
 If **`raw`** does not match any v1.0 trigger in §2, reply exactly `vault-think: bad-trigger` and **stop** (no MCP calls).
 
@@ -268,9 +277,46 @@ Summary: [1-2 sentences]
 
 6. **No bridge** within caps: reply exactly `vault-think: connect no direct connection found`.
 
+### `/today`
+
+§1b match. MCP: **`vault_list`**, **`vault_read`** only. Caps: ≤3 list, ≤6 read (1 daily + ≤5 projects). Cap hit → `vault-think: incomplete`.
+
+1. **`vault_list`** `DailyNotes/`; match **`{today_utc}.md`**.
+2. Found → **`vault_read`**: tasks `- [ ]`/`- [x]`, **Priorities**/**Focus**/**Today** lines, else 200 chars post-FM; empty → `(empty daily note)`. Missing → `not yet created` (no read).
+3. **`vault_list`** `01-Projects/`; skip `_README.md`; sort **`modified`** desc; top **5** → **`vault_read`** each; **`status`** FM or first body line (≤200 chars).
+4. **`vault_list`** `00-Inbox/`; count files (**No** `vault_read` on inbox).
+5. Reply template. Optional one grounded theme line (full only).
+
+**Full:**
+
+```text
+📅 Today — <YYYY-MM-DD>
+
+**Daily note:** <summary or "not yet created">
+**Active projects (<n>):**
+- <Project title> — <status or first line>
+...
+
+**Inbox:** <n> items waiting
+
+<theme if grounded>
+```
+
+**Brief (`--brief`) — exactly 3 lines (no project section, no theme line):**
+
+```text
+📅 Today — <YYYY-MM-DD>
+**Daily note:** <summary or "not yet created">
+**Inbox:** <n> items waiting
+```
+
+`<YYYY-MM-DD>`=`today_utc`; title=FM `title` else basename sans `.md`; project `<n>`=bullets shown (≤5).
+
 ## 4) Forbidden tools reminder
 
-Do **not** call: `vault_list`, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
+**`/today` path only:** may call **`vault_list`** and **`vault_read`** as in §3 **`/today`**.
+
+**All other commands:** do **not** call **`vault_list`**, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
 
 ## 5) Incomplete work
 
