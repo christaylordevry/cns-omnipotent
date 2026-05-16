@@ -76,13 +76,15 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
 
   it("task-prompt forbids mutators and gates vault_search", () => {
     const body = readFileSync(taskPromptPath, "utf8");
-    for (const t of ["vault_create_note", "vault_update_frontmatter", "vault_append_daily", "vault_log_action"]) {
+    for (const t of ["vault_create_note", "vault_append_daily", "vault_log_action"]) {
       assert.ok(body.includes(t), `missing forbidden tool ${t}`);
     }
-    assert.ok(body.includes("The only allowed mutating tool in this skill is `vault_move`"));
+    assert.ok(body.includes("vault_update_frontmatter"));
     assert.ok(body.includes("vault_search` only if"));
     assert.ok(body.includes("max_results"));
     assert.ok(body.includes("50"));
+    assert.ok(body.includes("Story 30-2"));
+    assert.ok(body.includes("Allowed mutators on this branch"));
   });
 
   it("trigger-pattern documents --offset and ambiguity refusal", () => {
@@ -125,6 +127,26 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("SYNTHESIS_CLEAR"));
     assert.ok(body.includes("ignore self"));
     assert.ok(body.includes("Story 30.1 addition: post-move synthesis gate"));
+  });
+
+  it("Story 30.2 invokes run-chain, stamps verification_status, and parses the ChainRunResult path", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("## Synthesis invocation (Story 30-2)"));
+    assert.ok(body.includes("--raw-json"));
+    assert.ok(
+      body.includes(
+        "cd /home/christ/ai-factory/projects/Omnipotent.md && source .env.live-chain && npx tsx scripts/run-chain.ts --topic ",
+      ),
+    );
+    assert.ok(body.includes('--query "<source_uri>"'));
+    assert.ok(body.includes("`synthesis.insight_note.vault_path`"));
+    assert.ok(!body.includes("`pake_validation.insight_note_path`"));
+    assert.ok(body.includes("verification_status"));
+    assert.ok(body.includes("pending"));
+    assert.ok(body.includes("❌ Synthesis chain failed"));
+    assert.ok(body.includes("⚠️ Synthesis ran but output path not found"));
+    assert.ok(body.includes("✅ SynthesisNote created at"));
+    assert.ok(body.includes("SYNTHESIS_CLEAR"));
   });
 
   it("task-prompt defines bounded execution failure posture", () => {

@@ -3,8 +3,9 @@
 ## Hard constraints (must follow)
 
 1. **Channel scope**: this runs only for Discord `#hermes` (per operator config).
-2. **Mutations are command-gated**: do **not** call any mutating Vault IO tool during `/triage` or `/approve`. The only allowed mutating tool in this skill is `vault_move`, and only for a valid `/execute-approved` command.
-   - Forbidden tools in every mode: `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_log_action`
+2. **Mutations are command-gated**: do **not** call mutating Vault IO tools during `/triage` or `/approve`. For `/execute-approved`, call **`vault_move`** exactly once. **Story 30-2:** after **`run-chain`** completes with exit `0` and a resolved output path (**Synthesis invocation**), call **`vault_update_frontmatter`** at most **once** on that path (`verification_status: pending` only).
+   - Always forbidden: `vault_create_note`, `vault_append_daily`, `vault_log_action`
+   - **`vault_update_frontmatter`:** allowed **only** in **Story 30-2** after successful **`run-chain`** (never during `/triage`, `/approve`, **Post-move synthesis gate** steps 1–4, or before **`run-chain`** finishes).
 3. **Approvals are non-mutating**: `/approve` is allowed (Story 27.4), but it must never call Vault IO tools and must never execute moves.
 4. **Execution is narrow and governed**: `/execute-approved` is allowed (Story 27.5), but it may call only `vault_move` exactly once after validation. Do not call `vault_log_action`; successful `vault_move` emits the audit line.
 5. **Scoped discovery**: every Vault IO call used to discover or preview candidates must stay **at or under** `00-Inbox/` only. Do **not** list, search, or read `AI-Context/`, `_meta/logs/`, or other paths outside Inbox for this task.
@@ -26,7 +27,7 @@
 
 ### Story 30.1 addition: post-move synthesis gate (read-only)
 
-- After a **successful** `vault_move` on `/execute-approved`, the model runs **Post-move synthesis gate** (`## Post-move synthesis gate` below): **`vault_read_frontmatter`** on `destination_path`, then **`vault_search`** with **`scope` exactly `03-Resources/`** and **`query`** = trimmed frontmatter **`source_uri`**. No extra mutators.
+- After a **successful** `vault_move` on `/execute-approved`, the model runs **Post-move synthesis gate** (`## Post-move synthesis gate` below): **`vault_read_frontmatter`** on `destination_path`, then **`vault_search`** with **`scope` exactly `03-Resources/`** and **`query`** = trimmed frontmatter **`source_uri`**. No **`vault_move`**, **`vault_log_action`**, or **`vault_update_frontmatter`** in that gate (**Story 30-2** allows **one** **`vault_update_frontmatter`** afterward on the synthesis output path once **`run-chain`** succeeds—see **`## Synthesis invocation (Story 30-2)`**).
 - This path is **not** `/triage` candidate discovery; it does **not** reuse the “list/search only under `00-Inbox/`” rule from step A/B.
 
 ### Story 27.6 addition: discard safety and non-destructive guarantees
@@ -181,18 +182,28 @@ No vault tools were run; no actions taken.
 - **audit:** `vault_move` emitted the audit line in `_meta/logs/agent-log.md`.
 ```
 
-Then continue with **Post-move synthesis gate (Story 30.1)** below. Do not emit a triage session header. After the gate completes, **stop**; do not call any mutating Vault IO tool beyond the finished `vault_move`.
+Then continue with **Post-move synthesis gate (Story 30.1)** below; when **`SYNTHESIS_CLEAR`** is emitted, continue with **`## Synthesis invocation (Story 30-2)`**. Do not emit a triage session header. Allowed mutators on this branch: **`vault_move`** plus **one** **`vault_update_frontmatter`** only as specified in Story 30-2.
 
 ## Post-move synthesis gate (Story 30.1)
 
 **When:** only immediately after step **6** succeeds (`vault_move` returned success and you emitted **Approved move executed**). **Skip entirely** on validation failure (step 5) or move failure (step 7).
 
-**Tools (read-only):** `vault_read_frontmatter` once, then optionally `vault_search` once. No `vault_move`, `vault_create_note`, `vault_log_action`, or other mutators.
+**Tools while in this subsection (read-only):** `vault_read_frontmatter` once, then optionally `vault_search` once. No `vault_move`, `vault_create_note`, `vault_update_frontmatter`, `vault_log_action`, or other mutators (**Story 30-2** mutations run only after **`run-chain`** succeeds).
 
 1. Call **`vault_read_frontmatter`** with `{ "path": "<destination_path>" }` (same path as step 6). Parse the JSON tool result; locate the frontmatter object for `destination_path` and read string fields **`source_uri`** and **`title`** (trim whitespace). If **`title`** is missing or empty, set **`title`** to the markdown basename of `destination_path`.
 2. If **`source_uri`** is missing, empty, or does **not** start with `http` (case-insensitive, so `http://` and `https://` qualify): post exactly `🔬 Synthesis skipped — no source_uri on destination note` to Discord and **stop** (do not call `vault_search`).
 3. Dedup: call **`vault_search`** with `{ "query": "<source_uri>", "scope": "03-Resources/", "max_results": 50 }`. From parsed hits, keep only vault-relative `.md` paths under `03-Resources/` that are **not** exactly **`destination_path`** (the moved note always matches its own `source_uri`; ignore self). If **any** hit remains, pick the **first** as **`existing_path`** and post exactly `⚠️ Synthesis skipped — SynthesisNote already exists for <source_uri>: <existing_path>` (substitute the real URI string and path; no angle brackets in the final message). Then **stop**.
-4. Otherwise post `🔬 Synthesis gate clear — queuing research for <title>` (substitute the resolved title). On the **same** Discord reply, add one trailing line for downstream automation (Story 30.2): `SYNTHESIS_CLEAR destination_path=<destination_path> source_uri=<source_uri> title=<title>` with the three values substituted (no literal angle brackets). Then **stop**.
+4. Otherwise post `🔬 Synthesis gate clear — queuing research for <title>` (substitute the resolved title). On the **same** Discord reply, add one trailing line for downstream automation: `SYNTHESIS_CLEAR destination_path=<destination_path> source_uri=<source_uri> title=<title>` with the three values substituted (no literal angle brackets). Then **continue to `## Synthesis invocation (Story 30-2)` below** (same turn).
+
+## Synthesis invocation (Story 30-2)
+
+Read **`title`**, **`source_uri`** from **`SYNTHESIS_CLEAR`**.
+
+`cd /home/christ/ai-factory/projects/Omnipotent.md && source .env.live-chain && npx tsx scripts/run-chain.ts --topic "<title>" --query "<source_uri>" --depth shallow --raw-json`
+
+Exit non-zero: post `❌ Synthesis chain failed (exit <code>) — no vault mutation made`; **halt**.
+Exit code `0`: parse JSON from stdout (**`ChainRunResult`**): path = **`synthesis.insight_note.vault_path`**. No path: post `⚠️ Synthesis ran but output path not found — manual check required`; **halt**.
+Otherwise **`vault_update_frontmatter`** `{"path":"<resolved>","updates":{"verification_status":"pending"}}`; on MCP failure tell operator **`path`**; on success post `✅ SynthesisNote created at <path> — verification_status: pending. Review and update to verified when satisfied.` Then **halt**.
 
 7. If `vault_move` returns or throws an error, emit only:
 
