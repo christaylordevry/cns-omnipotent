@@ -146,6 +146,12 @@ Repeated runs of the same research prompt can yield **different source URLs** fr
 
 ## Closed / resolved (detail)
 
+### Strict URL normalization for dedup guard (29-6 deferral)
+
+`normalizeSourceUriForDedup` handled only http→https and trailing slashes; query strings, `www.`, and fragments were deferred. **Resolved** by Story **31-2** (`src/ingest/duplicate.ts`).
+
+- **Class:** (c)
+
 ### Symlink / realpath for reads (3-1 deferral)
 
 Read tools used lexical resolution only; symlink escape on read was deferred. **Resolved** by Story **4-9** (`read-boundary.ts`, canonical read path aligned with WriteGate policy).

@@ -368,6 +368,26 @@ describe("runIngestPipeline end-to-end", () => {
     expect(second.source_uri).toBe(uri);
   });
 
+  it("AC: dedup — URL variant with query string matches canonical stored source_uri (Story 31.2)", async () => {
+    const vaultRoot = await makeVault();
+    const stored = "https://example.com/dedup-variant-canonical";
+    const first = await runIngestPipeline(vaultRoot, {
+      input: stored,
+      fetched_content: "# First\n\nBody.",
+      source_type: "url",
+    });
+    expect(first.status).toBe("ok");
+
+    const second = await runIngestPipeline(vaultRoot, {
+      input: `${stored}?utm_source=test`,
+      fetched_content: "# Second\n\nDifferent body.",
+      source_type: "url",
+    });
+    expect(second.status).toBe("duplicate");
+    if (second.status !== "duplicate") return;
+    expect(second.source_uri).toBe(`${stored}?utm_source=test`);
+  });
+
   it("AC: dedup-title — refuses to create a new note when title already exists (keeps newest)", async () => {
     const vaultRoot = await makeVault();
 

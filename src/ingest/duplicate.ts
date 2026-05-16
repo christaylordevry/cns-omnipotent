@@ -4,35 +4,101 @@ import { resolveVaultPath } from "../paths.js";
 import { vaultSearch } from "../tools/vault-search.js";
 
 /**
- * Ingest/MCP dedup-only: trim, iterative trailing `/` strip on the full string, and `http://` → `https://`.
- * Not general-purpose URL canonicalization (queries, `www.`, fragments, punycode, host case-folding, etc.).
+ * Ingest/MCP dedup-only: trim; for `http(s)://` URIs strip `www.`, query, fragment; `http`→`https`;
+ * iterative trailing `/` strip on the serialized result.
+ * Not general-purpose URL canonicalization (IDN/punycode, host case-folding, default ports, query ordering, path case).
  */
+
+function stripQueryAndFragmentFromString(s: string): string {
+  let cut = s.length;
+  const q = s.indexOf("?");
+  const h = s.indexOf("#");
+  if (q >= 0) cut = Math.min(cut, q);
+  if (h >= 0) cut = Math.min(cut, h);
+  return s.slice(0, cut);
+}
+
+function stripWwwAuthority(authority: string): string {
+  const userinfoEnd = authority.lastIndexOf("@");
+  const prefix = userinfoEnd >= 0 ? authority.slice(0, userinfoEnd + 1) : "";
+  const hostPort = userinfoEnd >= 0 ? authority.slice(userinfoEnd + 1) : authority;
+  if (hostPort.startsWith("[")) return authority;
+  return `${prefix}${/^www\./i.test(hostPort) ? hostPort.slice(4) : hostPort}`;
+}
+
+function stripTrailingSlashesIteratively(s: string): string {
+  let out = s;
+  while (out.endsWith("/")) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+function normalizeHttpUrlStringFallback(s: string): string {
+  let base = stripQueryAndFragmentFromString(s);
+  const hostPath = base.match(/^(https?:\/\/)([^/?#]+)(.*)$/i);
+  if (hostPath) {
+    const rest = hostPath[3] ?? "";
+    base = `https://${stripWwwAuthority(hostPath[2] ?? "")}${rest}`;
+  } else if (/^http:\/\//i.test(base)) {
+    base = `https://${base.slice(7)}`;
+  }
+  return stripTrailingSlashesIteratively(base);
+}
+
 export function normalizeSourceUriForDedup(uri: string): string {
-  let s = uri.trim();
+  const trimmed = uri.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return normalizeHttpUrlStringFallback(trimmed);
+  }
+  let s = trimmed;
   if (/^http:\/\//i.test(s)) {
     s = `https://${s.slice(7)}`;
   }
-  while (s.endsWith("/")) {
-    s = s.slice(0, -1);
+  return stripTrailingSlashesIteratively(s);
+}
+
+function wwwHostTwinOfNormalizedUri(k: string): string | null {
+  const m = k.match(/^https:\/\/([^/]+)(\/.*)?$/i);
+  if (!m || /^www\./i.test(m[1] ?? "")) return null;
+  return `https://www.${m[1]}${m[2] ?? ""}`;
+}
+
+function addSchemeAndSlashVariants(uri: string, literals: Set<string>): void {
+  literals.add(uri);
+  if (!uri.endsWith("/")) {
+    literals.add(`${uri}/`);
   }
-  return s;
+  if (/^https:\/\//i.test(uri)) {
+    const rest = uri.slice(8);
+    literals.add(`http://${rest}`);
+    literals.add(`http://${rest}/`);
+  }
 }
 
 /** Literals that may appear in YAML `source_uri:` lines for the same dedup key (narrow vault_search queries). */
 function sourceUriVaultSearchLiteralsForDedup(trimmed: string): string[] {
   const k = normalizeSourceUriForDedup(trimmed);
   const literals = new Set<string>();
-  literals.add(trimmed);
-  literals.add(k);
-  if (!k.endsWith("/")) {
-    literals.add(`${k}/`);
-  }
-  if (/^https:\/\//i.test(k)) {
-    const rest = k.slice(8);
-    literals.add(`http://${rest}`);
-    literals.add(`http://${rest}/`);
+  addSchemeAndSlashVariants(trimmed, literals);
+  addSchemeAndSlashVariants(k, literals);
+  const wwwTwin = wwwHostTwinOfNormalizedUri(k);
+  if (wwwTwin) {
+    addSchemeAndSlashVariants(wwwTwin, literals);
   }
   return [...literals];
+}
+
+/** Full-text queries for a URI literal; includes a prefix form so stored values with `?` or `#` suffixes still hit. */
+function vaultSearchQueriesForDedupLiteral(lit: string, includePrefix: boolean): string[] {
+  const exact = `source_uri: ${JSON.stringify(lit)}`;
+  if (!includePrefix || !/^https?:\/\//i.test(lit)) {
+    return [exact];
+  }
+  const quoted = JSON.stringify(lit);
+  const prefix = `source_uri: ${quoted.slice(0, -1)}`;
+  if (prefix === exact) return [exact];
+  return [exact, prefix];
 }
 
 async function findAllGovernedPathsMatchingDedupSourceUri(
@@ -43,25 +109,30 @@ async function findAllGovernedPathsMatchingDedupSourceUri(
   const literals = sourceUriVaultSearchLiteralsForDedup(sourceUriTrimmed);
   const seenHitPaths = new Set<string>();
   const matchingPaths: string[] = [];
+  const seenQueries = new Set<string>();
 
   for (const lit of literals) {
-    const query = `source_uri: ${JSON.stringify(lit)}`;
-    const res = await vaultSearch(vaultRoot, {
-      query,
-      scope: "03-Resources",
-      maxResults: 50,
-      forceNodeScanner: true,
-    });
-    for (const hit of res.hits) {
-      if (seenHitPaths.has(hit.path)) continue;
-      seenHitPaths.add(hit.path);
-      const absPath = resolveVaultPath(vaultRoot, hit.path);
-      const raw = await readFile(absPath, "utf8");
-      const { frontmatter } = parseNoteFrontmatter(raw);
-      const su = frontmatter.source_uri;
-      if (typeof su !== "string") continue;
-      if (normalizeSourceUriForDedup(su) === seekKey) {
-        matchingPaths.push(hit.path);
+    const usePrefix = normalizeSourceUriForDedup(lit) === seekKey;
+    for (const query of vaultSearchQueriesForDedupLiteral(lit, usePrefix)) {
+      if (seenQueries.has(query)) continue;
+      seenQueries.add(query);
+      const res = await vaultSearch(vaultRoot, {
+        query,
+        scope: "03-Resources",
+        maxResults: 50,
+        forceNodeScanner: true,
+      });
+      for (const hit of res.hits) {
+        if (seenHitPaths.has(hit.path)) continue;
+        seenHitPaths.add(hit.path);
+        const absPath = resolveVaultPath(vaultRoot, hit.path);
+        const raw = await readFile(absPath, "utf8");
+        const { frontmatter } = parseNoteFrontmatter(raw);
+        const su = frontmatter.source_uri;
+        if (typeof su !== "string") continue;
+        if (normalizeSourceUriForDedup(su) === seekKey) {
+          matchingPaths.push(hit.path);
+        }
       }
     }
   }

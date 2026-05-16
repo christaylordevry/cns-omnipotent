@@ -305,9 +305,35 @@ describe("buildVaultCreateNoteMarkdown", () => {
   });
 });
 
-describe("normalizeSourceUriForDedup (Story 29.6)", () => {
+describe("normalizeSourceUriForDedup (Stories 29.6, 31.2)", () => {
   it("strips trailing slashes iteratively and upgrades http to https", () => {
     expect(normalizeSourceUriForDedup("  http://a.com/b//  ")).toBe("https://a.com/b");
+  });
+
+  it("strips query strings", () => {
+    expect(normalizeSourceUriForDedup("https://example.com/page?utm_source=twitter")).toBe(
+      "https://example.com/page",
+    );
+  });
+
+  it("strips URL fragments", () => {
+    expect(normalizeSourceUriForDedup("https://example.com/page#section")).toBe("https://example.com/page");
+  });
+
+  it("strips www. host prefix", () => {
+    expect(normalizeSourceUriForDedup("https://www.example.com/page")).toBe("https://example.com/page");
+  });
+
+  it("composes www, query, fragment, http, and trailing slash rules", () => {
+    expect(normalizeSourceUriForDedup("http://www.example.com/page/?utm=x#frag")).toBe(
+      "https://example.com/page",
+    );
+  });
+
+  it("leaves out-of-scope host case and default ports unchanged", () => {
+    expect(normalizeSourceUriForDedup("https://EXAMPLE.com:443/Page?x=1")).toBe(
+      "https://EXAMPLE.com:443/Page",
+    );
   });
 });
 
@@ -405,6 +431,87 @@ describe("vault_create_note MCP dedup pre-flight (Story 29.6)", () => {
     expect(payload.message.startsWith(`⚠️ Dedup: ${incoming} already exists at 03-Resources/dedup-seed-scheme.md. Skipping create.`)).toBe(
       true,
     );
+  });
+
+  it("treats www. variant as duplicate (Story 31.2)", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-www-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const stored = "https://www.example.com/story-31-2-www";
+    const incoming = "https://example.com/story-31-2-www";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-www.md"),
+      governedSourceNoteWithUri("Seed Www", stored),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Dup Www",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: incoming,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as { dedup_warning?: boolean; existing_path: string };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-www.md");
+  });
+
+  it("treats query-string on stored note as duplicate when incoming is canonical (Story 31.2)", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-query-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const stored = "https://example.com/story-31-2-query?utm_source=twitter";
+    const incoming = "https://example.com/story-31-2-query";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-query.md"),
+      governedSourceNoteWithUri("Seed Query", stored),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Dup Query",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: incoming,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as { dedup_warning?: boolean; existing_path: string };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-query.md");
+  });
+
+  it("treats composed stored URL variants as duplicate when incoming is canonical (Story 31.2)", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-dedup-compose-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const stored = "http://www.example.com/story-31-2-compose/?utm_source=twitter#section";
+    const incoming = "https://example.com/story-31-2-compose";
+    await writeFile(
+      path.join(vaultRoot, "03-Resources", "dedup-seed-compose.md"),
+      governedSourceNoteWithUri("Seed Compose", stored),
+      "utf8",
+    );
+
+    const server = new McpServer({ name: "cns-dedup", version: "0.0.0" });
+    const { vault_create_note } = registerVaultIoTools(server, cfgForDedupVault(vaultRoot));
+
+    const out = (await callRegisteredTool(vault_create_note, {
+      title: "Attempt Dup Compose",
+      content: "# X",
+      pake_type: "SourceNote",
+      tags: [],
+      source_uri: incoming,
+    })) as { content: Array<{ type: string; text: string }> };
+
+    const payload = JSON.parse(out.content[0].text) as { dedup_warning?: boolean; existing_path: string };
+    expect(payload.dedup_warning).toBe(true);
+    expect(payload.existing_path).toBe("03-Resources/dedup-seed-compose.md");
   });
 
   it("creates when source_uri is not a duplicate", async () => {
