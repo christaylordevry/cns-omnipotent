@@ -11,15 +11,15 @@ Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/C
 - **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
 - **Vault** — `Knowledge-Vault-ACTIVE/` (PARA structure) is the single source of truth
 - **Hermes** — `~/.hermes/` — Discord gateway, skills at `~/.hermes/skills/cns/`
-- **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v1.9.8, Phase 5 complete)
+- **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v2.0.1)
 
 ## Phase Status
 
-All phases complete through Phase 5. Epics 1–28 done.
+All phases complete through Phase 5. Epics 1–30 done; Epic 31 in-progress.
 - Vault IO MCP: live (10 tools, WriteGate enforced)
 - Hermes: live (Discord, daily digest, triage, session-close, #general auto-ingest)
 - NotebookLM: live (4 notebooks, fan-out via session-close)
-- Next: Epic 29 (scope TBD)
+- Next: Epic 31 (triage command rename — `/triage-approve`, `/triage-execute`)
 
 ---
 

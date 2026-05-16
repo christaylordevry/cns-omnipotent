@@ -13,7 +13,7 @@ const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Op
 describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
   it("SKILL.md declares scoped discovery, approvals, execution, and version bump", () => {
     const body = readFileSync(join(skillDir, "SKILL.md"), "utf8");
-    assert.ok(body.includes("version: 1.6.0"));
+    assert.ok(body.includes("version: 1.7.0"));
     assert.ok(body.includes("recursive"));
     assert.ok(
       body.includes("vault_search") &&
@@ -23,8 +23,10 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("vault_read_frontmatter"));
     assert.ok(body.includes("vault_search"));
     assert.ok(body.includes("routing suggestions"));
-    assert.ok(body.includes("/approve"));
-    assert.ok(body.includes("/execute-approved"));
+    assert.ok(body.includes("/triage-approve"));
+    assert.ok(body.includes("/triage-execute"));
+    assert.ok(body.includes("Operator posts **`triage-approve <00-Inbox/path.md> --to <destination_dir>/`** in Discord"));
+    assert.ok(body.includes("Operator posts **`triage-execute <00-Inbox/path.md> --to <destination_dir>/`** in Discord"));
     assert.ok(body.includes("vault_move"));
     assert.ok(body.includes("Stories 27.1 to 27.6 and 30.1 to 30.3"));
     assert.ok(body.includes("## Non-destructive guarantees (Story 27.6)"));
@@ -106,9 +108,13 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     const body = readFileSync(triggerPatternPath, "utf8");
     assert.ok(body.includes("--offset"));
     assert.ok(body.includes("Ambiguous multi-query"));
-    assert.ok(body.includes("/approve"));
-    assert.ok(body.includes("/execute-approved"));
+    assert.ok(body.includes("/triage-approve"));
+    assert.ok(body.includes("/triage-execute"));
+    assert.ok(body.includes("omit the leading slash for `triage-approve` and `triage-execute`"));
+    assert.ok(body.includes("`triage-approve <00-Inbox/path.md> --to <destination_dir>/`"));
+    assert.ok(body.includes("`triage-execute <00-Inbox/path.md> --to <destination_dir>/`"));
     assert.ok(body.includes("--to"));
+    assert.ok(body.includes("## Deprecated commands (Epic 31)"));
   });
 
   it("task-prompt defines non-mutating approval parsing and validation", () => {
@@ -118,7 +124,7 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("## Approval input error"));
     assert.ok(body.includes("must start with `00-Inbox/`") || body.includes("must start with 00-Inbox/"));
     assert.ok(body.includes("protected prefixes"));
-    assert.ok(body.includes("exactly four tokens: `/approve`, `source_path`, `--to`, `destination_dir`"));
+    assert.ok(body.includes("exactly four tokens: `/triage-approve`, `source_path`, `--to`, `destination_dir`"));
   });
 
   it("task-prompt defines approved move execution via exactly one vault_move call", () => {
@@ -130,7 +136,7 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("Do not call `vault_log_action`"));
     assert.ok(body.includes("## Approved move executed"));
     assert.ok(body.includes("vault_move emitted the audit line"));
-    assert.ok(body.includes("exactly four tokens: `/execute-approved`, `source_path`, `--to`, `destination_dir`"));
+    assert.ok(body.includes("exactly four tokens: `/triage-execute`, `source_path`, `--to`, `destination_dir`"));
   });
 
   it("Story 30.1 post-move synthesis gate follows successful vault_move", () => {
@@ -171,12 +177,21 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("Do not retry with raw filesystem writes"));
   });
 
-  it("trigger-pattern documents execute-approved grammar", () => {
+  it("trigger-pattern documents triage-execute grammar", () => {
     const body = readFileSync(triggerPatternPath, "utf8");
-    assert.ok(body.includes("/execute-approved <source_path> --to <destination_dir>/"));
-    assert.ok(body.includes("/execute-approved 00-Inbox/some-capture.md --to 03-Resources/"));
+    assert.ok(body.includes("/triage-execute <source_path> --to <destination_dir>/"));
+    assert.ok(body.includes("/triage-execute 00-Inbox/some-capture.md --to 03-Resources/"));
     assert.ok(body.includes("Derive `destination_path` as `<destination_dir>/<basename(source_path)>`"));
     assert.ok(body.includes("Reject any extra text before or after the grammar."));
+  });
+
+  it("task-prompt emits slash-less Discord operator approval and execution examples", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("- **Valid Discord inputs:** `/triage`, `/triage --offset 10`, `triage-approve 00-Inbox/x.md --to 03-Resources/`, `triage-execute 00-Inbox/x.md --to 03-Resources/`."));
+    assert.ok(body.includes("   - approve: `triage-approve <path> --to <destination>/` (edit `<destination>/` to override; no actions taken)"));
+    assert.ok(body.includes("   - execute: `triage-execute <path> --to <destination>/` (calls `vault_move` for this one item)"));
+    assert.ok(!body.includes("   - approve: `/triage-approve <path> --to <destination>/`"));
+    assert.ok(!body.includes("   - execute: `/triage-execute <path> --to <destination>/`"));
   });
 
   it("task-prompt separates syntactic offset refusal from offset past end after discovery", () => {

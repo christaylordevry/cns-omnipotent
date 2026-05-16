@@ -1,13 +1,13 @@
-# Task: `/triage` preview + `/approve` pattern + `/execute-approved` move (Stories 27.1 to 27.6)
+# Task: `/triage` preview + `/triage-approve` pattern + `/triage-execute` move (Stories 27.1 to 27.6)
 
 ## Hard constraints (must follow)
 
 1. **Channel scope**: this runs only for Discord `#hermes` (per operator config).
-2. **Mutations are command-gated**: do **not** call mutating Vault IO tools during `/triage` or `/approve`. For `/execute-approved`, call **`vault_move`** exactly once. **Story 30-2:** after **`run-chain`** completes with exit `0` and a resolved output path (**Synthesis invocation**), call **`vault_update_frontmatter`** at most **once** on that path (`verification_status: pending` only).
+2. **Mutations are command-gated**: do **not** call mutating Vault IO tools during `/triage` or `/triage-approve`. For `/triage-execute`, call **`vault_move`** exactly once. **Story 30-2:** after **`run-chain`** completes with exit `0` and a resolved output path (**Synthesis invocation**), call **`vault_update_frontmatter`** at most **once** on that path (`verification_status: pending` only).
    - Always forbidden: `vault_create_note`, `vault_append_daily`, `vault_log_action`
-   - **`vault_update_frontmatter`:** allowed **only** in **Story 30-2** after successful **`run-chain`** (never during `/triage`, `/approve`, **Post-move synthesis gate** steps 1–4, or before **`run-chain`** finishes).
-3. **Approvals are non-mutating**: `/approve` is allowed (Story 27.4), but it must never call Vault IO tools and must never execute moves.
-4. **Execution is narrow and governed**: `/execute-approved` is allowed (Story 27.5), but it may call only `vault_move` exactly once after validation. Do not call `vault_log_action`; successful `vault_move` emits the audit line.
+   - **`vault_update_frontmatter`:** allowed **only** in **Story 30-2** after successful **`run-chain`** (never during `/triage`, `/triage-approve`, **Post-move synthesis gate** steps 1–4, or before **`run-chain`** finishes).
+3. **Approvals are non-mutating**: `/triage-approve` is allowed (Story 27.4), but it must never call Vault IO tools and must never execute moves.
+4. **Execution is narrow and governed**: `/triage-execute` is allowed (Story 27.5), but it may call only `vault_move` exactly once after validation. Do not call `vault_log_action`; successful `vault_move` emits the audit line.
 5. **Scoped discovery**: every Vault IO call used to discover or preview candidates must stay **at or under** `00-Inbox/` only. Do **not** list, search, or read `AI-Context/`, `_meta/logs/`, or other paths outside Inbox for this task.
 6. **`vault_search` rule**: call **`vault_search` only if** the operator provided a **non-empty** literal `query` per `references/trigger-pattern.md`. When calling it, set **`scope` exactly to `00-Inbox/`** and **`max_results` ≤ 50**. If there is **no** query, use **listing-only** discovery (no `vault_search`).
 7. **Bounded output**: cap page size and excerpt size; avoid spamming Discord.
@@ -16,50 +16,50 @@
 
 ### Story 27.4 addition: approvals are allowed but still non-mutating
 
-- `/approve` commands are now supported as a **non-mutating approval interaction pattern**.
+- `/triage-approve` commands are now supported as a **non-mutating approval interaction pattern**.
 - Approval handling in 27.4 must not call any Vault IO tools (read or write). It is purely parse + validate + acknowledge.
 
 ### Story 27.5 addition: approved moves can execute through `vault_move`
 
-- `/execute-approved` commands are now supported as the **only** mutating path in this skill.
+- `/triage-execute` commands are now supported as the **only** mutating path in this skill.
 - Execution handling must validate input first, derive `destination_path`, call `vault_move` exactly once, and stop.
 - Do not call `vault_log_action`. `vault_move` owns the audit line.
 
 ### Story 30.1 addition: post-move synthesis gate (read-only)
 
-- After a **successful** `vault_move` on `/execute-approved`, the model runs **Post-move synthesis gate** (`## Post-move synthesis gate` below): **`vault_read_frontmatter`** on `destination_path`, then **`vault_search`** with **`scope` exactly `03-Resources/`** and **`query`** = trimmed frontmatter **`source_uri`**. No **`vault_move`**, **`vault_log_action`**, or **`vault_update_frontmatter`** in that gate (**Story 30-2** allows **one** **`vault_update_frontmatter`** afterward on the synthesis output path once **`run-chain`** succeeds—see **`## Synthesis invocation (Story 30-2)`**).
+- After a **successful** `vault_move` on `/triage-execute`, the model runs **Post-move synthesis gate** (`## Post-move synthesis gate` below): **`vault_read_frontmatter`** on `destination_path`, then **`vault_search`** with **`scope` exactly `03-Resources/`** and **`query`** = trimmed frontmatter **`source_uri`**. No **`vault_move`**, **`vault_log_action`**, or **`vault_update_frontmatter`** in that gate (**Story 30-2** allows **one** **`vault_update_frontmatter`** afterward on the synthesis output path once **`run-chain`** succeeds—see **`## Synthesis invocation (Story 30-2)`**).
 - This path is **not** `/triage` candidate discovery; it does **not** reuse the “list/search only under `00-Inbox/`” rule from step A/B.
 
 ### Story 27.6 addition: discard safety and non-destructive guarantees
 
 - Hermes must **not** delete, truncate, or “discard” notes via MCP delete tools (**Phase 1 does not expose `vault_delete` / `vault_trash`**—do not assume them), shell **`rm`**, or filesystem bypasses.
-- The **only** automated relocation remains **`/execute-approved … --to …/`** → exactly **one** **`vault_move`**.
+- The **only** automated relocation remains **`/triage-execute … --to …/`** → exactly **one** **`vault_move`**.
 - **Routing suggestions** must never propose deletion, discard-as-delete, or archive-as-delete; the **stale** bucket still appends “stale capture, review relevance” only (no automated discard language).
 
 ## Discard / delete / archive safety (Story 27.6)
 
 **Vocabulary mapping (operator colloquial → allowed automation):**
 
-- **“Move” / “file” / “route”** (to a stated vault directory): use the canonical **`/execute-approved <00-Inbox/path.md> --to <destination_dir>/`** grammar → **`vault_move`** once; destination is operator-chosen (WriteGate/PAKE apply when leaving **`00-Inbox/`**).
-- **“Discard” / “delete” / “archive”** meaning **remove from Inbox**: treat as **optional relocation**—same **`/execute-approved`** pattern to an operator-chosen folder (vault-neutral; no canonical “discard pile” required)—**or** tell the operator to remove the note **only** via **human** steps (Obsidian UI, manual filesystem) **outside** Hermes. Never imply silent destruction or automated permanent deletion.
-- **Bulk** “clear the inbox” / **rename-only** shortcuts / **implicit archive folders**: **not** automated here—each item needs its own explicit **`/execute-approved`** if relocating; no batch orchestration.
+- **“Move” / “file” / “route”** (to a stated vault directory): tell the Discord operator to use **`triage-execute <00-Inbox/path.md> --to <destination_dir>/`**; the model matches the canonical `/triage-execute` grammar internally, then calls **`vault_move`** once. Destination is operator-chosen (WriteGate/PAKE apply when leaving **`00-Inbox/`**).
+- **“Discard” / “delete” / “archive”** meaning **remove from Inbox**: treat as **optional relocation**—same **`triage-execute`** operator pattern to an operator-chosen folder (vault-neutral; no canonical “discard pile” required)—**or** tell the operator to remove the note **only** via **human** steps (Obsidian UI, manual filesystem) **outside** Hermes. Never imply silent destruction or automated permanent deletion.
+- **Bulk** “clear the inbox” / **rename-only** shortcuts / **implicit archive folders**: **not** automated here—each item needs its own explicit **`triage-execute`** operator command if relocating; no batch orchestration.
 
 **Non-destructive guarantees (repeatable copy):**
 
-- **`/triage`** and **`/approve`**: **non-mutating** (no Vault IO writes).
-- **`/execute-approved`**: **only** **`vault_move`** (once); **no** **`vault_log_action`** on the success path for that move (**`vault_move`** emits the audit line).
+- **`/triage`** and **`/triage-approve`**: **non-mutating** (no Vault IO writes).
+- **`/triage-execute`**: **only** **`vault_move`** (once); **no** **`vault_log_action`** on the success path for that move (**`vault_move`** emits the audit line).
 - **No** bulk moves, **no** rename-without-**`vault_move`**, **no** archive-folder automation unless the destination appears explicitly in **`--to`**.
 
 **Valid structured commands vs destructive colloquial examples:**
 
-- **Valid:** `/triage`, `/triage --offset 10`, `/approve 00-Inbox/x.md --to 03-Resources/`, `/execute-approved 00-Inbox/x.md --to 03-Resources/`.
-- **Refuse (fail-closed, no Vault IO):** “delete this note”, “discard all stale captures”, “archive via rm”, “run rm on 00-Inbox”, “use vault_delete”, natural-language move/delete without valid **`/execute-approved`** grammar—except when the message **starts with** valid **`/execute-approved`**, in which case follow **Execute approved move handling** instead.
+- **Valid Discord inputs:** `/triage`, `/triage --offset 10`, `triage-approve 00-Inbox/x.md --to 03-Resources/`, `triage-execute 00-Inbox/x.md --to 03-Resources/`.
+- **Refuse (fail-closed, no Vault IO):** “delete this note”, “discard all stale captures”, “archive via rm”, “run rm on 00-Inbox”, “use vault_delete”, natural-language move/delete without valid **`triage-execute`** operator syntax—except when the message **starts with** valid **`/triage-execute`** internally, in which case follow **Execute approved move handling** instead.
 
 ## Inputs
 
 - A Discord message that matches the positive trigger grammar in `references/trigger-pattern.md` after trimming.
-- If the message starts with `/approve`, follow **Approval handling (Story 27.4)** and stop.
-- If the message starts with `/execute-approved`, follow **Execute approved move handling (Story 27.5)** and stop.
+- If the message starts with `/triage-approve`, follow **Approval handling (Story 27.4)** and stop.
+- If the message starts with `/triage-execute`, follow **Execute approved move handling (Story 27.5)** and stop.
 - Otherwise, treat it as `/triage` and parse **`offset`** (default `0`) and optional **`query`** from the message.
 - If parsing fails because the input is syntactically invalid (negative offset, non-numeric offset, non-integer offset, missing offset value, duplicate `--offset`, ambiguous query, etc.), emit **only** the **single early error block** below and **stop** before any Vault IO call.
 - If parsing succeeds but the offset is later found to be past the end of the discovered candidate list, follow the **Offset past end** handling below instead. That case requires discovery first so Hermes can know `total`.
@@ -95,11 +95,11 @@ Use this exact header shape:
 
 ## Approval handling (Story 27.4, non-mutating)
 
-If the operator message matches the `/approve` grammar:
+If the operator message matches the `/triage-approve` grammar:
 
 1. Parse the single-line command:
-   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/approve`, `source_path`, `--to`, `destination_dir`
-   - `source_path` is the token immediately after `/approve`
+   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/triage-approve`, `source_path`, `--to`, `destination_dir`
+   - `source_path` is the token immediately after `/triage-approve`
    - `--to` must appear exactly once and must be followed by `destination_dir`
 2. Validate (strict, bounded):
    - `source_path` must start with `00-Inbox/` and end with `.md`
@@ -131,11 +131,11 @@ Then stop. Do not emit a triage session header and do not run any Vault IO tools
 
 ## Execute approved move handling (Story 27.5)
 
-If the operator message matches the `/execute-approved` grammar:
+If the operator message matches the `/triage-execute` grammar:
 
 1. Parse the single-line command:
-   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/execute-approved`, `source_path`, `--to`, `destination_dir`
-   - `source_path` is the token immediately after `/execute-approved`
+   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/triage-execute`, `source_path`, `--to`, `destination_dir`
+   - `source_path` is the token immediately after `/triage-execute`
    - `--to` must appear exactly once and must be followed by `destination_dir`
 2. Validate before any Vault IO call:
    - `source_path` must start with `00-Inbox/` and end with `.md`
@@ -384,9 +384,9 @@ After the session header, output:
 ## Notes
 
 - This is a **read-only** preview. No notes were moved, renamed, edited, deleted, or truncated.
-- `/approve` is a **non-mutating** approval pattern (no Vault IO calls).
-- `/execute-approved` executes exactly one governed move through **`vault_move`** only (no other mutators; no **`vault_log_action`** for that move).
-- Hermes does **not** automate deletion or “discard-as-delete”; relocation is **`vault_move`** via **`/execute-approved`** only; permanent removal is **human-only** outside this skill.
+- `triage-approve` is the Discord approval command (no leading slash) and is **non-mutating** (no Vault IO calls).
+- `triage-execute` is the Discord execution command (no leading slash) and executes exactly one governed move through **`vault_move`** only (no other mutators; no **`vault_log_action`** for that move).
+- Hermes does **not** automate deletion or “discard-as-delete”; relocation is **`vault_move`** via **`triage-execute`** only; permanent removal is **human-only** outside this skill.
 
 ## Paging
 
@@ -412,8 +412,8 @@ Each numbered list item must follow:
      - destination: `<03-Resources/|02-Areas/|00-Inbox/|01-Projects/<project>/>`
      - confidence: `<low|medium|high>`
      - reason: `<one short sentence>`
-   - approve: `/approve <path> --to <destination>/` (edit `<destination>/` to override; no actions taken)
-   - execute: `/execute-approved <path> --to <destination>/` (calls `vault_move` for this one item)
+   - approve: `triage-approve <path> --to <destination>/` (edit `<destination>/` to override; no actions taken)
+   - execute: `triage-execute <path> --to <destination>/` (calls `vault_move` for this one item)
 ```
 
 If an item errored:
@@ -430,15 +430,15 @@ If an item errored:
 
 ## Refusal handling (approval/mutation attempts)
 
-If the operator message starts with valid `/execute-approved`, follow **Execute approved move handling (Story 27.5)** above (**Story 27.6**: this branch takes precedence over keyword checks—do not refuse valid **`/execute-approved`** because the substring “execute” appears).
+If the operator message starts with valid `/triage-execute`, follow **Execute approved move handling (Story 27.5)** above (**Story 27.6**: this branch takes precedence over keyword checks—do not refuse valid **`/triage-execute`** because the substring “execute” appears).
 
-If the operator message includes any of these (case-insensitive): `move`, `rename`, `discard`, `delete`, `archive`, or `execute`, or looks like an execution action outside valid `/execute-approved` (e.g. `/move`, “go ahead and move it”, “execute approvals”),
+If the operator message includes any of these (case-insensitive): `move`, `rename`, `discard`, `delete`, `archive`, or `execute`, or looks like an execution action outside valid `/triage-execute` (e.g. `/move`, “go ahead and move it”, “execute approvals”),
 respond with:
 
 ```markdown
 ## Mutations disabled
 
-Mutations are disabled except for one valid `/execute-approved` command; no actions taken.
+Mutations are disabled except for one valid `/triage-execute` command; no actions taken.
 ```
 
 Then continue with the read-only preview **only if** the message still satisfies the triage trigger grammar; otherwise do not run this skill.
