@@ -280,6 +280,12 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review of 31-1-triage-command-rename-and-constitution-sync (2026-05-16)
+
+- Operator guide §15.3 still documents legacy `/approve` and `/execute-approved` — confined scope per story 31-1; update in a follow-up commit/story with version-history row (suggest v1.27.0).
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.

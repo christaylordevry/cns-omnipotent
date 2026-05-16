@@ -2,12 +2,12 @@
 story_id: 31-1
 epic: 31
 title: triage-command-rename-and-constitution-sync
-status: review
+status: done
 ---
 
 # Story 31.1: triage-command-rename-and-constitution-sync
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide for Epic 31 gateway routing fix. -->
 
@@ -74,6 +74,12 @@ The Hermes gateway has a built-in `/approve [session|always]` command that inter
 ### Review Findings
 
 - [x] [Review][Patch] Document no-leading-slash Discord operator syntax for triage approval and execution [scripts/hermes-skill-examples/triage/references/trigger-pattern.md:36]: AC1/AC7 and the operator review note are not satisfied because the repo and live `trigger-pattern.md` copies still teach slash-prefixed `/triage-approve` and `/triage-execute` examples throughout, while the validated Discord operator path requires `triage-approve` and `triage-execute` without the leading slash. The normative prompt and tests also lock the slash-prefixed contract instead of explicitly documenting and asserting the Discord no-slash form. Patched in repo mirror, tests, live config, and live triage install.
+
+- [x] [Review][Patch] Normative `task-prompt.md` routing still requires slash-prefixed commands [scripts/hermes-skill-examples/triage/references/task-prompt.md:61-62,98-102,134-138,433]: Fixed — Inputs, Approval/Execute parsers, and Refusal handling accept `triage-approve`/`/triage-approve` and `triage-execute`/`/triage-execute`.
+
+- [x] [Review][Patch] Regression tests do not guard Inputs routing for slash-less commands [tests/hermes-triage-skill.test.mjs:120-140]: Fixed — added `task-prompt routes slash-less triage-approve and triage-execute in Inputs` test; updated four-token grammar assertions.
+
+- [x] [Review][Defer] Operator guide §15.3 still documents legacy `/approve` and `/execute-approved` [Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md:611-637] — deferred per story confined scope; operators should use skill references until a follow-up updates the guide.
 
 ## Dev Notes
 
@@ -196,6 +202,7 @@ _(none)_
 - Synced in-repo `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` from specs (v2.0.1); `diff -q` exit 0.
 - Removed prunable worktrees `friendly-hellman-e174d2` and `peaceful-tharp-60dc95`.
 - **Operator guide: deferred** — `CNS-Operator-Guide.md` §15.3 still uses legacy command names; confined scope per story.
+- **Code review (2026-05-16):** Patched `task-prompt.md` so Discord slash-less `triage-approve` / `triage-execute` route correctly in Inputs, parsers, and Refusal handling (prior patch documented syntax only).
 
 ### File List
 
@@ -221,3 +228,4 @@ _(none)_
 
 - 2026-05-16: Epic 31 story 31-1 — triage command rename (`/triage-approve`, `/triage-execute`), SKILL v1.7.0, constitution/CLAUDE sync, regression tests updated.
 - 2026-05-16: Review patch: documented slash-less Discord operator invocation for `triage-approve` and `triage-execute`, updated operator-facing examples and live channel prompt, and returned story to review.
+- 2026-05-16: Code review fix: `task-prompt.md` Inputs/Approval/Execute/Refusal accept slash-less `triage-approve` and `triage-execute`; regression test added; live skill reinstalled.

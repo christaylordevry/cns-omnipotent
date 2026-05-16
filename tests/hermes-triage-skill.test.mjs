@@ -124,7 +124,18 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("## Approval input error"));
     assert.ok(body.includes("must start with `00-Inbox/`") || body.includes("must start with 00-Inbox/"));
     assert.ok(body.includes("protected prefixes"));
-    assert.ok(body.includes("exactly four tokens: `/triage-approve`, `source_path`, `--to`, `destination_dir`"));
+    assert.ok(
+      body.includes(
+        "exactly four tokens: (`triage-approve` or `/triage-approve`), `source_path`, `--to`, `destination_dir`",
+      ),
+    );
+  });
+
+  it("task-prompt routes slash-less triage-approve and triage-execute in Inputs", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("If the message starts with `triage-approve` or `/triage-approve`"));
+    assert.ok(body.includes("If the message starts with `triage-execute` or `/triage-execute`"));
+    assert.ok(body.includes("If the operator message starts with valid `triage-execute` or `/triage-execute`"));
   });
 
   it("task-prompt defines approved move execution via exactly one vault_move call", () => {
@@ -136,7 +147,11 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
     assert.ok(body.includes("Do not call `vault_log_action`"));
     assert.ok(body.includes("## Approved move executed"));
     assert.ok(body.includes("vault_move emitted the audit line"));
-    assert.ok(body.includes("exactly four tokens: `/triage-execute`, `source_path`, `--to`, `destination_dir`"));
+    assert.ok(
+      body.includes(
+        "exactly four tokens: (`triage-execute` or `/triage-execute`), `source_path`, `--to`, `destination_dir`",
+      ),
+    );
   });
 
   it("Story 30.1 post-move synthesis gate follows successful vault_move", () => {

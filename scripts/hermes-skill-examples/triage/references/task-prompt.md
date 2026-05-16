@@ -53,13 +53,13 @@
 **Valid structured commands vs destructive colloquial examples:**
 
 - **Valid Discord inputs:** `/triage`, `/triage --offset 10`, `triage-approve 00-Inbox/x.md --to 03-Resources/`, `triage-execute 00-Inbox/x.md --to 03-Resources/`.
-- **Refuse (fail-closed, no Vault IO):** “delete this note”, “discard all stale captures”, “archive via rm”, “run rm on 00-Inbox”, “use vault_delete”, natural-language move/delete without valid **`triage-execute`** operator syntax—except when the message **starts with** valid **`/triage-execute`** internally, in which case follow **Execute approved move handling** instead.
+- **Refuse (fail-closed, no Vault IO):** “delete this note”, “discard all stale captures”, “archive via rm”, “run rm on 00-Inbox”, “use vault_delete”, natural-language move/delete without valid **`triage-execute`** operator syntax—except when the message **starts with** valid **`triage-execute`** or **`/triage-execute`**, in which case follow **Execute approved move handling** instead.
 
 ## Inputs
 
 - A Discord message that matches the positive trigger grammar in `references/trigger-pattern.md` after trimming.
-- If the message starts with `/triage-approve`, follow **Approval handling (Story 27.4)** and stop.
-- If the message starts with `/triage-execute`, follow **Execute approved move handling (Story 27.5)** and stop.
+- If the message starts with `triage-approve` or `/triage-approve`, follow **Approval handling (Story 27.4)** and stop.
+- If the message starts with `triage-execute` or `/triage-execute`, follow **Execute approved move handling (Story 27.5)** and stop.
 - Otherwise, treat it as `/triage` and parse **`offset`** (default `0`) and optional **`query`** from the message.
 - If parsing fails because the input is syntactically invalid (negative offset, non-numeric offset, non-integer offset, missing offset value, duplicate `--offset`, ambiguous query, etc.), emit **only** the **single early error block** below and **stop** before any Vault IO call.
 - If parsing succeeds but the offset is later found to be past the end of the discovered candidate list, follow the **Offset past end** handling below instead. That case requires discovery first so Hermes can know `total`.
@@ -95,11 +95,11 @@ Use this exact header shape:
 
 ## Approval handling (Story 27.4, non-mutating)
 
-If the operator message matches the `/triage-approve` grammar:
+If the operator message matches the `triage-approve` or `/triage-approve` grammar:
 
 1. Parse the single-line command:
-   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/triage-approve`, `source_path`, `--to`, `destination_dir`
-   - `source_path` is the token immediately after `/triage-approve`
+   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: (`triage-approve` or `/triage-approve`), `source_path`, `--to`, `destination_dir`
+   - `source_path` is the token immediately after the command token
    - `--to` must appear exactly once and must be followed by `destination_dir`
 2. Validate (strict, bounded):
    - `source_path` must start with `00-Inbox/` and end with `.md`
@@ -131,11 +131,11 @@ Then stop. Do not emit a triage session header and do not run any Vault IO tools
 
 ## Execute approved move handling (Story 27.5)
 
-If the operator message matches the `/triage-execute` grammar:
+If the operator message matches the `triage-execute` or `/triage-execute` grammar:
 
 1. Parse the single-line command:
-   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: `/triage-execute`, `source_path`, `--to`, `destination_dir`
-   - `source_path` is the token immediately after `/triage-execute`
+   - Tokens are split on ASCII whitespace and the command must have exactly four tokens: (`triage-execute` or `/triage-execute`), `source_path`, `--to`, `destination_dir`
+   - `source_path` is the token immediately after the command token
    - `--to` must appear exactly once and must be followed by `destination_dir`
 2. Validate before any Vault IO call:
    - `source_path` must start with `00-Inbox/` and end with `.md`
@@ -430,15 +430,15 @@ If an item errored:
 
 ## Refusal handling (approval/mutation attempts)
 
-If the operator message starts with valid `/triage-execute`, follow **Execute approved move handling (Story 27.5)** above (**Story 27.6**: this branch takes precedence over keyword checks—do not refuse valid **`/triage-execute`** because the substring “execute” appears).
+If the operator message starts with valid `triage-execute` or `/triage-execute`, follow **Execute approved move handling (Story 27.5)** above (**Story 27.6**: this branch takes precedence over keyword checks—do not refuse valid **`triage-execute`** / **`/triage-execute`** because the substring “execute” appears).
 
-If the operator message includes any of these (case-insensitive): `move`, `rename`, `discard`, `delete`, `archive`, or `execute`, or looks like an execution action outside valid `/triage-execute` (e.g. `/move`, “go ahead and move it”, “execute approvals”),
+If the operator message includes any of these (case-insensitive): `move`, `rename`, `discard`, `delete`, `archive`, or `execute`, or looks like an execution action outside valid `triage-execute` / `/triage-execute` (e.g. `/move`, “go ahead and move it”, “execute approvals”),
 respond with:
 
 ```markdown
 ## Mutations disabled
 
-Mutations are disabled except for one valid `/triage-execute` command; no actions taken.
+Mutations are disabled except for one valid `triage-execute` or `/triage-execute` command; no actions taken.
 ```
 
 Then continue with the read-only preview **only if** the message still satisfies the triage trigger grammar; otherwise do not run this skill.
