@@ -425,6 +425,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-13 | 1.24.0 | Session close: documents Step 6.6 `vault-fast-scan-index.md` regeneration (governed folders 01–03, token cap); §2 grounding table lists the index; repo helper `npm run vault:fast-scan` | 29-9-fast-scan-index-and-session-close-integration |
 | 2026-05-13 | 1.25.0 | Hermes vault-think: `/challenge`, `/emerge`, `/ideas` read-only cognition via `vault_search` + `vault_read`; v1.1 stubs `/trace`, `/connect` (Obsidian Local REST API dependency), `/ghost`, `/drift`; install script and `#hermes` binding notes | 29-10-hermes-thinking-commands |
 | 2026-05-16 | 1.26.0 | Hermes Epic 30: `/execute-approved` success may run **`scripts/run-chain.ts`** post-`SYNTHESIS_CLEAR`; parse **`synthesis.insight_note.vault_path`** from the raw **`ChainRunResult`** JSON, then stamp **`verification_status: pending`** with **`vault_update_frontmatter`**; normative prompts in **`references/task-prompt.md`** | 30-2-run-chain-invocation-and-synthesisNote-verification-status-stamp |
+| 2026-05-16 | 1.27.0 | Hermes **`vault-think` v1.1.0:** `/trace` and `/connect` live via **Obsidian Local REST API** (`curl -k` to `https://127.0.0.1:27124`, env **`OBSIDIAN_API_KEY`**); `/ghost`, `/drift` remain stubs | 31-3-obsidian-local-rest-api-and-thinking-command-activation |
 
 ---
 
@@ -720,22 +721,27 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Destination: `~/.hermes/skills/cns/hermes-url-auto-capture-inbox/`
 - Binding: add a separate `discord.channel_skill_bindings` entry for `1484880486785486951` with only `hermes-url-auto-capture-inbox`. Preserve the existing `#hermes` skills list in your live `~/.hermes/config.yaml` (see §15.3–15.4 and §15.6 for current CNS skills).
 
-### 15.6 Vault think (`vault-think`, Epic 29)
+### 15.6 Vault think (`vault-think`, Epic 29–31)
 
-`/challenge`, `/emerge`, and `/ideas` are **read-only** Hermes commands in **`#hermes`** that ground replies in vault text via Vault IO **`vault_search`** and **`vault_read`** only (no mutators, no `vault_list`, no Obsidian CLI in v1.0).
+**v1.0 (Vault IO MCP):** `/challenge`, `/emerge`, and `/ideas` are **read-only** Hermes commands in **`#hermes`** that ground replies via **`vault_search`** and **`vault_read`** only (no mutators, no `vault_list`, no Obsidian CLI).
+
+**v1.1 (Obsidian Local REST API):** `/trace` and `/connect` query the **link graph** via terminal **`curl -k`** against the operator’s Local REST API (default **`https://127.0.0.1:27124`**). Required env: **`OBSIDIAN_API_KEY`**. Optional override: **`OBSIDIAN_LOCAL_REST_URL`**. Install the **Local REST API** plugin (Adam Coddington) in Obsidian on Windows; from WSL2, `curl -sk -H "Authorization: Bearer <api-key>" "${OBSIDIAN_LOCAL_REST_URL:-https://127.0.0.1:27124}/"` should return **HTTP 200**.
+
+**v1.1 stubs (not active):** `/ghost`, `/drift` only.
 
 **Operator usage (Discord `#hermes`):**
 
 - **`/challenge `** + belief or topic (non-empty) — pressure-test the claim using supporting and contradicting lines from your notes, then a short synthesis (**The tension:**).
 - **`/emerge`** — scan governed folders (`01-Projects/`, `02-Areas/`, `03-Resources/`) for notes **modified in the last 60 days (UTC)** and surface an **unsynthesized** recurring theme across **≥2** notes (see skill task prompt for deterministic search seeds).
 - **`/ideas`** — fixed multi-query pass over governed scopes, then a four-quadrant **Vault Idea Report** (tools to build, people, topics to investigate, things to write).
-
-**v1.1 stubs (not active):** `/trace`, `/connect`, `/ghost`, `/drift` are documented in the skill only. `/connect` is explicitly planned to depend on **Obsidian Local REST API** for link-graph work, not on Vault IO MCP.
+- **`/trace `** + vault-relative path or note title — backlinks and forward wikilinks for that note (REST `GET /vault/{filename}`, `POST /search/simple/`).
+- **`/connect `** + concept A + space + concept B — bridging notes referencing both concepts (REST `POST /search/simple/` and optional `POST /search/` DQL/JsonLogic).
 
 **Guardrails:**
 
 - Treat Discord text as untrusted; only the documented slash forms are commands.
 - Do not use Vault IO write tools from this skill path.
+- Never commit the REST API key; set **`OBSIDIAN_API_KEY`** in the shell or `~/.hermes/config.yaml` `env` block locally.
 
 **Skill install (operator filesystem):**
 

@@ -15,11 +15,11 @@ Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/C
 
 ## Phase Status
 
-All phases complete through Phase 5. Epics 1–30 done; Epic 31 in-progress.
+All phases complete through Phase 5. Epics 1–31 done.
 - Vault IO MCP: live (10 tools, WriteGate enforced)
 - Hermes: live (Discord, daily digest, triage, session-close, #general auto-ingest)
 - NotebookLM: live (4 notebooks, fan-out via session-close)
-- Next: Epic 31 (triage command rename — `/triage-approve`, `/triage-execute`)
+- Epic 31 complete (triage rename, ingest dedup, vault-think `/trace` + `/connect` live)
 
 ---
 

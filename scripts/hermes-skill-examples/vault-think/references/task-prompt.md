@@ -1,36 +1,61 @@
-# Task: `vault-think` on-demand cognition (read-only: `vault_search` + `vault_read` only)
+# Task: `vault-think` on-demand cognition
 
-## 0) Vault root and clocks
+- **v1.0:** Vault IO MCP — `vault_search` + `vault_read` only.
+- **v1.1 live:** Obsidian Local REST API — **terminal `curl -k`** only (no new Node dependencies).
+- **v1.1 stubs:** `/ghost`, `/drift` only.
 
-1. Resolve directory `CNS_VAULT_ROOT`:
+## 0) Vault root, REST env, and clocks
+
+1. Resolve directory **`CNS_VAULT_ROOT`** (required for v1.0 commands only):
 
    - If environment variable `CNS_VAULT_ROOT` is set and non-empty after trim, use it.
    - Else read `~/.hermes/config.yaml` as text, parse YAML mentally, and read `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
-   - If still unset: reply exactly `vault-think: no-vault-root` and **stop**.
+   - If still unset on a v1.0 command path: reply exactly `vault-think: no-vault-root` and **stop**.
 
-2. Set **`today_utc`** = current UTC calendar date `YYYY-MM-DD` at the instant you start (use for report headers and date math).
+2. Resolve **Obsidian Local REST** (required for `/trace` and `/connect` only):
 
-3. For `/emerge` only, set **`since_utc`** = `today_utc` minus **60** calendar days (UTC date roll; if a day is invalid, clamp within the month).
+   - **`OBSIDIAN_API_KEY`**: from environment, or `~/.hermes/config.yaml` → `env.OBSIDIAN_API_KEY`. If unset or empty: reply exactly `vault-think: obsidian-rest-no-api-key` and **stop**.
+   - **`OBSIDIAN_LOCAL_REST_URL`**: from environment, or config `env.OBSIDIAN_LOCAL_REST_URL`, else default **`https://127.0.0.1:27124`** (trim trailing `/`).
+   - **Never** print the API key in Discord or logs.
+
+3. **REST `curl` helper** (use the **terminal** tool for every HTTP call):
+
+   ```bash
+   REST_BASE="${OBSIDIAN_LOCAL_REST_URL:-https://127.0.0.1:27124}"
+   REST_BASE="${REST_BASE%/}"
+   curl -sk -H "Authorization: Bearer ${OBSIDIAN_API_KEY}" "${REST_BASE}<path>"
+   ```
+
+   - If any request fails (connection error, timeout, or HTTP status not **2xx**): reply exactly `vault-think: obsidian-rest-unavailable` and **stop**.
+   - URL-encode path segments in `/vault/{filename}` (spaces → `%20`, etc.).
+
+4. Set **`today_utc`** = current UTC calendar date `YYYY-MM-DD` at the instant you start.
+
+5. For `/emerge` only, set **`since_utc`** = `today_utc` minus **60** calendar days (UTC date roll; if a day is invalid, clamp within the month).
 
 ## 1) Line classification (after trim)
 
 Let **`raw`** = operator message with leading and trailing ASCII whitespace removed.
 
-### 1a) v1.1 stub triggers (handle before v1.0)
+### 1a) v1.1 stub triggers (handle before v1.0 and before trace/connect)
 
-If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, starts with `/connect `, equals `/ghost`, starts with `/ghost `, or equals `/drift` (optional trailing spaces only for the zero-argument forms), reply **exactly**:
+If **`raw`** equals `/ghost`, starts with `/ghost `, or equals `/drift` (optional trailing spaces only for `/drift`), reply **exactly**:
 
 ```text
-vault-think: v1.1-not-active — /trace, /connect, /ghost, and /drift are documented stubs only. /connect will require Obsidian Local REST API for link-graph bridging when implemented. Use /challenge, /emerge, or /ideas in v1.0.
+vault-think: v1.1-not-active — /ghost and /drift are documented stubs only. Use /challenge, /emerge, /ideas, /trace, or /connect.
 ```
 
-Then **stop** (no MCP calls).
+Then **stop** (no MCP calls, no REST calls).
 
-### 1b) v1.0 bad trigger
+### 1b) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
+
+If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, or starts with `/connect `, continue to **§3** (do not treat as bad-trigger).
+
+### 1c) v1.0 bad trigger
 
 If **`raw`** does not match any v1.0 trigger in §2, reply exactly `vault-think: bad-trigger` and **stop** (no MCP calls).
 
-## 2) v1.0 triggers
+## 2) v1.0 triggers (Vault IO MCP)
 
 ### `/challenge`
 
@@ -143,10 +168,110 @@ Draft thesis: [one paragraph Hermes would write if asked to]
 - `[note reference]` and `[note references]` use vault-relative paths; separate multiple paths with comma + space.
 - Every substantive bullet must trace to text you read in **`vault_read`** output for this run (no invented people or companies).
 
-## 3) Forbidden tools reminder
+## 3) v1.1 live triggers (Obsidian Local REST via `curl -k`)
+
+Use **§0** REST env. All HTTP in this section uses the **terminal** tool only.
+
+### `/trace`
+
+**Match:** `raw` starts with `/trace` followed by at least one ASCII space; let **`target`** = remainder trimmed (non-empty).
+
+**If** `/trace` with no remainder or only spaces: reply `vault-think: trace requires note` and stop.
+
+**Note resolution:**
+
+1. If **`target`** contains `/` or ends with `.md`, treat as vault-relative path candidate.
+2. Else treat **`target`** as title substring (case-insensitive).
+3. **Direct read attempt:** `GET /vault/{url-encoded-path}` with `Accept: application/vnd.olrapi.note+json`.
+   If **200**, use that note.
+4. **Search fallback:** `POST "${REST_BASE}/search/simple/?query=$(urlencode target)&contextLength=80"`
+   Parse JSON matches; keep paths under `01-Projects/`, `02-Areas/`, `03-Resources/` first.
+5. **Ambiguous:** if **2–5** equally plausible paths remain, reply **only**:
+
+```text
+vault-think: trace ambiguous
+• [title] — [path]
+...
+```
+
+(max **5** candidates, `•` bullets).
+
+6. **Not found:** reply exactly `vault-think: trace not-found` and stop.
+
+**Link graph (after note resolved):**
+
+1. **Read note:** `GET /vault/{path}` with `Accept: application/vnd.olrapi.note+json`. Extract `content`, `frontmatter.title` (or basename), and `path`.
+2. **Forward links:** Parse body for `[[wikilink]]` targets; **exclude** embeds matching `![[...]]`. Dedupe targets. Cap display at **12** (prefer links whose resolved paths exist under governed folders).
+3. **Backlinks:** Search for notes that link to the **resolved note**, not to the note's outgoing targets:
+   - Build target aliases from the resolved note: frontmatter title, basename without `.md`, full vault-relative path, and path without `.md`.
+   - For up to **4** aliases, run `POST /search/simple/?query=$(urlencode alias)&contextLength=120` (cap **4** backlink search calls).
+   - Keep hits whose snippet or fetched body contains a wikilink to the resolved note alias, including `[[alias]]` or `[[alias|display]]`; exclude the resolved note itself.
+   - Dedupe by path. Cap display at **12** backlinks; prefer governed folders when ranking.
+4. **One-sentence graph synthesis** from actual link sets (no invented notes).
+
+**Discord reply — only this shape on success:**
+
+```text
+🔗 Trace: [note title]
+Path: [vault-relative path]
+
+← Backlinks ([N]):
+• [title] — [path]
+...
+
+→ Forward links ([M]):
+• [title] — [path]
+...
+
+Graph: [one sentence synthesis of how this note sits in the vault]
+```
+
+Omit empty backlink/forward sections; use `(none in sampled graph)` on the section line if zero.
+
+### `/connect`
+
+**Match:** `raw` starts with `/connect` followed by at least one ASCII space.
+
+Let **`rest`** = substring after `/connect ` trimmed. Split **`rest`** on the **first** ASCII space into **`concept_a`** and **`concept_b`** (both non-empty after trim). If fewer than two tokens: reply exactly `vault-think: connect requires two concepts` and stop.
+
+**Procedure (≤ 6** `search/simple` **calls total):**
+
+1. `POST /search/simple/?query=$(urlencode concept_a)&contextLength=100` → set **A** (paths).
+2. `POST /search/simple/?query=$(urlencode concept_b)&contextLength=100` → set **B** (paths).
+3. **Direct bridge:** if **A ∩ B** non-empty, pick best path (governed folders first); optionally `GET` one note for a one-line “why”.
+4. **Two-hop bridge:** if intersection empty, for up to **2** notes in **A** (cap REST budget), search for notes linking both concepts:
+   - `POST /search/simple/?query=$(urlencode concept_b)` and check snippets mentioning **concept_a** or wikilinks from **A** notes; or
+   - `POST /search/` with JsonLogic when simple search is thin:
+
+   ```bash
+   curl -sk -X POST \
+     -H "Authorization: Bearer ${OBSIDIAN_API_KEY}" \
+     -H "Content-Type: application/vnd.olrapi.jsonlogic+json" \
+     --data '{"and":[{"glob":["*'"${concept_a}"'*",{"var":"content"}]},{"glob":["*'"${concept_b}"'*",{"var":"content"}]}]}' \
+     "${REST_BASE}/search/"
+   ```
+
+   (Counts toward the **6** search call cap.)
+
+5. **Success:** Discord reply **only**:
+
+```text
+🌉 Connect: [concept A] ↔ [concept B]
+
+Bridge:
+• [path 1] — [why it links A]
+• [path 2] — [why it links B]
+...
+
+Summary: [1-2 sentences]
+```
+
+6. **No bridge** within caps: reply exactly `vault-think: connect no direct connection found`.
+
+## 4) Forbidden tools reminder
 
 Do **not** call: `vault_list`, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
 
-## 4) Incomplete work
+## 5) Incomplete work
 
 If caps block completion, reply `vault-think: incomplete` once, optionally with one sentence naming the blocking cap. Do not fabricate unread citations.

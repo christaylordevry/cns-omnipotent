@@ -9,32 +9,34 @@ const skillDir = join(root, "scripts/hermes-skill-examples/vault-think");
 const skillPath = join(skillDir, "SKILL.md");
 const taskPromptPath = join(skillDir, "references/task-prompt.md");
 
-describe("Story 29-10 Hermes vault-think skill mirror", () => {
-  it("defines the skill package and install helper", () => {
+describe("Story 31-3 Hermes vault-think skill mirror", () => {
+  it("defines the skill package at v1.1.0 with live trace and connect", () => {
     assert.ok(existsSync(skillPath));
     assert.ok(existsSync(taskPromptPath));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-vault-think.sh")));
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-think"));
+    assert.ok(body.includes("version: 1.1.0"));
     assert.ok(body.includes("## When to use"));
     assert.ok(body.includes("/challenge"));
     assert.ok(body.includes("/emerge"));
     assert.ok(body.includes("/ideas"));
-    assert.ok(body.includes("## v1.1 stubs"));
-    assert.ok(body.includes("/trace"));
-    assert.ok(body.includes("/connect"));
+    assert.ok(body.includes("/trace "));
+    assert.ok(body.includes("/connect "));
+    assert.ok(body.includes("OBSIDIAN_API_KEY"));
+    assert.ok(body.includes("https://127.0.0.1:27124"));
+    assert.ok(!body.includes("No (v1.1)") || body.includes("ghost") && body.includes("drift"));
     assert.ok(body.includes("/ghost"));
     assert.ok(body.includes("/drift"));
     assert.ok(body.includes("Obsidian Local REST API"));
-    assert.ok(body.includes("not-yet-active") || body.includes("not yet active") || body.includes("No (v1.1)"));
   });
 
-  it("restricts MCP reads to vault_search and vault_read only", () => {
+  it("restricts v1.0 MCP reads to vault_search and vault_read only", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("vault_search"));
     assert.ok(body.includes("vault_read"));
-    assert.ok(body.includes("## 3) Forbidden tools reminder"));
+    assert.ok(body.includes("## 4) Forbidden tools reminder"));
     for (const forbidden of [
       "vault_create_note",
       "vault_update_frontmatter",
@@ -48,7 +50,7 @@ describe("Story 29-10 Hermes vault-think skill mirror", () => {
     }
   });
 
-  it("documents v1.0 output templates and stub refusal", () => {
+  it("documents v1.0 output templates and ghost/drift stub refusal only", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("⚡ Challenge:"));
     assert.ok(body.includes("Supporting evidence from your vault:"));
@@ -62,5 +64,31 @@ describe("Story 29-10 Hermes vault-think skill mirror", () => {
     assert.ok(body.includes("🔍 Topics to investigate:"));
     assert.ok(body.includes("✍️ Things to write:"));
     assert.ok(body.includes("v1.1-not-active"));
+    assert.ok(body.includes("/ghost"));
+    assert.ok(body.includes("/drift"));
+    assert.ok(!body.includes("/trace, /connect, /ghost"));
+    assert.ok(!body.includes("/trace, /connect, /ghost, and /drift"));
+  });
+
+  it("documents trace and connect REST procedures with curl and Discord templates", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("## 3) v1.1 live triggers"));
+    assert.ok(body.includes("curl -sk"));
+    assert.ok(body.includes("GET /vault/"));
+    assert.ok(body.includes("/search/simple/"));
+    assert.ok(body.includes("POST /search/"));
+    assert.ok(body.includes("Search for notes that link to the **resolved note**"));
+    assert.ok(body.includes("frontmatter title, basename without `.md`, full vault-relative path, and path without `.md`"));
+    assert.ok(!body.includes("For each forward target"));
+    assert.ok(body.includes("🔗 Trace:"));
+    assert.ok(body.includes("← Backlinks"));
+    assert.ok(body.includes("→ Forward links"));
+    assert.ok(body.includes("🌉 Connect:"));
+    assert.ok(body.includes("vault-think: obsidian-rest-unavailable"));
+    assert.ok(body.includes("vault-think: obsidian-rest-no-api-key"));
+    assert.ok(body.includes("vault-think: trace not-found"));
+    assert.ok(body.includes("vault-think: trace ambiguous"));
+    assert.ok(body.includes("vault-think: connect requires two concepts"));
+    assert.ok(body.includes("vault-think: connect no direct connection found"));
   });
 });

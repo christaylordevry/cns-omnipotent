@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-16T23:37:17+10:00
+# last_updated: 2026-05-16T12:00:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -248,6 +248,7 @@ development_status:
   30-2-run-chain-invocation-and-synthesisNote-verification-status-stamp: done
   30-3-skill-md-capability-declaration-and-e2e-verification: done
 
-  epic-31: in-progress
+  epic-31: done
   31-1-triage-command-rename-and-constitution-sync: done
   31-2-strict-url-normalization-for-dedup-guard: done
+  31-3-obsidian-local-rest-api-and-thinking-command-activation: done
