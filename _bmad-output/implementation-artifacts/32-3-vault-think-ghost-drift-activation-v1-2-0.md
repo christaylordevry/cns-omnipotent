@@ -2,12 +2,12 @@
 story_id: 32-3
 epic: 32
 title: vault-think-ghost-drift-activation-v1-2-0
-status: review
+status: done
 ---
 
 # Story 32.3: vault-think-ghost-drift-activation-v1-2-0
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide for Epic 32 `/ghost` and `/drift` activation on vault-think v1.2.0. -->
 
@@ -87,7 +87,7 @@ so that **I can query my own thinking patterns from Discord instead of receiving
 - [x] Measure **`task-prompt.md`** post-edit delta; confirm **≤ 700** tokens combined for new sections (AC5).
 - [x] Extend **`~/.hermes/config.yaml`** **`discord.channel_prompts`** for **`#hermes`** to mention **`/ghost`** and **`/drift`** (bindings already route **`#hermes`** through **`vault-think`**).
 - [x] Run **`npm test`** and **`bash scripts/verify.sh`**.
-- [ ] **Operator (AC8):** Run live **`/ghost`** and **`/drift`** in **`#hermes`**; paste evidence into **`epic-32-thinking-commands-evidence.md`**.
+- [x] **Operator (AC8):** Run live **`/ghost`** and **`/drift`** in **`#hermes`**; paste evidence into **`epic-32-thinking-commands-evidence.md`**.
 
 ## Dev Notes
 
@@ -348,7 +348,7 @@ _(none)_
 - Regression tests: Story 32-3 describe block; flipped stub negative assertions; version **1.2.0** across describes.
 - Installed mirror to `~/.hermes/skills/cns/vault-think/`; updated `#hermes` channel_prompts (`/ghost <question>`).
 - AC5: baseline **15,711** → post **18,193** bytes; delta **2,482** (~**621** est. tokens, ≤ 700).
-- AC8: evidence skeleton at `epic-32-thinking-commands-evidence.md` — **operator** must run live Discord and paste results.
+- AC8: live Discord evidence pasted in `epic-32-thinking-commands-evidence.md`; `/ghost` returned vault-sourced first-person synthesis and `/drift` returned real unresolved recurring concepts.
 
 ### File List
 
@@ -373,10 +373,11 @@ _(none)_
 | Delta token budget (AC5) | **~621** (≤ 700) pass |
 | `npm test` | pass (606) |
 | `bash scripts/verify.sh` | pass |
-| Live Discord AC8 evidence | pending operator |
+| Live Discord AC8 evidence | pass |
 
 ## Change Log
 
 - 2026-05-17: Story 32-3 created (ready-for-dev) — activate `/ghost` and `/drift` on `vault-think` v1.2.0; remove v1.1 stub refusal; Vault IO read-only procedures; 700-token combined delta budget.
 - 2026-05-17: Dev implementation complete (review) — v1.2.0 ghost/drift live in skill mirror + Hermes install; tests green; AC8 awaits operator Discord evidence.
 - 2026-05-17: Review fix — `/drift` resolution now requires a matching `pake_type: SynthesisNote`; non-synthesis title matches remain unresolved. Status stays review pending AC8.
+- 2026-05-17: AC8 Discord evidence complete; `/ghost` and `/drift` live proofs recorded; story marked done.
