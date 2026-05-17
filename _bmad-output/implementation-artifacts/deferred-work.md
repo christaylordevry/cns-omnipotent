@@ -329,3 +329,7 @@ The following paragraphs record **pre-triage** notes (2026-04-02) for audit trai
 Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “deferred to Epic 5.2” in mutator tools (now closed). Placement table previously suggested CLI move verification and `IO_ERROR` hygiene for Epic 6; this file now classifies them formally as **(a)**.
 
 </details>
+
+## Deferred from: code review of 34-3-stale-pending-review-via-verify (2026-05-18)
+
+- Evidence UTC vs audit log sub-second skew — cosmetic timestamp display only; no vault or audit integrity impact.

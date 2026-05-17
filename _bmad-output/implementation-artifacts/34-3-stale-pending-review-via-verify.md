@@ -2,12 +2,12 @@
 story_id: 34-3
 epic: 34
 title: stale-pending-review-via-verify
-status: ready-for-dev
+status: in-progress
 ---
 
 # Story 34.3: Stale pending review via /verify
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -71,12 +71,19 @@ so that **verification debt is resolved** with human judgment (`verified` vs `di
 
 ## Tasks / Subtasks
 
-- [ ] Confirm Hermes gateway + `vault-think` v1.3.0 on `#hermes`.
-- [ ] For each **SynthesisNote** row: `/verify <path>` (review excerpt) → `/verify verified <path>` or `/verify disputed <path>`.
-- [ ] For each **WorkflowNote / InsightNote / SourceNote** row: `vault_update_frontmatter` with `verification_status` + `modified: 2026-05-17` (or run date).
-- [ ] Write evidence artifact with full decision log.
-- [ ] Re-run `/vault-lint`; confirm Rule 3 clear for processed paths.
-- [ ] Standing task: Operator guide — **no update required** (`/verify` already documented v1.30.0).
+- [x] Confirm Hermes gateway + `vault-think` v1.3.0 on `#hermes` (operator sign-off 2026-05-18 — code review).
+- [x] For each **SynthesisNote** row: stamped `verified`/`disputed` via `vault_update_frontmatter` (MCP pipeline; `/verify` marking tokens optional re-review in `#hermes`).
+- [x] For each **WorkflowNote / InsightNote / SourceNote** row: `vault_update_frontmatter` with `verification_status` + `modified: 2026-05-17`.
+- [x] Write evidence artifact with full decision log.
+- [ ] Re-run `/vault-lint`; confirm Rule 3 clear for processed paths (vault state clear; on-disk report stale until Hermes refresh).
+- [x] Standing task: Operator guide — **no update required** (`/verify` already documented v1.30.0).
+
+### Review Findings
+
+- [x] [Review][Decision] AC1 — Hermes gateway sign-off not recorded — Resolved 2026-05-18: operator confirmed gateway live + `vault-think` on `#hermes`.
+- [x] [Review][Decision] AC4 — SynthesisNotes stamped via MCP only, not `/verify` tokens — Resolved 2026-05-18: MCP batch accepted; Discord re-review not required.
+- [x] [Review][Patch] AC7 — Refresh on-disk lint report — Acknowledged 2026-05-18: operator will run `/vault-lint` in `#hermes` (story task remains open until complete).
+- [x] [Review][Defer] Evidence UTC vs audit log sub-second skew — Evidence table times (e.g. `11:23:17.436Z`) differ slightly from `agent-log.md` lines (e.g. `11:23:17.462Z`); cosmetic only. — deferred, pre-existing
 
 ## Dev Notes
 
@@ -132,17 +139,30 @@ If **34-2** has not run, some paths may still lack valid `pake_type` / `verifica
 
 ### Agent Model Used
 
-_(operator / agent on run)_
+Composer (Cursor dev-story)
 
 ### Completion Notes List
 
-_(fill when 22/22 processed)_
+**22/22 processed** via `vaultUpdateFrontmatter` (surface `story-34-3`): **5 verified** (session summary, phase-1 complete, pillars synthesis, gap analysis, notebooklm map); **17 disputed** (perplexity research chains per judgment table).
+
+**AC4 note:** SynthesisNotes stamped via MCP pipeline; code review (2026-05-18) accepted MCP batch — Discord re-review not required.
+
+**AC1:** Operator confirmed Hermes gateway + `vault-think` v1.3.0 on `#hermes` (2026-05-18).
+
+**AC7:** All 22 paths `verified|disputed` on disk. Operator to run `/vault-lint` in `#hermes` to refresh report (pending).
+
+**Audit:** 22 `story-34-3` lines in `_meta/logs/agent-log.md`.
+
+**Evidence:** `epic-34-stale-pending-verify-evidence.md`
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/epic-34-stale-pending-verify-evidence.md` (create on completion)
-- Up to 22 vault notes (frontmatter `verification_status` only)
+- `_bmad-output/implementation-artifacts/epic-34-stale-pending-verify-evidence.md`
+- 22 vault notes (frontmatter `verification_status` + `modified` only)
+- `Knowledge-Vault-ACTIVE/_meta/logs/agent-log.md` (audit lines)
 
 ## Change Log
 
 - 2026-05-17: Story created for Epic 34 — operator stale-pending clearance via `/verify` + MCP.
+- 2026-05-17: 22/22 stale-pending queue stamped; evidence artifact created; status → review (Hermes gateway sign-off + `/vault-lint` refresh pending).
+- 2026-05-18: Code review — AC1 signed off, AC4 MCP batch accepted; AC7 `/vault-lint` refresh committed by operator; status → in-progress.
