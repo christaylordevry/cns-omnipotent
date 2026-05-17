@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-17T23:59:00+10:00"
+last_updated: "2026-05-17T15:10:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -266,5 +266,5 @@ development_status:
 
   epic-34: in-progress
   34-1-auxiliary-model-cost-reduction: done
-  34-2-vault-lint-remediation-critical-issues: ready-for-dev
+  34-2-vault-lint-remediation-critical-issues: review
   34-3-stale-pending-review-via-verify: ready-for-dev
