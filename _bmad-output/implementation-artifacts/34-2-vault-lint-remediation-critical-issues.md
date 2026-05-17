@@ -2,12 +2,12 @@
 story_id: 34-2
 epic: 34
 title: vault-lint-remediation-critical-issues
-status: ready-for-dev
+status: review
 ---
 
 # Story 34.2: Vault lint remediation — critical issues
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -55,13 +55,13 @@ so that **governed vault notes pass critical lint** and ingest/dedup trust is re
 
 ## Tasks / Subtasks
 
-- [ ] Read full **`vault-lint-2026-05-17.md`** ERRORS section (Rule 1 + Rule 4); build checklist of 1 delete + 77 patch paths.
-- [ ] Execute **Rule 1** delete of `03-Resources/e2e-epic30-20260516-cursor-dev.md`.
-- [ ] For each Rule 4 path: `vault_read_frontmatter` → compute missing fields → `vault_update_frontmatter` with merge-safe updates.
-- [ ] Handle edge cases: notes with partial frontmatter, invalid `status`, `pake_id_not_uuid_v4` (Operator-Profile — fix UUID if in the 77 set).
-- [ ] Re-run `/vault-lint`; capture summary counts in Dev Agent Record.
-- [ ] Run `npm test` and `bash scripts/verify.sh`.
-- [ ] Standing task: Operator guide — **no update required** unless operator wants lint remediation documented (not in AC).
+- [x] Read full **`vault-lint-2026-05-17.md`** ERRORS section (Rule 1 + Rule 4); build checklist of 1 delete + 77 patch paths.
+- [x] Execute **Rule 1** delete of `03-Resources/e2e-epic30-20260516-cursor-dev.md`.
+- [x] For each Rule 4 path: `vault_read_frontmatter` → compute missing fields → `vault_update_frontmatter` with merge-safe updates.
+- [x] Handle edge cases: notes with partial frontmatter, invalid `status`, `pake_id_not_uuid_v4` (Operator-Profile — fix UUID if in the 77 set).
+- [x] Re-run `/vault-lint`; capture summary counts in Dev Agent Record.
+- [x] Run `npm test` and `bash scripts/verify.sh`.
+- [x] Standing task: Operator guide — **no update required** unless operator wants lint remediation documented (not in AC).
 
 ## Dev Notes
 
@@ -122,18 +122,57 @@ Duplicate source_uri: https://en.wikipedia.org/wiki/Model_Context_Protocol
 
 ### Agent Model Used
 
-_(fill on implementation)_
+Composer (Cursor dev-story workflow)
 
 ### Completion Notes List
 
-_(fill on implementation — include re-lint summary table)_
+**Rule 1:** Deleted `03-Resources/e2e-epic30-20260516-cursor-dev.md` via filesystem (`rm -f`). Kept `03-Resources/e2e-epic30-dedup-test.md`.
+
+**Rule 4:** Patched all **77** report paths via `vaultUpdateFrontmatter` (WriteGate + PAKE + audit, surface `story-34-2`). Defaults: `confidence_score` **0.7** when missing; `creation_method` **hybrid**; `tags` **["lint-auto"]** when empty; new UUID v4 for missing/invalid `pake_id` (incl. Operator-Profile).
+
+**Extra (AC6 / invalid enums):** `CNS-Workflow-Map.md` `verification_status` **approved → verified**. Also fixed `stable` status on `CNS-Operator-Guide.md` and `Vault-Intelligence-Discovery-Workflow.md` (coerced `created`/`modified` to string dates for PAKE write).
+
+**Status mappings (invalid → valid):** `parked→draft`, `operational→in-progress`, `reference→reviewed`, `active→in-progress` (36 notes; see script log).
+
+**Post-remediation lint (equivalent scan, `scripts/vault-lint-remediate-34-2.ts` verifier):**
+
+| Rule | ERROR count |
+|------|-------------|
+| Rule 1 duplicate `source_uri` | **0** |
+| Rule 4 missing critical fields (77 remediated paths) | **0** |
+| Rule 4 vault-wide (informational) | **0** |
+
+Operator should run `/vault-lint` in `#hermes` to refresh on-disk report; Rule 2/3 warnings expected unchanged.
+
+**Verification:** `npm test` — 606 Vitest passed; `bash scripts/verify.sh` — VERIFY PASSED. No test file changes.
+
+**Audit:** 233 `vault_update_frontmatter` lines with `surface: story-34-2` in `_meta/logs/agent-log.md`.
 
 ### File List
 
 - `Knowledge-Vault-ACTIVE/03-Resources/e2e-epic30-20260516-cursor-dev.md` (deleted)
-- Up to 77 governed notes under `01-Projects/`, `02-Areas/`, `03-Resources/` (frontmatter only)
-- `_meta/logs/agent-log.md` (audit lines from updates)
+- 77 governed notes under `01-Projects/`, `02-Areas/`, `03-Resources/` (frontmatter only; paths from `vault-lint-2026-05-17.md` Rule 4 Fix JSON)
+- `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md` (status + date coercion)
+- `Knowledge-Vault-ACTIVE/03-Resources/Vault-Intelligence-Discovery-Workflow.md` (status + date coercion)
+- `Knowledge-Vault-ACTIVE/_meta/logs/agent-log.md` (audit lines)
+- `scripts/vault-lint-remediate-34-2.ts` (implementation helper; optional to keep)
+
+### Review Findings
+
+- [x] [Review][Decision] AC7 closure — **B selected (2026-05-17):** Block `done` until `/vault-lint` runs in `#hermes` and on-disk `vault-lint-2026-05-17.md` (or same-day report) shows Rule 1 + Rule 4 ERROR = 0. Vault note state already passes script verifier; canonical report still stale until operator runs Hermes.
+
+- [x] [Review][Patch] Commit or drop remediation script — committed `scripts/vault-lint-remediate-34-2.ts` (code review batch-apply).
+
+- [x] [Review][Patch] Idempotent re-runs cause audit noise — `buildUpdates()` now emits only missing/invalid fields; re-run skips compliant notes (verified 2026-05-17).
+
+- [ ] [Review][Patch] Stale canonical lint report — blocked on operator `/vault-lint` in `#hermes` per decision **B**; script verifier already 0/0 on vault state.
+
+- [x] [Review][Defer] Duplicated Rule 4 checks in script — `rule4Findings()` mirrors `vault-lint.md` locally; drift risk if spec changes. Prefer shared module in a future story. [`scripts/vault-lint-remediate-34-2.ts`:182-214] — deferred, pre-existing one-off pattern
+
+- [x] [Review][Defer] Report JSON coupling — `parseRule4Paths()` depends on exact `Fix:` JSON shape in the lint report; brittle if Hermes output format changes. [`scripts/vault-lint-remediate-34-2.ts`:33-44] — deferred, pre-existing
 
 ## Change Log
 
 - 2026-05-17: Story created for Epic 34 — critical vault-lint remediation from 2026-05-17 report.
+- 2026-05-17: Implemented Rule 1 delete + 77 Rule 4 `vault_update_frontmatter` patches; equivalent re-lint Rule 1/4 ERROR zero; verify gate passed.
+- 2026-05-17: Code review — 1 decision-needed, 3 patch, 2 defer; vault state verified, on-disk report still stale.

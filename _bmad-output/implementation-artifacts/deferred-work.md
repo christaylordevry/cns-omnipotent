@@ -311,6 +311,14 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ---
 
+## Deferred from: code review (34-2-vault-lint-remediation-critical-issues.md) (2026-05-17)
+
+- **Duplicated Rule 4 checks in remediation script** — `scripts/vault-lint-remediate-34-2.ts` reimplements `rule4Findings()` from `vault-lint.md`; prefer shared lint module on a future vault-health story.
+
+- **Report JSON coupling in `parseRule4Paths()`** — remediation depends on exact Hermes `Fix:` JSON in `vault-lint-2026-05-17.md`; brittle if report format changes.
+
+---
+
 ## Historical notes (archived context)
 
 The following paragraphs record **pre-triage** notes (2026-04-02) for audit trail only; the tables above supersede them.
