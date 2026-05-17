@@ -16,7 +16,7 @@ metadata:
 
 This skill applies only in Discord **`#general`** (channel ID `1484880486785486951` on the CNS server) when loaded through `~/.hermes/config.yaml` `discord.channel_skill_bindings`.
 
-It is **capture only**. It writes unstructured markdown files under **`00-Inbox/`** so the operator can later use the existing manual triage workflow: `/triage` -> `/approve` -> `/execute-approved`.
+It is **capture only**. It writes unstructured markdown files under **`00-Inbox/`** so the operator can later use the existing manual triage workflow: `/triage` -> `/triage-approve` -> `/triage-execute`.
 
 ## When to use
 
@@ -35,7 +35,7 @@ It is **capture only**. It writes unstructured markdown files under **`00-Inbox/
 
 - This skill must not call `vault_create_note`.
 - This skill must not call `vault_move`.
-- This skill must not call `/approve` or `/execute-approved`.
+- This skill must not call `/triage-approve` or `/triage-execute`.
 - This skill must not create governed notes in `03-Resources/`, `01-Projects/`, or `02-Areas/`.
 - This skill must not infer routing or add PAKE frontmatter.
 

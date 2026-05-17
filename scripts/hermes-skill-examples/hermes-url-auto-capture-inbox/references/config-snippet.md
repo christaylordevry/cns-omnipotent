@@ -13,7 +13,7 @@ discord:
   channel_prompts:
     "1500733488897462382": |
       CNS Hermes channel: route by exact CNS skill trigger before casual replies.
-      URL-only messages use hermes-url-ingest-vault. /triage, /approve, and /execute-approved use triage. /session-close and /session-close --dry-run use session-close.
+      URL-only messages use hermes-url-ingest-vault. /triage, /triage-approve, and /triage-execute use triage. /session-close and /session-close --dry-run use session-close.
       Do not route /session-close through URL ingest.
       Use vault-lint for /vault-lint.
       Use vault-think for /challenge, /emerge, /ideas, /trace, /connect, /ghost, /drift.

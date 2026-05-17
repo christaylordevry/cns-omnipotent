@@ -101,7 +101,7 @@ Repeat the URL subsection for each captured URL, up to 3.
 
 ## Manual Triage Boundary
 
-After writing the Inbox capture, stop. Do not propose routing, do not move files, do not call `/approve`, and do not call `/execute-approved`. The standard Epic 27 workflow remains authoritative: `/triage` -> `/approve` -> `/execute-approved`.
+After writing the Inbox capture, stop. Do not propose routing, do not move files, do not call `/triage-approve`, and do not call `/triage-execute`. The standard Epic 27 workflow remains authoritative: `/triage` -> `/triage-approve` -> `/triage-execute`.
 
 ## Response
 

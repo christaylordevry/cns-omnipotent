@@ -26,6 +26,9 @@ describe("Story 28.3 Hermes #general URL auto-capture skill mirror", () => {
     assert.ok(body.includes("capture only"));
     assert.ok(body.includes("must not call `vault_create_note`"));
     assert.ok(body.includes("must not call `vault_move`"));
+    assert.ok(body.includes("/triage-approve"));
+    assert.ok(body.includes("/triage-execute"));
+    assert.ok(!body.includes("/execute-approved"));
   });
 
   it("documents URL trigger, SSRF refusal, timeout, and 3 URL cap", () => {
@@ -55,6 +58,10 @@ describe("Story 28.3 Hermes #general URL auto-capture skill mirror", () => {
     assert.ok(body.includes("No YAML frontmatter is required"));
     assert.ok(body.includes("Capture timestamp"));
     assert.ok(body.includes("Original URL"));
+    assert.ok(body.includes("/triage-approve"));
+    assert.ok(body.includes("/triage-execute"));
+    assert.ok(!body.includes("/execute-approved"));
+    assert.ok(!body.match(/do not call `\/approve`/));
   });
 
   it("config snippet binds only #general and preserves #hermes skills", () => {
