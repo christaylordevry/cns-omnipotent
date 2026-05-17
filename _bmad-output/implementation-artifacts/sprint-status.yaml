@@ -270,6 +270,6 @@ development_status:
   34-3-stale-pending-review-via-verify: in-progress
 
   epic-35: in-progress
-  35-1-hermes-url-auto-capture-inbox-triage-command-rename: review
+  35-1-hermes-url-auto-capture-inbox-triage-command-rename: done
   35-2-research-cluster-stale-pending-review-via-verify: ready-for-dev
   35-3-orphan-wikilink-pass-research-index: ready-for-dev

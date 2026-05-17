@@ -2,12 +2,12 @@
 story_id: 35-1
 epic: 35
 title: hermes-url-auto-capture-inbox-triage-command-rename
-status: review
+status: done
 ---
 
 # Story 35.1: hermes-url-auto-capture-inbox triage command rename
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -127,6 +127,11 @@ Composer (bmad-dev-story)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `~/.hermes/skills/cns/hermes-url-auto-capture-inbox/` (installed mirror)
 
+### Review Findings
+
+- 2026-05-18: **Clean review** — Blind Hunter, Edge Case Hunter, and Acceptance Auditor passed. All acceptance criteria satisfied in commit `3e3a11f`. No patch, decision, or defer items.
+
 ### Change Log
 
 - 2026-05-18: Story 35-1 — capture skill docs use `/triage-approve` and `/triage-execute`; tests hardened; live install synced.
+- 2026-05-18: Code review complete — status `done`.

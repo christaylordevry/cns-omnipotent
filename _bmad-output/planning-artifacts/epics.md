@@ -910,3 +910,35 @@ I want to **process 22 stale pending notes** using **`/verify`** (SynthesisNotes
 So that **verification debt from Rule 3 lint is cleared** with an evidence artifact.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/34-3-stale-pending-review-via-verify.md` (operator run in `#hermes`, evidence file, Rule 3 clear for listed paths; no repo code required).
+
+### Epic 35: Vault Curation + Housekeeping
+
+Close Phase 6 doc hygiene gaps, burn down Research-cluster verification debt, and reduce vault-lint orphan warnings via a Research hub index.
+
+**Stories:** 35-1 (hermes-url-auto-capture-inbox triage command rename), 35-2 (Research cluster 69× stale pending via `/verify`), 35-3 (Research `_README.md` orphan wikilink pass)
+**Phase:** 6
+**Status:** in-progress
+
+#### Story 35.1: hermes-url-auto-capture-inbox triage command rename
+
+As the **operator**,
+I want **`hermes-url-auto-capture-inbox`** skill docs to use **`/triage-approve`** and **`/triage-execute`**,
+So that **#general capture documentation matches Story 31-1** and does not reference gateway-owned `/approve`.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/35-1-hermes-url-auto-capture-inbox-triage-command-rename.md` (three repo files + live install mirror, `cmp` verify, `npm test` + `verify.sh`, commit).
+
+#### Story 35.2: Research cluster stale pending review via /verify
+
+As the **operator**,
+I want to **clear 69 Research-cluster notes** stuck at **`verification_status: pending`** (~7–8 weeks),
+So that **Research verification debt is resolved** with evidence and post-run `/vault-lint` confirmation.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/35-2-research-cluster-stale-pending-review-via-verify.md` (operator run in `#hermes`, evidence at `epic-35-research-verify-evidence.md`; no repo code).
+
+#### Story 35.3: Orphan wikilink pass — 03-Resources/Research index
+
+As the **operator**,
+I want a **`03-Resources/Research/_README.md` hub** linking all Research SourceNotes,
+So that **Rule 2 orphan WARNINGs drop** after `/vault-lint`.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/35-3-orphan-wikilink-pass-research-index.md` (`vault_create_note` hub, optional parent README only if missing, evidence at `epic-35-orphan-research-index-evidence.md`).
