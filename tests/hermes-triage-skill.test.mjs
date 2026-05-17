@@ -260,7 +260,10 @@ describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
   it("Story 27.6 operator guide AC7 documents discard safety and version history", () => {
     const body = readFileSync(operatorGuidePath, "utf8");
     assert.ok(body.includes("27-6-discard-policy-and-non-destructive-guarantees"));
-    assert.ok(body.includes("### 15.3 Inbox triage (`/triage`, Epic 27)"));
+    assert.ok(body.includes("### 15.3 Inbox triage (`triage` v1.7.0, Epic 27)"));
+    assert.ok(body.includes("/triage-approve"));
+    assert.ok(body.includes("/triage-execute"));
+    assert.ok(body.includes("Deprecated (Story 31.1)"));
     assert.ok(body.includes("**Discard / delete / archive vocabulary is safety-mapped.**"));
     assert.ok(body.includes("governed relocation"));
     assert.ok(body.includes("calls exactly one `vault_move`"));

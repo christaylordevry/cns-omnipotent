@@ -870,3 +870,11 @@ I want **a `/session-close` Hermes skill under `~/.hermes/skills/cns/` that read
 So that **session closure is repeatable**, **Current Focus stays truthful**, and **NotebookLM receives an up-to-date vault export without manual steps**.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/28-1-automate-agents-md-section-8-via-hermes-session-close.md` (Hermes skill layout, WriteGate-aware AGENTS sync, export + NotebookLM fan-out, verification notes).
+
+### Epic 33: Knowledge Quality Loop
+
+Closes the quality loop opened by Epic 30: operator can review and stamp pending SynthesisNotes from Discord (`/verify`), live E2E evidence confirms `/graduate` is production-ready, and the Operator Guide is brought current for all Phase 6 commands.
+
+**Stories:** 33-1 (/verify), 33-2 (/graduate E2E), 33-3 (Operator Guide 1.29.0 + 1.30.0)
+**Phase:** 6
+**Status:** in-progress

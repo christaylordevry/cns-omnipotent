@@ -10,8 +10,8 @@ Promote **`#graduate`** lines from **`DailyNotes/`** to **`03-Resources/`** Insi
 
 | Match | `scan_days` |
 |-------|-------------|
-| exactly `/graduate` (optional trailing spaces) | **7** |
-| `/graduate --days <n>` (`<n>` positive integer, no extra tokens) | **`<n>`** |
+| exactly `/vault-graduate` (optional trailing spaces) | **7** |
+| `/vault-graduate --days <n>` (`<n>` positive integer, no extra tokens) | **`<n>`** |
 | else | `vault-graduate: bad-trigger` and **stop** |
 
 ## 1) List and filter dailies (AC2a–b)

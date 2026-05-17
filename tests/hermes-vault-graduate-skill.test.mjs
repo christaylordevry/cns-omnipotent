@@ -11,7 +11,7 @@ const taskPromptPath = join(skillDir, "references/task-prompt.md");
 const installScript = join(root, "scripts/install-hermes-skill-vault-graduate.sh");
 
 describe("Story 32-1 Hermes vault-graduate skill mirror", () => {
-  it("defines the skill package at v1.0.0 with /graduate triggers", () => {
+  it("defines the skill package at v1.0.0 with /vault-graduate triggers", () => {
     assert.ok(existsSync(skillPath));
     assert.ok(existsSync(taskPromptPath));
     assert.ok(existsSync(installScript));
@@ -19,8 +19,8 @@ describe("Story 32-1 Hermes vault-graduate skill mirror", () => {
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-graduate"));
     assert.ok(body.includes("version: 1.0.0"));
-    assert.ok(body.includes("/graduate"));
-    assert.ok(body.includes("/graduate --days"));
+    assert.ok(body.includes("/vault-graduate"));
+    assert.ok(body.includes("/vault-graduate --days"));
     assert.ok(body.includes("## When to use"));
     assert.ok(body.includes("vault_create_note"));
     assert.ok(body.includes("vault_append_daily"));
@@ -73,7 +73,7 @@ describe("Story 32-1 Hermes vault-graduate skill mirror", () => {
     assert.ok(body.includes("🎓 Graduate report"));
     assert.ok(body.includes("No #graduate tags found in the last"));
     assert.ok(body.includes("vault-graduate: bad-trigger"));
-    assert.ok(body.includes("/graduate --days"));
+    assert.ok(body.includes("/vault-graduate --days"));
   });
 
   it("allows create/append mutators and forbids update/move/log", () => {
