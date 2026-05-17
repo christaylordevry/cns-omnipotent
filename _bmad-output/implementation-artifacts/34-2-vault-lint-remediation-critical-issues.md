@@ -2,12 +2,12 @@
 story_id: 34-2
 epic: 34
 title: vault-lint-remediation-critical-issues
-status: review
+status: in-progress
 ---
 
 # Story 34.2: Vault lint remediation — critical issues
 
-Status: review
+Status: in-progress
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -159,20 +159,23 @@ Operator should run `/vault-lint` in `#hermes` to refresh on-disk report; Rule 2
 
 ### Review Findings
 
-- [x] [Review][Decision] AC7 closure — **B selected (2026-05-17):** Block `done` until `/vault-lint` runs in `#hermes` and on-disk `vault-lint-2026-05-17.md` (or same-day report) shows Rule 1 + Rule 4 ERROR = 0. Vault note state already passes script verifier; canonical report still stale until operator runs Hermes.
+- [x] [Review][Decision] AC7 closure — **B selected (2026-05-17):** Block `done` until `/vault-lint` runs in `#hermes` and on-disk report shows Rule 1 + Rule 4 ERROR = 0. **Closed 2026-05-17 (re-review):** `vault-lint-2026-05-17.md` summary lines show Rule 1 = 0 errors, Rule 4 = 0 errors; `## ERRORS` section empty.
 
 - [x] [Review][Patch] Commit or drop remediation script — committed `scripts/vault-lint-remediate-34-2.ts` (code review batch-apply).
 
 - [x] [Review][Patch] Idempotent re-runs cause audit noise — `buildUpdates()` now emits only missing/invalid fields; re-run skips compliant notes (verified 2026-05-17).
 
-- [ ] [Review][Patch] Stale canonical lint report — blocked on operator `/vault-lint` in `#hermes` per decision **B**; script verifier already 0/0 on vault state.
+- [x] [Review][Dismiss] Stale canonical lint report — on-disk report refreshed; no longer blocked.
 
-- [x] [Review][Defer] Duplicated Rule 4 checks in script — `rule4Findings()` mirrors `vault-lint.md` locally; drift risk if spec changes. Prefer shared module in a future story. [`scripts/vault-lint-remediate-34-2.ts`:182-214] — deferred, pre-existing one-off pattern
+- [ ] [Review][Patch] Post-success script re-run hard-fails — `parseRule4Paths()` returns 0 when report has no Rule 4 `Fix:` JSON (clean report); `main()` throws `Expected 77 Rule 4 paths, got 0`. Add `--verify-only` or skip path parsing when report summary shows Rule 4 = 0. [`scripts/vault-lint-remediate-34-2.ts`:342-344]
 
-- [x] [Review][Defer] Report JSON coupling — `parseRule4Paths()` depends on exact `Fix:` JSON shape in the lint report; brittle if Hermes output format changes. [`scripts/vault-lint-remediate-34-2.ts`:33-44] — deferred, pre-existing
+- [x] [Review][Defer] Duplicated Rule 4 checks in script — `rule4Findings()` mirrors `vault-lint.md` locally; drift risk if spec changes. Prefer shared module in a future story. [`scripts/vault-lint-remediate-34-2.ts`:221-244] — deferred, pre-existing one-off pattern
+
+- [x] [Review][Defer] Report JSON coupling — `parseRule4Paths()` depends on exact `Fix:` JSON shape in the lint report; brittle if Hermes output format changes. [`scripts/vault-lint-remediate-34-2.ts`:47-57] — deferred, pre-existing
 
 ## Change Log
 
 - 2026-05-17: Story created for Epic 34 — critical vault-lint remediation from 2026-05-17 report.
 - 2026-05-17: Implemented Rule 1 delete + 77 Rule 4 `vault_update_frontmatter` patches; equivalent re-lint Rule 1/4 ERROR zero; verify gate passed.
 - 2026-05-17: Code review — 1 decision-needed, 3 patch, 2 defer; vault state verified, on-disk report still stale.
+- 2026-05-17: Re-review — AC7 closed (canonical report 0/0); 1 patch left as action item (`--verify-only`); status → in-progress.
