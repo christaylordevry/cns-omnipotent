@@ -24,6 +24,8 @@
 | Nexus trust-guard: detect `needs_configure` after Claude Code updates (NEXUS repo script) | (b) Phase 2 |
 | `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`: Symptom E + trust-guard post-update reconnection | (b) Phase 2 |
 | `vault_create_note` routes by `pake_type` only; ignores subdirectory path — use `vault_move` after creation for project subfolders | (b) Phase 2 / operator workflow |
+| `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (b) Phase 6 doc hygiene |
+| `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (b) parity hygiene |
 | Symlink / `realpath` on reads | (c) Resolved: Story 4-9 |
 | “Deferred to Epic 5.2” audit wiring in mutators | (c) Resolved: Epic 5 |
 
@@ -258,11 +260,10 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ## Deferred from: Epic 30 E2E (Story 30-3, 2026-05-16)
 
-- **`/approve` intercepted by Hermes gateway built-in** — triage skill `/approve` routing conflict; operator workaround required until gateway/skill routing is fixed. **Epic 31 candidate:** triage command routing.
-- **`/execute-approved` requires omitting leading `/`** — same gateway slash-command routing class as above.
+- **`/approve` / `/execute-approved` triage routing** — **Resolved** in triage skill by Story **31-1** (`/triage-approve`, `/triage-execute`). Remaining stale references: `hermes-url-auto-capture-inbox` skill copies (see Story 33-3 deferred items).
 - **`vault_create_note` routes by `pake_type` only; ignores caller-specified path** — E2E Inbox test notes must be created via direct filesystem write under `00-Inbox/` (already noted in summary table row 26; reinforced by 30-3 live run).
 
-**Class:** (b) Phase 2 / Epic 31 backlog unless operator guide workaround is documented first.
+**Class:** (b) Phase 2 / operator workflow (triage routing resolved 31-1; operator guide resolved 33-3).
 
 ---
 
@@ -288,7 +289,25 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 ## Deferred from: code review of 31-1-triage-command-rename-and-constitution-sync (2026-05-16)
 
-- Operator guide §15.3 still documents legacy `/approve` and `/execute-approved` — confined scope per story 31-1; update in a follow-up commit/story with version-history row (suggest v1.27.0).
+- Operator guide §15.3 still documents legacy `/approve` and `/execute-approved` — **Resolved** by Story **33-3** (Operator Guide v1.29.0; §15.3 marks deprecated names and documents `/triage-approve` / `/triage-execute`).
+
+- **Class:** (c)
+
+---
+
+## Deferred from: Story 33-3 operator-guide-phase6-completeness (2026-05-17)
+
+### hermes-url-auto-capture-inbox triage command names stale
+
+`SKILL.md`, `config-snippet.md`, `capture-prompt.md` (repo + installed) still reference `/approve` and `/execute-approved`. Operator Guide §15.3 marks these deprecated correctly. Update all three files to `/triage-approve` / `/triage-execute`.
+
+- **Class:** (b) Phase 6 doc hygiene
+
+### vault-think SKILL.md Pitfalls section — installed only
+
+`~/.hermes/skills/cns/vault-think/SKILL.md` has a Pitfalls section absent from `scripts/hermes-skill-examples/vault-think/SKILL.md`. No command or version drift. Mirror on next vault-think touch.
+
+- **Class:** (b) parity hygiene
 
 ---
 

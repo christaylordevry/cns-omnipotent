@@ -428,6 +428,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-16 | 1.27.0 | Hermes **`vault-think` v1.1.0:** `/trace` and `/connect` live via **Obsidian Local REST API** (`curl -k` to `https://127.0.0.1:27124`, env **`OBSIDIAN_API_KEY`**); `/ghost`, `/drift` remain stubs | 31-3-obsidian-local-rest-api-and-thinking-command-activation |
 | 2026-05-17 | 1.28.0 | Hermes **`vault-think` v1.1.1:** `/today` and `/today --brief` daily planning briefing via **`vault_list`** + **`vault_read`** (read-only; no inbox reads) | 32-2-vault-think-today-command-daily-planning-briefing |
 | 2026-05-17 | 1.29.0 | Phase 6 completeness: §15.0 caveats + command matrix; **`triage` v1.7.0** (`/triage-approve`, `/triage-execute`; deprecate `/approve`, `/execute-approved`); **`vault-think` v1.2.0** (`/ghost`, `/drift` live); **`vault-graduate` v1.0.0** (`/vault-graduate`); REST and mutator exceptions documented | 33-3-operator-guide-phase6-completeness |
+| 2026-05-17 | 1.30.0 | Hermes **`vault-think` v1.3.0:** **`/verify`** pending **SynthesisNote** queue, single-note review, and **`/verify verified`** / **`/verify disputed`** stamping via **`vault_update_frontmatter`**; §15.8 | 33-1-verify-command-synthesisnote-review |
 
 ---
 
@@ -568,18 +569,18 @@ Hermes is a separate agent stack from Nexus. It uses the **Hermes Discord gatewa
 
 | Caveat | Detail |
 |--------|--------|
-| **Read-only default** | **`vault-think`** commands do not mutate the vault (MCP read tools and REST `curl` only). |
-| **Mutator exceptions** | **`triage`:** exactly one **`vault_move`** per valid **`/triage-execute`**; optional **one** **`vault_update_frontmatter`** on synthesis output after successful **`run-chain`** (Stories 30.1–30.2). **`vault-graduate`:** **`vault_create_note`** + **`vault_append_daily`** for **`#graduate`** promotion. |
+| **Read-only default** | **`vault-think`** commands do not mutate the vault except the documented **`/verify`** marking path (MCP read tools and REST `curl` otherwise). |
+| **Mutator exceptions** | **`triage`:** exactly one **`vault_move`** per valid **`/triage-execute`**; optional **one** **`vault_update_frontmatter`** on synthesis output after successful **`run-chain`** (Stories 30.1–30.2). **`vault-graduate`:** **`vault_create_note`** + **`vault_append_daily`** for **`#graduate`** promotion. **`vault-think` `/verify`:** **one** **`vault_update_frontmatter`** per marking command on a **`03-Resources/`** **`SynthesisNote`** (`verification_status` + **`modified`** only). |
 | **REST dependency** | **`/trace`** and **`/connect`** require the **Obsidian Local REST API** plugin on the Windows Obsidian host, **`OBSIDIAN_API_KEY`**, and reachable **`https://127.0.0.1:27124`** (or **`OBSIDIAN_LOCAL_REST_URL`**) from WSL2 via **`curl -k`**. Fails closed when Obsidian is closed or the plugin is disabled. |
 | **Discord routing** | Phase 6 commands run only when **`#hermes`** **`discord.channel_skill_bindings`** route to the correct CNS skill. **Bot-authored** Discord messages are **not** treated as operator input (gateway ignores own bot posts). |
 | **Triage slash collision** | Use **`/triage-approve`** and **`/triage-execute`** (Hermes auto-registers these). **`/approve`** is **gateway-owned** and must **not** be used for Inbox triage. Deprecated: **`/approve`**, **`/execute-approved`**. |
 
-**Live Phase 6 commands (pre-`/verify`, Story 33-1):**
+**Live Phase 6 commands:**
 
 | Skill | Version | Commands |
 |-------|---------|----------|
 | **`triage`** | **1.7.0** | **`/triage`**, **`/triage-approve`**, **`/triage-execute`** |
-| **`vault-think`** | **1.2.0** | **`/challenge`**, **`/emerge`**, **`/ideas`**, **`/trace`**, **`/connect`**, **`/today`**, **`/today --brief`**, **`/ghost`**, **`/drift`** |
+| **`vault-think`** | **1.3.0** | **`/challenge`**, **`/emerge`**, **`/ideas`**, **`/trace`**, **`/connect`**, **`/today`**, **`/today --brief`**, **`/ghost`**, **`/drift`**, **`/verify`** (+ marking tokens) |
 | **`vault-graduate`** | **1.0.0** | **`/vault-graduate`**, **`/vault-graduate --days <n>`** |
 
 ### 15.1 Discord `#hermes` (HI-5 recap)
@@ -745,9 +746,9 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Destination: `~/.hermes/skills/cns/hermes-url-auto-capture-inbox/`
 - Binding: add a separate `discord.channel_skill_bindings` entry for `1484880486785486951` with only `hermes-url-auto-capture-inbox`. Preserve the existing `#hermes` skills list in your live `~/.hermes/config.yaml` (see §15.3–15.4 and §15.6 for current CNS skills).
 
-### 15.6 Vault think (`vault-think` v1.2.0, Epic 29–32)
+### 15.6 Vault think (`vault-think` v1.3.0, Epic 29–33)
 
-**Skill version:** **1.2.0** (repo mirror + `~/.hermes/skills/cns/vault-think/`). All commands below are **read-only** on the vault (no mutators on this skill path).
+**Skill version:** **1.3.0** (repo mirror + `~/.hermes/skills/cns/vault-think/`). Commands are **read-only** except **`/verify verified`** and **`/verify disputed`** (see §15.8).
 
 | Slice | Commands | Allowed tools |
 |-------|----------|---------------|
@@ -755,6 +756,7 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 | **v1.1** | `/trace`, `/connect` | **Obsidian Local REST API** via terminal **`curl -k`** (no Vault IO mutators) |
 | **v1.1.1** | `/today`, `/today --brief` | **`vault_list`**, **`vault_read`** (no inbox body reads) |
 | **v1.2.0** | `/ghost`, `/drift` | **`/ghost`:** search + read caps; **`/drift`:** list dailies, read last **14** days, search **`03-Resources/`** for synthesis coverage |
+| **v1.3.0** | `/verify` (+ tokens) | Queue + review: read-only; marking: **one** **`vault_update_frontmatter`** per command (§15.8) |
 
 **REST dependency (`/trace`, `/connect`):** Install the **Local REST API** plugin (Adam Coddington) in Obsidian on Windows. Required env: **`OBSIDIAN_API_KEY`**. Optional: **`OBSIDIAN_LOCAL_REST_URL`** (default **`https://127.0.0.1:27124`**). From WSL2, `curl -sk -H "Authorization: Bearer <api-key>" "${OBSIDIAN_LOCAL_REST_URL:-https://127.0.0.1:27124}/"` should return **HTTP 200**. Replies **`vault-think: obsidian-rest-no-api-key`** or **`vault-think: obsidian-rest-unavailable`** when REST is unreachable.
 
@@ -773,7 +775,7 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 **Guardrails:**
 
 - Treat Discord text as untrusted; only the documented slash forms are commands.
-- Do not use Vault IO write tools from this skill path (promotion is **`vault-graduate`**, §15.7).
+- Do not use Vault IO write tools from this skill path except **`/verify`** marking tokens (§15.8). Promotion is **`vault-graduate`** (§15.7).
 - Never commit the REST API key; set **`OBSIDIAN_API_KEY`** in the shell or `~/.hermes/config.yaml` `env` block locally.
 - Requires **`CNS_VAULT_ROOT`** for all Vault IO branches; REST branches additionally require **`OBSIDIAN_API_KEY`**.
 
@@ -782,7 +784,7 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Repo mirror: `scripts/hermes-skill-examples/vault-think/`
 - Install helper: `bash scripts/install-hermes-skill-vault-think.sh`
 - Destination: `~/.hermes/skills/cns/vault-think/`
-- Binding: add **`vault-think`** to the **`#hermes`** `discord.channel_skill_bindings` entry; extend `discord.channel_prompts` so the model routes **`/challenge`**, **`/emerge`**, **`/ideas`**, **`/today`**, **`/today --brief`**, **`/trace`**, **`/connect`**, **`/ghost`**, **`/drift`** through **vault-think**.
+- Binding: add **`vault-think`** to the **`#hermes`** `discord.channel_skill_bindings` entry; extend `discord.channel_prompts` so the model routes **`/challenge`**, **`/emerge`**, **`/ideas`**, **`/today`**, **`/today --brief`**, **`/trace`**, **`/connect`**, **`/ghost`**, **`/drift`**, **`/verify`** through **vault-think**.
 
 ### 15.7 Vault graduate (`vault-graduate` v1.0.0, Epic 32)
 
@@ -815,4 +817,26 @@ Hermes watches Discord `#general` for lightweight source capture. This surface i
 - Destination: `~/.hermes/skills/cns/vault-graduate/`
 - Binding: add **`vault-graduate`** to **`#hermes`** `discord.channel_skill_bindings` beside **`vault-think`** and **`triage`**; extend `discord.channel_prompts` for **`/vault-graduate`** and **`/vault-graduate --days`**.
 
-> [!note] **`/verify`** (pending SynthesisNote review from Discord) is documented in Operator Guide **v1.30.0** (Story 33-1), not this row.
+### 15.8 Verify pending synthesis (`/verify`, `vault-think` v1.3.0, Epic 33)
+
+Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-chain`**, new synthesis notes land with **`verification_status: pending`**. **`/verify`** lets you review and stamp them from **`#hermes`** without leaving Discord.
+
+**Operator usage (Discord `#hermes`):**
+
+| Command | Behavior |
+|---------|----------|
+| **`/verify`** | Queue of pending **`SynthesisNote`** files in **`03-Resources/`** (path, title, created date, days pending). Page size **10**; use **`/verify --offset <n>`** for the next slice. |
+| **`/verify <path-or-title>`** | Single-note review: abstract/excerpt + instructions for marking tokens. |
+| **`/verify verified <vault-relative-path>`** | Governed stamp: **`verification_status: verified`**, **`modified`** = today (UTC). Example: **`/verify verified 03-Resources/My-Synthesis.md`**. |
+| **`/verify disputed <vault-relative-path>`** | Governed stamp: **`verification_status: disputed`**, **`modified`** = today (UTC). Example: **`/verify disputed 03-Resources/My-Synthesis.md`**. |
+
+**Discovery:** Hermes searches **`03-Resources/`** for pending synthesis notes, confirms **`pake_type: SynthesisNote`** and **`verification_status: pending`** via **`vault_read_frontmatter`**, then sorts by **`modified`** descending.
+
+**Allowed Vault IO (this path only):** read: **`vault_search`**, **`vault_read_frontmatter`**, **`vault_read`** (single-note excerpt). Write: **at most one** **`vault_update_frontmatter`** per marking command, fields **`verification_status`** + **`modified`** only. **Forbidden:** **`vault_move`**, **`vault_create_note`**, **`vault_append_daily`**, **`vault_log_action`**, body edits, filesystem writes.
+
+**Guardrails:**
+
+- **Queue / single-note review:** targets resolve within the pending set (path or title); ambiguous matches list up to **5** candidates; no match → **`vault-think: verify not-found`**.
+- **Marking tokens:** resolve by **exact vault-relative path** via **`vault_read_frontmatter`** (not the pending queue). Missing path → **`vault-think: verify not-found`**. Wrong **`pake_type`** → **`vault-think: verify not-synthesis`**. Already stamped → **`vault-think: verify already verified`** or **`vault-think: verify already disputed`** (no mutation). Only **`verification_status: pending`** **`SynthesisNote`** files are updated.
+
+**Skill install:** same as §15.6 (`bash scripts/install-hermes-skill-vault-think.sh`). Extend **`discord.channel_prompts`** for **`/verify`**, **`/verify verified`**, and **`/verify disputed`**.

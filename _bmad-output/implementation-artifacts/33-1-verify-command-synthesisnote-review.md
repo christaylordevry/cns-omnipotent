@@ -2,12 +2,12 @@
 story_id: 33-1
 epic: 33
 title: verify-command-synthesisnote-review
-status: ready-for-dev
+status: done
 ---
 
 # Story 33.1: verify-command-synthesisnote-review
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -42,14 +42,47 @@ so that **the knowledge quality loop can close without leaving pending synthesis
 
 ## Tasks / Subtasks
 
-- [ ] Read current `vault-think` repo mirror and installed skill copies.
-- [ ] Add `/verify` procedure to `scripts/hermes-skill-examples/vault-think/references/task-prompt.md`.
-- [ ] Update `scripts/hermes-skill-examples/vault-think/SKILL.md` to v1.3.0 and document the mutator exception.
-- [ ] Install skill to `~/.hermes/skills/cns/vault-think/` and verify mirror parity.
-- [ ] Update `~/.hermes/config.yaml` channel prompt or binding as needed for `#hermes`.
-- [ ] Extend `tests/hermes-vault-think-skill.test.mjs` for `/verify`.
-- [ ] Update Operator Guide to v1.30.0 with `/verify`.
-- [ ] Run `npm test` and `bash scripts/verify.sh`.
+### Review Follow-ups (AI)
+
+- [x] [AI-Review] Fix marking resolver: direct `vault_read_frontmatter` path lookup (not pending queue); reachable `not-synthesis` / `already verified` / `already disputed` guards.
+- [x] [AI-Review] Narrow marking public contract to path-only (`<vault-relative-path>` in SKILL.md, Operator Guide §15.8, config channel prompt; task-prompt copy only).
+
+- [x] Read current `vault-think` repo mirror and installed skill copies.
+- [x] Add `/verify` procedure to `scripts/hermes-skill-examples/vault-think/references/task-prompt.md`.
+- [x] Update `scripts/hermes-skill-examples/vault-think/SKILL.md` to v1.3.0 and document the mutator exception.
+- [x] Install skill to `~/.hermes/skills/cns/vault-think/` and verify mirror parity.
+- [x] Update `~/.hermes/config.yaml` channel prompt or binding as needed for `#hermes`.
+- [x] Extend `tests/hermes-vault-think-skill.test.mjs` for `/verify`.
+- [x] Update Operator Guide to v1.30.0 with `/verify`.
+- [x] Run `npm test` and `bash scripts/verify.sh`.
+
+## Dev Agent Record
+
+### Implementation Plan
+
+- Bump **`vault-think`** to **v1.3.0** with documented **`/verify`** mutator exception (**`vault_update_frontmatter`** only, **`verification_status`** + **`modified`**).
+- Add **`§1g`** classification and **`§3 /verify`** (queue, **`--offset`**, single-note review, **`verified`** / **`disputed`** marking tokens).
+- Operator Guide **v1.30.0**: §15.8, matrix + caveats updated; **`vault-think`** **1.3.0** in §15.6.
+- Live: **`bash scripts/install-hermes-skill-vault-think.sh`**, **`~/.hermes/config.yaml`** channel prompt extended for **`/verify`** routes.
+
+### Completion Notes
+
+- **606** Vitest + **74** node tests pass (includes **`/verify`** + marking-resolver tests); **`bash scripts/verify.sh`** exit 0.
+- Repo mirror matches **`~/.hermes/skills/cns/vault-think/`** after install.
+- ✅ Resolved review finding [Medium]: marking mode now uses **Marking target resolution** — one **`vault_read_frontmatter`** on normalized path; guards **`verify not-synthesis`**, **`verify already verified`**, **`verify already disputed`** run before mutator (no longer masked by pending-queue **`not-found`**).
+- ✅ Resolved review finding [Medium]: public docs + **`~/.hermes/config.yaml`** advertise marking tokens as **vault-relative path** only (single-note review still allows path or title).
+- ✅ Code review pass: no blocking findings after re-checking Story 33-1 acceptance criteria, repo/live `vault-think` parity, live `#hermes` routing, and gates.
+
+## File List
+
+- `scripts/hermes-skill-examples/vault-think/SKILL.md`
+- `scripts/hermes-skill-examples/vault-think/references/task-prompt.md`
+- `tests/hermes-vault-think-skill.test.mjs`
+- `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/33-1-verify-command-synthesisnote-review.md` (this story)
+- `~/.hermes/skills/cns/vault-think/` (installed copy)
+- `~/.hermes/config.yaml` (channel prompt)
 
 ## Dev Notes
 
@@ -60,3 +93,7 @@ so that **the knowledge quality loop can close without leaving pending synthesis
 ## Change Log
 
 - 2026-05-17: Story created from Epic 33 planning brief.
+- 2026-05-17: **`vault-think` v1.3.0** — `/verify` queue, single-note review, **`verified`** / **`disputed`** marking; Operator Guide v1.30.0 §15.8; tests + verify gate passed.
+- 2026-05-17: Addressed code review — marking resolver uses direct path **`vault_read_frontmatter`**; Operator Guide §15.8 guardrails split queue vs marking; +1 Hermes test.
+- 2026-05-17: Addressed code review — marking tokens documented as **`<vault-relative-path>`** only (SKILL, Operator Guide, config prompt, task-prompt copy).
+- 2026-05-17: Code review passed; story marked done.

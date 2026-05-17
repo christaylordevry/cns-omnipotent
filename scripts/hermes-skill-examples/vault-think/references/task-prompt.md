@@ -4,6 +4,7 @@
 - **v1.1 live:** Obsidian Local REST API — **terminal `curl -k`** only (no new Node dependencies).
 - **v1.1.1:** `/today`, `/today --brief` — Vault IO **`vault_list`** + **`vault_read`** only.
 - **v1.2.0:** `/ghost`, `/drift` — Vault IO read-only (`vault_search` + `vault_read`; `/drift` also **`vault_list`** + **`vault_read_frontmatter`**).
+- **v1.3.0:** `/verify` — pending **SynthesisNote** queue + review (read-only); **`/verify verified`** / **`/verify disputed`** stamp **`verification_status`** via **`vault_update_frontmatter`** only.
 
 ## 0) Vault root, REST env, and clocks
 
@@ -11,7 +12,7 @@
 
    - If environment variable `CNS_VAULT_ROOT` is set and non-empty after trim, use it.
    - Else read `~/.hermes/config.yaml` as text, parse YAML mentally, and read `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
-   - If still unset on a v1.0, **`/today`**, **`/ghost`**, or **`/drift`** command path: reply exactly `vault-think: no-vault-root` and **stop**.
+   - If still unset on a v1.0, **`/today`**, **`/ghost`**, **`/drift`**, or **`/verify`** command path: reply exactly `vault-think: no-vault-root` and **stop**.
 
 2. Resolve **Obsidian Local REST** (required for `/trace` and `/connect` only):
 
@@ -56,6 +57,21 @@ Let **`raw`** = operator message with leading and trailing ASCII whitespace remo
 - **`/drift`** + other args → `vault-think: bad-trigger`; stop.
 
 **§1b–1d:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
+
+### 1g) `/verify` — route to §3
+
+Let **`verify_rest`** = substring after `/verify` (trimmed).
+
+| Match | Route |
+|-------|--------|
+| **`raw`** is `/verify` or `/verify` + trailing ASCII whitespace only | **§3 `/verify`** queue (offset **0**) |
+| **`raw`** starts with `/verify --offset ` | **§3 `/verify`** queue; parse non-negative integer **`offset`** after flag (invalid → `vault-think: verify bad-offset`; stop) |
+| **`raw`** starts with `/verify verified ` | **§3 `/verify`** marking; **`mark`** = `verified`; **`target`** = remainder trimmed (non-empty) |
+| **`raw`** starts with `/verify disputed ` | **§3 `/verify`** marking; **`mark`** = `disputed`; **`target`** = remainder trimmed (non-empty) |
+| **`raw`** starts with `/verify ` and **`verify_rest`** non-empty, not `--offset` | **§3 `/verify`** single-note review; **`target`** = **`verify_rest`** |
+| **`/verify`** + other args (e.g. `/verify pending`) | `vault-think: bad-trigger`; stop |
+
+**§1g:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**. Empty **`target`** on marking lines → `vault-think: verify requires target`; stop. Marking lines require a **vault-relative path** (not a title substring).
 
 ### 1e) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
 
@@ -326,6 +342,108 @@ Circling without landing:
 Consider /graduate or run-chain on these.
 ```
 
+### `/verify`
+
+§1g. **Governed scope:** **`03-Resources/`** only. **Pending set:** notes with **`pake_type: SynthesisNote`** and **`verification_status: pending`** (trimmed, case-sensitive per PAKE enum).
+
+**Shared discovery (queue + single-note only):**
+
+1. Call **`vault_search`** with `{ "query": "verification_status: pending", "scope": "03-Resources/", "max_results": 50 }`.
+2. Call **`vault_search`** with `{ "query": "pake_type: SynthesisNote", "scope": "03-Resources/", "max_results": 50 }` (counts toward cap).
+3. Union hit paths; dedupe POSIX vault-relative paths ending in `.md`.
+4. **`vault_read_frontmatter`** on each candidate (cap **24** reads this run; if cap hit → `vault-think: incomplete` and stop).
+5. Keep only paths where frontmatter **`pake_type`** trimmed equals **`SynthesisNote`** and **`verification_status`** trimmed equals **`pending`**.
+6. Sort kept paths by frontmatter **`modified`** descending (ISO `YYYY-MM-DD`; missing **`modified`** sorts last).
+
+**Target resolution** (queue + single-note): let **`target`** be operator path or title substring.
+
+- If **`target`** contains `/` or ends with `.md`, treat as vault-relative path under **`03-Resources/`** (prepend scope if operator omitted prefix).
+- Else case-insensitive match on frontmatter **`title`** or basename without `.md` within the pending set from step 5–6.
+- **0** matches → `vault-think: verify not-found`.
+- **2–5** equally plausible → reply **only**:
+
+```text
+vault-think: verify ambiguous
+• [title] — [path]
+...
+```
+
+(max **5** bullets).
+
+- **1** match → use that **`resolved_path`**.
+
+**Marking target resolution** (`/verify verified|disputed <vault-relative-path>` only — path form; no title matching; do **not** filter from the pending set):
+
+1. Let **`target`** be the operator remainder (**vault-relative path** only, e.g. `03-Resources/My-Synthesis.md`). Normalize to a POSIX vault-relative path under **`03-Resources/`** (prepend **`03-Resources/`** if the operator omitted the prefix).
+2. Call **`vault_read_frontmatter`** once on that path (counts toward the **24** read cap when queue/single-note discovery ran in the same run; marking-only runs use this single read).
+3. Read failure or missing file → `vault-think: verify not-found`; stop.
+4. If frontmatter **`pake_type`** trimmed ≠ **`SynthesisNote`** → `vault-think: verify not-synthesis`; stop.
+5. Let **`status`** = frontmatter **`verification_status`** trimmed. If **`status`** = **`verified`** → `vault-think: verify already verified`; stop. If **`status`** = **`disputed`** → `vault-think: verify already disputed`; stop.
+6. If **`status`** ≠ **`pending`** → `vault-think: verify not-found`; stop.
+7. Else set **`resolved_path`** to the normalized path and continue to marking steps below.
+
+#### Queue mode (`/verify`, `/verify --offset <n>`)
+
+- Page size **10**. Slice pending set from **`offset`** (default **0**).
+- For each row on the page, compute **`days_pending`** = UTC calendar days from frontmatter **`created`** (`YYYY-MM-DD`) to **`today_utc`** when **`created`** parses; else show `n/a`.
+- Discord reply **only**:
+
+```text
+✅ Verify queue — pending SynthesisNotes ([total])
+
+• [title] — [path] (created [created], [days_pending] days pending)
+...
+
+Paging: showing [start]–[end] of [total]. Next: /verify --offset [next_offset]
+```
+
+- If **`total`** = **0**:
+
+```text
+✅ Verify queue — no pending SynthesisNotes in 03-Resources/
+```
+
+- If **`offset`** ≥ **`total`**: `vault-think: verify offset past end`; stop.
+
+#### Single-note review (`/verify <target>`)
+
+1. Resolve **`resolved_path`** (above). No mutators.
+2. **`vault_read`** once on **`resolved_path`** (cap already enforced by discovery reads).
+3. Extract post-frontmatter excerpt: prefer first **`[!abstract]`** callout body through first blank line after it; else first **400** characters of body.
+4. Discord reply **only**:
+
+```text
+🔍 Verify: [title]
+Path: [resolved_path]
+Status: pending (SynthesisNote)
+
+[excerpt]
+
+Mark: /verify verified [resolved_path]
+Mark: /verify disputed [resolved_path]
+```
+
+#### Marking mode (`/verify verified|disputed <target>`)
+
+1. Resolve **`resolved_path`** via **Marking target resolution** (above). Guards **3–6** there must run before any mutator.
+2. Call **`vault_update_frontmatter`** **once**:
+
+```json
+{"path":"<resolved_path>","updates":{"verification_status":"<mark>","modified":"<today_utc>"}}
+```
+
+3. MCP failure: post path + short error; stop.
+4. Success — Discord **only**:
+
+```text
+✅ Verified [title] — verification_status: [mark]
+Path: [resolved_path]
+```
+
+(use **`Verified`** header for both **`verified`** and **`disputed`** marks).
+
+**Caps (this command):** ≤ **2** `vault_search` (queue + single-note only), ≤ **24** `vault_read_frontmatter`, ≤ **1** `vault_read` (single-note only), ≤ **1** `vault_update_frontmatter` (marking only). Marking-only invocations skip **`vault_search`** and use one **`vault_read_frontmatter`** on the normalized path.
+
 ### `/today`
 
 §1b match. MCP: **`vault_list`**, **`vault_read`** only. Caps: ≤3 list, ≤6 read (1 daily + ≤5 projects). Cap hit → `vault-think: incomplete`.
@@ -363,7 +481,7 @@ Consider /graduate or run-chain on these.
 
 ## 4) Forbidden tools reminder
 
-**`/today`:** **`vault_list`** + **`vault_read`** per §3. **`/drift`:** **`vault_list`**, **`vault_read`**, **`vault_search`** in **`03-Resources/`**, and **`vault_read_frontmatter`** only to verify candidate synthesis note PAKE type. **`/ghost`:** **`vault_search`** + **`vault_read`** only.
+**`/today`:** **`vault_list`** + **`vault_read`** per §3. **`/drift`:** **`vault_list`**, **`vault_read`**, **`vault_search`** in **`03-Resources/`**, and **`vault_read_frontmatter`** only to verify candidate synthesis note PAKE type. **`/ghost`:** **`vault_search`** + **`vault_read`** only. **`/verify`:** **`vault_search`**, **`vault_read_frontmatter`**, **`vault_read`** (single-note only); marking subcommands may call **`vault_update_frontmatter`** **once** with **`verification_status`** + **`modified`** only on a resolved **`SynthesisNote`** in **`03-Resources/`**.
 
 **All other commands:** do **not** call **`vault_list`**, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
 

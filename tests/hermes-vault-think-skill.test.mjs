@@ -10,14 +10,16 @@ const skillPath = join(skillDir, "SKILL.md");
 const taskPromptPath = join(skillDir, "references/task-prompt.md");
 
 describe("Story 31-3 Hermes vault-think skill mirror", () => {
-  it("defines the skill package at v1.2.0 with live trace, connect, today, ghost, and drift", () => {
+  it("defines the skill package at v1.3.0 with live trace, connect, today, ghost, drift, and verify", () => {
     assert.ok(existsSync(skillPath));
     assert.ok(existsSync(taskPromptPath));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-vault-think.sh")));
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-think"));
-    assert.ok(body.includes("version: 1.2.0"));
+    assert.ok(body.includes("version: 1.3.0"));
+    assert.ok(body.includes("/verify"));
+    assert.ok(body.includes("mutator exception"));
     assert.ok(body.includes("## When to use"));
     assert.ok(body.includes("/challenge"));
     assert.ok(body.includes("/emerge"));
@@ -42,6 +44,8 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
     assert.ok(body.includes("vault_read"));
     assert.ok(body.includes("## 4) Forbidden tools reminder"));
     assert.ok(body.includes("**All other commands:** do **not** call **`vault_list`**"));
+    assert.ok(body.includes("**`/verify`:**"));
+    assert.ok(body.includes("marking subcommands may call **`vault_update_frontmatter`**"));
     for (const forbidden of [
       "vault_create_note",
       "vault_update_frontmatter",
@@ -101,7 +105,7 @@ describe("Story 32-2 Hermes vault-think /today", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.2.0"));
+    assert.ok(skill.includes("version: 1.3.0"));
     assert.ok(skill.includes("/today"));
     assert.ok(skill.includes("/today --brief"));
 
@@ -146,7 +150,7 @@ describe("Story 32-3 Hermes vault-think /ghost and /drift", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.2.0"));
+    assert.ok(skill.includes("version: 1.3.0"));
     assert.ok(skill.includes("/ghost "));
     assert.ok(skill.includes("/drift"));
 
@@ -181,5 +185,76 @@ describe("Story 32-3 Hermes vault-think /ghost and /drift", () => {
     assert.ok(driftSection.match(/\/graduate|run-chain/));
     assert.ok(task.includes("**`/ghost`:**") || task.includes("**`/ghost` path:**"));
     assert.ok(task.includes("v1.2.0"));
+  });
+});
+
+describe("Story 33-1 Hermes vault-think /verify", () => {
+  it("documents v1.3.0 verify queue, single-note, marking tokens, and narrow mutator contract", () => {
+    const skill = readFileSync(skillPath, "utf8");
+    const task = readFileSync(taskPromptPath, "utf8");
+
+    assert.ok(skill.includes("version: 1.3.0"));
+    assert.ok(skill.includes("/verify verified "));
+    assert.ok(skill.includes("/verify disputed "));
+    assert.ok(skill.includes("vault-relative path"));
+    assert.ok(!skill.includes("/verify verified `** + path or title"));
+    assert.ok(skill.includes("vault_update_frontmatter"));
+    assert.ok(skill.includes("mutator exception"));
+
+    assert.ok(task.includes("### 1g) `/verify`"));
+    assert.ok(task.includes("v1.3.0"));
+    assert.ok(task.includes("### `/verify`"));
+    assert.ok(task.includes("verification_status: pending"));
+    assert.ok(task.includes("pake_type: SynthesisNote"));
+    assert.ok(task.includes("03-Resources/"));
+    assert.ok(task.includes("Queue mode"));
+    assert.ok(task.includes("Single-note review"));
+    assert.ok(task.includes("Marking mode"));
+    assert.ok(task.includes("/verify verified|disputed"));
+    assert.ok(task.includes("vault-think: verify ambiguous"));
+    assert.ok(task.includes("vault-think: verify not-found"));
+    assert.ok(task.includes("vault-think: verify not-synthesis"));
+    assert.ok(task.includes("vault-think: verify already verified"));
+    assert.ok(task.includes("vault-think: verify already disputed"));
+    assert.ok(task.includes("✅ Verify queue"));
+    assert.ok(task.includes("Mark: /verify verified"));
+    assert.ok(task.includes("Mark: /verify disputed"));
+
+    const verifySection = task.slice(task.indexOf("### `/verify`"), task.indexOf("### `/today`"));
+    assert.ok(verifySection.includes("vault_search"));
+    assert.ok(verifySection.includes("vault_read_frontmatter"));
+    assert.ok(verifySection.includes("vault_update_frontmatter"));
+    assert.ok(verifySection.includes('"verification_status"'));
+    assert.ok(verifySection.includes("≤ **1** `vault_update_frontmatter`"));
+    assert.ok(!verifySection.includes("vault_move"));
+    assert.ok(!verifySection.includes("vault_create_note"));
+    assert.ok(task.includes("**Marking target resolution**"));
+    assert.ok(task.includes("do **not** filter from the pending set"));
+    const markingBlock = task.slice(
+      task.indexOf("**Marking target resolution**"),
+      task.indexOf("#### Queue mode"),
+    );
+    assert.ok(markingBlock.includes("vault_read_frontmatter"));
+    assert.ok(!markingBlock.includes("pending set from step"));
+  });
+
+  it("carves verify out of the global vault_update_frontmatter ban", () => {
+    const task = readFileSync(taskPromptPath, "utf8");
+    assert.ok(task.includes("**`/verify`:**"));
+    assert.match(
+      task,
+      /\/verify.*vault_update_frontmatter[\s\S]*All other commands:[\s\S]*do \*\*not\*\* call[\s\S]*vault_update_frontmatter/,
+    );
+  });
+
+  it("marking mode resolves by direct path lookup, not the pending queue", () => {
+    const task = readFileSync(taskPromptPath, "utf8");
+    const markingSection = task.slice(
+      task.indexOf("#### Marking mode"),
+      task.indexOf("**Caps (this command):**"),
+    );
+    assert.ok(markingSection.includes("Marking target resolution"));
+    assert.ok(markingSection.includes("Guards **3–6** there must run before any mutator"));
+    assert.ok(!markingSection.includes("pending set from step"));
   });
 });
