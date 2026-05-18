@@ -24,8 +24,8 @@
 | Nexus trust-guard: detect `needs_configure` after Claude Code updates (NEXUS repo script) | (b) Phase 2 |
 | `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`: Symptom E + trust-guard post-update reconnection | (b) Phase 2 |
 | `vault_create_note` routes by `pake_type` only; ignores subdirectory path — use `vault_move` after creation for project subfolders | (b) Phase 2 / operator workflow |
-| `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (b) Phase 6 doc hygiene |
-| `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (b) parity hygiene |
+| `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (c) Closed by 35-1 |
+| `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (c) Closed — no drift found in either copy |
 | Symlink / `realpath` on reads | (c) Resolved: Story 4-9 |
 | “Deferred to Epic 5.2” audit wiring in mutators | (c) Resolved: Epic 5 |
 
@@ -143,6 +143,24 @@ Update `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md` with **Symptom E** and
 Repeated runs of the same research prompt can yield **different source URLs** from Firecrawl, causing downstream note sets (and derived scoring/gates) to vary even when the chain architecture is stable. Treat this as a **topic/search result quality** issue (source selection / ranking / dedupe), not a chain correctness defect.
 
 - **Class:** (b) Phase 2 backlog (research source quality + stability / dedupe policy).
+
+### Per-skill Hermes model routing
+
+Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain. Blocked on Hermes native per-skill model API. Policy documented in MEMORY.md.
+
+- **Class:** (b) Phase 2 backlog
+
+### `vault-lint-remediate-34-2.ts` `--verify-only`
+
+Add flag to skip `parseRule4Paths` when report shows Rule 4 = 0.
+
+- **Class:** (b) XS effort. Source: 34-2 code review.
+
+### MCP `vault_create_note` explicit path support
+
+Hub/manifest creates currently require `vaultCreateNoteFromMarkdown` internal pipeline; MCP surface still routes by `pake_type` only.
+
+- **Class:** (b) L effort. Source: 35-3 code review.
 
 ---
 
@@ -301,13 +319,13 @@ Passes because errors throw before audit; fragile if audit moves earlier in the 
 
 `SKILL.md`, `config-snippet.md`, `capture-prompt.md` (repo + installed) still reference `/approve` and `/execute-approved`. Operator Guide §15.3 marks these deprecated correctly. Update all three files to `/triage-approve` / `/triage-execute`.
 
-- **Class:** (b) Phase 6 doc hygiene
+- **Class:** (c) Closed by 35-1
 
 ### vault-think SKILL.md Pitfalls section — installed only
 
 `~/.hermes/skills/cns/vault-think/SKILL.md` has a Pitfalls section absent from `scripts/hermes-skill-examples/vault-think/SKILL.md`. No command or version drift. Mirror on next vault-think touch.
 
-- **Class:** (b) parity hygiene
+- **Class:** (c) Closed — no drift found in either copy
 
 ---
 
