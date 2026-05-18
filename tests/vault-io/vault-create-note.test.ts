@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -287,6 +287,39 @@ token AKIA0123456789ABCDEF
     await expect(
       vaultCreateNoteFromMarkdown(vaultRoot, "03-Resources/esc.md", markdown),
     ).rejects.toMatchObject({ code: "VAULT_BOUNDARY" });
+  });
+});
+
+describe("vaultCreateNoteFromMarkdown contract manifests", () => {
+  it("creates _README.md without pake_id in frontmatter", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-readme-create-"));
+    await mkdir(path.join(vaultRoot, "03-Resources", "Research"), { recursive: true });
+    const markdown = `---
+purpose: Hub index for Research SourceNotes
+schema_required: true
+allowed_pake_types: SourceNote | InsightNote | SynthesisNote | ValidationNote
+naming_convention: Concept-scoped research filenames
+---
+# Research
+
+## SourceNote index
+- [[Example]]
+`;
+    const result = await vaultCreateNoteFromMarkdown(
+      vaultRoot,
+      "03-Resources/Research/_README.md",
+      markdown,
+    );
+    expect(result).toMatchObject({
+      pake_id: "contract-manifest",
+      file_path: "03-Resources/Research/_README.md",
+    });
+    await access(path.join(vaultRoot, "03-Resources", "Research", "_README.md"));
+    const onDisk = await readFile(
+      path.join(vaultRoot, "03-Resources", "Research", "_README.md"),
+      "utf8",
+    );
+    expect(onDisk).toContain("purpose: Hub index for Research SourceNotes");
   });
 });
 

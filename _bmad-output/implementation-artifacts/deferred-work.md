@@ -333,3 +333,11 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 34-3-stale-pending-review-via-verify (2026-05-18)
 
 - Evidence UTC vs audit log sub-second skew — cosmetic timestamp display only; no vault or audit integrity impact.
+
+## Deferred from: code review of 35-2-research-cluster-stale-pending-review-via-verify (2026-05-18)
+
+- Evidence UTC vs audit log sub-second skew — cosmetic timestamp display only; no vault or audit integrity impact.
+
+## Deferred from: code review of 35-3-orphan-wikilink-pass-research-index (2026-05-18)
+
+- AC6 authoritative `/vault-lint` post-run — after metrics are simulated in evidence; operator refresh in `#hermes` still required for `_meta/reports/vault-lint-YYYY-MM-DD.md` (same pattern as 34-x stories).

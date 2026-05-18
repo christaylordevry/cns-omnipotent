@@ -5,7 +5,7 @@ import { link, mkdir, unlink, writeFile } from "node:fs/promises";
 import { CnsError } from "../errors.js";
 import { resolveVaultPath } from "../paths.js";
 import { parseNoteFrontmatter } from "../pake/parse-frontmatter.js";
-import { normalizeVaultRelativePosix } from "../pake/path-rules.js";
+import { isContractManifestReadmePath, normalizeVaultRelativePosix } from "../pake/path-rules.js";
 import type { PakeType } from "../pake/schemas.js";
 import { validatePakeForVaultPath } from "../pake/validate.js";
 import { appendRecord } from "../audit/audit-logger.js";
@@ -122,6 +122,7 @@ export async function vaultCreateNoteFromMarkdown(
     await unlink(tmpPath);
 
     if (!options.suppressAudit) {
+      const isManifest = isContractManifestReadmePath(posixRel);
       const pakeType = frontmatter.pake_type;
       const titleVal = frontmatter.title;
       await appendRecord(vaultRoot, {
@@ -129,10 +130,12 @@ export async function vaultCreateNoteFromMarkdown(
         tool: "vault_create_note",
         surface,
         targetPath: posixRel,
-        payloadInput: {
-          pake_type: typeof pakeType === "string" ? pakeType : String(pakeType),
-          title: typeof titleVal === "string" ? titleVal : String(titleVal),
-        },
+        payloadInput: isManifest
+          ? { pake_type: "contract-manifest" }
+          : {
+              pake_type: typeof pakeType === "string" ? pakeType : String(pakeType),
+              title: typeof titleVal === "string" ? titleVal : String(titleVal),
+            },
       });
     }
   } catch (e: unknown) {
@@ -147,6 +150,10 @@ export async function vaultCreateNoteFromMarkdown(
       path: posixRel,
       errno: err.code,
     });
+  }
+
+  if (isContractManifestReadmePath(posixRel)) {
+    return { pake_id: "contract-manifest", file_path: posixRel, created_at: createdAt };
   }
 
   const pid = frontmatter.pake_id;
