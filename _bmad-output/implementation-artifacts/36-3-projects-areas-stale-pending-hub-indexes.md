@@ -2,12 +2,12 @@
 story_id: 36-3
 epic: 36
 title: projects-areas-stale-pending-hub-indexes
-status: ready-for-dev
+status: done
 ---
 
 # Story 36.3: 01-Projects + 02-Areas stale pending review + hub indexes
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -117,18 +117,33 @@ Paths flagged as orphans (hub indexes should link these WorkflowNotes):
 ## Tasks / Subtasks
 
 ### Part A
-- [ ] Confirm gateway + `vault-think` on `#hermes` (AC1)
-- [ ] Process all 27 paths; write evidence artifact (AC2–5)
-- [ ] `/vault-lint` post-run for Rule 3 (AC6)
+- [x] Confirm gateway + `vault-think` on `#hermes` (AC1)
+- [x] Process all 27 paths; write evidence artifact (AC2–5)
+- [x] `/vault-lint` post-run for Rule 3 (AC6) — Rule 3: 4 vault-wide (all `03-Resources/`); 01/02 → **0**
 
 ### Part B
-- [ ] Capture Rule 2 baseline (AC7)
-- [ ] `vault_list` both trees (AC8)
-- [ ] Update **`01-Projects/_README.md`** with wikilink index (AC9)
-- [ ] Update **`02-Areas/_README.md`** with wikilink index (AC10)
-- [ ] Spot-check incoming edges (AC11)
-- [ ] `/vault-lint` post-run; record Rule 2 delta (AC12–13)
-- [ ] Standing task: Operator guide — **optional** one line under vault structure if hubs become operator-facing; else "no update required"
+- [x] Capture Rule 2 baseline (AC7)
+- [x] `vault_list` both trees (AC8)
+- [x] Update **`01-Projects/_README.md`** with wikilink index (AC9)
+- [x] Update **`02-Areas/_README.md`** with wikilink index (AC10)
+- [x] Spot-check incoming edges (AC11)
+- [x] `/vault-lint` post-run; record Rule 2 delta (AC12–13) — R2: **40 → 27** (−13 via hub); warnings **69 → 31**
+- [x] Standing task: Operator guide — **optional** one line under vault structure if hubs become operator-facing; else "no update required"
+
+### Review Findings
+
+- [x] [Review][Decision] AC6/AC12 post-run `/vault-lint` — Operator lint pasted: R3 01/02 **0**; R2 **40→27**; ERRORS **0**; warnings **69→31**.
+- [x] [Review][Patch] Hub overwrite drops existing manifest body — Fixed: `mergeHubWithIndex` reads live `_README.md`, preserves body, replaces index section only.
+- [x] [Review][Patch] Orphan baseline over-counted — Fixed: `parseOrphanPaths` scoped to Rule 2 section only.
+- [x] [Review][Patch] `days_pending` always 0 in evidence — Fixed: parser matches `], N days)` in Rule 3 section.
+- [x] [Review][Patch] Audit surface split — Fixed: hub writes use `story-36-3`.
+- [x] [Review][Patch] Completion notes orphan count wrong — Fixed: evidence regenerated with Rule-2-scoped count.
+- [x] [Review][Patch] Unrelated `vault-fast-scan-index.md` diff — Reverted.
+- [x] [Review][Patch] `sprint-status.yaml` `last_updated` moved earlier — Fixed timestamp.
+- [x] [Review][Defer] Live vault hub/index not mirrored into repo `Knowledge-Vault-ACTIVE/` fixture — AC14 optional; cannot verify Part B from repo alone.
+- [x] [Review][Dismiss] Batch `vaultUpdateFrontmatter` for WorkflowNotes — Explicitly allowed in story Dev Notes (same as 34-3/35-2).
+- [x] [Review][Patch] Evidence disputed rows lacked per-row rationale — Added **Disputed rationale** table to `epic-36-stale-pending-verify-evidence.md`.
+- [x] [Review][Patch] Script evidence template still said "AC6/AC12 pending" — `epic-36-3-projects-areas.ts` templates aligned with operator post-run lint.
 
 ## Dev Notes
 
@@ -173,11 +188,37 @@ Same as 34-3: stable project plans / handoffs → **`verified`**; abandoned draf
 
 ### Agent Model Used
 
+Composer (Cursor dev-story 36-3)
+
 ### Completion Notes List
 
+**Part A:** 27/27 stale-pending paths stamped via `vaultUpdateFrontmatter` (surface `story-36-3`): **24 verified**, **3 disputed** (Perplexity deep research, LinkedIn Prompt - Research, Perplexity Feedback). Zero `pending` on queue paths on disk. Evidence: `epic-36-stale-pending-verify-evidence.md`. Operator `/vault-lint` in `#hermes` recommended to refresh report file (34-3/35-2 pattern).
+
+**Part B:** Live vault hubs updated via `vaultCreateNoteFromMarkdown` (read-merge index): `01-Projects/_README.md` (**29** WorkflowNote wikilinks), `02-Areas/_README.md` (**4** wikilinks). Existing contract body preserved; index section replaced. Evidence: `epic-36-projects-areas-hub-evidence.md`. Rule 2 baseline **13** orphan paths in 01/02 (Rule 2 section only, `vault-lint-2026-05-18.md`).
+
+**Post-lint (operator):** `/vault-lint` live — ERRORS **0**; warnings **31** (was **69**). Rule 3: **4** remaining (all `03-Resources/`); 01/02 queue **0**. Rule 2: **27** orphans (was **40**); Part B cleared **13** 01/02 paths.
+
+**AC1:** Hermes gateway + `vault-think` precedent from Epics 34–35 (operator-confirmed).
+
+**Operator guide:** No update required.
+
+**Verify:** `bash scripts/verify.sh` passed (607 Vitest + node tests).
+
 ### File List
+
+- `scripts/epic-36-3-projects-areas.ts`
+- `_bmad-output/implementation-artifacts/epic-36-stale-pending-verify-evidence.md`
+- `_bmad-output/implementation-artifacts/epic-36-projects-areas-hub-evidence.md`
+- `01-Projects/_README.md` (live vault via Vault IO)
+- `02-Areas/_README.md` (live vault via Vault IO)
+- 27 vault notes under `01-Projects/` and `02-Areas/` (frontmatter `verification_status` + `modified` only)
+- `Knowledge-Vault-ACTIVE/_meta/logs/agent-log.md` (27 audit lines, surface `story-36-3`)
+
+### Change Log
+
+- 2026-05-20: 27/27 stale-pending cleared; Projects/Areas hub indexes on live vault; evidence artifacts; status → review.
 
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [ ] Optional — note in Dev Agent Record if no update
+- [x] Optional — no update required (noted in Completion Notes)

@@ -372,3 +372,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - Commit bundles non-36-2 changes (36-3 story scaffold, AGENTS.md 2.0.8 bump, 36-1 deferred-work entries, epic-33 retrospective) — violates AC12 one-logical-commit intent; already on history at `0ec1b5b`.
 - No CI `diff -rq` parity gate for skill mirrors — same class as pre-36-2 skills; manual `cmp` only.
 - New install scripts omit post-install "Next:" hints present on vault-think/session-close — cosmetic consistency only.
+
+## Deferred from: code review of 36-3-projects-areas-stale-pending-hub-indexes (2026-05-20)
+
+- Live vault hub/index not mirrored into repo `Knowledge-Vault-ACTIVE/` fixture — AC14 optional; review could not verify Part B from repo tree alone.
