@@ -4,7 +4,7 @@ vault-lint bulk scan — filesystem-based frontmatter + wikilink engine.
 Run from execute_code or directly. Set VAULT and TODAY_STR before use.
 
 Usage (execute_code):
-    exec(open('/home/christ/.hermes/skills/cns/vault-lint/scripts/bulk_scan.py').read())
+    exec(open(os.path.expanduser('~/.hermes/skills/cns/vault-lint/scripts/bulk_scan.py')).read())
     # then access: governed_md, frontmatters, orphans, stale, errors_r4, dup_groups
     # IMPORTANT: continue in the SAME execute_code block to build and write the report.
     # Do NOT split into a second execute_code call — locals are not shared across calls.

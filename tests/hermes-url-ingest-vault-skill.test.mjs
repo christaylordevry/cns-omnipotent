@@ -23,6 +23,6 @@ describe("Story 36-2 Hermes url-ingest-vault skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: hermes-url-ingest-vault"));
-    assert.ok(body.includes("#general") || body.includes("general"));
+    assert.ok(body.includes("#general channel: capture-only mode"));
   });
 });

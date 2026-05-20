@@ -2,12 +2,12 @@
 story_id: 36-2
 epic: 36
 title: hermes-skill-parity-pass
-status: review
+status: done
 ---
 
 # Story 36.2: Hermes skill parity pass
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -81,8 +81,19 @@ so that **`cp` + `cmp` verification is repeatable**, **Pitfalls and tooling surv
 - [x] **hermes-url-ingest-vault:** sync files; add `install-hermes-skill-url-ingest-vault.sh`; install; `cmp` all (AC7–9)
 - [x] (Optional) Add **`tests/hermes-vault-lint-skill.test.mjs`** / extend session-close test for `## Pitfalls` (AC10)
 - [x] **`npm test`** + **`verify.sh`** (AC10–11)
-- [ ] Commit (AC12)
-- [x] Standing task: Operator guide — **no update required** unless install paths are operator-facing (note in Dev Agent Record)
+- [x] Commit (AC12) — `0ec1b5b` (see Review Findings for scope note)
+- [x] Standing task: Operator guide — added §15.9 (`hermes-url-ingest-vault`) and §15.10 (`vault-lint`) install helpers (code review 2026-05-20)
+
+### Review Findings
+
+- [x] [Review][Decision] Operator Guide install-path discoverability — Added §15.9 and §15.10 with install helpers for `install-hermes-skill-url-ingest-vault.sh` and `install-hermes-skill-vault-lint.sh`.
+
+- [x] [Review][Patch] Weak url-ingest mirror test assertion [`tests/hermes-url-ingest-vault-skill.test.mjs:26`]
+- [x] [Review][Patch] bulk_scan.py docstring uses operator-specific absolute path [`scripts/hermes-skill-examples/vault-lint/scripts/bulk_scan.py:7`]
+
+- [x] [Review][Defer] Commit bundles non-36-2 changes (36-3 story scaffold, AGENTS.md 2.0.8 bump, 36-1 deferred-work entries, epic-33 retrospective) — violates AC12 one-logical-commit intent; already on `main` history [`0ec1b5b`] — deferred, pre-existing
+- [x] [Review][Defer] No CI `diff -rq` parity gate for skill mirrors — same class as pre-36-2 skills; manual `cmp` only — deferred, pre-existing
+- [x] [Review][Defer] New install scripts omit post-install "Next:" hints present on vault-think/session-close — deferred, pre-existing
 
 ## Dev Notes
 
@@ -174,8 +185,9 @@ Composer (Cursor)
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [x] Operator guide: no update required (maintainer install scripts only)
+- [x] Operator guide: §15.9 + §15.10 install helpers added (code review 2026-05-20)
 
 ## Change Log
 
+- 2026-05-20: Code review — Operator Guide §15.9/§15.10, test assertion tightened, bulk_scan docstring portable.
 - 2026-05-20: Story 36-2 — Hermes skill parity for session-close, vault-lint, hermes-url-ingest-vault; install scripts + tests.

@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-17
+modified: 2026-05-20
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -429,6 +429,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-17 | 1.28.0 | Hermes **`vault-think` v1.1.1:** `/today` and `/today --brief` daily planning briefing via **`vault_list`** + **`vault_read`** (read-only; no inbox reads) | 32-2-vault-think-today-command-daily-planning-briefing |
 | 2026-05-17 | 1.29.0 | Phase 6 completeness: §15.0 caveats + command matrix; **`triage` v1.7.0** (`/triage-approve`, `/triage-execute`; deprecate `/approve`, `/execute-approved`); **`vault-think` v1.2.0** (`/ghost`, `/drift` live); **`vault-graduate` v1.0.0** (`/vault-graduate`); REST and mutator exceptions documented | 33-3-operator-guide-phase6-completeness |
 | 2026-05-17 | 1.30.0 | Hermes **`vault-think` v1.3.0:** **`/verify`** pending **SynthesisNote** queue, single-note review, and **`/verify verified`** / **`/verify disputed`** stamping via **`vault_update_frontmatter`**; §15.8 | 33-1-verify-command-synthesisnote-review |
+| 2026-05-20 | 1.31.0 | Hermes skill install helpers: **`hermes-url-ingest-vault`** (§15.9) and **`vault-lint`** (§15.10); repo mirror parity via `install-hermes-skill-url-ingest-vault.sh` and `install-hermes-skill-vault-lint.sh` | 36-2-hermes-skill-parity-pass |
 
 ---
 
@@ -840,3 +841,44 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - **Marking tokens:** resolve by **exact vault-relative path** via **`vault_read_frontmatter`** (not the pending queue). Missing path → **`vault-think: verify not-found`**. Wrong **`pake_type`** → **`vault-think: verify not-synthesis`**. Already stamped → **`vault-think: verify already verified`** or **`vault-think: verify already disputed`** (no mutation). Only **`verification_status: pending`** **`SynthesisNote`** files are updated.
 
 **Skill install:** same as §15.6 (`bash scripts/install-hermes-skill-vault-think.sh`). Extend **`discord.channel_prompts`** for **`/verify`**, **`/verify verified`**, and **`/verify disputed`**.
+
+### 15.9 URL ingest vault (`hermes-url-ingest-vault`, Epic 26 / 28)
+
+**Skill version:** **1.0.0** (repo mirror + `~/.hermes/skills/cns/hermes-url-ingest-vault/`). Handles governed URL capture in **`#hermes`** (`vault_create_note` → `03-Resources/`) and **`#general`** capture-only mode (`00-Inbox/` writes only; capture semantics in §15.5).
+
+**Operator usage (Discord):**
+
+- **`#hermes`:** URL-only messages matching the skill trigger shapes; governed **`SourceNote`** creation via Vault IO MCP.
+- **`#general`:** Any message containing an `http://` or `https://` URL substring → Inbox capture only (Story 28.3 subsection in the skill).
+
+**Guardrails:**
+
+- **`#hermes`:** SSRF refusals, single-URL trigger shapes, no direct filesystem writes to governed paths outside Vault IO.
+- **`#general`:** No routing, approval, synthesis, AGENTS updates, or NotebookLM fan-out — manual `/triage` remains authoritative.
+
+**Skill install (operator filesystem):**
+
+- Repo mirror: `scripts/hermes-skill-examples/hermes-url-ingest-vault/`
+- Install helper: `bash scripts/install-hermes-skill-url-ingest-vault.sh`
+- Destination: `~/.hermes/skills/cns/hermes-url-ingest-vault/`
+- Binding: add **`hermes-url-ingest-vault`** to **`#hermes`** and **`#general`** `discord.channel_skill_bindings`; see `references/general-config-snippet.md` in the repo mirror.
+
+### 15.10 Vault lint (`vault-lint`, Epic 29)
+
+**Skill version:** **1.0.0** (repo mirror + `~/.hermes/skills/cns/vault-lint/`). Read-only four-rule scan; posts a Discord summary and writes a dated report to **`_meta/reports/vault-lint-YYYY-MM-DD.md`**.
+
+**Operator usage (Discord `#hermes`):**
+
+- **`/vault-lint`** — scan governed folders (`01-Projects/`, `02-Areas/`, `03-Resources/`) for duplicate **`source_uri`**, orphan wikilinks, stale **`verification_status: pending`**, and frontmatter violations.
+
+**Guardrails:**
+
+- Vault IO is read-only for the scan (`vault_list`, `vault_read`, `vault_read_frontmatter`, `vault_search`). Bulk frontmatter extraction uses **`execute_code`** + **`scripts/bulk_scan.py`** (see skill Pitfalls).
+- The only write is the dated report file under **`_meta/reports/`** via operator filesystem tools — not Vault IO mutators.
+
+**Skill install (operator filesystem):**
+
+- Repo mirror: `scripts/hermes-skill-examples/vault-lint/`
+- Install helper: `bash scripts/install-hermes-skill-vault-lint.sh`
+- Destination: `~/.hermes/skills/cns/vault-lint/`
+- Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.

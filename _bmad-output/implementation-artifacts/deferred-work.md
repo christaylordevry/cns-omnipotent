@@ -366,3 +366,9 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - No post-`nohup` health check — script exits 0 after fork even if gateway dies immediately; manual recovery documented in Operator Guide §15.3.
 - TOCTOU on concurrent launcher runs — overlapping `@reboot`/manual runs could double-start; watchdog/flock out of story scope.
 - Crontab install not re-verified in review sandbox — Dev Agent Record has excerpt; operator should confirm `crontab -l` on live WSL user.
+
+## Deferred from: code review of 36-2-hermes-skill-parity-pass (2026-05-20)
+
+- Commit bundles non-36-2 changes (36-3 story scaffold, AGENTS.md 2.0.8 bump, 36-1 deferred-work entries, epic-33 retrospective) — violates AC12 one-logical-commit intent; already on history at `0ec1b5b`.
+- No CI `diff -rq` parity gate for skill mirrors — same class as pre-36-2 skills; manual `cmp` only.
+- New install scripts omit post-install "Next:" hints present on vault-think/session-close — cosmetic consistency only.
