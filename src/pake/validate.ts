@@ -1,5 +1,5 @@
 import { CnsError } from "../errors.js";
-import { isContractManifestReadmePath, isInboxVaultPath } from "./path-rules.js";
+import { isContractManifestPath, isInboxVaultPath } from "./path-rules.js";
 import { pakeStandardFrontmatterSchema } from "./schemas.js";
 import type { ZodError } from "zod";
 
@@ -20,7 +20,7 @@ function zodToSchemaInvalidDetails(err: ZodError): Record<string, unknown> {
  * - Otherwise: require object-shaped data satisfying PAKE Standard for declared pake_type.
  */
 export function validatePakeForVaultPath(vaultRelativePosix: string, frontmatter: unknown): void {
-  if (isInboxVaultPath(vaultRelativePosix) || isContractManifestReadmePath(vaultRelativePosix)) {
+  if (isInboxVaultPath(vaultRelativePosix) || isContractManifestPath(vaultRelativePosix)) {
     return;
   }
 

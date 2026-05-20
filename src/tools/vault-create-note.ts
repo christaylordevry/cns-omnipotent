@@ -5,7 +5,7 @@ import { link, mkdir, unlink, writeFile } from "node:fs/promises";
 import { CnsError } from "../errors.js";
 import { resolveVaultPath } from "../paths.js";
 import { parseNoteFrontmatter } from "../pake/parse-frontmatter.js";
-import { isContractManifestReadmePath, normalizeVaultRelativePosix } from "../pake/path-rules.js";
+import { isContractManifestPath, normalizeVaultRelativePosix } from "../pake/path-rules.js";
 import type { PakeType } from "../pake/schemas.js";
 import { validatePakeForVaultPath } from "../pake/validate.js";
 import { appendRecord } from "../audit/audit-logger.js";
@@ -122,7 +122,7 @@ export async function vaultCreateNoteFromMarkdown(
     await unlink(tmpPath);
 
     if (!options.suppressAudit) {
-      const isManifest = isContractManifestReadmePath(posixRel);
+      const isManifest = isContractManifestPath(posixRel);
       const pakeType = frontmatter.pake_type;
       const titleVal = frontmatter.title;
       await appendRecord(vaultRoot, {
@@ -152,7 +152,7 @@ export async function vaultCreateNoteFromMarkdown(
     });
   }
 
-  if (isContractManifestReadmePath(posixRel)) {
+  if (isContractManifestPath(posixRel)) {
     return { pake_id: "contract-manifest", file_path: posixRel, created_at: createdAt };
   }
 

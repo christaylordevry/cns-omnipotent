@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CnsError } from "../../src/errors.js";
 import { parseNoteFrontmatter } from "../../src/pake/parse-frontmatter.js";
-import { isContractManifestReadmePath, isInboxVaultPath, normalizeVaultRelativePosix } from "../../src/pake/path-rules.js";
+import {
+  isContractManifestReadmePath,
+  isContractTopicHubPath,
+  isInboxVaultPath,
+  normalizeVaultRelativePosix,
+} from "../../src/pake/path-rules.js";
 import { validatePakeForVaultPath } from "../../src/pake/validate.js";
 
 type PakeType = "SourceNote" | "InsightNote" | "SynthesisNote" | "WorkflowNote" | "ValidationNote";
@@ -37,6 +42,11 @@ describe("path rules", () => {
     expect(isContractManifestReadmePath("01-Projects/_README.md")).toBe(true);
     expect(isContractManifestReadmePath("_README.md")).toBe(true);
     expect(isContractManifestReadmePath("03-Resources/note.md")).toBe(false);
+  });
+
+  it("detects Research topic hub paths", () => {
+    expect(isContractTopicHubPath("03-Resources/Research/consulting-rates-hub.md")).toBe(true);
+    expect(isContractTopicHubPath("03-Resources/consulting-rates-hub.md")).toBe(false);
   });
 });
 

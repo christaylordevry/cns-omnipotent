@@ -291,6 +291,31 @@ token AKIA0123456789ABCDEF
 });
 
 describe("vaultCreateNoteFromMarkdown contract manifests", () => {
+  it("creates Research topic hub without pake_id in frontmatter", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-hub-create-"));
+    await mkdir(path.join(vaultRoot, "03-Resources", "Research"), { recursive: true });
+    const markdown = `---
+purpose: Topic hub linking related perplexity research notes
+schema_required: true
+allowed_pake_types: SourceNote | InsightNote | SynthesisNote | ValidationNote
+naming_convention: Topic-scoped hub; wikilink index in body
+---
+# Consulting rates (Sydney)
+
+## Related notes
+- [[Example]]
+`;
+    const result = await vaultCreateNoteFromMarkdown(
+      vaultRoot,
+      "03-Resources/Research/consulting-rates-hub.md",
+      markdown,
+    );
+    expect(result).toMatchObject({
+      pake_id: "contract-manifest",
+      file_path: "03-Resources/Research/consulting-rates-hub.md",
+    });
+  });
+
   it("creates _README.md without pake_id in frontmatter", async () => {
     const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-readme-create-"));
     await mkdir(path.join(vaultRoot, "03-Resources", "Research"), { recursive: true });

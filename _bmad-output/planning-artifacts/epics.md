@@ -949,7 +949,7 @@ Phase 6 close-out: align sprint tracking with shipped work, automate Hermes gate
 
 **Stories:** 36-1 (sprint hygiene + gateway `@reboot` cron), 36-2 (Hermes skill parity pass), 36-3 (Projects/Areas stale pending + hub indexes)
 **Phase:** 6
-**Status:** in-progress
+**Status:** done
 
 #### Story 36.1: Sprint hygiene + Hermes gateway auto-start
 
@@ -974,3 +974,27 @@ I want **`/verify` / MCP frontmatter updates** for **01-Projects + 02-Areas** st
 So that **Rule 3 and Rule 2 lint debt drops** for those clusters with evidence artifacts.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/36-3-projects-areas-stale-pending-hub-indexes.md` (operator run in `#hermes`, evidence at `epic-36-stale-pending-verify-evidence.md`, hub updates, post-run `/vault-lint`).
+
+### Epic 37: 03-Resources Vault Close-Out
+
+Phase 6 close-out for remaining `03-Resources/` lint debt: remove E2E test fixtures, clear Rule 3 stale pending for the cluster, and wire perplexity research orphans into topic hub indexes.
+
+**Stories:** 37-1 (test artifact delete + stale pending stamp), 37-2 (topic hub indexes + orphan wiring)
+**Phase:** 6
+**Status:** in-progress
+
+#### Story 37.1: Test artifact cleanup + 03-Resources stale pending stamp
+
+As the **operator**,
+I want **five E2E fixtures deleted from `03-Resources/`** and **remaining Rule 3 stale-pending notes stamped** `verified` or `disputed`,
+So that **`03-Resources/` Rule 3 reaches zero** with auditable delete and frontmatter evidence.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/37-1-test-artifact-cleanup-03-resources-stale-pending-stamp.md` (fs delete + `vault_log_action` per file, `vault_update_frontmatter` stamp, evidence at `epic-37-03-resources-cleanup-evidence.md`, post-run `/vault-lint`; not a code story).
+
+#### Story 37.2: 03-Resources topic hub indexes (perplexity research clusters)
+
+As the **operator**,
+I want **six topic hub notes under `03-Resources/Research/`** plus **wikilink wiring** for loose orphans to existing README hubs,
+So that **Rule 2 orphan count drops below 5** after `/vault-lint`.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/37-2-03-resources-topic-hub-indexes.md` (`vaultCreateNoteFromMarkdown` hubs, Research/parent README updates, evidence at `epic-37-hub-evidence.md`; run after 37-1 when gemini ingest note may be deleted).

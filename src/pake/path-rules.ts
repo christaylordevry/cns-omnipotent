@@ -22,3 +22,14 @@ export function isContractManifestReadmePath(vaultRelativePosix: string): boolea
   const n = normalizeVaultRelativePosix(vaultRelativePosix);
   return n === "_README.md" || n.endsWith("/_README.md");
 }
+
+/** Story 37-2 topic hubs under Research/ use contract manifest frontmatter. */
+export function isContractTopicHubPath(vaultRelativePosix: string): boolean {
+  const n = normalizeVaultRelativePosix(vaultRelativePosix);
+  return n.startsWith("03-Resources/Research/") && n.endsWith("-hub.md");
+}
+
+/** Contract manifest or topic hub — skip PAKE Standard validation. */
+export function isContractManifestPath(vaultRelativePosix: string): boolean {
+  return isContractManifestReadmePath(vaultRelativePosix) || isContractTopicHubPath(vaultRelativePosix);
+}

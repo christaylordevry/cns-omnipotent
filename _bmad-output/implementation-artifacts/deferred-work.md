@@ -24,6 +24,7 @@
 | Nexus trust-guard: detect `needs_configure` after Claude Code updates (NEXUS repo script) | (b) Phase 2 |
 | `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`: Symptom E + trust-guard post-update reconnection | (b) Phase 2 |
 | `vault_create_note` routes by `pake_type` only; ignores subdirectory path — use `vault_move` after creation for project subfolders | (b) Phase 2 / operator workflow |
+| Vault-lint Rule 2 filename-stem matching — display-text/title wikilinks not counted (37-2: 23 orphans baseline) | (b) Phase 2 backlog |
 | `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (c) Closed by 35-1 |
 | `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (c) Closed — no drift found in either copy |
 | Symlink / `realpath` on reads | (c) Resolved: Story 4-9 |
@@ -161,6 +162,12 @@ Add flag to skip `parseRule4Paths` when report shows Rule 4 = 0.
 Hub/manifest creates currently require `vaultCreateNoteFromMarkdown` internal pipeline; MCP surface still routes by `pake_type` only.
 
 - **Class:** (b) L effort. Source: 35-3 code review.
+
+### Vault-lint Rule 2 filename-stem matching
+
+Orphan checker requires exact `[[filename-stem]]` wikilinks, not display-text or title-based links. Topic hubs use readable names; **23** perplexity research notes remain flagged as orphans after Story **37-2** (vault warnings **69 → 23**). Fix options: (a) regenerate hubs with exact stems, (b) add title-based matching to vault-lint Rule 2.
+
+- **Class:** (b) Phase 2 backlog. Source: Story 37-2 close-out (2026-05-21).
 
 ---
 
@@ -376,3 +383,17 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 36-3-projects-areas-stale-pending-hub-indexes (2026-05-20)
 
 - Live vault hub/index not mirrored into repo `Knowledge-Vault-ACTIVE/` fixture — AC14 optional; review could not verify Part B from repo tree alone.
+
+## Deferred from: code review of 37-1-test-artifact-cleanup-03-resources-stale-pending-stamp (2026-05-21)
+
+- No unit test for `scripts/epic-37-1-03-resources-cleanup.ts` — same class as 34-2/36-3 hygiene scripts; `npm test` green but path not exercised.
+- Script not idempotent on re-run — second run throws on missing delete targets; acceptable for one-shot batch; optional `--dry-run` or header note.
+- Uncommitted `AGENTS.md` / `epics.md` edits outside story File List — exclude from 37-1 commit scope.
+
+## Deferred from: code review of 37-2-03-resources-topic-hub-indexes (2026-05-21)
+
+- AC11 closed (2026-05-21) — Hermes `/vault-lint`: **23** Rule 2 orphans accepted baseline; vault-lint stem-match limitation → Phase 2 backlog (see **Vault-lint Rule 2 filename-stem matching** above).
+- Workflow & discovery links beyond AC7–8 minimum — hooks E2E, Gemini PE, Top Github wired for extra orphan edges; not spec violations.
+- `appendSectionIfMissing` skips section refresh on re-run — first-run idempotency only.
+- Obsidian cluster uses long prefix only — `perplexity-obsidian-pkm` alt not scanned; live run matched 3 notes per evidence.
+- No `validatePakeForVaultPath` integration test for `*-hub.md` — path-rule unit test + create test cover contract hub bypass.
