@@ -359,3 +359,10 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 35-3-orphan-wikilink-pass-research-index (2026-05-18)
 
 - AC6 authoritative `/vault-lint` post-run — after metrics are simulated in evidence; operator refresh in `#hermes` still required for `_meta/reports/vault-lint-YYYY-MM-DD.md` (same pattern as 34-x stories).
+
+## Deferred from: code review of 36-1-sprint-hygiene-hermes-gateway-auto-start (2026-05-20)
+
+- Fragile `hermes gateway status` text/PID parsing — same class as `hermes-morning-digest.sh`; optional hardening later.
+- No post-`nohup` health check — script exits 0 after fork even if gateway dies immediately; manual recovery documented in Operator Guide §15.3.
+- TOCTOU on concurrent launcher runs — overlapping `@reboot`/manual runs could double-start; watchdog/flock out of story scope.
+- Crontab install not re-verified in review sandbox — Dev Agent Record has excerpt; operator should confirm `crontab -l` on live WSL user.

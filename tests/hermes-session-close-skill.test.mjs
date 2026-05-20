@@ -23,6 +23,9 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("/session-close"));
     assert.ok(body.includes("## When to use"));
     assert.ok(body.includes("## Tools"));
+    assert.ok(body.includes("## Pitfalls"));
+    assert.ok(body.includes("ERRNO 18"));
+    assert.ok(body.includes("ready: false"));
     assert.ok(body.includes("## Non-goals"));
     assert.ok(body.includes("OMNIPOTENT_REPO"));
     assert.ok(body.includes("source_add"));

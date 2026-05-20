@@ -93,6 +93,23 @@ Perform in `#hermes` with gateway running:
 - Successful run: new file under `03-Resources/` (or spec-correct subpath returned), `vault_read_frontmatter` on returned path shows valid PAKE including `source_uri` matching the trigger URL (trimmed).
 - `_meta/logs/agent-log.md` gains a line for `vault_create_note` whose `target_path` matches the created file.
 
+## #general channel: capture-only mode (Story 28.3)
+
+This skill also covers the **`#general`** channel (channel ID `1484880486785486951`) in a strictly **capture-only** variant. The `#hermes` governed-ingest path (above) does **not** apply to `#general`. In `#general`:
+
+- **Trigger**: any message containing at least one `http://` or `https://` URL substring.
+- **Non-goals**: no `vault_create_note`, no routing, no `/approve`, no `/execute-approved`, no governed-zone writes. Only `00-Inbox/` filesystem writes.
+- **Captures**: up to **3** distinct URLs per message (first-seen order); if more exist, record `additional_urls_omitted: <count>`.
+- **SSRF guardrails**: same localhost/RFC1918/link-local rejection as `#hermes` path; rejected URLs still get an Inbox capture entry with `failure_class: blocked-host`.
+- **Fetch**: Hermes browser path, 30s wall-clock budget, ≤2000 chars per URL extract; on failure write `failure_class` instead of raw HTML.
+- **Filename**: `00-Inbox/hermes-auto-capture-<UTC YYYYMMDDTHHMMSSZ>-<hostname slug>.md` under the active CNS vault root (`/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE`).
+- **No frontmatter**: `00-Inbox/` is a raw capture zone.
+- **Manual triage boundary**: after writing the Inbox file, stop. Standard Epic 27 workflow (`/triage` → `/approve` → `/execute-approved`) governs what happens next.
+- **Reply**: brief `#general` reply with the Inbox path and URL count. No page body pastes.
+
+Full capture task prompt: `references/general-capture-prompt.md`
+Channel binding config snippet: `references/general-config-snippet.md`
+
 ## Regression (HI-3 / HI-4 / HI-5)
 
 - No direct Hermes filesystem writes to governed vault paths outside `00-Inbox/`.

@@ -41,14 +41,56 @@ Normative rules, severities, Discord layout, on-disk report, and JSON machine bl
 
 ## Tools
 
-- **Vault IO MCP (read-only):** `vault_list`, `vault_read`, `vault_read_frontmatter`, `vault_search`.
-- **Filesystem:** write the dated report under the resolved vault root (Nexus-class direct write; outside Vault IO governance).
+- **Vault IO MCP (read-only):** `vault_list`, `vault_search` — use for the three required `vault_search` calls (Step 1) and for `vault_list` inventory (Step 2). Do NOT use `vault_read_frontmatter` with a `paths` array — it is broken at the gateway level (see Pitfalls). Use single-path `vault_read_frontmatter` sparingly or skip entirely in favour of `execute_code` filesystem reads.
+- **Filesystem via `execute_code`:** Use `bulk_scan.py` (or an inline equivalent) for all frontmatter extraction (Step 3), Rule evaluation (Steps 4–7), and counting (Step 8). This is faster and avoids the MCP batch bug.
+- **Filesystem write:** write the dated report under the resolved vault root (Nexus-class direct write; outside Vault IO governance). Use `write_file` or a terminal `python3 -c 'open(...).write(...)'`.
 
 ## Non-goals
 
 - Auto-fix, batch deletes, or mutator MCP calls.
 - Scanning `00-Inbox/`, `_meta/` (except writing the report path under `_meta/reports/`), or emitting findings for `_README.md` under Rules 3 and 4.
 
+## Pitfalls
+
+### vault_read_frontmatter `paths` array silently fails
+`vault_read_frontmatter` with a `paths` array argument fails: `Expected array, received string` — the MCP interface serialises the JSON array as a string. **Do not** attempt batch frontmatter reads via MCP. Use `execute_code` + direct filesystem reads instead (see below).
+
+### vault_read_frontmatter single-path: always pass `path` kwarg explicitly
+Calling with no arguments returns a validation error. Always pass `path="<vault-relative-path>"` for single-note reads.
+
+### Bulk frontmatter extraction: use filesystem via execute_code, not MCP
+With 115+ governed notes, MCP per-call overhead is infeasible. Use `execute_code` with `os.walk(VAULT)` and a minimal YAML regex parser:
+
+```python
+def extract_frontmatter_and_body(path_str):
+    with open(path_str, 'r', encoding='utf-8', errors='replace') as f:
+        content = f.read()
+    if not content.startswith('---'):
+        return {}, content
+    rest = content[3:]
+    end = rest.find('\n---')
+    if end == -1:
+        return {}, content
+    body = rest[end+4:]
+    # parse rest[:end] into dict with simple line-by-line parser
+    return fm, body
+```
+
+This handles the full inventory + Rule 4 checks in one pass (~1–2s for 115 files).
+
+### Rule 2 orphan scan: filesystem walk + regex, not MCP vault_read
+Reading ~550 edge `.md` files via MCP `vault_read` is too slow for one turn. Use `os.walk(VAULT)` excluding `00-Inbox/` and `_meta/` top-level dirs, extract bodies, run `re.findall(r'!?\[\[([^\]|]+)(?:\|[^\]]*)?\]\]', body)`. Build `incoming` count dict across all governed paths. Confirmed working in ~2s.
+
+### execute_code: keep the whole scan in one block
+Split calls lose local variables (`NameError: name 'frontmatters' is not defined`). Combine frontier walk, frontmatter extraction, wikilink scan, rule evaluation, and report write into one or two large `execute_code` blocks, not many small ones.
+
+### Run the 3 required vault_search calls in parallel after execute_code completes
+The three `vault_search` calls (scopes `01-Projects/`, `02-Areas/`, `03-Resources/` with query `source_uri`) are required by the task-prompt AC but do not feed the rule evaluation (that uses the filesystem scan). Fire all three in a single parallel tool invocation **after** the `execute_code` scan finishes. Results serve as a cross-check hint only; the authoritative counts come from the filesystem pass. Verified 2026-05-18.
+
+### CNS_VAULT_ROOT resolution: use regex on config.yaml, not yaml module
+`yaml` module is not installed in the execute_code sandbox. Read `~/.hermes/config.yaml` as text and use `re.search(r'CNS_VAULT_ROOT:\s*(.+)', txt)` to extract the value. Falls back gracefully to env var check first.
+
 ## References
 
 - **`references/task-prompt.md`** — full procedure, wikilink grammar, batching, output shapes.
+- **`scripts/bulk_scan.py`** — reusable filesystem-based bulk scan engine (frontmatter extract + wikilink orphan check + all four rule evaluations). `exec()` inside `execute_code` or run directly; exposes `governed_md`, `frontmatters`, `orphans`, `stale`, `errors_r4`, `dup_groups` as local vars.

@@ -2,12 +2,12 @@
 story_id: 36-1
 epic: 36
 title: sprint-hygiene-hermes-gateway-auto-start
-status: review
+status: done
 ---
 
 # Story 36.1: Sprint hygiene + Hermes gateway auto-start
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -182,3 +182,13 @@ Composer (Cursor)
 ## Change Log
 
 - 2026-05-20: Story 36-1 — sprint hygiene + Hermes gateway `@reboot` auto-start, launcher, MEMORY/Operator Guide.
+- 2026-05-20: Code review — restored `epic-33-retrospective: done`; aligned sprint-status header `# last_updated` comment.
+
+### Review Findings
+
+- [x] [Review][Patch] **epic-33-retrospective regressed `done` → `optional`** [`sprint-status.yaml:265`] — Restored `epic-33-retrospective: done` (code review 2026-05-20).
+- [x] [Review][Patch] **Stale header `# last_updated` comment** [`sprint-status.yaml:2`] — Aligned comment with body `2026-05-20T12:00:00+10:00` (code review 2026-05-20).
+- [x] [Review][Defer] **Fragile `hermes gateway status` text/PID parsing** [`scripts/hermes-gateway-start.sh:26-34`] — Same class as `hermes-morning-digest.sh`; acceptable for 36-1; optional hardening later.
+- [x] [Review][Defer] **No post-`nohup` health check** [`scripts/hermes-gateway-start.sh:36-37`] — Script exits 0 after fork even if gateway dies immediately; operator manual recovery documented.
+- [x] [Review][Defer] **TOCTOU on concurrent launcher runs** [`scripts/hermes-gateway-start.sh:26-36`] — Overlapping `@reboot`/manual runs could double-start; watchdog/flock out of scope per story.
+- [x] [Review][Defer] **Crontab install not re-verified in review sandbox** — AC9 satisfied per Dev Agent Record excerpt; operator should confirm `crontab -l` on live WSL user (review env had no match).

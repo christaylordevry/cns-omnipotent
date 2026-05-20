@@ -942,3 +942,35 @@ I want a **`03-Resources/Research/_README.md` hub** linking all Research SourceN
 So that **Rule 2 orphan WARNINGs drop** after `/vault-lint`.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/35-3-orphan-wikilink-pass-research-index.md` (`vault_create_note` hub, optional parent README only if missing, evidence at `epic-35-orphan-research-index-evidence.md`).
+
+### Epic 36: Operational Stability + Vault Close-Out
+
+Phase 6 close-out: align sprint tracking with shipped work, automate Hermes gateway on WSL boot, restore Hermes skill repo mirrors, and clear remaining `01-Projects/` / `02-Areas/` verification and orphan debt.
+
+**Stories:** 36-1 (sprint hygiene + gateway `@reboot` cron), 36-2 (Hermes skill parity pass), 36-3 (Projects/Areas stale pending + hub indexes)
+**Phase:** 6
+**Status:** in-progress
+
+#### Story 36.1: Sprint hygiene + Hermes gateway auto-start
+
+As the **operator**,
+I want **accurate sprint-status rows** and **Hermes gateway auto-start on WSL boot**,
+So that **Phase 6 tracking matches reality** and **`#hermes` survives reboot without manual tmux**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/36-1-sprint-hygiene-hermes-gateway-auto-start.md` (Part A sprint-status edits; Part B `scripts/hermes-gateway-start.sh`, `@reboot` crontab, MEMORY.md + Operator Guide, simulated restart, `npm test` + `verify.sh`, commit).
+
+#### Story 36.2: Hermes skill parity pass
+
+As the **CNS maintainer**,
+I want **repo skill mirrors and install scripts** synced with `~/.hermes/skills/cns/` for **session-close**, **vault-lint**, and **hermes-url-ingest-vault**,
+So that **Pitfalls and tooling survive reinstall** and **`cmp` verification is repeatable**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/36-2-hermes-skill-parity-pass.md` (three skills + two new install scripts, `cmp` after install, `npm test` + `verify.sh`, commit).
+
+#### Story 36.3: 01-Projects + 02-Areas stale pending review + hub indexes
+
+As the **operator**,
+I want **`/verify` / MCP frontmatter updates** for **01-Projects + 02-Areas** stale pending notes and **wikilink hub indexes** on both directory `_README.md` files,
+So that **Rule 3 and Rule 2 lint debt drops** for those clusters with evidence artifacts.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/36-3-projects-areas-stale-pending-hub-indexes.md` (operator run in `#hermes`, evidence at `epic-36-stale-pending-verify-evidence.md`, hub updates, post-run `/vault-lint`).
