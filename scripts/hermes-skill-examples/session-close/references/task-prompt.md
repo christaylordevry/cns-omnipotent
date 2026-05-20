@@ -183,7 +183,7 @@ Phase 6 active. Epic [N] [status]. Done: [completed story IDs].
 - [decision 3]
 
 ## Environment
-- Gateway: manual start required (not systemd)
+- Gateway: WSL `@reboot` cron runs `scripts/hermes-gateway-start.sh` (idempotent; logs `~/.hermes/logs/gateway-cron.log`, reboot wrapper `gateway-reboot-cron.log`)
 - SOUL.md: remove after every hermes version/gateway start
 - Vault: /mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/
 
