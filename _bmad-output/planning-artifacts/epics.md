@@ -998,3 +998,35 @@ I want **six topic hub notes under `03-Resources/Research/`** plus **wikilink wi
 So that **Rule 2 orphan count drops below 5** after `/vault-lint`.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/37-2-03-resources-topic-hub-indexes.md` (`vaultCreateNoteFromMarkdown` hubs, Research/parent README updates, evidence at `epic-37-hub-evidence.md`; run after 37-1 when gemini ingest note may be deleted).
+
+### Epic 38: Cost + Provider Optimization
+
+Phase 7 opener: document the 2026-05-22 Hermes migration to Codex OAuth, evaluate cheaper models for `run-chain`, and verify prompt-cache savings with 1h TTL in `agent.log`.
+
+**Stories:** 38-1 (provider migration documentation — retro done), 38-2 (Kimi K2.6 run-chain evaluation), 38-3 (prompt cache hit rate verification)
+**Phase:** 7
+**Status:** in-progress
+
+#### Story 38.1: Provider migration documentation
+
+As the **CNS maintainer**,
+I want **the 2026-05-22 Hermes provider migration** (main model, auxiliary mapping, gateway token bridge) **captured as a closed BMAD story with config diff and log evidence**,
+So that **Phase 7 optimization has an auditable baseline** without relying on chat history.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/38-1-provider-migration-documentation.md` (retro **done** — `openai-codex` / `gpt-5.5` main, `gpt-5.4-mini` auxiliary, `compression.threshold` 0.2, gateway token bridge, `agent.log` evidence; operator config only).
+
+#### Story 38.2: Kimi K2.6 evaluation for run-chain
+
+As the **operator**,
+I want **`scripts/run-chain.ts` tested with Kimi K2.6** for the synthesis stage (minimum),
+So that **we can decide whether to replace Claude Sonnet for chain inference** on cost/quality grounds.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/38-2-kimi-k2-6-evaluation-run-chain.md` (live smoke, PAKE++ PASS/FAIL, adopt/defer/reject record; optional adapter flag + verify gate if adopting).
+
+#### Story 38.3: Prompt cache hit rate verification
+
+As the **operator**,
+I want **`prompt_caching.cache_ttl: 1h` verified** with **non-zero cache read lines in `~/.hermes/logs/agent.log`**,
+So that **Codex prefix caching is proven after migration** and TTL keys are aligned.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/38-3-prompt-cache-hit-rate-verification.md` (`cache=` log suffix on API call lines, evidence at `epic-38-prompt-cache-evidence.md`; operator config + log grep only).
