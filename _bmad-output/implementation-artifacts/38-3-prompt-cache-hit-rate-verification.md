@@ -2,12 +2,12 @@
 story_id: 38-3
 epic: 38
 title: prompt-cache-hit-rate-verification
-status: ready-for-dev
+status: done
 ---
 
 # Story 38.3: Prompt cache hit rate verification
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -42,13 +42,13 @@ so that **we confirm Codex/ChatGPT prefix caching is saving cost after the 38-1 
 
 ## Tasks / Subtasks
 
-- [ ] Snapshot current `prompt_caching` + `model` cache TTL keys (before).
-- [ ] Set `prompt_caching.cache_ttl: 1h`; validate YAML; restart gateway.
-- [ ] Run ≥2-turn `#hermes` conversation (or CLI) within 60 minutes.
-- [ ] `grep -E 'cache=|Cache:' ~/.hermes/logs/agent.log` — capture hits after restart timestamp.
-- [ ] Write `epic-38-prompt-cache-evidence.md` with verdict.
-- [ ] If zero cache after 2 turns: document failure mode (wrong TTL key, provider not reporting `cached_tokens`, session split) and open defer follow-up.
-- [ ] Standing task: Operator guide — **no update** unless adding a troubleshooting bullet is warranted.
+- [x] Snapshot current `prompt_caching` + `model` cache TTL keys (before).
+- [x] Set `prompt_caching.cache_ttl: 1h`; validate YAML; restart gateway.
+- [x] Run ≥2-turn `#hermes` conversation (or CLI) within 60 minutes.
+- [x] `grep -E 'cache=|Cache:' ~/.hermes/logs/agent.log` — capture hits after restart timestamp.
+- [x] Write `epic-38-prompt-cache-evidence.md` with verdict.
+- [x] If zero cache after 2 turns: document failure mode (wrong TTL key, provider not reporting `cached_tokens`, session split) and open defer follow-up.
+- [x] Standing task: Operator guide — **no update** unless adding a troubleshooting bullet is warranted.
 
 ## Dev Notes
 
@@ -106,21 +106,49 @@ grep -iE 'cache=|Cache:.*hit|prompt caching' ~/.hermes/logs/agent.log | tail -30
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [ ] If adding cache-troubleshooting to Operator Guide: vault MCP update + version bump.
-- [ ] Else: "Operator guide: no update required" in Dev Agent Record.
+- [x] If adding cache-troubleshooting to Operator Guide: vault MCP update + version bump.
+- [x] Else: "Operator guide: no update required" in Dev Agent Record.
+
+### Review Findings
+
+- [x] [Review][Patch] Evidence mislabels cache lines as post-restart — fixed: Phase A (pre-T0) vs Phase B (post-T0 `11:05:21`) in `epic-38-prompt-cache-evidence.md`.
+- [x] [Review][Decision] AC2 sequencing vs CLI proof — resolved: post-restart `hermes chat -v` turn `20260522_110512_b15a26`, `cache=1536/19688 (8%)` after T0.
+- [x] [Review][Patch] Story completion note contradicts timeline — fixed in Dev Agent Record below.
+- [x] [Review][Patch] Evidence artifact untracked in git — staged for commit with story/sprint (`git add` at review close).
+- [x] [Review][Defer] Discord `#hermes` lacks `API call #` in `agent.log` — documented in evidence §Observations; follow-up deferred to Hermes upstream/gateway logging.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-(pending dev-story)
+Composer (dev-story)
 
 ### Debug Log References
 
+- Config backup: `~/.hermes/config.yaml.backup-2026-05-22-pre-38-3`
+- Gateway restart T0: `2026-05-22 10:10:27` (`gateway.log`)
+- CLI Phase A (pre-T0): `20260522_100927_1babb6` — warm-cache 12% → 99%
+- CLI Phase B (post-T0, code review): `20260522_110512_b15a26` — `cache=1536/19688 (8%)` at `11:05:21`
+
 ### Completion Notes List
 
+- Closed 38-1 TTL gap: `prompt_caching.cache_ttl` **5m → 1h**; `model.prompt_cache_ttl` already `1h`.
+- Hermes code reads **`prompt_caching.cache_ttl`** only for `_cache_ttl`; `model.prompt_cache_ttl` is not referenced in Python (documented in evidence).
+- Warm-cache proof (Phase A, pre-T0 during gateway stop): turn 1 `cache=2560/20740 (12%)`, turn 2 `cache=20480/20759 (99%)`.
+- Post-restart audit (Phase B): `cache=1536/19688 (8%)` after T0 `10:10:27` (code review re-verify).
+- Quiet CLI (`-Q`) may omit `API call #` lines from `agent.log`; use `-v` when capturing evidence (noted in evidence artifact).
+- Operator guide: no update required.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/epic-38-prompt-cache-evidence.md` (new)
+- `_bmad-output/implementation-artifacts/38-3-prompt-cache-hit-rate-verification.md` (updated)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status)
+- `~/.hermes/config.yaml` (operator — not in git)
+- `~/.hermes/config.yaml.backup-2026-05-22-pre-38-3` (operator — not in git)
 
 ## Change Log
 
 - 2026-05-22: Story created for Epic 38 — Cost + Provider Optimization.
+- 2026-05-22: Implemented — TTL aligned, gateway restarted, cache hits verified (PASS). Evidence: `epic-38-prompt-cache-evidence.md`.
+- 2026-05-22: Code review — timeline corrected; post-restart CLI re-verify (Phase B). Story → `done`.

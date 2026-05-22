@@ -397,3 +397,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - `appendSectionIfMissing` skips section refresh on re-run — first-run idempotency only.
 - Obsidian cluster uses long prefix only — `perplexity-obsidian-pkm` alt not scanned; live run matched 3 notes per evidence.
 - No `validatePakeForVaultPath` integration test for `*-hub.md` — path-rule unit test + create test cover contract hub bypass.
+
+## Deferred from: code review of 38-3-prompt-cache-hit-rate-verification (2026-05-22)
+
+- Discord `#hermes` lacks `API call #` lines in `agent.log` (gateway workers) — CLI `-v` satisfies AC4; Hermes upstream/gateway logging gap if Discord parity required.
