@@ -1,6 +1,6 @@
 ---
 name: session-close
-description: "Hermes CNS session closure for /session-close in #hermes. Rewrites AGENTS.md Section 8 from sprint status and recent story artifacts, syncs both constitution copies by filesystem, exports the vault for NotebookLM, regenerates MEMORY.md and vault-fast-scan-index.md by filesystem, and fans the export out with source_add."
+description: "Hermes CNS session closure for /session-close in #hermes. Rewrites AGENTS.md Section 8 from sprint status and recent story artifacts, syncs both constitution copies by filesystem, exports the vault for NotebookLM, regenerates MEMORY.md and vault-fast-scan-index.md by filesystem, refreshes CNS-Daily-Rhythm.md AUTO blocks, and fans the export out with source_add."
 version: 1.0.0
 author: CNS Operator
 license: MIT
@@ -21,6 +21,7 @@ This skill implements the **`/session-close`** entrypoint in Discord **`#hermes`
 - Sync the repo mirror and canonical vault copy byte-for-byte.
 - Run the NotebookLM vault export script.
 - Overwrite **`AI-Context/MEMORY.md`** and **`AI-Context/vault-fast-scan-index.md`** on each real close (operator filesystem, not Vault IO mutators).
+- Refresh every **`<!-- AUTO:xxx -->`** block in **`AI-Context/CNS-Daily-Rhythm.md`** (Step 6.7) from sprint status, Hermes config, vault-lint, and `npm test`.
 - Add the fresh export to each active NotebookLM notebook using **`source_add`**.
 
 The skill reconciles the stakeholder request for `vault_update_frontmatter` with WriteGate reality: **`AI-Context/**` is protected and returns `PROTECTED_PATH`, so AGENTS body edits are operator filesystem edits, not Vault IO mutator calls.
@@ -47,7 +48,7 @@ The skill reconciles the stakeholder request for `vault_update_frontmatter` with
 ## Steps
 
 1. Follow `references/trigger-pattern.md` to validate the command.
-2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, deterministic `MEMORY.md` overwrite, deterministic `vault-fast-scan-index.md` overwrite (Step 6.6), and NotebookLM fan-out.
+2. Follow `references/task-prompt.md` exactly for sprint parsing, artifact selection, Section 8 replacement, sync verification, export, deterministic `MEMORY.md` overwrite, deterministic `vault-fast-scan-index.md` overwrite (Step 6.6), `CNS-Daily-Rhythm.md` AUTO block refresh (Step 6.7), and NotebookLM fan-out.
 3. Keep the Discord reply concise: result, AGENTS sync status, export path and size, NotebookLM per-target statuses, and any failure class.
 
 ## Tools
@@ -105,6 +106,9 @@ This is resilient to separator whitespace variance. Verified 2026-05-18: separat
 
 ### Planning-artifacts AGENTS.md mirror is a hardlink — `cp` "same file" is not an error
 `_bmad-output/planning-artifacts/cns-vault-contract/AGENTS.md` is typically a hardlink to `specs/cns-vault-contract/AGENTS.md` (same inode). When Step 5 runs `cp "$REPO_AGENTS" "$PLAN_AGENTS"`, cp emits `are the same file` to stderr and exits non-zero. This is harmless — the bytes are already identical by definition. Do not treat the message as a failure or retry. Verified 2026-05-17.
+
+### CNS-Daily-Rhythm.md (Step 6.7): filesystem only, single cell, sanitize tables
+`AI-Context/CNS-Daily-Rhythm.md` is WriteGate-protected like AGENTS.md. Refresh AUTO blocks with **plain `open()`** on `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/CNS-Daily-Rhythm.md` — never `vault_create_note` / `vault_update_frontmatter` and never `hermes_tools.read_file` inside `execute_code`. Read sprint status, deferred-work, epics, vault-lint reports, and Hermes config in the **same** `execute_code` or `python3` invocation as the write (same `NameError` risk as Step 6.6 if split). Replace `|` in table cell text with ` - ` so markdown tables do not break. For `AUTO:TESTS`, export NVM `bin` to PATH before `npm test` (see task-prompt Hard constraint 7). Dry-run computes values for Discord preview only; real close updates the footer `*Last auto-update: …*` line.
 
 ### NotebookLM `source_add` returns `ready: false` — this is normal async behavior
 All successful `source_add` calls return `{"status": "success", "ready": false, "source_id": "..."}`. The `ready: false` field signals that NotebookLM indexes the source asynchronously in the background. It does **not** indicate failure. A response with `status: success` and a concrete `source_id` is a fully successful fan-out entry. Do not retry, flag as failed, or wait for `ready: true`. Verified 2026-05-17.

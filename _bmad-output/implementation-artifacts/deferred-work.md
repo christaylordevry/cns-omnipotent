@@ -444,3 +444,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 38-3-prompt-cache-hit-rate-verification (2026-05-22)
 
 - Discord `#hermes` lacks `API call #` lines in `agent.log` (gateway workers) — CLI `-v` satisfies AC4; Hermes upstream/gateway logging gap if Discord parity required.
+
+## Deferred from: code review of 43-1-cns-daily-rhythm-auto-blocks-via-session-close (2026-05-23)
+
+- Step 6 optional `npm run vault:fast-scan` PATH — Hermes PATH gap predates 43-1; fix when centralizing npm prelude in session-close Hard constraints.
+- SKILLS_COUNT nested `SKILL.md` dedupe — count rule may double-count parent/child dirs; low risk at current Hermes skill tree scale.

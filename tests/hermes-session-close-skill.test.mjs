@@ -9,7 +9,22 @@ const skillDir = join(root, "scripts/hermes-skill-examples/session-close");
 const skillPath = join(skillDir, "SKILL.md");
 const taskPromptPath = join(skillDir, "references/task-prompt.md");
 const triggerPatternPath = join(skillDir, "references/trigger-pattern.md");
+const dailyRhythmStaticPath = join(skillDir, "references/daily-rhythm-static-rows.md");
 const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md");
+
+const AUTO_MARKERS = [
+  "PROVIDER",
+  "VAULT_NOTES",
+  "VAULT_HEALTH",
+  "SPRINT",
+  "AGENTS_VERSION",
+  "SKILLS_COUNT",
+  "TESTS",
+  "LAST_SESSION",
+  "ACTIVE_PROJECTS",
+  "DEFERRED_SUMMARY",
+  "ROADMAP",
+];
 
 describe("Story 28.1 Hermes session-close skill mirror", () => {
   it("defines the HI-8 skill package and install helper", () => {
@@ -110,5 +125,61 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("NotebookLM"));
     assert.ok(body.includes("session-close"));
     assert.ok(body.includes("Do not use Vault IO mutators for `AI-Context/AGENTS.md`"));
+  });
+});
+
+describe("Story 43.1 CNS-Daily-Rhythm AUTO blocks via session-close", () => {
+  it("defines Step 6.7, static rows, and all AUTO markers", () => {
+    assert.ok(existsSync(dailyRhythmStaticPath));
+    const staticBody = readFileSync(dailyRhythmStaticPath, "utf8");
+    assert.ok(staticBody.includes("## Active projects — operator business rows"));
+    assert.ok(staticBody.includes("LinkedIn Profile System"));
+    assert.ok(staticBody.includes("## Roadmap — epic theme fallbacks"));
+
+    const body = readFileSync(taskPromptPath, "utf8");
+    assert.ok(body.includes("## Step 6.7: Refresh CNS-Daily-Rhythm AUTO blocks"));
+    assert.ok(body.includes("CNS-Daily-Rhythm.md"));
+    assert.ok(body.includes("daily-rhythm-static-rows.md"));
+    assert.ok(body.includes("deferred-work.md"));
+    assert.ok(body.includes("vault-lint-"));
+    assert.ok(body.includes("bulk_scan.py"));
+    assert.ok(body.includes("daily_rhythm:"));
+    assert.ok(body.includes("failure_class: tests"));
+    assert.ok(body.includes("Do **not** write `CNS-Daily-Rhythm.md`"));
+    assert.ok(body.includes("Hermes npm PATH"));
+    assert.ok(body.includes(".nvm/versions/node"));
+    const step67 = body.slice(body.indexOf("## Step 6.7"), body.indexOf("## Step 7:"));
+    assert.ok(step67.includes("Hard constraint 7"));
+    assert.ok(step67.includes("Dry-run:") && step67.includes("Do **not** invoke `/vault-lint`"));
+    for (const tag of AUTO_MARKERS) {
+      const documented =
+        step67.includes(`AUTO:${tag}`) || step67.includes(`| \`${tag}\` |`);
+      assert.ok(documented, `missing marker ${tag} in Step 6.7`);
+    }
+  });
+
+  it("forbids Vault IO mutators for CNS-Daily-Rhythm path", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    const step67 = body.slice(body.indexOf("## Step 6.7"), body.indexOf("## Step 7:"));
+    assert.ok(step67.includes("Do **not** call `vault_create_note`"));
+    for (const forbidden of ["vault_create_note", "vault_update_frontmatter", "vault_append_daily", "vault_log_action"]) {
+      assert.ok(step67.includes(forbidden), `Step 6.7 must forbid ${forbidden}`);
+    }
+  });
+
+  it("SKILL.md documents CNS-Daily-Rhythm refresh pitfalls", () => {
+    const body = readFileSync(skillPath, "utf8");
+    assert.ok(body.includes("CNS-Daily-Rhythm.md"));
+    assert.ok(body.includes("Step 6.7"));
+    assert.ok(body.includes("AUTO:xxx"));
+    assert.ok(body.includes("hermes_tools.read_file"));
+  });
+
+  it("operator guide documents Step 6.7 and no git commit in session-close", () => {
+    const body = readFileSync(operatorGuidePath, "utf8");
+    assert.ok(body.includes("43-1-cns-daily-rhythm-auto-blocks-via-session-close"));
+    assert.ok(body.includes("Step 6.7"));
+    assert.ok(body.includes("CNS-Daily-Rhythm.md"));
+    assert.ok(body.includes("does **not** run `git commit`"));
   });
 });

@@ -1,6 +1,6 @@
 # Story 43.1: CNS-Daily-Rhythm AUTO blocks via session-close
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -116,14 +116,25 @@ so that **my daily operating rhythm doc stays truthful without manual edits** an
 
 ## Tasks / Subtasks
 
-- [ ] Add `references/daily-rhythm-static-rows.md` with non-sprint project rows and epic 39–42 theme fallbacks (AC: projects, roadmap)
-- [ ] Implement Step 6.7 in `references/task-prompt.md` with deterministic parsing helpers (AC: step, markers)
-- [ ] Update `SKILL.md` overview, steps, pitfalls (AC: skill)
-- [ ] Run install script + `cmp` (AC: parity)
-- [ ] Extend `tests/hermes-session-close-skill.test.mjs` (AC: verify)
-- [ ] Update Operator Guide §15.4 + version history (AC: docs)
-- [ ] Smoke: `/session-close --dry-run` shows preview of AUTO values; real close updates vault file (AC: step)
-- [ ] Mark deferred-work item closed or “in progress → done” in Dev Agent Record when complete (AC: deferred-work hygiene)
+- [x] Add `references/daily-rhythm-static-rows.md` with non-sprint project rows and epic 39–42 theme fallbacks (AC: projects, roadmap)
+- [x] Implement Step 6.7 in `references/task-prompt.md` with deterministic parsing helpers (AC: step, markers)
+- [x] Update `SKILL.md` overview, steps, pitfalls (AC: skill)
+- [x] Run install script + `cmp` (AC: parity)
+- [x] Extend `tests/hermes-session-close-skill.test.mjs` (AC: verify)
+- [x] Update Operator Guide §15.4 + version history (AC: docs)
+- [x] Smoke: `/session-close --dry-run` shows preview of AUTO values; real close updates vault file (AC: step)
+- [x] Mark deferred-work item closed or “in progress → done” in Dev Agent Record when complete (AC: deferred-work hygiene)
+
+### Review Findings
+
+- [x] [Review][Patch] **Hermes npm PATH missing for AUTO:TESTS** — Fixed: Hard constraint 7 + AUTO:TESTS shell prelude in `task-prompt.md`.
+- [x] [Review][Patch] **Shared npm prelude in Hard constraints** — Fixed: Hard constraint 7; Step 6.6 optional `npm run vault:fast-scan` references it.
+- [x] [Review][Patch] **Vitest guard for npm PATH documentation** — Fixed: Story 43.1 tests assert `Hermes npm PATH`, `.nvm/versions/node`, dry-run vault-lint skip.
+- [x] [Review][Patch] **Operator Guide §15.4 npm PATH** — Fixed: §15.4 + Version History 1.32.1.
+- [x] [Review][Patch] **Dry-run must not trigger vault-lint scan** — Fixed: Vault-lint step 4 dry-run read-only; scan steps 5–6 real close only.
+- [x] [Review][Patch] **Vitest regex non-match fallback** — Fixed: TESTS table row + AUTO:TESTS failure policy step 3.
+- [x] [Review][Defer] **Step 6 optional `npm run vault:fast-scan` PATH** — Same Hermes PATH gap as pre-28.1 optional parity check; not introduced by 43-1. [`task-prompt.md` Step 6.6] — deferred, pre-existing
+- [x] [Review][Defer] **SKILLS_COUNT nested `SKILL.md` ambiguity** — Count rule allows `{dir}/*/SKILL.md` but does not dedupe parent/child packages; low risk at current scale. [`task-prompt.md` SKILLS_COUNT row] — deferred, pre-existing pattern
 
 ## Dev Notes
 
@@ -194,20 +205,47 @@ Add bullet: `- **daily_rhythm:** updated | preview-only | failed`
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [ ] If this story changes any user-facing behavior (new tool, new workflow, new constraint, new panel, new integration): update `03-Resources/CNS-Operator-Guide.md` via `vault_create_note` (full overwrite) or `vault_update_frontmatter` plus targeted section edit. Bump `modified` date and add a row to the Version History table in Section 12.
-- [ ] If no user-facing behavior changed: note "Operator guide: no update required" in Dev Agent Record.
+- [x] If this story changes any user-facing behavior (new tool, new workflow, new constraint, new panel, new integration): update `03-Resources/CNS-Operator-Guide.md` via `vault_create_note` (full overwrite) or `vault_update_frontmatter` plus targeted section edit. Bump `modified` date and add a row to the Version History table in Section 12.
+- [x] If no user-facing behavior changed: note "Operator guide: no update required" in Dev Agent Record.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-(create-story workflow)
+Composer (dev-story workflow)
 
 ### Debug Log References
 
+- Step numbering: inserted **Step 6.7** after 6.6; Steps 7–9 unchanged (no renumber).
+- Vault-lint strategy: reuse newest `vault-lint-*.md` by basename date; if older than 7 days, run `/vault-lint` or `bulk_scan.py` in same turn.
+- Deferred-work Summary table has no Priority column; Step 6.7 derives P1/P2/P3 from High/Medium/Low in Class text.
+- Smoke: install + `cmp` passed; `npm test` (609) and `verify.sh` passed. Operator should run `/session-close --dry-run` in #hermes for live preview.
+- Code review (2026-05-23): six patch findings applied — Hermes npm PATH (Hard constraint 7), dry-run vault-lint read-only, vitest regex non-match fallback, operator guide 1.32.1.
+
 ### Completion Notes List
 
+- Added **Step 6.7** to session-close task-prompt: eleven AUTO markers, dry-run preview, filesystem-only write to `CNS-Daily-Rhythm.md`, `failure_class: tests` partial-close policy, `daily_rhythm` Discord bullet.
+- New `daily-rhythm-static-rows.md` for operator business rows and epic 39–42 theme fallbacks.
+- SKILL.md overview/steps/pitfalls updated; installed to `~/.hermes/skills/cns/session-close/` with `cmp` parity.
+- Extended `hermes-session-close-skill.test.mjs` with Story 43.1 suite (11 markers, mutator ban, operator guide).
+- Operator Guide §15.4 v1.32.0: Step 6.7, `npm test` for AUTO:TESTS, explicit **no git commit** in session-close.
+- **Deferred-work:** `CNS-Daily-Rhythm.md auto-update from session-close AUTO blocks` — implementation shipped; operator may reclassify row to (c) on next deferred-work triage.
+
 ### File List
+
+- `scripts/hermes-skill-examples/session-close/references/daily-rhythm-static-rows.md` (new)
+- `scripts/hermes-skill-examples/session-close/references/task-prompt.md`
+- `scripts/hermes-skill-examples/session-close/SKILL.md`
+- `tests/hermes-session-close-skill.test.mjs`
+- `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-05-23 | Story 43.1: session-close Step 6.7 CNS-Daily-Rhythm AUTO blocks, static rows, tests, operator guide |
+| 2026-05-23 | Code review patches: Hermes npm PATH (Hard constraint 7), dry-run vault-lint read-only; operator dry-run sign-off; status → done |
 
 ## Previous story intelligence
 

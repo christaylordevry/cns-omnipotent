@@ -8,8 +8,13 @@
    - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
 3. **Forbidden Vault IO mutators:** `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_log_action`.
 4. **Allowed Vault IO usage:** read-only project map discovery with `vault_read`, `vault_search`, `vault_list`, or `vault_read_frontmatter`.
-5. **Dry run:** `/session-close --dry-run` performs reads and synthesis only. It must not write AGENTS files, run the export script, call `source_add`, or write `AI-Context/MEMORY.md` or `AI-Context/vault-fast-scan-index.md`.
+5. **Dry run:** `/session-close --dry-run` performs reads and synthesis only. It must not write AGENTS files, run the export script, call `source_add`, or write `AI-Context/MEMORY.md`, `AI-Context/vault-fast-scan-index.md`, or `AI-Context/CNS-Daily-Rhythm.md`. Dry-run **may** compute Step 6.7 AUTO block values and include them in the Discord reply as preview-only.
 6. **No secrets:** Do not paste note bodies, export content, env values, or raw NotebookLM payloads into Discord.
+7. **Hermes npm PATH:** `execute_code` and minimal terminal shells may not have `npm` on PATH even when `auto_source_bashrc` is enabled. Before **any** `npm` command in this skill (`npm test`, `npm run vault:fast-scan`, etc.):
+   - Prefer the newest NVM install: `NODE_BIN="$(ls -d "$HOME/.nvm/versions/node/"*/bin 2>/dev/null | sort -V | tail -1)"` then `export PATH="${NODE_BIN}:$PATH"`.
+   - Fallback when NVM layout differs: `export PATH="$HOME/.nvm/versions/node/v24.14.0/bin:$PATH"`.
+   - Then `cd "<resolved_repo_root>"` before the npm subcommand.
+   - If `command -v npm` still fails, treat `AUTO:TESTS` as `FAILED (see session-close log)` and set `failure_class: tests`.
 
 ## Preconditions
 
@@ -239,7 +244,153 @@ Hard constraints:
 
 - **Do not** call `vault_create_note`, `vault_update_frontmatter`, or any Vault IO mutator for this path.
 - Deterministic for unchanged inputs (same bytes if nothing changed).
-- Optional: run `npm run vault:fast-scan` from `<resolved_repo_root>` when `CNS_VAULT_ROOT` points at the canonical vault, as a parity check; the Discord skill path still ends with the canonical file bytes above.
+- Optional: run `npm run vault:fast-scan` from `<resolved_repo_root>` when `CNS_VAULT_ROOT` points at the canonical vault, as a parity check (apply **Hard constraint 7** npm PATH prelude first); the Discord skill path still ends with the canonical file bytes above.
+
+## Step 6.7: Refresh CNS-Daily-Rhythm AUTO blocks (after Step 6.6, before NotebookLM)
+
+**Dry-run:** Compute all AUTO values and include a **preview** subsection in the Step 9 Discord reply. Do **not** write `CNS-Daily-Rhythm.md`.
+
+**Real close:** Run after Step 5 (AGENTS sync) and after Step 6.6 so `AUTO:AGENTS_VERSION` matches the post-close header. Use a **single** `execute_code` or terminal `python3` pipeline: read all inputs → compute all markers → write once.
+
+**Paths:**
+
+- **Vault root:** `CNS_VAULT_ROOT` if set to an absolute path, else `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/`
+- **Rhythm file:** `{vault_root}/AI-Context/CNS-Daily-Rhythm.md`
+- **Static supplements:** `<resolved_repo_root>/scripts/hermes-skill-examples/session-close/references/daily-rhythm-static-rows.md`
+- **Hermes config:** `~/.hermes/config.yaml`
+- **Skills root:** `~/.hermes/skills/`
+
+**Write boundary:** Filesystem `open()` read/write only. Do **not** call `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, or `vault_log_action` for `CNS-Daily-Rhythm.md` or any `AI-Context/**` path in this step. Do **not** use `hermes_tools.read_file` inside `execute_code` (use plain `open()`).
+
+**Replacement contract:** For each tag `TAG`, replace only the inner content between `<!-- AUTO:TAG -->` and `<!-- /AUTO:TAG -->`, preserving both comment anchors. UTF-8, LF newlines. Idempotent when inputs are unchanged.
+
+```python
+import re
+
+def replace_auto(text, tag, inner):
+    pat = rf"<!-- AUTO:{tag} -->.*?<!-- /AUTO:{tag} -->"
+    repl = f"<!-- AUTO:{tag} -->{inner}<!-- /AUTO:{tag} -->"
+    return re.sub(pat, repl, text, count=1, flags=re.DOTALL)
+```
+
+### Data sources (all eleven markers)
+
+| Tag | Inner shape | Source |
+|-----|-------------|--------|
+| `PROVIDER` | `{provider} / {default_model}` | `~/.hermes/config.yaml` → `model.provider`, `model.default` |
+| `VAULT_NOTES` | integer | Latest vault-lint report `Scanned:` (see below) |
+| `VAULT_HEALTH` | `{clean}/{scanned} clean — ERRORS: {e}, WARNINGS: {w}` | Same report Summary (`Clean:`, `Errors:`, `Warnings:`) |
+| `SPRINT` | one line ≤120 chars, two max | `sprint-status.yaml` `development_status` |
+| `AGENTS_VERSION` | `vX.Y.Z` | Vault `AI-Context/AGENTS.md` header `> Version: X.Y.Z` (post Step 5) |
+| `SKILLS_COUNT` | `{n} available` | Count dirs under `~/.hermes/skills/` that contain `SKILL.md` at `{dir}/SKILL.md` or `{dir}/*/SKILL.md` (count each skill package once) |
+| `TESTS` | `{n} passing` or `FAILED (see session-close log)` | **Hard constraint 7** npm PATH prelude, then `npm test` in `<resolved_repo_root>`; regex `Tests\s+(\d+)\s+passed` on combined stdout/stderr; if exit 0 but no match, use `FAILED (see session-close log)` |
+| `LAST_SESSION` | `YYYY-MM-DD` | Local date on real close only; dry-run: omit write, preview may show computed date |
+| `ACTIVE_PROJECTS` | markdown table | Sprint + static rows (below) |
+| `DEFERRED_SUMMARY` | markdown table | `deferred-work.md` Summary (below) |
+| `ROADMAP` | markdown table | `sprint-status.yaml` + `epics.md` + static fallbacks |
+
+### Vault-lint freshness
+
+1. List `{vault_root}/_meta/reports/vault-lint-*.md`.
+2. Pick the file with the **latest date** in the basename (`vault-lint-YYYY-MM-DD.md`), not mtime alone.
+3. Parse `## Summary` bullets: `Scanned:`, `Clean:`, `Errors:`, `Warnings:`.
+4. **Dry-run:** Stop after step 3. Do **not** invoke `/vault-lint` or `bulk_scan.py`. If the newest report is older than 7 calendar days, use it anyway and note `vault_lint: stale` in the Discord preview.
+5. **Real close only:** If the newest report is **older than 7 calendar days** (compare basename date to today), run vault-lint in the same turn:
+   - Prefer: invoke Hermes `/vault-lint` if bound, **or**
+   - `python3 <resolved_repo_root>/scripts/hermes-skill-examples/vault-lint/scripts/bulk_scan.py` with `CNS_VAULT_ROOT` set
+6. Re-read the newest report after scan. If scan fails, keep the latest report ≤7 days and note `vault_lint: stale` in the Discord reply.
+
+### AUTO:SPRINT
+
+For each `epic-N` with value `in-progress`, build a fragment: `Epic N in-progress (` then comma-separated notable story keys for that epic with status `ready-for-dev`, `review`, `deferred`, or `done` (cap 4 keys). Preserve YAML file order. Join multiple epics with `; ` if needed. Truncate to 120 characters; allow one continuation inside the marker only if unavoidable.
+
+Example: `Epic 38 in-progress (38-2 ready-for-dev); Epic 43 in-progress (43-1 in-progress)`
+
+### AUTO:TESTS failure policy
+
+1. Apply **Hard constraint 7** (npm PATH prelude), then `cd "<resolved_repo_root>"` and run `npm test`.
+2. Parse combined stdout/stderr with regex `Tests\s+(\d+)\s+passed`. On match, set inner to `{n} passing`.
+3. On non-zero exit, `command -v npm` failure, or exit 0 with no regex match, set inner to `FAILED (see session-close log)` and set `failure_class: tests` in the Discord reply.
+4. Do **not** abort Steps 7–8 or undo AGENTS/MEMORY/fast-scan work already completed.
+
+Example shell prelude (same cell as `npm test`):
+
+```bash
+NODE_BIN="$(ls -d "$HOME/.nvm/versions/node/"*/bin 2>/dev/null | sort -V | tail -1)"
+export PATH="${NODE_BIN:-$HOME/.nvm/versions/node/v24.14.0/bin}:$PATH"
+cd "<resolved_repo_root>" && npm test
+```
+
+### AUTO:ACTIVE_PROJECTS
+
+Emit a markdown table:
+
+```markdown
+| Project | Status | Next action |
+|---|---|---|
+```
+
+**Sprint rows (first):** For each `epic-N` in `development_status` with value `in-progress`, add one row:
+
+- **Project:** title from `epics.md` `### Epic N:` heading after the colon, else `Epic N`
+- **Status:** `in-progress`
+- **Next action:** comma-separated story keys for that epic with status `in-progress`, `ready-for-dev`, or `review` (max 3), else `—`
+
+**Static rows (second):** Parse the table under `## Active projects — operator business rows` in `daily-rhythm-static-rows.md`. Append each row whose Project name is not already present (case-insensitive).
+
+Sanitize: replace `|` in any cell with ` - `.
+
+### AUTO:DEFERRED_SUMMARY
+
+Read `<resolved_repo_root>/_bmad-output/implementation-artifacts/deferred-work.md`. Parse the **Summary table** (rows under `## Summary table`).
+
+Include rows where the **Class** column contains `(b)`.
+
+Derive **Priority** for sorting:
+
+| Class text contains | Priority |
+|---------------------|----------|
+| `High` | P1 |
+| `Medium` | P2 |
+| `Low` | P3 |
+| explicit `P0`–`P4` in Class or Item | use that token |
+
+Sort ascending by priority (`P0` before `P1` …). Take up to **12** rows.
+
+Emit:
+
+```markdown
+| Item | Priority | Class |
+|---|---|---|
+```
+
+Use the short Item text (first column), derived Priority, and full Class column.
+
+### AUTO:ROADMAP
+
+Determine epic range: all keys matching `^epic-\d+$` in `development_status`, plus at minimum `epic-38` through `epic-42`.
+
+For each epic number in range (sorted numerically), emit one row:
+
+- **Epic:** number only (e.g. `38`)
+- **Theme:** from `epics.md` heading, else theme fallback table in `daily-rhythm-static-rows.md`
+- **Status:** `development_status[epic-N]` if present, else status fallback from static file
+
+### Document footer
+
+After all `replace_auto` calls, set the document footer line (near end of file) to:
+
+```markdown
+*Last auto-update: {YYYY-MM-DD} | AGENTS.md {version} | Provider: {provider}/{model}*
+```
+
+Use the same date, AGENTS version, and provider strings as the AUTO blocks.
+
+### Write
+
+`open(RHYTHM, "w", encoding="utf-8", newline="\n").write(text)` once.
+
+Record in Discord reply: `daily_rhythm: updated | preview-only | failed`.
 
 ## Step 7: Resolve active NotebookLM notebooks
 
@@ -289,7 +440,8 @@ Use this shape:
 - **export:** `<path + bytes, skipped in dry-run, or failed>`
 - **notebooklm:** `<n succeeded, m failed, skipped if export failed>`
 - **vault_fast_scan:** `<wrote path + est tokens | skipped in dry-run | failed>`
-- **failure_class:** `<none | repo_root | invalid_input | agents_sync | export | notebooklm>`
+- **daily_rhythm:** `<updated | preview-only | failed>`
+- **failure_class:** `<none | repo_root | invalid_input | agents_sync | export | tests | notebooklm>`
 
 ### NotebookLM targets
 

@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-20
+modified: 2026-05-23
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -430,6 +430,8 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-17 | 1.29.0 | Phase 6 completeness: §15.0 caveats + command matrix; **`triage` v1.7.0** (`/triage-approve`, `/triage-execute`; deprecate `/approve`, `/execute-approved`); **`vault-think` v1.2.0** (`/ghost`, `/drift` live); **`vault-graduate` v1.0.0** (`/vault-graduate`); REST and mutator exceptions documented | 33-3-operator-guide-phase6-completeness |
 | 2026-05-17 | 1.30.0 | Hermes **`vault-think` v1.3.0:** **`/verify`** pending **SynthesisNote** queue, single-note review, and **`/verify verified`** / **`/verify disputed`** stamping via **`vault_update_frontmatter`**; §15.8 | 33-1-verify-command-synthesisnote-review |
 | 2026-05-20 | 1.31.0 | Hermes skill install helpers: **`hermes-url-ingest-vault`** (§15.9) and **`vault-lint`** (§15.10); repo mirror parity via `install-hermes-skill-url-ingest-vault.sh` and `install-hermes-skill-vault-lint.sh` | 36-2-hermes-skill-parity-pass |
+| 2026-05-23 | 1.32.0 | Session close **Step 6.7:** refreshes all `<!-- AUTO:xxx -->` blocks in **`AI-Context/CNS-Daily-Rhythm.md`** (provider, vault-lint, sprint, tests, projects, deferred, roadmap); dry-run previews only; **no** `git commit` in session-close | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
+| 2026-05-23 | 1.32.1 | Session close **npm PATH:** Step 6.7 / `AUTO:TESTS` exports NVM `bin` before `npm test` in Hermes; dry-run skips vault-lint scan side effects | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
 
 ---
 
@@ -691,13 +693,16 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
   - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
 - Runs `bash scripts/export-vault-for-notebooklm.sh`.
 - Overwrites **`AI-Context/MEMORY.md`** (Step 6.5) and **`AI-Context/vault-fast-scan-index.md`** (Step 6.6) on each real close using operator filesystem writes (same WriteGate boundary as `AGENTS.md`; not `vault_create_note`). Dry-run skips both files.
-- Reads the NotebookLM project map and calls `source_add` once per active mapped notebook with `notebook_id`, `source_name: "My Knowledge Base"`, `source_type: "file"`, and `file_path` pointing at the fresh export file. If the active map lacks IDs, the live proof must record the connector-accepted fallback.
+- Refreshes **`AI-Context/CNS-Daily-Rhythm.md`** (Step 6.7): all eleven `<!-- AUTO:xxx -->` regions plus the footer `*Last auto-update: …*` line from sprint status, `~/.hermes/config.yaml`, newest vault-lint report, `npm test`, `deferred-work.md`, and static supplement rows in `references/daily-rhythm-static-rows.md`. Dry-run computes preview values for the Discord reply only.
+- Runs **`npm test`** in the Omnipotent repo to populate the `AUTO:TESTS` block on real close. Hermes `execute_code` may not have `npm` on PATH — the skill exports `$HOME/.nvm/versions/node/*/bin` (newest install, fallback `v24.14.0`) before `cd` + `npm test`. Failures set `FAILED (see session-close log)` and `failure_class: tests` without rolling back earlier steps.
+- Reads the NotebookLM project map and calls `source_add` once per active mapped notebook with `notebook_id`, `title: "My Knowledge Base"` (live connector; `source_name` is ignored), `source_type: "file"`, and `file_path` pointing at the fresh export file. If the active map lacks IDs, the live proof must record the connector-accepted fallback.
 
 **Guardrails:**
 
-- Do not use Vault IO mutators for `AI-Context/AGENTS.md`. WriteGate protects `AI-Context/**`, so the skill uses operator filesystem edits for the constitution sync and records that boundary in its reply.
+- Do not use Vault IO mutators for `AI-Context/AGENTS.md`, `CNS-Daily-Rhythm.md`, `MEMORY.md`, or `vault-fast-scan-index.md`. WriteGate protects `AI-Context/**`, so the skill uses operator filesystem edits and records that boundary in its reply.
 - Vault IO use is read-only for project map discovery: `vault_read`, `vault_search`, `vault_list`, and `vault_read_frontmatter`.
-- Dry-run never writes AGENTS files, runs export, calls `source_add`, or writes `MEMORY.md` / `vault-fast-scan-index.md`.
+- Dry-run never writes AGENTS files, runs export, calls `source_add`, or writes `MEMORY.md`, `vault-fast-scan-index.md`, or `CNS-Daily-Rhythm.md`.
+- Session-close does **not** run `git commit` or `git push`. Commit from Cursor after BMAD stories; see `CNS-Daily-Rhythm.md` for the operator rhythm (session-close updates living docs only).
 - If NotebookLM MCP tools are unavailable, the skill reports the fan-out as blocked and does not invent `source_add` results.
 
 **Skill install (operator filesystem):**
