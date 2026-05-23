@@ -25,6 +25,11 @@
 | `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`: Symptom E + trust-guard post-update reconnection | (b) Phase 2 |
 | `vault_create_note` routes by `pake_type` only; ignores subdirectory path — use `vault_move` after creation for project subfolders | (b) Phase 2 / operator workflow |
 | Vault-lint Rule 2 filename-stem matching — display-text/title wikilinks not counted (37-2: 23 orphans baseline) | (b) Phase 2 backlog |
+| CNS-Daily-Rhythm.md auto-update from session-close `AUTO` blocks | (b) Architecture, Medium |
+| Weekly autonomous business report cron | (b) Architecture, Medium, Epic 41 |
+| Composio MCP for client delivery | (b) Architecture, High when first client onboarded, Epic 41 |
+| Hermes morning health ping | (b) Ops, Low |
+| Epic 42 tech stack: SvelteKit + Convex | (b) Architecture, Low, Epic 42 |
 | `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (c) Closed by 35-1 |
 | `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (c) Closed — no drift found in either copy |
 | Symlink / `realpath` on reads | (c) Resolved: Story 4-9 |
@@ -168,6 +173,44 @@ Hub/manifest creates currently require `vaultCreateNoteFromMarkdown` internal pi
 Orphan checker requires exact `[[filename-stem]]` wikilinks, not display-text or title-based links. Topic hubs use readable names; **23** perplexity research notes remain flagged as orphans after Story **37-2** (vault warnings **69 → 23**). Fix options: (a) regenerate hubs with exact stems, (b) add title-based matching to vault-lint Rule 2.
 
 - **Class:** (b) Phase 2 backlog. Source: Story 37-2 close-out (2026-05-21).
+
+### CNS-Daily-Rhythm.md auto-update from session-close
+
+Extend `session-close` to find and replace `<!-- AUTO:xxx -->` blocks in `AI-Context/CNS-Daily-Rhythm.md` with live system state.
+
+- **Class:** (b) Architecture.
+- **Priority:** Medium.
+
+### Weekly autonomous business report cron
+
+Add a Hermes cron skill that reads `02-Areas/Business/performance-log.md`, runs `emerge`, synthesises a weekly state-of-operator report, files it to the vault, and pings `<#1500733488897462382>`.
+
+- **Class:** (b) Architecture.
+- **Priority:** Medium.
+- **Epic:** 41.
+
+### Composio MCP for client delivery
+
+Evaluate or add Composio MCP as a single connector to 1000+ apps, including client auth handling. Required for agency service delivery.
+
+- **Class:** (b) Architecture.
+- **Priority:** High when first client is onboarded.
+- **Epic:** 41.
+
+### Hermes morning health ping
+
+Add a cron skill that checks Hermes gateway status each morning and pings `<#1500733488897462382>` if anything broke overnight.
+
+- **Class:** (b) Ops.
+- **Priority:** Low.
+
+### Epic 42 tech stack: SvelteKit + Convex
+
+Use SvelteKit + Convex for Epic 42 rather than Next.js + Supabase. Rationale: agent has better context on Svelte because it is HTML and TypeScript native; Convex keeps backend state, schema, and functions in code, giving agents complete project context.
+
+- **Class:** (b) Architecture.
+- **Priority:** Low.
+- **Epic:** 42.
 
 ---
 
