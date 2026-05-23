@@ -1030,3 +1030,19 @@ I want **`prompt_caching.cache_ttl: 1h` verified** with **non-zero cache read li
 So that **Codex prefix caching is proven after migration** and TTL keys are aligned.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/38-3-prompt-cache-hit-rate-verification.md` (`cache=` log suffix on API call lines, evidence at `epic-38-prompt-cache-evidence.md`; operator config + log grep only).
+
+### Epic 43: Operator Living Document Automation
+
+Keep operator-facing living docs synchronized with live system state via Hermes session-close (extends Epic 28). Separated from Epic 41 business/cron work in deferred-work.
+
+**Stories:** 43-1 (CNS-Daily-Rhythm AUTO blocks)
+**Phase:** 7
+**Status:** in-progress
+
+#### Story 43.1: CNS-Daily-Rhythm AUTO blocks via session-close
+
+As the **operator**,
+I want **`/session-close` to replace every `<!-- AUTO:xxx -->` block in `AI-Context/CNS-Daily-Rhythm.md`** with data from **sprint-status.yaml**, **`~/.hermes/config.yaml`**, **vault-lint reports**, and **`npm test`**,
+So that **the daily rhythm doc reflects real system state** without manual edits.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/43-1-cns-daily-rhythm-auto-blocks-via-session-close.md` (Step 6.7 in session-close task-prompt, eleven AUTO markers, dry-run preview, filesystem-only writes, Operator Guide update).
