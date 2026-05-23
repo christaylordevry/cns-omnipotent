@@ -78,3 +78,5 @@ Priority IDs:
 - Vault IO spec: `specs/cns-vault-contract/CNS-Phase-1-Spec.md`
 - Mutation audit: `_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md`
 - Verify gate: `scripts/verify.sh`
+## Security
+Never install an npm or pip package fewer than 14 days old unless explicitly approved by the operator. This prevents supply chain attacks via recently published malicious packages.
