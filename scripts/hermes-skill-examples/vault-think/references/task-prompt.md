@@ -39,6 +39,8 @@
 
 Let **`raw`** = operator message with leading and trailing ASCII whitespace removed.
 
+**Slash normalisation:** If `raw` starts with exactly one `/` followed by a letter, also set **`raw_bare`** = `raw` with that leading `/` removed. All trigger matches below accept either form — with or without the leading `/`. This makes `/emerge`, `/ideas`, `/challenge`, `/today`, `/ghost`, `/drift`, `/verify`, `/trace`, `/connect`, `/vault-graduate` work identically when sent without the slash prefix.
+
 ### 1b) `/today` — route to §3
 
 - `/today` or `/today` + trailing spaces only → full briefing.
