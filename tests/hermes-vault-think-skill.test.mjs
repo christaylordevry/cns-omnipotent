@@ -17,7 +17,7 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-think"));
-    assert.ok(body.includes("version: 1.3.0"));
+    assert.ok(body.includes("version: 1.4.0"));
     assert.ok(body.includes("/verify"));
     assert.ok(body.includes("mutator exception"));
     assert.ok(body.includes("## When to use"));
@@ -105,7 +105,7 @@ describe("Story 32-2 Hermes vault-think /today", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.3.0"));
+    assert.ok(skill.includes("version: 1.4.0"));
     assert.ok(skill.includes("/today"));
     assert.ok(skill.includes("/today --brief"));
 
@@ -150,7 +150,7 @@ describe("Story 32-3 Hermes vault-think /ghost and /drift", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.3.0"));
+    assert.ok(skill.includes("version: 1.4.0"));
     assert.ok(skill.includes("/ghost "));
     assert.ok(skill.includes("/drift"));
 
@@ -193,7 +193,7 @@ describe("Story 33-1 Hermes vault-think /verify", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.3.0"));
+    assert.ok(skill.includes("version: 1.4.0"));
     assert.ok(skill.includes("/verify verified "));
     assert.ok(skill.includes("/verify disputed "));
     assert.ok(skill.includes("vault-relative path"));
