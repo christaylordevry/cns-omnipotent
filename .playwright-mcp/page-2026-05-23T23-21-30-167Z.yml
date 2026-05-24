@@ -1,0 +1,505 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - link "Skip to main content" [ref=e4] [cursor=pointer]:
+      - /url: "#main"
+      - generic [ref=e5]: Skip to main content
+    - link "Skip to footer" [ref=e6] [cursor=pointer]:
+      - /url: "#footer"
+      - generic [ref=e7]: Skip to footer
+    - banner [ref=e8]:
+      - generic [ref=e9]:
+        - link "Home Page" [ref=e10] [cursor=pointer]:
+          - /url: https://www.anthropic.com/
+          - img [ref=e11]
+        - button "menu" [ref=e14] [cursor=pointer]
+  - generic [ref=e22]:
+    - heading "AI research and products that put safety at the frontier AI research and products that put safety at the frontier" [level=1] [ref=e24]:
+      - generic [ref=e25]:
+        - text: AI
+        - link "research" [ref=e26] [cursor=pointer]:
+          - /url: https://www.anthropic.com/research
+        - text: and
+        - link "products" [ref=e27] [cursor=pointer]:
+          - /url: https://claude.com/product/overview
+        - text: that put safety at the frontier
+      - generic [ref=e28]: AI
+      - link "research" [ref=e29] [cursor=pointer]:
+        - /url: https://www.anthropic.com/research
+        - generic [ref=e30]: research
+      - generic [ref=e31]: and
+      - link "products" [ref=e32] [cursor=pointer]:
+        - /url: https://claude.com/product/overview
+        - generic [ref=e33]: products
+      - generic [ref=e34]: that
+      - generic [ref=e35]: put
+      - generic [ref=e36]: safety
+      - generic [ref=e37]: at
+      - generic [ref=e38]: the
+      - generic [ref=e39]: frontier
+    - paragraph [ref=e42]: AI will have a vast impact on the world. Anthropic is a public benefit corporation dedicated to securing its benefits and mitigating its risks.
+  - generic [ref=e45]:
+    - generic [ref=e47]:
+      - heading "Project Glasswing" [level=2] [ref=e49]
+      - generic [ref=e50]:
+        - paragraph [ref=e51]: Securing critical software for the AI era
+        - generic [ref=e53] [cursor=pointer]: Continue reading
+    - link "Read the story" [ref=e56] [cursor=pointer]:
+      - /url: http://anthropic.com/glasswing
+      - generic [ref=e57]: Read the story
+  - generic [ref=e60]:
+    - heading "Latest releases" [level=2] [ref=e62]
+    - generic [ref=e63]:
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - heading "Claude Opus 4.7" [level=3] [ref=e69]
+          - paragraph [ref=e70]: Introducing a smarter, more capable Opus for coding, agents, vision, and complex professional work.
+          - generic [ref=e71]:
+            - link "Model details" [ref=e73] [cursor=pointer]:
+              - /url: https://www.anthropic.com/claude/opus
+              - generic [ref=e74]: Model details
+            - generic [ref=e75]: Model details
+            - img [ref=e77]
+        - generic [ref=e80]:
+          - list [ref=e81]:
+            - listitem [ref=e82]:
+              - generic [ref=e83]: Date
+              - generic [ref=e84]: April 16, 2026
+            - listitem [ref=e85]:
+              - generic [ref=e86]: Category
+              - generic [ref=e87]: Announcements
+          - generic [ref=e88]:
+            - link "Read announcement" [ref=e90] [cursor=pointer]:
+              - /url: https://www.anthropic.com/news/claude-opus-4-7
+              - generic [ref=e91]: Read announcement
+            - generic [ref=e92]: Read announcement
+            - img [ref=e94]
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - heading "Claude is a space to think" [level=3] [ref=e101]
+          - paragraph [ref=e102]: No ads. No sponsored content. Just genuinely helpful conversations.
+        - generic [ref=e104]:
+          - list [ref=e105]:
+            - listitem [ref=e106]:
+              - generic [ref=e107]: Date
+              - generic [ref=e108]: February 4, 2026
+            - listitem [ref=e109]:
+              - generic [ref=e110]: Category
+              - generic [ref=e111]: Announcements
+          - generic [ref=e112]:
+            - link "Read the post" [ref=e114] [cursor=pointer]:
+              - /url: https://www.anthropic.com/news/claude-is-a-space-to-think
+              - generic [ref=e115]: Read the post
+            - generic [ref=e116]: Read the post
+            - img [ref=e118]
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - heading "Claude on Mars" [level=3] [ref=e125]
+          - paragraph [ref=e126]: The first AI-assisted drive on another planet. Claude helped NASA’s Perseverance rover travel four hundred meters on Mars.
+        - generic [ref=e128]:
+          - list [ref=e129]:
+            - listitem [ref=e130]:
+              - generic [ref=e131]: Date
+              - generic [ref=e132]: January 30, 2026
+            - listitem [ref=e133]:
+              - generic [ref=e134]: Category
+              - generic [ref=e135]: Announcements
+          - generic [ref=e136]:
+            - link "Read the story" [ref=e138] [cursor=pointer]:
+              - /url: https://www.anthropic.com/features/claude-on-mars
+              - generic [ref=e139]: Read the story
+            - generic [ref=e140]: Read the story
+            - img [ref=e142]
+  - generic [ref=e147]:
+    - generic [ref=e149]:
+      - heading "At Anthropic, we build AI to serve humanity’s long-term well-being." [level=2] [ref=e150]
+      - heading "‍" [level=2] [ref=e151]
+    - list "Featured articles and updates" [ref=e153]:
+      - listitem [ref=e154]:
+        - generic [ref=e155]:
+          - heading "Core views on AI safety" [level=3] [ref=e157]
+          - generic [ref=e160]: Announcements
+          - link [ref=e161] [cursor=pointer]:
+            - /url: https://www.anthropic.com/news/core-views-on-ai-safety
+      - listitem [ref=e162]:
+        - generic [ref=e163]:
+          - heading "Anthropic’s Responsible Scaling Policy" [level=3] [ref=e165]
+          - generic [ref=e168]: Alignment Science
+          - link [ref=e169] [cursor=pointer]:
+            - /url: https://www.anthropic.com/rsp-updates
+      - listitem [ref=e170]:
+        - generic [ref=e171]:
+          - 'heading "Anthropic Academy: Build and Learn with Claude" [level=3] [ref=e173]'
+          - generic [ref=e176]: Education
+          - link [ref=e177] [cursor=pointer]:
+            - /url: https://www.anthropic.com/learn
+      - listitem [ref=e178]:
+        - generic [ref=e179]:
+          - heading "Anthropic’s Economic Index" [level=3] [ref=e181]
+          - generic [ref=e184]: Economic Research
+          - link [ref=e185] [cursor=pointer]:
+            - /url: https://www.anthropic.com/economic-index
+      - listitem [ref=e186]:
+        - generic [ref=e187]:
+          - heading "Claude’s Constitution" [level=3] [ref=e189]
+          - generic [ref=e192]: Announcements
+          - link [ref=e193] [cursor=pointer]:
+            - /url: https://www.anthropic.com/constitution
+  - generic [ref=e195]:
+    - heading "Footer" [level=2] [ref=e196]
+    - navigation [ref=e198]:
+      - img [ref=e200]
+      - generic [ref=e203]:
+        - generic [ref=e204]:
+          - generic [ref=e205]:
+            - heading "Products" [level=3] [ref=e206]
+            - list [ref=e207]:
+              - listitem [ref=e208]:
+                - link "Claude" [ref=e209] [cursor=pointer]:
+                  - /url: https://claude.com/product/overview
+                  - generic [ref=e210]: Claude
+              - listitem [ref=e211]:
+                - link "Claude Code" [ref=e212] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code
+                  - generic [ref=e213]: Claude Code
+              - listitem [ref=e214]:
+                - link "Claude Code for Enterprise" [ref=e215] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code/enterprise
+                  - generic [ref=e216]: Claude Code for Enterprise
+              - listitem [ref=e217]:
+                - link "Claude Cowork" [ref=e218] [cursor=pointer]:
+                  - /url: https://claude.com/product/cowork
+                  - generic [ref=e219]: Claude Cowork
+              - listitem [ref=e220]:
+                - link "Claude Security" [ref=e221] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-security
+                  - generic [ref=e222]: Claude Security
+              - listitem [ref=e223]:
+                - link "Claude for Chrome" [ref=e224] [cursor=pointer]:
+                  - /url: https://claude.com/claude-for-chrome
+                  - generic [ref=e225]: Claude for Chrome
+              - listitem [ref=e226]:
+                - link "Claude for Slack" [ref=e227] [cursor=pointer]:
+                  - /url: https://claude.com/claude-for-slack
+                  - generic [ref=e228]: Claude for Slack
+              - listitem [ref=e229]:
+                - link "Claude for Microsoft 365" [ref=e230] [cursor=pointer]:
+                  - /url: https://claude.com/claude-for-microsoft-365
+                  - generic [ref=e231]: Claude for Microsoft 365
+              - listitem [ref=e232]:
+                - link "Skills" [ref=e233] [cursor=pointer]:
+                  - /url: https://www.claude.com/skills
+                  - generic [ref=e234]: Skills
+              - listitem [ref=e235]:
+                - link "Max plan" [ref=e236] [cursor=pointer]:
+                  - /url: https://claude.com/pricing/max
+                  - generic [ref=e237]: Max plan
+              - listitem [ref=e238]:
+                - link "Team plan" [ref=e239] [cursor=pointer]:
+                  - /url: https://claude.com/pricing/team
+                  - generic [ref=e240]: Team plan
+              - listitem [ref=e241]:
+                - link "Enterprise plan" [ref=e242] [cursor=pointer]:
+                  - /url: https://claude.com/pricing/enterprise
+                  - generic [ref=e243]: Enterprise plan
+              - listitem [ref=e244]:
+                - link "Download app" [ref=e245] [cursor=pointer]:
+                  - /url: https://claude.com/download
+                  - generic [ref=e246]: Download app
+              - listitem [ref=e247]:
+                - link "Pricing" [ref=e248] [cursor=pointer]:
+                  - /url: https://claude.com/pricing
+                  - generic [ref=e249]: Pricing
+              - listitem [ref=e250]:
+                - link "Log in to Claude" [ref=e251] [cursor=pointer]:
+                  - /url: https://claude.ai/login
+                  - generic [ref=e252]: Log in to Claude
+          - generic [ref=e253]:
+            - heading "Models" [level=3] [ref=e254]
+            - list [ref=e255]:
+              - listitem [ref=e256]:
+                - link "Mythos Preview" [ref=e257] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/glasswing
+                  - generic [ref=e258]: Mythos Preview
+              - listitem [ref=e259]:
+                - link "Opus" [ref=e260] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/opus
+                  - generic [ref=e261]: Opus
+              - listitem [ref=e262]:
+                - link "Sonnet" [ref=e263] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/sonnet
+                  - generic [ref=e264]: Sonnet
+              - listitem [ref=e265]:
+                - link "Haiku" [ref=e266] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/haiku
+                  - generic [ref=e267]: Haiku
+        - generic [ref=e268]:
+          - generic [ref=e269]:
+            - heading "Solutions" [level=3] [ref=e270]
+            - list [ref=e271]:
+              - listitem [ref=e272]:
+                - link "AI agents" [ref=e273] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/agents
+                  - generic [ref=e274]: AI agents
+              - listitem [ref=e275]:
+                - link "Code modernization" [ref=e276] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/code-modernization
+                  - generic [ref=e277]: Code modernization
+              - listitem [ref=e278]:
+                - link "Coding" [ref=e279] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/coding
+                  - generic [ref=e280]: Coding
+              - listitem [ref=e281]:
+                - link "Customer support" [ref=e282] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/customer-support
+                  - generic [ref=e283]: Customer support
+              - listitem [ref=e284]:
+                - link "Education" [ref=e285] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/education
+                  - generic [ref=e286]: Education
+              - listitem [ref=e287]:
+                - link "Financial services" [ref=e288] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/financial-services
+                  - generic [ref=e289]: Financial services
+              - listitem [ref=e290]:
+                - link "Government" [ref=e291] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/government
+                  - generic [ref=e292]: Government
+              - listitem [ref=e293]:
+                - link "Healthcare" [ref=e294] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/healthcare
+                  - generic [ref=e295]: Healthcare
+              - listitem [ref=e296]:
+                - link "Legal" [ref=e297] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/legal
+                  - generic [ref=e298]: Legal
+              - listitem [ref=e299]:
+                - link "Life sciences" [ref=e300] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/life-sciences
+                  - generic [ref=e301]: Life sciences
+              - listitem [ref=e302]:
+                - link "Nonprofits" [ref=e303] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/nonprofits
+                  - generic [ref=e304]: Nonprofits
+              - listitem [ref=e305]:
+                - link "Security" [ref=e306] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/security
+                  - generic [ref=e307]: Security
+              - listitem [ref=e308]:
+                - link "Small business" [ref=e309] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/small-business
+                  - generic [ref=e310]: Small business
+          - generic [ref=e311]:
+            - heading "Claude Platform" [level=3] [ref=e312]
+            - list [ref=e313]:
+              - listitem [ref=e314]:
+                - link "Overview" [ref=e315] [cursor=pointer]:
+                  - /url: http://claude.com/platform/api
+                  - generic [ref=e316]: Overview
+              - listitem [ref=e317]:
+                - link "Developer docs" [ref=e318] [cursor=pointer]:
+                  - /url: https://platform.claude.com/docs
+                  - generic [ref=e319]: Developer docs
+              - listitem [ref=e320]:
+                - link "Pricing" [ref=e321] [cursor=pointer]:
+                  - /url: https://claude.com/pricing#api
+                  - generic [ref=e322]: Pricing
+              - listitem [ref=e323]:
+                - link "Marketplace" [ref=e324] [cursor=pointer]:
+                  - /url: https://claude.com/platform/marketplace
+                  - generic [ref=e325]: Marketplace
+              - listitem [ref=e326]:
+                - link "Regional compliance" [ref=e327] [cursor=pointer]:
+                  - /url: https://claude.com/regional-compliance
+                  - generic [ref=e328]: Regional compliance
+              - listitem [ref=e329]:
+                - link "Claude on AWS" [ref=e330] [cursor=pointer]:
+                  - /url: https://claude.com/partners/claude-on-aws
+                  - generic [ref=e331]: Claude on AWS
+              - listitem [ref=e332]:
+                - link "Google Cloud’s Vertex AI" [ref=e333] [cursor=pointer]:
+                  - /url: https://claude.com/partners/google-cloud-vertex-ai
+                  - generic [ref=e334]: Google Cloud’s Vertex AI
+              - listitem [ref=e335]:
+                - link "Microsoft Foundry" [ref=e336] [cursor=pointer]:
+                  - /url: https://claude.com/partners/microsoft-foundry
+                  - generic [ref=e337]: Microsoft Foundry
+              - listitem [ref=e338]:
+                - link "Console login" [ref=e339] [cursor=pointer]:
+                  - /url: https://platform.claude.com/
+                  - generic [ref=e340]: Console login
+        - generic [ref=e341]:
+          - generic [ref=e342]:
+            - heading "Resources" [level=3] [ref=e343]
+            - list [ref=e344]:
+              - listitem [ref=e345]:
+                - link "Blog" [ref=e346] [cursor=pointer]:
+                  - /url: https://www.claude.com/blog
+                  - generic [ref=e347]: Blog
+              - listitem [ref=e348]:
+                - link "Claude partner network" [ref=e349] [cursor=pointer]:
+                  - /url: https://claude.com/partners
+                  - generic [ref=e350]: Claude partner network
+              - listitem [ref=e351]:
+                - link "Community" [ref=e352] [cursor=pointer]:
+                  - /url: https://claude.com/community
+                  - generic [ref=e353]: Community
+              - listitem [ref=e354]:
+                - link "Connectors" [ref=e355] [cursor=pointer]:
+                  - /url: https://claude.com/partners/mcp
+                  - generic [ref=e356]: Connectors
+              - listitem [ref=e357]:
+                - link "Courses" [ref=e358] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/learn
+                  - generic [ref=e359]: Courses
+              - listitem [ref=e360]:
+                - link "Customer stories" [ref=e361] [cursor=pointer]:
+                  - /url: https://www.claude.com/customers
+                  - generic [ref=e362]: Customer stories
+              - listitem [ref=e363]:
+                - link "Engineering at Anthropic" [ref=e364] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/engineering
+                  - generic [ref=e365]: Engineering at Anthropic
+              - listitem [ref=e366]:
+                - link "Events" [ref=e367] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/events
+                  - generic [ref=e368]: Events
+              - listitem [ref=e369]:
+                - link "Inside Claude Code" [ref=e370] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/product/claude-code
+                  - generic [ref=e371]: Inside Claude Code
+              - listitem [ref=e372]:
+                - link "Inside Claude Cowork" [ref=e373] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/product/claude-cowork
+                  - generic [ref=e374]: Inside Claude Cowork
+              - listitem [ref=e375]:
+                - link "Inside Claude Enterprise" [ref=e376] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/product/enterprise
+                  - generic [ref=e377]: Inside Claude Enterprise
+              - listitem [ref=e378]:
+                - link "Inside Claude Security" [ref=e379] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/product/security
+                  - generic [ref=e380]: Inside Claude Security
+              - listitem [ref=e381]:
+                - link "Plugins" [ref=e382] [cursor=pointer]:
+                  - /url: https://claude.com/plugins
+                  - generic [ref=e383]: Plugins
+              - listitem [ref=e384]:
+                - link "Powered by Claude" [ref=e385] [cursor=pointer]:
+                  - /url: https://claude.com/partners/powered-by-claude
+                  - generic [ref=e386]: Powered by Claude
+              - listitem [ref=e387]:
+                - link "Service partners" [ref=e388] [cursor=pointer]:
+                  - /url: https://claude.com/partners/services
+                  - generic [ref=e389]: Service partners
+              - listitem [ref=e390]:
+                - link "Startups program" [ref=e391] [cursor=pointer]:
+                  - /url: https://claude.com/programs/startups
+                  - generic [ref=e392]: Startups program
+              - listitem [ref=e393]:
+                - link "Tutorials" [ref=e394] [cursor=pointer]:
+                  - /url: https://claude.com/resources/tutorials
+                  - generic [ref=e395]: Tutorials
+              - listitem [ref=e396]:
+                - link "Use cases" [ref=e397] [cursor=pointer]:
+                  - /url: https://claude.com/resources/use-cases
+                  - generic [ref=e398]: Use cases
+          - generic [ref=e399]:
+            - heading "Help and security" [level=3] [ref=e400]
+            - list [ref=e401]:
+              - listitem [ref=e402]:
+                - link "Availability" [ref=e403] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/supported-countries
+                  - generic [ref=e404]: Availability
+              - listitem [ref=e405]:
+                - link "Status" [ref=e406] [cursor=pointer]:
+                  - /url: https://status.anthropic.com/
+                  - generic [ref=e407]: Status
+              - listitem [ref=e408]:
+                - link "Support center" [ref=e409] [cursor=pointer]:
+                  - /url: https://support.claude.com/
+                  - generic [ref=e410]: Support center
+        - generic [ref=e411]:
+          - generic [ref=e412]:
+            - heading "Company" [level=3] [ref=e413]
+            - list [ref=e414]:
+              - listitem [ref=e415]:
+                - link "Anthropic" [ref=e416] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/company
+                  - generic [ref=e417]: Anthropic
+              - listitem [ref=e418]:
+                - link "Careers" [ref=e419] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/careers
+                  - generic [ref=e420]: Careers
+              - listitem [ref=e421]:
+                - link "Economic Futures" [ref=e422] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/economic-futures
+                  - generic [ref=e423]: Economic Futures
+              - listitem [ref=e424]:
+                - link "Research" [ref=e425] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/research
+                  - generic [ref=e426]: Research
+              - listitem [ref=e427]:
+                - link "News" [ref=e428] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/news
+                  - generic [ref=e429]: News
+              - listitem [ref=e430]:
+                - link "Claude's Constitution" [ref=e431] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/constitution
+                  - generic [ref=e432]: Claude's Constitution
+              - listitem [ref=e433]:
+                - link "Responsible Scaling Policy" [ref=e434] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/responsible-scaling-policy
+                  - generic [ref=e435]: Responsible Scaling Policy
+              - listitem [ref=e436]:
+                - link "Security and compliance" [ref=e437] [cursor=pointer]:
+                  - /url: https://trust.anthropic.com/
+                  - generic [ref=e438]: Security and compliance
+              - listitem [ref=e439]:
+                - link "Transparency" [ref=e440] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/transparency
+                  - generic [ref=e441]: Transparency
+          - generic [ref=e442]:
+            - heading "Terms and policies" [level=3] [ref=e443]
+            - list [ref=e444]:
+              - listitem [ref=e445]:
+                - button "Privacy choices" [ref=e446] [cursor=pointer]:
+                  - generic [ref=e447]: Privacy choices
+              - listitem [ref=e448]:
+                - link "Privacy policy" [ref=e449] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/privacy
+                  - generic [ref=e450]: Privacy policy
+              - listitem [ref=e451]:
+                - link "Consumer health data privacy policy" [ref=e452] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/consumer-health-data-privacy-policy
+                  - generic [ref=e453]: Consumer health data privacy policy
+              - listitem [ref=e454]:
+                - link "Responsible disclosure policy" [ref=e455] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/responsible-disclosure-policy
+                  - generic [ref=e456]: Responsible disclosure policy
+              - listitem [ref=e457]:
+                - 'link "Terms of service: Commercial" [ref=e458] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/commercial-terms
+                  - generic [ref=e459]: "Terms of service: Commercial"
+              - listitem [ref=e460]:
+                - 'link "Terms of service: Consumer" [ref=e461] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/consumer-terms
+                  - generic [ref=e462]: "Terms of service: Consumer"
+              - listitem [ref=e463]:
+                - link "Usage policy" [ref=e464] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/aup
+                  - generic [ref=e465]: Usage policy
+      - generic [ref=e466]:
+        - generic [ref=e467]: © 2026 Anthropic PBC
+        - list [ref=e468]:
+          - listitem [ref=e469]:
+            - link [ref=e470] [cursor=pointer]:
+              - /url: https://www.youtube.com/@anthropic-ai
+              - img [ref=e472]
+          - listitem [ref=e474]:
+            - link "Visit our LinkedIn page" [ref=e475] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/anthropicresearch
+              - img [ref=e477]
+          - listitem [ref=e479]:
+            - link "Visit our X (formerly Twitter) profile" [ref=e480] [cursor=pointer]:
+              - /url: https://x.com/AnthropicAI
+              - img [ref=e482]
