@@ -2,12 +2,12 @@
 story_id: 38-2
 epic: 38
 title: kimi-k2-6-evaluation-run-chain
-status: ready-for-dev
+status: done
 ---
 
 # Story 38.2: Kimi K2.6 evaluation for run-chain
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -42,14 +42,14 @@ so that **we know whether a cheaper model can replace Claude Sonnet for chain in
 
 ## Tasks / Subtasks
 
-- [ ] Resolve live Kimi K2.6 model id (OpenRouter `hermes models` / catalog or provider docs).
-- [ ] Spike adapter path: env-driven model on `createLlmSynthesisAdapter` **or** parallel `synthesis-adapter-openrouter.ts` (prefer smallest diff).
-- [ ] Run baseline Sonnet smoke (same topic) if no recent evidence on disk.
-- [ ] Run Kimi smoke; save compact evidence markdown (no secrets).
-- [ ] Compare PAKE++ PASS/FAIL, latency, qualitative output.
-- [ ] Write recommendation (adopt / defer / reject) in evidence file + Dev Agent Record.
-- [ ] If adopt: implement flag, tests if touching adapter contracts, `verify.sh`, commit.
-- [ ] Standing task: Operator guide per AC9.
+- [x] Resolve live Kimi K2.6 model id (OpenRouter `hermes models` / catalog or provider docs).
+- [x] Spike adapter path: env-driven model on `createLlmSynthesisAdapter` **or** parallel `synthesis-adapter-openrouter.ts` (prefer smallest diff).
+- [x] Run baseline Sonnet smoke (same topic) if no recent evidence on disk.
+- [x] Run Kimi smoke; save compact evidence markdown (no secrets).
+- [x] Compare PAKE++ PASS/FAIL, latency, qualitative output.
+- [x] Write recommendation (adopt / defer / reject) in evidence file + Dev Agent Record.
+- [x] If adopt: implement flag, tests if touching adapter contracts, `verify.sh`, commit.
+- [x] Standing task: Operator guide per AC9.
 
 ## Dev Notes
 
@@ -65,10 +65,11 @@ so that **we know whether a cheaper model can replace Claude Sonnet for chain in
 
 ### Implementation options (pick one in dev)
 
-**A — Env-only OpenRouter synthesis (recommended spike)**  
+**A — Env-only OpenRouter synthesis (recommended spike)**
+**implemented**
 Add `CNS_SYNTHESIS_PROVIDER=openrouter` + `CNS_SYNTHESIS_MODEL=<kimi-slug>` + `OPENROUTER_API_KEY`. Branch in adapter factory to call OpenRouter chat-completions compatible endpoint. Keeps Sonnet as default when unset.
 
-**B — Hermes-delegated chain**  
+**B — Hermes-delegated chain**
 Not in scope — run-chain is repo TypeScript, not Hermes gateway.
 
 ### Smoke commands (secret-safe)
@@ -108,21 +109,56 @@ export CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE"
 ## Standing tasks (every story)
 
 ### Standing task: Update operator guide
-- [ ] If run-chain env or operator steps change: update `03-Resources/CNS-Operator-Guide.md` via vault MCP; bump Version History.
-- [ ] If evaluation-only with no operator-facing change: note "Operator guide: no update required" in Dev Agent Record.
+- [x] If run-chain env or operator steps change: update `03-Resources/CNS-Operator-Guide.md` via vault MCP; bump Version History.
+- [x] If evaluation-only with no operator-facing change: note "Operator guide: no update required" in Dev Agent Record.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-(pending dev-story)
+Composer (Amelia dev-story)
 
 ### Debug Log References
 
+- OpenRouter catalog query 2026-05-24 → `moonshotai/kimi-k2.6`
+- Sonnet baseline run: `/tmp/run-chain-sonnet-38-2.md` — aborted synthesis (Anthropic credits)
+- Kimi run: `/tmp/run-chain-kimi-38-2.md` — aborted at hook (Anthropic credits); harness PAKE++ UNKNOWN
+- Sonnet baseline: `/tmp/run-chain-sonnet-38-2.md` — aborted at synthesis; harness PAKE++ UNKNOWN
+
 ### Completion Notes List
 
+- Implemented Option A: `CNS_SYNTHESIS_PROVIDER=openrouter` + `CNS_SYNTHESIS_MODEL` + `OPENROUTER_API_KEY` in `synthesis-adapter-llm.ts`; default remains Anthropic.
+- Live Kimi smoke harness reports PAKE++ UNKNOWN (chain aborted at hook); full PAKE++ re-run deferred until Anthropic credits restored.
+- Sonnet baseline on same topic blocked at synthesis — AC5 same-topic comparison **deferred**, not failed.
+- Review fix: `resolveSynthesisModel` ignores `CNS_SYNTHESIS_MODEL` unless `CNS_SYNTHESIS_PROVIDER=openrouter`.
+- **Recommendation: DEFER** — blocking issue: restore Anthropic API credits for Sonnet baseline + hook/boss validation before adoption.
+- Evidence: `_bmad-output/implementation-artifacts/epic-38-kimi-run-chain-evidence.md`
+- Operator guide updated to v1.32.0 (OpenRouter synthesis env vars).
+- `npm test` 614/614 pass; `bash scripts/verify.sh` PASS.
+
 ### File List
+
+- `src/agents/synthesis-adapter-llm.ts`
+- `scripts/run-chain.ts`
+- `tests/vault-io/synthesis-adapter-llm.test.ts` (provider guard + stale-model tests)
+- `tests/vault-io/run-chain-live-harness.test.ts`
+- `_bmad-output/implementation-artifacts/epic-38-kimi-run-chain-evidence.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md`
+- `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/03-Resources/synthesis-freelance-consulting-day-rate-calculation-methodology-2026-2026-05-24.md` (live smoke artifact)
 
 ## Change Log
 
 - 2026-05-22: Story created for Epic 38 — Cost + Provider Optimization.
+- 2026-05-24: OpenRouter synthesis spike, live Kimi eval, evidence + operator guide; recommendation defer pending Anthropic credits.
+- 2026-05-24: CR follow-up — evidence PAKE++ UNKNOWN aligned to smoke; provider guard; AC5 deferred; operator guide `modified` bump; epic-42 sprint lines reverted.
+- 2026-05-24: Code review — closed as done (AC4/AC5 deferred); fail-fast provider validation; OpenRouter array content parsing; evidence file tracked.
+
+### Review Findings
+
+- [x] [Review][Decision] AC4 gate vs story closure — **Resolved:** Close as `done` (1A). Spike + wiring + evidence delivered; AC4/AC5 deferred with documented blocking issue (Anthropic credits).
+- [x] [Review][Decision] Unknown `CNS_SYNTHESIS_PROVIDER` values — **Resolved:** Fail fast (2A). `resolveSynthesisProvider` throws `CnsError` unless value is unset, `anthropic`, or `openrouter`.
+- [x] [Review][Patch] OpenRouter content array not parsed — fixed: `extractOpenRouterText` joins `{text}` parts from array content.
+- [x] [Review][Patch] Evidence file not tracked in git — fixed: `epic-38-kimi-run-chain-evidence.md` added to repo.
+- [x] [Review][Defer] OpenRouter error-path test parity — deferred, pre-existing parity gap on new branch.
+- [x] [Review][Defer] Duplicated fetch/parse logic in `callAnthropicSynthesis` vs `callOpenRouterSynthesis` — deferred, acceptable spike scope.

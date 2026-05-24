@@ -42,7 +42,7 @@ import { buildScraplingAdapter } from "../src/adapters/scrapling-adapter.js";
 import {
   createPerplexitySlot,
 } from "../src/agents/perplexity-slot.js";
-import { createLlmSynthesisAdapter } from "../src/agents/synthesis-adapter-llm.js";
+import { createLlmSynthesisAdapter, resolveSynthesisProvider } from "../src/agents/synthesis-adapter-llm.js";
 import { createLlmHookGenerationAdapter } from "../src/agents/hook-adapter-llm.js";
 import { createLlmWeaponsCheckAdapter } from "../src/agents/boss-adapter-llm.js";
 import {
@@ -199,6 +199,8 @@ function printHelp(): void {
   CNS_VAULT_ROOT=/path/to/staging-vault \\
   CNS_BRIEF_TOPIC="freelance consulting day rate calculation methodology 2026" \\
   FIRECRAWL_API_KEY=... APIFY_API_TOKEN=... PERPLEXITY_API_KEY=... ANTHROPIC_API_KEY=... \\
+  # Optional OpenRouter synthesis (hook/boss still Anthropic):
+  # CNS_SYNTHESIS_PROVIDER=openrouter CNS_SYNTHESIS_MODEL=moonshotai/kimi-k2.6 OPENROUTER_API_KEY=... \\
   tsx scripts/run-chain.ts [--brief-file brief.json] [--evidence-file path] [--operator-note text]
 
 Apify token: set APIFY_API_TOKEN (canonical) or APIFY_TOKEN (deprecated alias).
@@ -533,6 +535,10 @@ export function assertChainLiveRequiredEnv(env: NodeJS.ProcessEnv = process.env)
   const missing: string[] = [];
   if ((env.FIRECRAWL_API_KEY?.trim() ?? "").length === 0) missing.push("FIRECRAWL_API_KEY");
   if ((env.ANTHROPIC_API_KEY?.trim() ?? "").length === 0) missing.push("ANTHROPIC_API_KEY");
+  if (resolveSynthesisProvider(env) === "openrouter") {
+    if ((env.OPENROUTER_API_KEY?.trim() ?? "").length === 0) missing.push("OPENROUTER_API_KEY");
+    if ((env.CNS_SYNTHESIS_MODEL?.trim() ?? "").length === 0) missing.push("CNS_SYNTHESIS_MODEL");
+  }
   if (resolveApifyApiToken(env).length === 0) {
     missing.push("APIFY_API_TOKEN (deprecated alias: APIFY_TOKEN)");
   }
@@ -742,9 +748,16 @@ async function main() {
   let operatorNotes = [...cli.operatorNotes];
 
   assertChainLiveRequiredEnv();
-  console.log(
-    "Env validation: OK (required: FIRECRAWL_API_KEY, APIFY_API_TOKEN or APIFY_TOKEN alias, ANTHROPIC_API_KEY)",
-  );
+  const synthesisProvider = resolveSynthesisProvider();
+  const synthesisModel =
+    synthesisProvider === "openrouter"
+      ? process.env.CNS_SYNTHESIS_MODEL?.trim()
+      : "claude-sonnet-4-6";
+  const envSummary =
+    synthesisProvider === "openrouter"
+      ? "FIRECRAWL_API_KEY, APIFY_API_TOKEN or APIFY_TOKEN alias, ANTHROPIC_API_KEY (hook/boss), OPENROUTER_API_KEY, CNS_SYNTHESIS_MODEL"
+      : "FIRECRAWL_API_KEY, APIFY_API_TOKEN or APIFY_TOKEN alias, ANTHROPIC_API_KEY";
+  console.log(`Env validation: OK (required: ${envSummary})`);
 
   const firecrawlKey = normalizeSecretEnv(process.env.FIRECRAWL_API_KEY);
   const apifyToken = resolveApifyApiToken();
@@ -759,7 +772,7 @@ async function main() {
   console.log(`Brief topic: ${brief.topic}`);
   console.log(`Brief query count: ${brief.queries.length}`);
   console.log(
-    `Services configured: Firecrawl, Apify, Scrapling=${scraplingAvailable ? "enabled" : "disabled"}, Anthropic, Perplexity=${perplexitySlot.available ? "enabled" : "disabled"}`,
+    `Services configured: Firecrawl, Apify, Scrapling=${scraplingAvailable ? "enabled" : "disabled"}, Synthesis=${synthesisProvider}/${synthesisModel ?? "unknown"}, Anthropic (hook/boss), Perplexity=${perplexitySlot.available ? "enabled" : "disabled"}`,
   );
 
   try {

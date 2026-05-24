@@ -449,3 +449,30 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - Step 6 optional `npm run vault:fast-scan` PATH — Hermes PATH gap predates 43-1; fix when centralizing npm prelude in session-close Hard constraints.
 - SKILLS_COUNT nested `SKILL.md` dedupe — count rule may double-count parent/child dirs; low risk at current Hermes skill tree scale.
+
+## Deferred from: code review of 38-2-kimi-k2-6-evaluation-run-chain (2026-05-24)
+
+- OpenRouter error-path test parity — Anthropic adapter tests cover HTTP 429, non-JSON, schema-invalid; OpenRouter branch has happy-path + missing-key tests only.
+- Duplicated fetch/parse logic in `callAnthropicSynthesis` vs `callOpenRouterSynthesis` — acceptable spike scope; refactor when hook/boss also move to OpenRouter.
+
+## Deferred from: code review of 42-1-scaffold-cns-dashboard-repository (2026-05-24)
+
+- No initial git commit in `cns-dashboard` — staged scaffold only; operator commits per Dev Agent Record.
+- Anonymous local Convex deployment — cloud/team linking deferred to Stories 42-2+.
+
+## Deferred from: code review of 42-2-convex-schema-and-ingest-mutation (2026-05-24)
+
+- Unauthenticated public `ingestDashboardSnapshot` mutation — Convex MVP relies on deploy-key-only sync writes; rate-limit/auth deferred to provisioning/ops story.
+
+## Deferred from: code review of 42-3-cns-dashboard-sync-collectors (2026-05-24)
+
+- Hand-mirrored `DashboardSnapshot` types in `scripts/dashboard-sync.ts` can drift from `cns-dashboard/convex/validators.ts` — intentional until CNS may add a shared package; keep manual sync comment discipline.
+
+## Deferred from: code review of 42-4-sync-push-secret-guard-hermes-cron (2026-05-24)
+
+- Log rotation for `~/.hermes/logs/dashboard-sync.log` — append-only cron log will grow unbounded; add logrotate or size cap in ops story.
+- Crontab install race without file locking — concurrent `install-dashboard-sync-cron.sh` runs could drop unrelated crontab entries; low frequency operator action.
+- Re-chmod existing `~/.hermes/dashboard-sync.env` on reinstall — installer only `chmod 600` on first create; pre-existing loose permissions not corrected.
+- NFR-P5 ≤60s sync benchmark on 118+ note vault — no perf test or timeout guard; full vault walk may exceed 60s at scale.
+- `flock` guard for overlapping 3-min cron runs — hung or slow sync can overlap next cron tick; enhancement beyond story AC.
+- Automated tests for `install-dashboard-sync-cron.sh` — shell installer validated manually; no CI coverage for crontab line shape.

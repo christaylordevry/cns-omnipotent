@@ -364,6 +364,41 @@ describe("run-chain live harness helpers", () => {
     ).toBe("canonical");
   });
 
+  it("assertChainLiveRequiredEnv rejects unknown CNS_SYNTHESIS_PROVIDER", () => {
+    expect(() =>
+      assertChainLiveRequiredEnv({
+        FIRECRAWL_API_KEY: "a",
+        ANTHROPIC_API_KEY: "b",
+        APIFY_API_TOKEN: "c",
+        CNS_SYNTHESIS_PROVIDER: "openruter",
+      }),
+    ).toThrow(/CNS_SYNTHESIS_PROVIDER must be "anthropic" or "openrouter"/);
+  });
+
+  it("assertChainLiveRequiredEnv requires OpenRouter keys when synthesis provider is openrouter", () => {
+    expect(() =>
+      assertChainLiveRequiredEnv({
+        FIRECRAWL_API_KEY: "a",
+        ANTHROPIC_API_KEY: "b",
+        APIFY_API_TOKEN: "c",
+        CNS_SYNTHESIS_PROVIDER: "openrouter",
+      }),
+    ).toThrow(
+      "Missing required environment variables: OPENROUTER_API_KEY, CNS_SYNTHESIS_MODEL",
+    );
+
+    expect(() =>
+      assertChainLiveRequiredEnv({
+        FIRECRAWL_API_KEY: "a",
+        ANTHROPIC_API_KEY: "b",
+        APIFY_API_TOKEN: "c",
+        CNS_SYNTHESIS_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "or",
+        CNS_SYNTHESIS_MODEL: "moonshotai/kimi-k2.6",
+      }),
+    ).not.toThrow();
+  });
+
   it("assertChainLiveRequiredEnv aggregates missing keys including Apify canonical+alias", () => {
     expect(() => assertChainLiveRequiredEnv({})).toThrow(
       "Missing required environment variables: FIRECRAWL_API_KEY, ANTHROPIC_API_KEY, APIFY_API_TOKEN (deprecated alias: APIFY_TOKEN)",

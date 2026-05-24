@@ -15,7 +15,34 @@ import type {
 
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const MODEL = "claude-sonnet-4-6";
+const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
+export type SynthesisProvider = "anthropic" | "openrouter";
+
+export function resolveSynthesisProvider(
+  env: NodeJS.ProcessEnv = process.env,
+): SynthesisProvider {
+  const raw = env.CNS_SYNTHESIS_PROVIDER?.trim().toLowerCase();
+  if (!raw || raw.length === 0) return "anthropic";
+  if (raw === "anthropic") return "anthropic";
+  if (raw === "openrouter") return "openrouter";
+  throw new CnsError(
+    "IO_ERROR",
+    `CNS_SYNTHESIS_PROVIDER must be "anthropic" or "openrouter" (got: ${JSON.stringify(env.CNS_SYNTHESIS_PROVIDER)})`,
+  );
+}
+
+export function resolveSynthesisModel(env: NodeJS.ProcessEnv = process.env): string {
+  if (resolveSynthesisProvider(env) !== "openrouter") {
+    return DEFAULT_ANTHROPIC_MODEL;
+  }
+  const custom = env.CNS_SYNTHESIS_MODEL?.trim();
+  if (custom && custom.length > 0) return custom;
+  throw new CnsError(
+    "IO_ERROR",
+    "CNS_SYNTHESIS_MODEL is required when CNS_SYNTHESIS_PROVIDER=openrouter",
+  );
+}
 const MAX_TOKENS = 8000;
 const MAX_SOURCE_NOTES = 8;
 const MAX_SOURCE_NOTE_BODY_CHARS = 600;
@@ -235,100 +262,223 @@ function extractAssistantText(payload: unknown): string | undefined {
   return textBlocks.length > 0 ? textBlocks.join("") : undefined;
 }
 
+function extractOpenRouterText(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) return undefined;
+  const first = choices[0];
+  if (!first || typeof first !== "object") return undefined;
+  const message = (first as { message?: unknown }).message;
+  if (!message || typeof message !== "object") return undefined;
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return undefined;
+  const textBlocks: string[] = [];
+  for (const part of content) {
+    if (
+      part &&
+      typeof part === "object" &&
+      typeof (part as { text?: unknown }).text === "string"
+    ) {
+      textBlocks.push((part as { text: string }).text);
+    }
+  }
+  return textBlocks.length > 0 ? textBlocks.join("") : undefined;
+}
+
+async function callAnthropicSynthesis(
+  input: SynthesisAdapterInput,
+  model: string,
+): Promise<SynthesisAdapterOutput> {
+  const apiKeyRaw = process.env.ANTHROPIC_API_KEY;
+  const apiKey = apiKeyRaw?.trim();
+  if (!apiKey) {
+    throw new CnsError(
+      "IO_ERROR",
+      "ANTHROPIC_API_KEY is not set; cannot call Anthropic Messages API",
+    );
+  }
+
+  const requestBody = {
+    model,
+    max_tokens: MAX_TOKENS,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: buildUserPrompt(input) }],
+  };
+
+  let response: Response;
+  try {
+    response = await fetchWithRetry(
+      ANTHROPIC_MESSAGES_URL,
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      },
+      {
+        adapterLabel: "synthesis",
+        exhaustedMessage: "Synthesis API rate limited after 3 attempts",
+      },
+    );
+  } catch (err) {
+    if (err instanceof CnsError) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new CnsError("IO_ERROR", `Synthesis LLM fetch failed: ${msg}`);
+  }
+
+  if (!response.ok) {
+    let bodySnippet: string | undefined;
+    try {
+      const text = await response.text();
+      const trimmed = text.trim();
+      if (trimmed.length > 0) bodySnippet = trimmed.slice(0, 300);
+    } catch {
+      // ignore
+    }
+    throw new CnsError(
+      "IO_ERROR",
+      bodySnippet
+        ? `Synthesis LLM returned HTTP ${response.status}: ${bodySnippet}`
+        : `Synthesis LLM returned HTTP ${response.status}`,
+      {
+        http_status: response.status,
+        retry_after: response.headers.get("retry-after") ?? undefined,
+      },
+    );
+  }
+
+  let envelope: unknown;
+  try {
+    envelope = await response.json();
+  } catch {
+    throw new CnsError("IO_ERROR", "Synthesis LLM response body was not valid JSON");
+  }
+
+  const assistantText = extractAssistantText(envelope);
+  if (typeof assistantText !== "string") {
+    throw new CnsError(
+      "IO_ERROR",
+      "Synthesis LLM response missing assistant content text",
+    );
+  }
+
+  return parseSynthesisAssistantText(assistantText);
+}
+
+async function callOpenRouterSynthesis(
+  input: SynthesisAdapterInput,
+  model: string,
+): Promise<SynthesisAdapterOutput> {
+  const apiKeyRaw = process.env.OPENROUTER_API_KEY;
+  const apiKey = apiKeyRaw?.trim();
+  if (!apiKey) {
+    throw new CnsError(
+      "IO_ERROR",
+      "OPENROUTER_API_KEY is not set; cannot call OpenRouter chat completions API",
+    );
+  }
+
+  const requestBody = {
+    model,
+    max_tokens: MAX_TOKENS,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(input) },
+    ],
+  };
+
+  let response: Response;
+  try {
+    response = await fetchWithRetry(
+      OPENROUTER_CHAT_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+          "HTTP-Referer": "https://github.com/cns-vault-io",
+          "X-Title": "CNS run-chain synthesis",
+        },
+        body: JSON.stringify(requestBody),
+      },
+      {
+        adapterLabel: "synthesis",
+        exhaustedMessage: "Synthesis API rate limited after 3 attempts",
+      },
+    );
+  } catch (err) {
+    if (err instanceof CnsError) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new CnsError("IO_ERROR", `Synthesis LLM fetch failed: ${msg}`);
+  }
+
+  if (!response.ok) {
+    let bodySnippet: string | undefined;
+    try {
+      const text = await response.text();
+      const trimmed = text.trim();
+      if (trimmed.length > 0) bodySnippet = trimmed.slice(0, 300);
+    } catch {
+      // ignore
+    }
+    throw new CnsError(
+      "IO_ERROR",
+      bodySnippet
+        ? `Synthesis LLM returned HTTP ${response.status}: ${bodySnippet}`
+        : `Synthesis LLM returned HTTP ${response.status}`,
+      {
+        http_status: response.status,
+        retry_after: response.headers.get("retry-after") ?? undefined,
+      },
+    );
+  }
+
+  let envelope: unknown;
+  try {
+    envelope = await response.json();
+  } catch {
+    throw new CnsError("IO_ERROR", "Synthesis LLM response body was not valid JSON");
+  }
+
+  const assistantText = extractOpenRouterText(envelope);
+  if (typeof assistantText !== "string") {
+    throw new CnsError(
+      "IO_ERROR",
+      "Synthesis LLM response missing assistant content text",
+    );
+  }
+
+  return parseSynthesisAssistantText(assistantText);
+}
+
+function parseSynthesisAssistantText(assistantText: string): SynthesisAdapterOutput {
+  let parsedJson: unknown;
+  try {
+    parsedJson = parseLlmJsonText(assistantText);
+  } catch {
+    throw new CnsError("IO_ERROR", "Synthesis LLM returned non-JSON response");
+  }
+
+  const parsed = synthesisAdapterOutputSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    throw new CnsError("SCHEMA_INVALID", parsed.error.message);
+  }
+  return parsed.data;
+}
+
 export function createLlmSynthesisAdapter(): SynthesisAdapter {
   return {
     async synthesize(input: SynthesisAdapterInput): Promise<SynthesisAdapterOutput> {
-      const apiKeyRaw = process.env.ANTHROPIC_API_KEY;
-      const apiKey = apiKeyRaw?.trim();
-      if (!apiKey) {
-        throw new CnsError(
-          "IO_ERROR",
-          "ANTHROPIC_API_KEY is not set; cannot call Anthropic Messages API",
-        );
+      const provider = resolveSynthesisProvider();
+      const model = resolveSynthesisModel();
+      if (provider === "openrouter") {
+        return callOpenRouterSynthesis(input, model);
       }
-
-      const requestBody = {
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: buildUserPrompt(input) }],
-      };
-
-      let response: Response;
-      try {
-        response = await fetchWithRetry(
-          ANTHROPIC_MESSAGES_URL,
-          {
-            method: "POST",
-            headers: {
-              "x-api-key": apiKey,
-              "anthropic-version": ANTHROPIC_VERSION,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(requestBody),
-          },
-          {
-            adapterLabel: "synthesis",
-            exhaustedMessage: "Synthesis API rate limited after 3 attempts",
-          },
-        );
-      } catch (err) {
-        if (err instanceof CnsError) throw err;
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new CnsError("IO_ERROR", `Synthesis LLM fetch failed: ${msg}`);
-      }
-
-      if (!response.ok) {
-        let bodySnippet: string | undefined;
-        try {
-          const text = await response.text();
-          const trimmed = text.trim();
-          if (trimmed.length > 0) bodySnippet = trimmed.slice(0, 300);
-        } catch {
-          // ignore
-        }
-        throw new CnsError(
-          "IO_ERROR",
-          bodySnippet
-            ? `Synthesis LLM returned HTTP ${response.status}: ${bodySnippet}`
-            : `Synthesis LLM returned HTTP ${response.status}`,
-          {
-            http_status: response.status,
-            retry_after: response.headers.get("retry-after") ?? undefined,
-          },
-        );
-      }
-
-      let envelope: unknown;
-      try {
-        envelope = await response.json();
-      } catch {
-        throw new CnsError(
-          "IO_ERROR",
-          "Synthesis LLM response body was not valid JSON",
-        );
-      }
-
-      const assistantText = extractAssistantText(envelope);
-      if (typeof assistantText !== "string") {
-        throw new CnsError(
-          "IO_ERROR",
-          "Synthesis LLM response missing assistant content text",
-        );
-      }
-
-      let parsedJson: unknown;
-      try {
-        parsedJson = parseLlmJsonText(assistantText);
-      } catch {
-        throw new CnsError("IO_ERROR", "Synthesis LLM returned non-JSON response");
-      }
-
-      const parsed = synthesisAdapterOutputSchema.safeParse(parsedJson);
-      if (!parsed.success) {
-        throw new CnsError("SCHEMA_INVALID", parsed.error.message);
-      }
-      return parsed.data;
+      return callAnthropicSynthesis(input, model);
     },
   };
 }

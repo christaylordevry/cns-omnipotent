@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLlmSynthesisAdapter } from "../../src/agents/synthesis-adapter-llm.js";
+import {
+  createLlmSynthesisAdapter,
+  resolveSynthesisModel,
+  resolveSynthesisProvider,
+} from "../../src/agents/synthesis-adapter-llm.js";
 import type { SynthesisAdapterInput } from "../../src/agents/synthesis-agent.js";
 import { DEFAULT_OPERATOR_CONTEXT } from "../../src/agents/operator-context.js";
 import type { VaultContextPacket } from "../../src/agents/vault-context-builder.js";
@@ -175,17 +179,147 @@ const validSynthesisOutput = {
   summary: "Agents converge on orchestration; Chris should ship a weekly brief.",
 };
 
+function makeOpenRouterJsonResponse(
+  bodyObj: unknown,
+  contentFormat: "string" | "array" = "string",
+): Response {
+  const content =
+    contentFormat === "array"
+      ? [{ type: "text", text: JSON.stringify(bodyObj) }]
+      : JSON.stringify(bodyObj);
+  return new Response(
+    JSON.stringify({
+      choices: [{ message: { content } }],
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
 describe("createLlmSynthesisAdapter", () => {
   const originalApiKey = process.env.ANTHROPIC_API_KEY;
+  const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+  const originalProvider = process.env.CNS_SYNTHESIS_PROVIDER;
+  const originalModel = process.env.CNS_SYNTHESIS_MODEL;
 
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = "test-api-key-xxxx";
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.CNS_SYNTHESIS_PROVIDER;
+    delete process.env.CNS_SYNTHESIS_MODEL;
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     if (originalApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = originalApiKey;
+    if (originalOpenRouterKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+    if (originalProvider === undefined) delete process.env.CNS_SYNTHESIS_PROVIDER;
+    else process.env.CNS_SYNTHESIS_PROVIDER = originalProvider;
+    if (originalModel === undefined) delete process.env.CNS_SYNTHESIS_MODEL;
+    else process.env.CNS_SYNTHESIS_MODEL = originalModel;
+  });
+
+  it("openrouter path: calls OpenRouter chat completions with env model", async () => {
+    process.env.CNS_SYNTHESIS_PROVIDER = "openrouter";
+    process.env.CNS_SYNTHESIS_MODEL = "moonshotai/kimi-k2.6";
+    process.env.OPENROUTER_API_KEY = "or-test-key";
+
+    const fetchMock = vi.fn().mockResolvedValue(makeOpenRouterJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    const result = await adapter.synthesize(sampleInput);
+
+    expect(result).toEqual(validSynthesisOutput);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer or-test-key");
+    const body = JSON.parse(init.body as string) as {
+      model: string;
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(body.model).toBe("moonshotai/kimi-k2.6");
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[1].role).toBe("user");
+  });
+
+  it("openrouter path without OPENROUTER_API_KEY: throws CnsError IO_ERROR", async () => {
+    process.env.CNS_SYNTHESIS_PROVIDER = "openrouter";
+    process.env.CNS_SYNTHESIS_MODEL = "moonshotai/kimi-k2.6";
+
+    const adapter = createLlmSynthesisAdapter();
+    await expect(adapter.synthesize(sampleInput)).rejects.toMatchObject({
+      name: "CnsError",
+      code: "IO_ERROR",
+    });
+  });
+
+  it("openrouter path without CNS_SYNTHESIS_MODEL: throws CnsError IO_ERROR", async () => {
+    process.env.CNS_SYNTHESIS_PROVIDER = "openrouter";
+    process.env.OPENROUTER_API_KEY = "or-test-key";
+
+    const adapter = createLlmSynthesisAdapter();
+    await expect(adapter.synthesize(sampleInput)).rejects.toMatchObject({
+      name: "CnsError",
+      code: "IO_ERROR",
+    });
+  });
+
+  it("resolveSynthesisProvider defaults to anthropic", () => {
+    expect(resolveSynthesisProvider({})).toBe("anthropic");
+    expect(resolveSynthesisProvider({ CNS_SYNTHESIS_PROVIDER: "anthropic" })).toBe(
+      "anthropic",
+    );
+    expect(resolveSynthesisProvider({ CNS_SYNTHESIS_PROVIDER: "openrouter" })).toBe(
+      "openrouter",
+    );
+  });
+
+  it("resolveSynthesisProvider rejects unknown provider values", () => {
+    expect(() =>
+      resolveSynthesisProvider({ CNS_SYNTHESIS_PROVIDER: "openruter" }),
+    ).toThrow(/CNS_SYNTHESIS_PROVIDER must be "anthropic" or "openrouter"/);
+  });
+
+  it("openrouter path: parses array content parts from chat completions", async () => {
+    process.env.CNS_SYNTHESIS_PROVIDER = "openrouter";
+    process.env.CNS_SYNTHESIS_MODEL = "moonshotai/kimi-k2.6";
+    process.env.OPENROUTER_API_KEY = "or-test-key";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeOpenRouterJsonResponse(validSynthesisOutput, "array"),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    const result = await adapter.synthesize(sampleInput);
+
+    expect(result).toEqual(validSynthesisOutput);
+  });
+
+  it("resolveSynthesisModel ignores CNS_SYNTHESIS_MODEL without openrouter provider", () => {
+    expect(
+      resolveSynthesisModel({
+        CNS_SYNTHESIS_MODEL: "moonshotai/kimi-k2.6",
+      }),
+    ).toBe("claude-sonnet-4-6");
+  });
+
+  it("stale CNS_SYNTHESIS_MODEL without provider: anthropic happy path uses Sonnet default", async () => {
+    process.env.CNS_SYNTHESIS_MODEL = "moonshotai/kimi-k2.6";
+
+    const fetchMock = vi.fn().mockResolvedValue(makeAnthropicJsonResponse(validSynthesisOutput));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = createLlmSynthesisAdapter();
+    await adapter.synthesize(sampleInput);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { model: string };
+    expect(body.model).toBe("claude-sonnet-4-6");
   });
 
   it("happy path: returns validated synthesis output and calls Anthropic API with required params", async () => {
