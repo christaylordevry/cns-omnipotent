@@ -488,3 +488,9 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - Shell subscribes to full `getDashboardSnapshot` while only consuming `syncMetadata` — intentional until 42-7 wires panels to same query.
 - No component/integration tests for `DashboardShell` / `StaleBanner` — story scoped pure-helper unit tests only.
 - Background-tab timer throttling for 30s interval — enhancement; revisit if operators report stale chrome stuck after tab resume.
+
+## Deferred from: code review of 42-7-real-time-panel-updates (2026-05-25)
+
+- No Svelte component/integration tests for panel wiring — story scoped pure-helper unit tests only (same as 42-6).
+- `dashboard-snapshot.ts` types maintained separately from Convex validators — revisit if Convex→TS codegen is adopted.
+- No `aria-live` on panels for live subscription updates — accessibility polish; not required by 42-7 AC.
