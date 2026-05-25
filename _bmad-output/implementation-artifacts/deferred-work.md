@@ -506,3 +506,14 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - Full-table fallback `collect()` on empty search index — test-only path per story dev notes; production uses Convex `search_metadata` index.
 - No Convex auth on `searchNotes` — pre-existing pattern; no `ctx.auth` on any dashboard query in Epic 42.
+
+## Deferred from: code review of 44-1-1-convex-trend-schema (2026-05-26)
+
+- `note-search.test.ts` import path fix (`noteSearch` vs `note-search`) — pre-existing broken test; required for `npm test` gate; out of story scope but acceptable.
+- Wire `signalIngestBatchValidator` reject paths — until `ingestSignalBatch` wires validators in Story 44-1-2; no standalone public parse API in cns-dashboard tests today.
+
+## Deferred from: code review of 44-1-2-ingest-signal-batch (2026-05-26)
+
+- No automated test for C8 stale thresholds or stale refresh on partial batch — follow-up hardening in 44-1-3 or dedicated test story.
+- `findPriorNormalizedValue` collects all topic events per insert — acceptable at 500 retention cap for MVP; optimize with tuple index if profiling shows pain.
+- `note-search.test.ts` import path fix — same collateral item as 44-1-1 review; already applied in working tree.
