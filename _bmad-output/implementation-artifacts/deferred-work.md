@@ -501,3 +501,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - CI does not validate `PUBLIC_CONVEX_URL` at build time — workflow matches local `npm run build`; contract enforced in DEPLOY/Vercel operator steps.
 - Vercel password protection may require paid Deployment Protection tier — operator verifies during first provisioning.
 - Acceptance checklist FCP gate allows subjective pass — manual Epic 42 gate by design; optional Lighthouse follow-up out of scope.
+
+## Deferred from: code review of 42-10-vault-search (2026-05-26)
+
+- Full-table fallback `collect()` on empty search index — test-only path per story dev notes; production uses Convex `search_metadata` index.
+- No Convex auth on `searchNotes` — pre-existing pattern; no `ctx.auth` on any dashboard query in Epic 42.
