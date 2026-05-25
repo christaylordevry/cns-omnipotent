@@ -476,3 +476,15 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - NFR-P5 ≤60s sync benchmark on 118+ note vault — no perf test or timeout guard; full vault walk may exceed 60s at scale.
 - `flock` guard for overlapping 3-min cron runs — hung or slow sync can overlap next cron tick; enhancement beyond story AC.
 - Automated tests for `install-dashboard-sync-cron.sh` — shell installer validated manually; no CI coverage for crontab line shape.
+
+## Deferred from: code review of 42-5-dashboard-shell-and-panel-grid (2026-05-25)
+
+- Add `<svelte:head><title>` for browser tab — not required by 42-5 AC; defer to accessibility polish story.
+- Vite Node.js ≥20.19 warning during build — environment/toolchain, not introduced by 42-5 UI.
+
+## Deferred from: code review of 42-6-stale-banner-and-last-sync-chrome (2026-05-25)
+
+- 30s `nowMs` tick can lag staleness banner/header suffix up to one interval — documented in story Dev Notes; acceptable for Phase 1.
+- Shell subscribes to full `getDashboardSnapshot` while only consuming `syncMetadata` — intentional until 42-7 wires panels to same query.
+- No component/integration tests for `DashboardShell` / `StaleBanner` — story scoped pure-helper unit tests only.
+- Background-tab timer throttling for 30s interval — enhancement; revisit if operators report stale chrome stuck after tab resume.
