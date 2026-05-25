@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-23
+modified: 2026-05-25
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -432,6 +432,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-20 | 1.31.0 | Hermes skill install helpers: **`hermes-url-ingest-vault`** (§15.9) and **`vault-lint`** (§15.10); repo mirror parity via `install-hermes-skill-url-ingest-vault.sh` and `install-hermes-skill-vault-lint.sh` | 36-2-hermes-skill-parity-pass |
 | 2026-05-23 | 1.32.0 | Session close **Step 6.7:** refreshes all `<!-- AUTO:xxx -->` blocks in **`AI-Context/CNS-Daily-Rhythm.md`** (provider, vault-lint, sprint, tests, projects, deferred, roadmap); dry-run previews only; **no** `git commit` in session-close | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
 | 2026-05-23 | 1.32.1 | Session close **npm PATH:** Step 6.7 / `AUTO:TESTS` exports NVM `bin` before `npm test` in Hermes; dry-run skips vault-lint scan side effects | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
+| 2026-05-25 | 1.33.0 | **CNS Dashboard (Epic 42):** §16 production URL, Vercel password protection, Convex `PUBLIC_CONVEX_URL`, sync cron via `install-dashboard-sync-cron.sh` and `~/.hermes/dashboard-sync.env`; deploy runbook in `cns-dashboard/docs/DEPLOY.md` | 42-9-vercel-production-deploy |
 
 ---
 
@@ -887,3 +888,58 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - Install helper: `bash scripts/install-hermes-skill-vault-lint.sh`
 - Destination: `~/.hermes/skills/cns/vault-lint/`
 - Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.
+
+---
+
+## 16. CNS Dashboard (Epic 42, operator)
+
+Read-only **SvelteKit + Convex** web app for vault health, MCP status, Hermes activity, run-chain, vault search, and trend stub. The browser never reads the vault filesystem; data arrives via **`scripts/dashboard-sync.ts`** every 3 minutes.
+
+| Item | Location |
+|------|----------|
+| Dashboard repo | `/home/christ/ai-factory/projects/cns-dashboard` (sibling to Omnipotent.md) |
+| Deploy runbook | `cns-dashboard/docs/DEPLOY.md` |
+| Production acceptance | `cns-dashboard/docs/EPIC-42-ACCEPTANCE-CHECKLIST.md` |
+| CI | `cns-dashboard/.github/workflows/ci.yml` (`check`, `build`, `test`) |
+
+### 16.1 Production URL and auth
+
+**Production URL:** _(fill after first Vercel deploy — bookmark in browser; do not commit)_
+
+- Pin the **Vercel production URL** after first deploy (password in your password manager only — not in git).
+- **Vercel Deployment Protection → Password Protection** must be enabled on production so unauthenticated requests never receive dashboard HTML (**NFR-S1**).
+- **No application-level login** in the dashboard source; edge password gate only.
+
+### 16.2 Environment variables
+
+| Surface | Variables | Notes |
+|---------|-----------|--------|
+| **Vercel** (frontend) | `PUBLIC_CONVEX_URL` | Production Convex deployment URL only |
+| **WSL sync** (`~/.hermes/dashboard-sync.env`) | `CNS_VAULT_ROOT`, `CONVEX_URL`, `CONVEX_DEPLOY_KEY` | Deploy key **never** on Vercel or in the dashboard bundle |
+
+Create or refresh the sync env file:
+
+```sh
+bash /home/christ/ai-factory/projects/Omnipotent.md/scripts/install-dashboard-sync-cron.sh
+```
+
+Edit `~/.hermes/dashboard-sync.env` (mode `600`). Logs: `~/.hermes/logs/dashboard-sync.log`.
+
+Manual push smoke from Omnipotent.md repo root:
+
+```sh
+. ~/.hermes/dashboard-sync.env
+npx tsx scripts/dashboard-sync.ts
+```
+
+### 16.3 Convex production
+
+From `cns-dashboard/`: `npx convex deploy` — use the same deployment URL for `PUBLIC_CONVEX_URL` (Vercel) and `CONVEX_URL` (sync).
+
+### 16.4 Daily use
+
+1. Open the password-protected production URL (desktop ≥1280px).
+2. Confirm header **last sync** is recent; if **stale banner** shows, check cron and `dashboard-sync.log`.
+3. Panels update via Convex subscriptions after each successful sync (no manual refresh).
+
+Epic 44 replaces the trend stub with live analytics; no operator change required until that epic ships.

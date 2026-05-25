@@ -494,3 +494,10 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - No Svelte component/integration tests for panel wiring — story scoped pure-helper unit tests only (same as 42-6).
 - `dashboard-snapshot.ts` types maintained separately from Convex validators — revisit if Convex→TS codegen is adopted.
 - No `aria-live` on panels for live subscription updates — accessibility polish; not required by 42-7 AC.
+
+## Deferred from: code review of 42-9-vercel-production-deploy (2026-05-26)
+
+- Production build allows empty `PUBLIC_CONVEX_URL` — `+layout.svelte` only throws in DEV; Vercel misconfig yields silent broken Convex client until operator fixes env.
+- CI does not validate `PUBLIC_CONVEX_URL` at build time — workflow matches local `npm run build`; contract enforced in DEPLOY/Vercel operator steps.
+- Vercel password protection may require paid Deployment Protection tier — operator verifies during first provisioning.
+- Acceptance checklist FCP gate allows subjective pass — manual Epic 42 gate by design; optional Lighthouse follow-up out of scope.
