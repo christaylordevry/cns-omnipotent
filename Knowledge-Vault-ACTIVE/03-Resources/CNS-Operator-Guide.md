@@ -433,6 +433,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-23 | 1.32.0 | Session close **Step 6.7:** refreshes all `<!-- AUTO:xxx -->` blocks in **`AI-Context/CNS-Daily-Rhythm.md`** (provider, vault-lint, sprint, tests, projects, deferred, roadmap); dry-run previews only; **no** `git commit` in session-close | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
 | 2026-05-23 | 1.32.1 | Session close **npm PATH:** Step 6.7 / `AUTO:TESTS` exports NVM `bin` before `npm test` in Hermes; dry-run skips vault-lint scan side effects | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
 | 2026-05-25 | 1.33.0 | **CNS Dashboard (Epic 42):** §16 production URL, Vercel password protection, Convex `PUBLIC_CONVEX_URL`, sync cron via `install-dashboard-sync-cron.sh` and `~/.hermes/dashboard-sync.env`; deploy runbook in `cns-dashboard/docs/DEPLOY.md` | 42-9-vercel-production-deploy |
+| 2026-05-26 | 1.33.1 | Dashboard sync cron exports NVM `bin` before `npx` (cron minimal PATH); reinstall via `install-dashboard-sync-cron.sh` | 42-9-vercel-production-deploy |
 
 ---
 
@@ -924,6 +925,8 @@ bash /home/christ/ai-factory/projects/Omnipotent.md/scripts/install-dashboard-sy
 ```
 
 Edit `~/.hermes/dashboard-sync.env` (mode `600`). Logs: `~/.hermes/logs/dashboard-sync.log`.
+
+**Cron:** Use `bash scripts/run-dashboard-sync-cron.sh` (installed by `install-dashboard-sync-cron.sh`). Do not `. dashboard-sync.env` directly in the crontab line — default `/bin/sh` misparses quoted `CNS_VAULT_ROOT` paths with spaces. The wrapper exports NVM `bin` then `source`s the env file under bash.
 
 Manual push smoke from Omnipotent.md repo root:
 

@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-Epic 44 trend ingest — watchlist, collectors, SignalIngestBatch push (Stories 44-2-1–44-3-2).
+Epic 44 trend ingest — watchlist, collectors, SignalIngestBatch push (Stories 44-2-1–44-3-3).
 
 Usage:
-  python3 scripts/trend-ingest.py --dry-run [--sources news,reddit,google_trends]
-  python3 scripts/trend-ingest.py [--sources news,reddit,google_trends]
+  python3 scripts/trend-ingest.py --dry-run --sources news
+  python3 scripts/trend-ingest.py --source reddit
+  python3 scripts/trend-ingest.py --sources google_trends
+  python3 scripts/trend-ingest.py --dry-run [--sources a,b | --source name]
+
+Cron one-liners (one collector per run):
+  --sources news | --sources reddit | --sources google_trends
+  --source <name> is equivalent to --sources <name> (singular alias).
 
 Collectors: Epic 44 Epic 3+.
+Structured run log: ~/.hermes/logs/trend-ingest.log (override: TREND_INGEST_LOG).
 """
 
 from __future__ import annotations
@@ -139,6 +146,78 @@ def _default_norm_cache_path() -> Path:
     if override:
         return Path(override).expanduser()
     return Path.home() / ".hermes" / "trend-norm-cache.json"
+
+
+def _default_ingest_log_path() -> Path:
+    override = os.environ.get("TREND_INGEST_LOG", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".hermes" / "logs" / "trend-ingest.log"
+
+
+def _iso_utc_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _sanitize_log_error(message: str) -> str:
+    """Operator-safe error text — no deploy keys or API key substrings."""
+    text = message.strip()
+    for needle in (
+        "deploy_key",
+        "DEPLOY_KEY",
+        "api_key",
+        "API_KEY",
+        "sk-proj-",
+        "sk-",
+    ):
+        if needle in text:
+            return "ingest failed (credentials or secrets redacted)"
+    return text[:240]
+
+
+def build_ingest_log_record(
+    batch: SignalIngestBatch,
+    *,
+    dry_run: bool,
+    duration_ms: int,
+    outcome: str,
+    http_status: int | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    safe_http: int | None
+    if isinstance(http_status, int):
+        safe_http = http_status
+    else:
+        safe_http = None
+
+    record: dict[str, Any] = {
+        "ts": _iso_utc_timestamp(),
+        "ingestRunId": batch.ingest_run_id,
+        "activeSources": list(batch.active_sources),
+        "watchlistKeywords": len(batch.watchlist),
+        "eventsEmitted": len(batch.events),
+        "dryRun": dry_run,
+        "durationMs": duration_ms,
+        "httpStatus": safe_http,
+        "outcome": outcome,
+    }
+    if error:
+        record["error"] = _sanitize_log_error(error)
+    return record
+
+
+def append_ingest_log(record: dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n"
+    with path.open("a", encoding="utf-8") as f:
+        f.write(line)
+
+
+def _http_status_from_push_error(err: BaseException) -> int | None:
+    match = re.search(r"Convex HTTP (\d{3})", str(err))
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def load_ingest_env(path: Path) -> dict[str, str]:
@@ -344,8 +423,11 @@ def push_signal_batch(
     deploy_key: str,
     urlopen: Callable[..., Any] | None = None,
     timeout_sec: int = CONVEX_PUSH_TIMEOUT_SEC,
-) -> None:
-    """POST batch to Convex HTTP mutation API (dashboard-sync transport mirror)."""
+) -> int:
+    """POST batch to Convex HTTP mutation API (dashboard-sync transport mirror).
+
+    Returns HTTP status code (200–299) on success; raises RuntimeError otherwise.
+    """
     open_impl = urlopen or urllib.request.urlopen
     url = f"{normalize_convex_url(convex_url)}/api/mutation"
     body = json.dumps(build_ingest_mutation_request(batch)).encode("utf-8")
@@ -390,6 +472,8 @@ def push_signal_batch(
             if isinstance(message, str)
             else "Convex mutation returned unexpected status"
         )
+
+    return int(status)
 
 
 def floor_to_utc_hour_ms(timestamp_ms: int) -> int:
@@ -1027,7 +1111,17 @@ def build_batch(
 
 
 def run(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="CNS trend signal ingest")
+    started = time.monotonic()
+    parser = argparse.ArgumentParser(
+        description="CNS trend signal ingest",
+        epilog=(
+            "Examples:\n"
+            "  python3 scripts/trend-ingest.py --dry-run --sources news\n"
+            "  python3 scripts/trend-ingest.py --source reddit\n"
+            "  python3 scripts/trend-ingest.py --sources google_trends"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -1035,10 +1129,27 @@ def run(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--sources",
-        default="",
-        help="Comma-separated active sources for this run (google_trends, reddit, news)",
+        default=None,
+        metavar="NAMES",
+        help=(
+            "Comma-separated active sources for this run: "
+            "google_trends, reddit, news (cron: --sources news | reddit | google_trends)"
+        ),
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        metavar="NAME",
+        help="Single source alias (equivalent to --sources NAME)",
     )
     args = parser.parse_args(argv)
+
+    if args.source is not None and args.sources is not None:
+        print(
+            "FATAL: use either --source or --sources, not both",
+            file=sys.stderr,
+        )
+        return 1
 
     if yaml is None:
         print("FATAL: PyYAML is required (pip install pyyaml)", file=sys.stderr)
@@ -1051,6 +1162,7 @@ def run(argv: list[str] | None = None) -> int:
 
     snapshot_at = int(time.time() * 1000)
     watchlist_path = _default_watchlist_path()
+    log_path = _default_ingest_log_path()
 
     try:
         snapshot = load_watchlist_snapshot(watchlist_path, snapshot_at)
@@ -1065,129 +1177,191 @@ def run(argv: list[str] | None = None) -> int:
         )
         return 0
 
+    sources_raw = args.source if args.source is not None else args.sources
     try:
-        active_sources = parse_sources_arg(args.sources)
+        active_sources = parse_sources_arg(sources_raw)
     except ValueError as err:
         print(f"FATAL: {err}", file=sys.stderr)
         return 1
 
     batch = build_batch(watchlist=snapshot, active_sources=active_sources)
+    exit_code = 0
+    log_outcome = "ok"
+    log_error: str | None = None
+    log_http_status: int | None = None
 
-    norm_cache: dict[str, Any] | None = None
-    norm_cache_path = _default_norm_cache_path()
-    if "reddit" in active_sources or "news" in active_sources:
-        try:
-            norm_cache = load_norm_cache(norm_cache_path)
-        except ValueError as err:
-            print(f"FATAL: {err}", file=sys.stderr)
-            return 1
+    def duration_ms() -> int:
+        return int((time.monotonic() - started) * 1000)
 
-    if "google_trends" in active_sources:
-        if _TrendReq is None:
-            print(
-                "FATAL: pytrends is required for google_trends (pip install pytrends)",
-                file=sys.stderr,
-            )
-            return 1
-        try:
-            events, trends_patch = collect_google_trends(
-                snapshot,
-                ingest_run_id=batch.ingest_run_id,
-                collected_at_ms=snapshot_at,
-            )
-        except RuntimeError as err:
-            print(f"FATAL: {err}", file=sys.stderr)
-            return 1
-        batch.events.extend(events)
-        batch.signal_sources.append(trends_patch)
+    def write_run_log() -> None:
+        append_ingest_log(
+            build_ingest_log_record(
+                batch,
+                dry_run=args.dry_run,
+                duration_ms=duration_ms(),
+                outcome=log_outcome,
+                http_status=log_http_status,
+                error=log_error,
+            ),
+            log_path,
+        )
 
-    if "reddit" in active_sources:
-        if _praw is None:
-            reddit_events, reddit_patch = [], _source_collector_error_patch(
-                "reddit",
-                last_run_ms=snapshot_at,
-                message="praw is required for reddit (pip install praw)",
-            )
-        else:
+    try:
+        norm_cache: dict[str, Any] | None = None
+        norm_cache_path = _default_norm_cache_path()
+        if "reddit" in active_sources or "news" in active_sources:
             try:
-                reddit_events, reddit_patch = collect_reddit(
+                norm_cache = load_norm_cache(norm_cache_path)
+            except ValueError as err:
+                print(f"FATAL: {err}", file=sys.stderr)
+                log_outcome = "error"
+                log_error = str(err)
+                exit_code = 1
+                return exit_code
+
+        if "google_trends" in active_sources:
+            if _TrendReq is None:
+                print(
+                    "FATAL: pytrends is required for google_trends (pip install pytrends)",
+                    file=sys.stderr,
+                )
+                log_outcome = "error"
+                log_error = "pytrends is required for google_trends (pip install pytrends)"
+                exit_code = 1
+                return exit_code
+            try:
+                events, trends_patch = collect_google_trends(
                     snapshot,
                     ingest_run_id=batch.ingest_run_id,
-                    norm_cache=norm_cache
-                    or {"version": NORM_CACHE_VERSION, "entries": {}},
+                    collected_at_ms=snapshot_at,
+                )
+            except RuntimeError as err:
+                print(f"FATAL: {err}", file=sys.stderr)
+                log_outcome = "error"
+                log_error = str(err)
+                exit_code = 1
+                return exit_code
+            batch.events.extend(events)
+            batch.signal_sources.append(trends_patch)
+
+        if "reddit" in active_sources:
+            if _praw is None:
+                reddit_events, reddit_patch = [], _source_collector_error_patch(
+                    "reddit",
+                    last_run_ms=snapshot_at,
+                    message="praw is required for reddit (pip install praw)",
+                )
+            else:
+                try:
+                    reddit_events, reddit_patch = collect_reddit(
+                        snapshot,
+                        ingest_run_id=batch.ingest_run_id,
+                        norm_cache=norm_cache
+                        or {"version": NORM_CACHE_VERSION, "entries": {}},
+                        env=env_vars,
+                        collected_at_ms=snapshot_at,
+                    )
+                except (ValueError, RuntimeError) as err:
+                    reddit_events, reddit_patch = [], _source_collector_error_patch(
+                        "reddit",
+                        last_run_ms=snapshot_at,
+                        message=str(err),
+                    )
+            batch.events.extend(reddit_events)
+            batch.signal_sources.append(reddit_patch)
+
+        if "news" in active_sources:
+            try:
+                news_events, news_patch = collect_news(
+                    snapshot,
+                    ingest_run_id=batch.ingest_run_id,
+                    norm_cache=norm_cache or {"version": NORM_CACHE_VERSION, "entries": {}},
                     env=env_vars,
                     collected_at_ms=snapshot_at,
                 )
             except (ValueError, RuntimeError) as err:
-                reddit_events, reddit_patch = [], _source_collector_error_patch(
-                    "reddit",
+                news_events, news_patch = [], _source_collector_error_patch(
+                    "news",
                     last_run_ms=snapshot_at,
                     message=str(err),
                 )
-        batch.events.extend(reddit_events)
-        batch.signal_sources.append(reddit_patch)
+            batch.events.extend(news_events)
+            batch.signal_sources.append(news_patch)
 
-    if "news" in active_sources:
-        try:
-            news_events, news_patch = collect_news(
-                snapshot,
-                ingest_run_id=batch.ingest_run_id,
-                norm_cache=norm_cache or {"version": NORM_CACHE_VERSION, "entries": {}},
-                env=env_vars,
-                collected_at_ms=snapshot_at,
+        if args.dry_run:
+            log_outcome = "dry_run"
+            print(json.dumps(batch.to_wire_json(), indent=2))
+            return 0
+
+        if not active_sources:
+            print(
+                "warning: no --sources/--source specified; pushing watchlist mirror only",
+                file=sys.stderr,
             )
-        except (ValueError, RuntimeError) as err:
-            news_events, news_patch = [], _source_collector_error_patch(
-                "news",
-                last_run_ms=snapshot_at,
-                message=str(err),
-            )
-        batch.events.extend(news_events)
-        batch.signal_sources.append(news_patch)
 
-    if args.dry_run:
-        print(json.dumps(batch.to_wire_json(), indent=2))
-        return 0
+        if norm_cache is not None:
+            try:
+                save_norm_cache(norm_cache_path, norm_cache)
+            except OSError as err:
+                print(f"FATAL: could not write norm cache: {err}", file=sys.stderr)
+                log_outcome = "error"
+                log_error = f"could not write norm cache: {err}"
+                exit_code = 1
+                return exit_code
 
-    if norm_cache is not None:
+        repo_root = repo_root_from_script()
         try:
-            save_norm_cache(norm_cache_path, norm_cache)
-        except OSError as err:
-            print(f"FATAL: could not write norm cache: {err}", file=sys.stderr)
-            return 1
+            pattern_id = scan_batch_for_secret_pattern_id(batch, repo_root)
+        except ValueError as err:
+            print(f"FATAL: {err}", file=sys.stderr)
+            log_outcome = "error"
+            log_error = str(err)
+            exit_code = 1
+            return exit_code
+        if pattern_id is not None:
+            print(f"FATAL: batch matches secret pattern: {pattern_id}", file=sys.stderr)
+            log_outcome = "error"
+            log_error = f"batch matches secret pattern: {pattern_id}"
+            exit_code = 1
+            return exit_code
 
-    repo_root = repo_root_from_script()
-    try:
-        pattern_id = scan_batch_for_secret_pattern_id(batch, repo_root)
-    except ValueError as err:
-        print(f"FATAL: {err}", file=sys.stderr)
-        return 1
-    if pattern_id is not None:
-        print(f"FATAL: batch matches secret pattern: {pattern_id}", file=sys.stderr)
-        return 1
+        try:
+            convex_url, deploy_key = require_push_credentials(env_vars)
+        except ValueError as err:
+            print(f"FATAL: {err}", file=sys.stderr)
+            log_outcome = "error"
+            log_error = str(err)
+            exit_code = 1
+            return exit_code
 
-    try:
-        convex_url, deploy_key = require_push_credentials(env_vars)
-    except ValueError as err:
-        print(f"FATAL: {err}", file=sys.stderr)
-        return 1
+        try:
+            pushed_status = push_signal_batch(
+                batch,
+                convex_url=convex_url,
+                deploy_key=deploy_key,
+            )
+            log_http_status = int(pushed_status)
+        except RuntimeError as err:
+            print(f"FATAL: trend-ingest push failed: {err}", file=sys.stderr)
+            log_outcome = "error"
+            log_error = str(err)
+            log_http_status = _http_status_from_push_error(err)
+            exit_code = 1
+            return exit_code
 
-    try:
-        push_signal_batch(
-            batch,
-            convex_url=convex_url,
-            deploy_key=deploy_key,
+        if not active_sources:
+            log_outcome = "watchlist_only"
+        else:
+            log_outcome = "ok"
+
+        print(
+            f"trend-ingest: pushed watchlist ({len(batch.watchlist)} topics), "
+            f"{len(batch.events)} events",
+            file=sys.stderr,
         )
-    except RuntimeError as err:
-        print(f"FATAL: trend-ingest push failed: {err}", file=sys.stderr)
-        return 1
-
-    print(
-        f"trend-ingest: pushed watchlist ({len(batch.watchlist)} topics), "
-        f"{len(batch.events)} events",
-        file=sys.stderr,
-    )
-    return 0
+        return 0
+    finally:
+        write_run_log()
 
 
 def main() -> None:

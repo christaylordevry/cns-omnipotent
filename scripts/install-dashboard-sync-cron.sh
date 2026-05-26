@@ -16,12 +16,17 @@ if [[ ! -f "$ENV_FILE" ]]; then
 CNS_VAULT_ROOT=""
 CONVEX_URL=""
 CONVEX_DEPLOY_KEY=""
+# If deploy key contains |, wrap the value in double quotes in this file.
 EOF
   chmod 600 "$ENV_FILE"
   echo "Created $ENV_FILE — set CNS_VAULT_ROOT, CONVEX_URL, and CONVEX_DEPLOY_KEY before enabling cron."
 fi
 
-CRON_LINE="*/3 * * * * . \"$ENV_FILE\" && cd \"$REPO_ROOT\" && npx tsx scripts/dashboard-sync.ts >> \"$LOG_FILE\" 2>&1 # $CRON_TAG"
+# Do not `. env` in the crontab line — /bin/sh breaks quoted values (spaces in vault path).
+# Use bash wrapper: NVM PATH + `source` dashboard-sync.env.
+RUNNER="$REPO_ROOT/scripts/run-dashboard-sync-cron.sh"
+chmod +x "$RUNNER"
+CRON_LINE="*/3 * * * * /bin/bash \"$RUNNER\" >> \"$LOG_FILE\" 2>&1 # $CRON_TAG"
 
 EXISTING="$(crontab -l 2>/dev/null || true)"
 FILTERED="$(printf '%s\n' "$EXISTING" | grep -v "$CRON_TAG" | sed '/^[[:space:]]*$/d' || true)"

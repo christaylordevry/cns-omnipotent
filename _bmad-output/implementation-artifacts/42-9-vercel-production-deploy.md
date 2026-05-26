@@ -111,6 +111,7 @@ Composer (Cursor)
 **Omnipotent.md:**
 
 - `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md` (modified)
+- `scripts/install-dashboard-sync-cron.sh` (modified)
 - `_bmad-output/implementation-artifacts/42-9-vercel-production-deploy.md` (new)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
 
@@ -118,6 +119,7 @@ Composer (Cursor)
 
 - 2026-05-25: Story created; CI, deploy docs, operator guide §16; status → review.
 - 2026-05-26: Code review batch-fix: DEPLOY ordering/env/preview policy; operator guide §16.1 URL placeholder; status → done.
+- 2026-05-26: Re-review patch — dashboard-sync cron exports NVM `bin` before `npx`; DEPLOY troubleshooting + Operator Guide 1.33.1.
 
 ### Review Findings
 
@@ -130,3 +132,4 @@ Composer (Cursor)
 - [x] [Review][Defer] CI does not fail when `PUBLIC_CONVEX_URL` unset at build time [`.github/workflows/ci.yml`] — deferred, matches local build; env contract is operator/Vercel
 - [x] [Review][Defer] Vercel password protection may require paid Deployment Protection tier [`cns-dashboard/docs/DEPLOY.md:47`] — deferred, operator verifies during provisioning
 - [x] [Review][Defer] Acceptance checklist FCP gate allows subjective pass [`cns-dashboard/docs/EPIC-42-ACCEPTANCE-CHECKLIST.md:41`] — deferred, manual gate by design
+- [x] [Review][Patch] Cron `npx` fails under minimal PATH — NVM `bin` export in `install-dashboard-sync-cron.sh`; DEPLOY + §16.2 troubleshooting [`scripts/install-dashboard-sync-cron.sh:24`, `cns-dashboard/docs/DEPLOY.md:122`, `CNS-Operator-Guide.md:926`]

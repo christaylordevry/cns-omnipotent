@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for scripts/trend-ingest.py (Stories 44-2-1, 44-2-2, 44-3-1, 44-3-2)."""
+"""Unit tests for scripts/trend-ingest.py (Stories 44-2-1–44-3-3)."""
 
 from __future__ import annotations
 
@@ -368,12 +368,13 @@ class PushAndSecretTests(unittest.TestCase):
             captured["request"] = request
             return FakeResponse()
 
-        trend_ingest.push_signal_batch(
+        status = trend_ingest.push_signal_batch(
             batch,
             convex_url="https://happy-otter-123.convex.cloud/",
             deploy_key="deploy-key-secret",
             urlopen=fake_urlopen,
         )
+        self.assertEqual(status, 200)
         request = captured["request"]
         self.assertEqual(
             request.full_url,  # type: ignore[attr-defined]
@@ -414,12 +415,13 @@ class PushAndSecretTests(unittest.TestCase):
             def __exit__(self, *args: object) -> None:
                 return None
 
-        trend_ingest.push_signal_batch(
+        status = trend_ingest.push_signal_batch(
             batch,
             convex_url="https://example.convex.cloud",
             deploy_key="key",
             urlopen=lambda *_a, **_k: FakeResponse(),
         )
+        self.assertEqual(status, 200)
 
     def test_push_raises_on_convex_error_status(self) -> None:
         WatchlistEntry = trend_ingest.WatchlistEntry
@@ -1368,6 +1370,212 @@ class PushCliTests(unittest.TestCase):
         pushed = push_mock.call_args[0][0]
         self.assertEqual(pushed.events, [])
         self.assertEqual(pushed.signal_sources[0]["name"], "google_trends")
+
+
+@unittest.skipUnless(_yaml is not None, "PyYAML required")
+class CliSourcePolishTests(unittest.TestCase):
+    def test_source_alias_equivalent_to_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "watchlist.yaml"
+            wl.write_text("version: 1\nkeywords:\n  - test topic\n", encoding="utf-8")
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(trend_ingest, "_default_ingest_log_path") as log_mock:
+                        log_path = Path(tmp) / "ingest.log"
+                        log_mock.return_value = log_path
+                        from io import StringIO
+
+                        buf = StringIO()
+                        with patch("sys.stdout", buf):
+                            code = run(["--dry-run", "--source", "news"])
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["activeSources"], ["news"])
+
+    def test_source_and_sources_mutual_exclusion_fatal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "watchlist.yaml"
+            wl.write_text("version: 1\nkeywords:\n  - kw\n", encoding="utf-8")
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    code = run(["--dry-run", "--source", "news", "--sources", "reddit"])
+        self.assertEqual(code, 1)
+
+
+@unittest.skipUnless(_yaml is not None, "PyYAML required")
+class IngestLogTests(unittest.TestCase):
+    def _watchlist_file(self, tmp: str) -> Path:
+        wl = Path(tmp) / "watchlist.yaml"
+        wl.write_text("version: 1\nkeywords:\n  - safe topic\n", encoding="utf-8")
+        return wl
+
+    def _read_log_lines(self, log_path: Path) -> list[dict]:
+        text = log_path.read_text(encoding="utf-8").strip()
+        if not text:
+            return []
+        return [json.loads(line) for line in text.splitlines()]
+
+    def test_append_ingest_log_creates_parent_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "nested" / "trend-ingest.log"
+            WatchlistEntry = trend_ingest.WatchlistEntry
+            batch = build_batch(
+                watchlist=[WatchlistEntry("slug", "safe topic", "global", 1)],
+                active_sources=["news"],
+            )
+            trend_ingest.append_ingest_log(
+                trend_ingest.build_ingest_log_record(
+                    batch,
+                    dry_run=True,
+                    duration_ms=10,
+                    outcome="dry_run",
+                ),
+                log_path,
+            )
+            self.assertTrue(log_path.is_file())
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(lines[0]["ingestRunId"], batch.ingest_run_id)
+            self.assertEqual(lines[0]["activeSources"], ["news"])
+            self.assertEqual(lines[0]["watchlistKeywords"], 1)
+            self.assertEqual(lines[0]["eventsEmitted"], 0)
+            self.assertTrue(lines[0]["dryRun"])
+            self.assertEqual(lines[0]["outcome"], "dry_run")
+            self.assertIsNone(lines[0]["httpStatus"])
+
+    def test_dry_run_empty_sources_logs_zero_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            log_path = Path(tmp) / "ingest.log"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        from io import StringIO
+
+                        buf = StringIO()
+                        with patch("sys.stdout", buf):
+                            code = run(["--dry-run"])
+            self.assertEqual(code, 0)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(lines[0]["activeSources"], [])
+            self.assertEqual(lines[0]["eventsEmitted"], 0)
+            self.assertEqual(lines[0]["outcome"], "dry_run")
+
+    def test_push_success_log_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            env = Path(tmp) / "trend-ingest.env"
+            env.write_text(
+                "CONVEX_URL=https://example.convex.cloud\n"
+                "CONVEX_DEPLOY_KEY=test-key\n",
+                encoding="utf-8",
+            )
+            log_path = Path(tmp) / "ingest.log"
+
+            def fake_push(*_a: object, **_k: object) -> int:
+                return 201
+
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(trend_ingest, "_default_ingest_env_path", return_value=env):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        with patch.object(trend_ingest, "push_signal_batch", side_effect=fake_push):
+                            code = run(["--sources", "news"])
+            self.assertEqual(code, 0)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(lines[0]["outcome"], "ok")
+            self.assertEqual(lines[0]["httpStatus"], 201)
+            self.assertIn("durationMs", lines[0])
+            self.assertFalse(lines[0]["dryRun"])
+
+    def test_push_failure_logs_error_and_http_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            env = Path(tmp) / "trend-ingest.env"
+            env.write_text(
+                "CONVEX_URL=https://example.convex.cloud\n"
+                "CONVEX_DEPLOY_KEY=test-key\n",
+                encoding="utf-8",
+            )
+            log_path = Path(tmp) / "ingest.log"
+
+            def fail_push(*_a: object, **_k: object) -> int:
+                raise RuntimeError("Convex HTTP 503: Service Unavailable")
+
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(trend_ingest, "_default_ingest_env_path", return_value=env):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        with patch.object(trend_ingest, "push_signal_batch", side_effect=fail_push):
+                            code = run([])
+            self.assertEqual(code, 1)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(lines[0]["outcome"], "error")
+            self.assertEqual(lines[0]["httpStatus"], 503)
+            self.assertIn("error", lines[0])
+
+    def test_watchlist_only_live_push_logs_outcome(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            env = Path(tmp) / "trend-ingest.env"
+            env.write_text(
+                "CONVEX_URL=https://example.convex.cloud\n"
+                "CONVEX_DEPLOY_KEY=test-key\n",
+                encoding="utf-8",
+            )
+            log_path = Path(tmp) / "ingest.log"
+
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(trend_ingest, "_default_ingest_env_path", return_value=env):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        with patch.object(trend_ingest, "push_signal_batch", return_value=200):
+                            err = io.StringIO()
+                            with patch("sys.stderr", err):
+                                code = run([])
+            self.assertEqual(code, 0)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(lines[0]["outcome"], "watchlist_only")
+            self.assertEqual(lines[0]["activeSources"], [])
+            self.assertIn("watchlist mirror only", err.getvalue())
+
+    def test_empty_watchlist_skips_log_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "empty.yaml"
+            wl.write_text("", encoding="utf-8")
+            log_path = Path(tmp) / "ingest.log"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        code = run(["--dry-run"])
+        self.assertEqual(code, 0)
+        self.assertFalse(log_path.exists())
 
 
 if __name__ == "__main__":
