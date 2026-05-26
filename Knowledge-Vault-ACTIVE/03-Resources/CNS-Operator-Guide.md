@@ -435,6 +435,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-25 | 1.33.0 | **CNS Dashboard (Epic 42):** §16 production URL, Vercel password protection, Convex `PUBLIC_CONVEX_URL`, sync cron via `install-dashboard-sync-cron.sh` and `~/.hermes/dashboard-sync.env`; deploy runbook in `cns-dashboard/docs/DEPLOY.md` | 42-9-vercel-production-deploy |
 | 2026-05-26 | 1.33.1 | Dashboard sync cron exports NVM `bin` before `npx` (cron minimal PATH); reinstall via `install-dashboard-sync-cron.sh` | 42-9-vercel-production-deploy |
 | 2026-05-26 | 1.34.0 | **Trend ingest (Epic 44):** §16.5 watchlist, `trend-ingest.env`, cron install via `install-trend-ingest-cron.sh`, structured ingest log + NewsAPI quota notes | 44-4-1-cron-install-documentation-env-example |
+| 2026-05-26 | 1.34.1 | §16.5 reliability verification — `audit-trend-ingest-reliability.py`, 7-day NFR-R1 audit, partial degradation + NFR-R2/R5 checks | 44-4-2-seven-day-pipeline-reliability-verification |
 
 ---
 
@@ -1011,3 +1012,26 @@ Free/developer tier on [newsapi.org](https://newsapi.org) is typically **~100 re
 When news ingest fails with quota errors, check `signalSources` on the dashboard (Epic 44 panel) or ingest log `outcome: error`. Remediation: reduce watchlist size, widen news cron interval temporarily, rotate to a new dev key, or upgrade to NewsAPI **Business** tier for production-scale polling.
 
 **Partial degradation:** Reddit and google_trends crons are independent — a NewsAPI outage does not block other sources (FR16).
+
+**Reliability verification (7-day, NFR-R1 / NFR-R5):**
+
+1. Enable cron via `install-trend-ingest-cron.sh` and leave it running for **at least 7 days** (exclude planned downtime from your mental baseline).
+2. Run the audit from Omnipotent.md repo root:
+
+```sh
+python3 scripts/audit-trend-ingest-reliability.py --days 7
+```
+
+Per source you should see **≥95%** success rate (`ok` + HTTP 200, or `watchlist_only`) vs expected slots (news/reddit every 15 min, google_trends hourly). Non-zero `missed_slots` means cron did not run or logs were rotated away.
+
+3. **Failures without stopping cron (NFR-R2):** Cron keeps firing on collector errors. Inspect recent errors:
+
+```sh
+grep '"outcome":"error"' ~/.hermes/logs/trend-ingest.log | tail -5 | jq -c '{ts,activeSources,httpStatus,error}'
+```
+
+Do not remove crontab lines after a single failed tick unless you are deliberately pausing ingest.
+
+4. **Freshness (NFR-R5):** On the dashboard trend panel (or Convex data browser), confirm `trendTopics.lastUpdated` for topics using a source is within **30 minutes** for news/reddit and **2 hours** for google_trends when that source shows healthy in `signalSources`.
+
+5. Record audit output and date in your session notes when closing Epic 44.4.2.

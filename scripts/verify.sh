@@ -56,6 +56,12 @@ if [[ -f package.json ]]; then
   run_npm_script_optional build
 fi
 
+# Trend ingest (Epic 44) — structured log + reliability audit unit tests
+if [[ -f scripts/trend-ingest.py ]]; then
+  echo "==> python3 -m unittest tests.test_trend_ingest tests.test_trend_ingest_reliability"
+  python3 -m unittest tests.test_trend_ingest tests.test_trend_ingest_reliability -q
+fi
+
 # Python projects
 if [[ -f pyproject.toml || -f requirements.txt ]]; then
   ran_any=1

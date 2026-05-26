@@ -547,3 +547,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - ~~Operator guide **Trend ingest logging** section~~ — **Resolved in 44-4-1:** CNS-Operator-Guide §16.5 (cron, log path, `jq`, NewsAPI quota).
 - Story 44-3-3 implementation landed in commit `e4dc309` (dashboard-sync cron message) — no functional defect; consider a dedicated commit message on future touch for traceability.
+
+## Deferred from: code review of 44-4-2-seven-day-pipeline-reliability-verification (2026-05-26)
+
+- Log lines with `activeSources` length ≠ 1 are dropped from per-source stats — safe for cron (single source per run); manual multi-source runs are mis-counted.
+- Full log file read into memory on each audit — acceptable for 7-day JSONL at expected operator volume.
