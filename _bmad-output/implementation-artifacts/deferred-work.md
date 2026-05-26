@@ -522,3 +522,15 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - Full-table `collect()` before `slice` on `getTrendTopics` — watchlist-bounded row count; index/limit push-down optional per story dev notes.
 - No upper cap on `limit` arg — AC/spec specify default 10 only; table size bounded by watchlist mirror scale.
+
+## Deferred from: code review of 44-2-1-trend-ingest-skeleton-watchlist-dry-run (2026-05-26)
+
+- Python `unittest` not wired into `scripts/verify.sh` — Omnipotent.md gate is npm-only; story AC boundary requires manual `python3 -m unittest tests.test_trend_ingest`.
+
+## Deferred from: code review of 44-2-2-trend-ingest-http-push-secret-guard (2026-05-26)
+
+- Python `unittest` not wired into `scripts/verify.sh` — same npm-only gate as 44-2-1; run `python3 -m unittest tests.test_trend_ingest` before production push.
+
+## Deferred from: code review of 44-3-1-google-trends-collector-pytrends (2026-05-26)
+
+- Python `unittest` not wired into `scripts/verify.sh` — same npm-only gate as 44-2-1/44-2-2; run `python3 -m unittest tests.test_trend_ingest` before live trends collect/push.
