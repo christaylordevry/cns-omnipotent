@@ -68,6 +68,7 @@ TRENDS_NORM_METHOD = "trends_interest_over_100"
 REDDIT_NORM_METHOD = "reddit_7d_minmax"
 NEWS_NORM_METHOD = "news_7d_minmax"
 REDDIT_SEARCH_LIMIT = 100
+REDDIT_COLLECTION_METHOD = "reddit_search_day_cap_100"
 NEWSAPI_EVERYTHING_URL = "https://newsapi.org/v2/everything"
 
 
@@ -436,7 +437,10 @@ def load_norm_cache(path: Path) -> dict[str, Any]:
 
 def save_norm_cache(path: Path, cache: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(cache, indent=2) + "\n", encoding="utf-8")
+    payload = json.dumps(cache, indent=2) + "\n"
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def _prune_norm_samples(
@@ -487,7 +491,11 @@ def record_norm_cache_sample(
 
 
 def _history_samples_for_key(
-    cache: dict[str, Any], topic_slug: str, source: SourceName
+    cache: dict[str, Any],
+    topic_slug: str,
+    source: SourceName,
+    *,
+    collected_at_ms: int,
 ) -> list[dict[str, Any]]:
     entries = cache.get("entries")
     if not isinstance(entries, dict):
@@ -498,7 +506,13 @@ def _history_samples_for_key(
     samples = entry.get("samples")
     if not isinstance(samples, list):
         return []
-    return [s for s in samples if isinstance(s, dict)]
+    return [
+        s
+        for s in samples
+        if isinstance(s, dict)
+        and isinstance(s.get("t"), (int, float))
+        and collected_at_ms - int(s["t"]) <= NORM_CACHE_RETENTION_MS
+    ]
 
 
 def build_minmax_signal_event(
@@ -512,7 +526,14 @@ def build_minmax_signal_event(
     ingest_run_id: str,
     collected_at_ms: int,
     window_hours: int,
+    collection_method: str | None = None,
 ) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "normalisationMethod": norm_method,
+        "rawValue": raw_value,
+    }
+    if collection_method:
+        metadata["collectionMethod"] = collection_method
     return {
         "topicSlug": entry.topic_slug,
         "keyword": entry.keyword,
@@ -531,10 +552,7 @@ def build_minmax_signal_event(
             window_hours=window_hours,
         ),
         "ingestRunId": ingest_run_id,
-        "metadata": {
-            "normalisationMethod": norm_method,
-            "rawValue": raw_value,
-        },
+        "metadata": metadata,
     }
 
 
@@ -756,7 +774,22 @@ def require_newsapi_key(env: dict[str, str]) -> str:
     return api_key
 
 
-def fetch_reddit_mention_count(entry: WatchlistEntry, *, env: dict[str, str]) -> float:
+def _reddit_time_filter_for_window(window_hours: int) -> str:
+    if window_hours <= 24:
+        return "day"
+    if window_hours <= 168:
+        return "week"
+    if window_hours <= 720:
+        return "month"
+    return "year"
+
+
+def fetch_reddit_mention_count(
+    entry: WatchlistEntry,
+    *,
+    env: dict[str, str],
+    window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
+) -> float:
     if _praw is None:
         raise RuntimeError("praw is required (pip install praw)")
     client_id, client_secret, user_agent = require_reddit_credentials(env)
@@ -765,9 +798,10 @@ def fetch_reddit_mention_count(entry: WatchlistEntry, *, env: dict[str, str]) ->
         client_secret=client_secret,
         user_agent=user_agent,
     )
+    time_filter = _reddit_time_filter_for_window(window_hours)
     count = 0
     for _ in reddit.subreddit("all").search(
-        entry.keyword, time_filter="day", limit=REDDIT_SEARCH_LIMIT
+        entry.keyword, time_filter=time_filter, limit=REDDIT_SEARCH_LIMIT
     ):
         count += 1
     return float(count)
@@ -778,16 +812,17 @@ def fetch_news_article_count(
     *,
     env: dict[str, str],
     window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
+    collected_at_ms: int | None = None,
 ) -> float:
     api_key = require_newsapi_key(env)
-    collected_at_ms = int(time.time() * 1000)
+    run_at = collected_at_ms if collected_at_ms is not None else int(time.time() * 1000)
     from_dt = datetime.fromtimestamp(
-        (collected_at_ms - window_hours * 3_600_000) / 1000, tz=timezone.utc
+        (run_at - window_hours * 3_600_000) / 1000, tz=timezone.utc
     )
     params = urllib.parse.urlencode(
         {
             "q": entry.keyword,
-            "from": from_dt.strftime("%Y-%m-%d"),
+            "from": from_dt.strftime("%Y-%m-%dT%H:%M:%S"),
             "pageSize": 1,
             "apiKey": api_key,
         }
@@ -830,6 +865,7 @@ def collect_minmax_source(
     collected_at_ms: int | None = None,
     count_fetcher: Callable[[WatchlistEntry], float],
     window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
+    collection_method: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     run_at = collected_at_ms or int(time.time() * 1000)
     if not entries:
@@ -843,22 +879,28 @@ def collect_minmax_source(
 
     events: list[dict[str, Any]] = []
     error_count = 0
+    last_error: str | None = None
 
     for entry in entries:
         try:
             raw_value = count_fetcher(entry)
-        except CollectorKeywordError:
+        except CollectorKeywordError as err:
             error_count += 1
+            last_error = str(err)[:240]
             continue
-        except Exception:
+        except Exception as err:
             error_count += 1
+            last_error = str(err)[:240]
             continue
 
         if raw_value < 0:
             error_count += 1
+            last_error = "negative raw count"
             continue
 
-        history = _history_samples_for_key(norm_cache, entry.topic_slug, source)
+        history = _history_samples_for_key(
+            norm_cache, entry.topic_slug, source, collected_at_ms=run_at
+        )
         normalized = minmax_normalize_7d(raw_value, history)
         record_norm_cache_sample(
             norm_cache,
@@ -878,6 +920,7 @@ def collect_minmax_source(
                 ingest_run_id=ingest_run_id,
                 collected_at_ms=run_at,
                 window_hours=window_hours,
+                collection_method=collection_method,
             )
         )
 
@@ -893,7 +936,7 @@ def collect_minmax_source(
         status=status,
         last_run_ms=run_at,
         error_count=error_count,
-        last_error=None,
+        last_error=last_error,
     )
 
 
@@ -906,7 +949,12 @@ def collect_reddit(
     collected_at_ms: int | None = None,
     count_fetcher: Callable[[WatchlistEntry], float] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    fetch = count_fetcher or (lambda entry: fetch_reddit_mention_count(entry, env=env))
+    run_at = collected_at_ms or int(time.time() * 1000)
+    fetch = count_fetcher or (
+        lambda entry: fetch_reddit_mention_count(
+            entry, env=env, window_hours=REDDIT_NEWS_WINDOW_HOURS
+        )
+    )
     return collect_minmax_source(
         entries,
         source="reddit",
@@ -914,8 +962,9 @@ def collect_reddit(
         norm_method=REDDIT_NORM_METHOD,
         ingest_run_id=ingest_run_id,
         norm_cache=norm_cache,
-        collected_at_ms=collected_at_ms,
+        collected_at_ms=run_at,
         count_fetcher=fetch,
+        collection_method=REDDIT_COLLECTION_METHOD,
     )
 
 
@@ -928,7 +977,12 @@ def collect_news(
     collected_at_ms: int | None = None,
     count_fetcher: Callable[[WatchlistEntry], float] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    fetch = count_fetcher or (lambda entry: fetch_news_article_count(entry, env=env))
+    run_at = collected_at_ms or int(time.time() * 1000)
+    fetch = count_fetcher or (
+        lambda entry: fetch_news_article_count(
+            entry, env=env, collected_at_ms=run_at
+        )
+    )
     return collect_minmax_source(
         entries,
         source="news",
@@ -936,7 +990,7 @@ def collect_news(
         norm_method=NEWS_NORM_METHOD,
         ingest_run_id=ingest_run_id,
         norm_cache=norm_cache,
-        collected_at_ms=collected_at_ms,
+        collected_at_ms=run_at,
         count_fetcher=fetch,
     )
 
@@ -1049,25 +1103,27 @@ def run(argv: list[str] | None = None) -> int:
 
     if "reddit" in active_sources:
         if _praw is None:
-            print(
-                "FATAL: praw is required for reddit (pip install praw)",
-                file=sys.stderr,
-            )
-            return 1
-        try:
-            reddit_events, reddit_patch = collect_reddit(
-                snapshot,
-                ingest_run_id=batch.ingest_run_id,
-                norm_cache=norm_cache or {"version": NORM_CACHE_VERSION, "entries": {}},
-                env=env_vars,
-                collected_at_ms=snapshot_at,
-            )
-        except (ValueError, RuntimeError) as err:
             reddit_events, reddit_patch = [], _source_collector_error_patch(
                 "reddit",
                 last_run_ms=snapshot_at,
-                message=str(err),
+                message="praw is required for reddit (pip install praw)",
             )
+        else:
+            try:
+                reddit_events, reddit_patch = collect_reddit(
+                    snapshot,
+                    ingest_run_id=batch.ingest_run_id,
+                    norm_cache=norm_cache
+                    or {"version": NORM_CACHE_VERSION, "entries": {}},
+                    env=env_vars,
+                    collected_at_ms=snapshot_at,
+                )
+            except (ValueError, RuntimeError) as err:
+                reddit_events, reddit_patch = [], _source_collector_error_patch(
+                    "reddit",
+                    last_run_ms=snapshot_at,
+                    message=str(err),
+                )
         batch.events.extend(reddit_events)
         batch.signal_sources.append(reddit_patch)
 

@@ -3,14 +3,14 @@ story_id: 44-3-2
 epic: 44
 planning_epic: "Epic 44 / Epic 3 Story 3.2"
 title: reddit-news-collectors-norm-cache
-status: review
+status: done
 output_repo: Omnipotent.md
 cns_repo_touch: scripts/trend-ingest.py
 ---
 
 # Story 44-3-2: Reddit and News collectors with norm cache
 
-Status: review
+Status: done
 
 **Planning map:** Epic 44 Story 3.2 — `44-3-2-reddit-news-collectors-norm-cache`.
 
@@ -48,6 +48,19 @@ So that **cross-source ranking in the panel is comparable**.
 - [x] Wire `run()` with per-source isolation
 - [x] Unit tests; verify.sh; sprint-status → review
 
+### Review Findings
+
+- [x] [Review][Decision] Reddit mention count capped at 100 — v1 accepted; `metadata.collectionMethod: reddit_search_day_cap_100` on Reddit events (2026-05-26)
+- [x] [Review][Patch] 7-day min-max at normalize time — `_history_samples_for_key` filters by `NORM_CACHE_RETENTION_MS` (2026-05-26)
+- [x] [Review][Patch] Missing PRAW no longer aborts run — reddit error patch; news still runs (2026-05-26)
+- [x] [Review][Patch] Atomic norm cache save — temp file + `os.replace` (2026-05-26)
+- [x] [Review][Patch] Partial runs set `signalSources.lastError` (2026-05-26)
+- [x] [Review][Patch] Reddit window — `_reddit_time_filter_for_window` maps `window_hours` to PRAW `time_filter` (2026-05-26)
+- [x] [Review][Patch] NewsAPI `from` uses ISO datetime for rolling window (2026-05-26)
+- [x] [Review][Patch] `test_dry_run_does_not_write_norm_cache` added (2026-05-26)
+- [x] [Review][Patch] Cross-source tests: missing PRAW + news failure mirrors (2026-05-26)
+- [x] [Review][Defer] New PRAW client per keyword — deferred to 44-4-1 cron hardening
+
 ## Dev Agent Record
 
 ### Completion Notes List
@@ -55,7 +68,8 @@ So that **cross-source ranking in the panel is comparable**.
 - `~/.hermes/trend-norm-cache.json` — versioned cache with 7-day sample retention; min-max normalisation per `topicSlug|source`.
 - `collect_reddit` / `collect_news` — PRAW + NewsAPI (urllib); injectable fetchers; per-keyword + cross-source isolation.
 - Events include `value`, `metadata.rawValue`, `metadata.normalisationMethod`; cache saved before push (not on dry-run).
-- `tests/test_trend_ingest.py`: 55 tests. Operator: `pip install praw`; set `REDDIT_*` and `NEWSAPI_API_KEY` in trend-ingest.env.
+- `tests/test_trend_ingest.py`: 60 tests. Operator: `pip install praw`; set `REDDIT_*` and `NEWSAPI_API_KEY` in trend-ingest.env.
+- Code review (2026-05-26): 8 patches + decision A (`reddit_search_day_cap_100` metadata); status → done.
 
 ### File List
 
@@ -67,6 +81,7 @@ So that **cross-source ranking in the panel is comparable**.
 ### Change Log
 
 - 2026-05-26: Story 44-3-2 — Reddit/News collectors + norm cache; status → review.
+- 2026-05-26: Code review fixes — norm cache hardening, cross-source isolation, tests; status → done.
 
 ## Dev Notes
 

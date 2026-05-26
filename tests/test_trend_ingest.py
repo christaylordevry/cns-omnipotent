@@ -830,6 +830,24 @@ class NormCacheTests(unittest.TestCase):
         history = [{"v": 0, "t": 1}, {"v": 100, "t": 2}]
         self.assertEqual(trend_ingest.minmax_normalize_7d(50, history), 0.5)
 
+    def test_history_samples_excludes_stale_entries(self) -> None:
+        now = 1_746_000_000_000
+        stale_ms = now - trend_ingest.NORM_CACHE_RETENTION_MS - 1
+        cache = {
+            "version": 1,
+            "entries": {
+                "a|reddit": {
+                    "samples": [{"v": 0, "t": stale_ms}, {"v": 100, "t": now - 1000}],
+                    "updatedAt": now,
+                }
+            },
+        }
+        history = trend_ingest._history_samples_for_key(
+            cache, "a", "reddit", collected_at_ms=now
+        )
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["v"], 100)
+
     def test_load_save_norm_cache_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "cache.json"
@@ -867,6 +885,10 @@ class RedditNewsCollectorTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["signalType"], "mention_count")
         self.assertEqual(events[0]["metadata"]["normalisationMethod"], "reddit_7d_minmax")
+        self.assertEqual(
+            events[0]["metadata"]["collectionMethod"],
+            "reddit_search_day_cap_100",
+        )
         self.assertEqual(events[0]["metadata"]["rawValue"], 20.0)
         self.assertEqual(events[0]["value"], 20.0)
         self.assertEqual(patch["status"], "ok")
@@ -912,6 +934,26 @@ class RedditNewsCollectorTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["topicSlug"], "b")
         self.assertEqual(patch["status"], "partial")
+        self.assertEqual(patch.get("lastError"), "fail")
+
+    def test_collect_reddit_partial_sets_last_error(self) -> None:
+        WatchlistEntry = trend_ingest.WatchlistEntry
+        entries = [WatchlistEntry("a", "A", "global", 1)]
+        cache = {"version": 1, "entries": {}}
+
+        def fetch(_entry: object) -> float:
+            raise trend_ingest.CollectorKeywordError("api down")
+
+        _events, patch = trend_ingest.collect_reddit(
+            entries,
+            ingest_run_id="run-1",
+            norm_cache=cache,
+            env={},
+            collected_at_ms=1_746_000_000_000,
+            count_fetcher=fetch,
+        )
+        self.assertEqual(patch["status"], "error")
+        self.assertEqual(patch.get("lastError"), "api down")
 
     def test_run_collects_reddit_and_news_when_both_sourced(self) -> None:
         WatchlistEntry = trend_ingest.WatchlistEntry
@@ -1057,6 +1099,154 @@ class RedditNewsCollectorTests(unittest.TestCase):
         self.assertEqual(payload["signalSources"][0]["name"], "reddit")
         self.assertEqual(payload["signalSources"][0]["status"], "error")
         self.assertEqual(payload["signalSources"][1]["name"], "news")
+        self.assertEqual(len(payload["events"]), 1)
+
+    def test_dry_run_does_not_write_norm_cache(self) -> None:
+        reddit_patch = trend_ingest.build_signal_source_patch(
+            "reddit",
+            status="ok",
+            last_run_ms=1,
+            error_count=0,
+            last_error=None,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "watchlist.yaml"
+            wl.write_text("version: 1\nkeywords:\n  - test topic\n", encoding="utf-8")
+            cache_path = Path(tmp) / "cache.json"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_norm_cache_path", return_value=cache_path
+                    ):
+                        with patch.object(trend_ingest, "_praw", object()):
+                            with patch.object(
+                                trend_ingest,
+                                "collect_reddit",
+                                return_value=([], reddit_patch),
+                            ):
+                                from io import StringIO
+
+                                buf = StringIO()
+                                with patch("sys.stdout", buf):
+                                    code = run(["--dry-run", "--sources", "reddit"])
+        self.assertEqual(code, 0)
+        self.assertFalse(cache_path.exists())
+
+    def test_missing_praw_still_runs_news(self) -> None:
+        WatchlistEntry = trend_ingest.WatchlistEntry
+        news_patch = trend_ingest.build_signal_source_patch(
+            "news",
+            status="ok",
+            last_run_ms=1,
+            error_count=0,
+            last_error=None,
+        )
+        fake_news_event = trend_ingest.build_minmax_signal_event(
+            WatchlistEntry("b", "B", "global", 1),
+            source="news",
+            signal_type="article_count",
+            raw_value=2,
+            normalized_value=0.5,
+            norm_method="news_7d_minmax",
+            ingest_run_id="run-1",
+            collected_at_ms=1,
+            window_hours=trend_ingest.REDDIT_NEWS_WINDOW_HOURS,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "watchlist.yaml"
+            wl.write_text("version: 1\nkeywords:\n  - B\n", encoding="utf-8")
+            cache_path = Path(tmp) / "cache.json"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_norm_cache_path", return_value=cache_path
+                    ):
+                        with patch.object(trend_ingest, "_praw", None):
+                            with patch.object(
+                                trend_ingest,
+                                "collect_news",
+                                return_value=([fake_news_event], news_patch),
+                            ):
+                                from io import StringIO
+
+                                buf = StringIO()
+                                with patch("sys.stdout", buf):
+                                    code = run(
+                                        ["--dry-run", "--sources", "reddit,news"]
+                                    )
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["signalSources"][0]["status"], "error")
+        self.assertEqual(payload["signalSources"][1]["status"], "ok")
+        self.assertEqual(len(payload["events"]), 1)
+
+    def test_news_failure_still_runs_reddit(self) -> None:
+        WatchlistEntry = trend_ingest.WatchlistEntry
+        reddit_patch = trend_ingest.build_signal_source_patch(
+            "reddit",
+            status="ok",
+            last_run_ms=1,
+            error_count=0,
+            last_error=None,
+        )
+        fake_reddit_event = trend_ingest.build_minmax_signal_event(
+            WatchlistEntry("a", "A", "global", 1),
+            source="reddit",
+            signal_type="mention_count",
+            raw_value=1,
+            normalized_value=0.5,
+            norm_method="reddit_7d_minmax",
+            ingest_run_id="run-1",
+            collected_at_ms=1,
+            window_hours=trend_ingest.REDDIT_NEWS_WINDOW_HOURS,
+            collection_method="reddit_search_day_cap_100",
+        )
+
+        def fail_news(*_a: object, **_k: object) -> tuple[list, dict]:
+            raise ValueError("NEWSAPI_API_KEY is required in trend-ingest.env for news")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = Path(tmp) / "watchlist.yaml"
+            wl.write_text("version: 1\nkeywords:\n  - A\n", encoding="utf-8")
+            cache_path = Path(tmp) / "cache.json"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_norm_cache_path", return_value=cache_path
+                    ):
+                        with patch.object(trend_ingest, "_praw", object()):
+                            with patch.object(
+                                trend_ingest,
+                                "collect_reddit",
+                                return_value=([fake_reddit_event], reddit_patch),
+                            ):
+                                with patch.object(
+                                    trend_ingest, "collect_news", side_effect=fail_news
+                                ):
+                                    from io import StringIO
+
+                                    buf = StringIO()
+                                    with patch("sys.stdout", buf):
+                                        code = run(
+                                            ["--dry-run", "--sources", "reddit,news"]
+                                        )
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["signalSources"][0]["status"], "ok")
+        self.assertEqual(payload["signalSources"][1]["status"], "error")
         self.assertEqual(len(payload["events"]), 1)
 
 

@@ -534,3 +534,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 44-3-1-google-trends-collector-pytrends (2026-05-26)
 
 - Python `unittest` not wired into `scripts/verify.sh` — same npm-only gate as 44-2-1/44-2-2; run `python3 -m unittest tests.test_trend_ingest` before live trends collect/push.
+
+## Deferred from: code review of 44-3-2-reddit-news-collectors-norm-cache (2026-05-26)
+
+- New PRAW `Reddit()` client per keyword in `fetch_reddit_mention_count` — rate-limit/perf risk acceptable for v1 operator-scale watchlist; revisit with Epic 44 cron hardening (44-4-1).
