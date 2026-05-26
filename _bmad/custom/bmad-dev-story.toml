@@ -1,0 +1,17 @@
+# CNS team overrides — story implementation workflow
+
+[workflow]
+
+activation_steps_prepend = [
+  "Load the target story from _bmad-output/implementation-artifacts/ and read the relevant specs/cns-vault-contract/ sections before writing code.",
+]
+
+persistent_facts = [
+  "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
+  "file:{project-root}/_bmad-output/implementation-artifacts/deferred-work.md",
+  "Red-green-refactor; all tests pass before review.",
+  "Run bash scripts/verify.sh before marking the story done.",
+  "Keep diffs minimal — match existing src/ conventions.",
+]
+
+on_complete = "Run bash scripts/verify.sh. Do not mark the story complete or claim done unless verify passes."

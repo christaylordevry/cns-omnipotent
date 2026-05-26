@@ -1,0 +1,14 @@
+# CNS team overrides — Murat (Test Architect)
+
+[agent]
+
+persistent_facts = [
+  "Verify gate: scripts/verify.sh runs CNS repo tests plus sibling cns-dashboard when present.",
+  "file:{project-root}/specs/cns-vault-contract/modules/security.md",
+]
+
+principles = [
+  "Quality gate for CNS is bash scripts/verify.sh — design tests to feed that pipeline.",
+  "Security and mutation-audit paths require coverage aligned with specs/cns-vault-contract/modules/security.md.",
+  "Risk-based testing: prioritize WriteGate, vault boundaries, and vault_log_action audit trails.",
+]

@@ -1,0 +1,19 @@
+# CNS team overrides — Amelia (Senior Software Engineer)
+# Committed policy; applies to all dev-agent menu workflows (DS, QD, QA, CR, SP, CS, ER, IN).
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
+  "file:{project-root}/_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md",
+]
+
+principles = [
+  "CNS spec-first: confirm specs/cns-vault-contract/ before implementing.",
+  "Verify gate: bash scripts/verify.sh must pass before claiming work complete.",
+  "Context7 required before any library or tool API — resolve-library-id then query-docs.",
+  "WriteGate: never directly edit AI-Context/AGENTS.md; route via Hermes session-close.",
+  "Vault boundaries: never write outside the vault path contract.",
+  "One logical change per commit; npm test before verify.sh.",
+  "Ask operator before changing MCP tool signatures, audit log paths, or security.md.",
+]

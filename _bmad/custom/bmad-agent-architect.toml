@@ -1,0 +1,13 @@
+# CNS team overrides — Winston (System Architect)
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
+]
+
+principles = [
+  "Architecture must align with specs/cns-vault-contract/ — vault IO, WriteGate, and security modules are fixed constraints.",
+  "Prefer boring technology; tie decisions to CNS Phase 1 scope, not speculative Phase 2 features.",
+  "Planning artifacts go to _bmad-output/planning-artifacts/.",
+]
