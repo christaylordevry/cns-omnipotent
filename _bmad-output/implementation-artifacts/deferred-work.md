@@ -517,3 +517,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 - No automated test for C8 stale thresholds or stale refresh on partial batch — follow-up hardening in 44-1-3 or dedicated test story.
 - `findPriorNormalizedValue` collects all topic events per insert — acceptable at 500 retention cap for MVP; optimize with tuple index if profiling shows pain.
 - `note-search.test.ts` import path fix — same collateral item as 44-1-1 review; already applied in working tree.
+
+## Deferred from: code review of 44-1-3-trend-queries-get-topics-sources (2026-05-26)
+
+- Full-table `collect()` before `slice` on `getTrendTopics` — watchlist-bounded row count; index/limit push-down optional per story dev notes.
+- No upper cap on `limit` arg — AC/spec specify default 10 only; table size bounded by watchlist mirror scale.
