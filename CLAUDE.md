@@ -52,7 +52,7 @@ Deferred work: `_bmad-output/implementation-artifacts/deferred-work.md`
 
 ## Non-Negotiables
 1. **Spec-first.** Confirm `specs/cns-vault-contract/` before implementing
-2. **Verify gate.** `bash scripts/verify.sh` must pass before every commit
+2. **Verify gate.** `bash scripts/verify.sh` must pass before every commit (CNS repo tests plus sibling `cns-dashboard` `npm test` when `../cns-dashboard` exists; override path with `CNS_DASHBOARD_ROOT`)
 3. **Small commits.** One logical change each
 4. **WriteGate.** Never directly edit `AI-Context/AGENTS.md` — route via Hermes session-close
 5. **Vault boundaries.** Never write outside vault path contract

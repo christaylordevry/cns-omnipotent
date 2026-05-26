@@ -37,6 +37,12 @@
 
 ---
 
+## Deferred from: code review of 45-6-arima-forecasting (2026-05-27)
+
+- **ARIMA trains on value sequence only, not calendar spacing** (`convex/lib/predictiveAnalytics.ts`) — architecture assumes ~daily signals; irregular or multiple signals per day are treated as sequential observations without time-axis modeling.
+
+---
+
 ## Brain service (Epic 12)
 
 ### Nexus corpus exclusion by inbound path (12-8 finding)

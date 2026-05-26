@@ -56,10 +56,26 @@ if [[ -f package.json ]]; then
   run_npm_script_optional build
 fi
 
+# cns-dashboard sibling (Epic 42+) — Convex/Svelte tests live outside this package.json
+CNS_DASHBOARD_ROOT="${CNS_DASHBOARD_ROOT:-${REPO_ROOT}/../cns-dashboard}"
+if [[ -f "${CNS_DASHBOARD_ROOT}/package.json" ]]; then
+  echo "==> cns-dashboard npm test (${CNS_DASHBOARD_ROOT})"
+  (
+    cd "${CNS_DASHBOARD_ROOT}"
+    if ! npm_has_script test; then
+      echo "FATAL: cns-dashboard package.json must define scripts.test"
+      exit 1
+    fi
+    npm test
+  ) || { echo "CNS-DASHBOARD TESTS failed"; exit 1; }
+else
+  echo "(skip) cns-dashboard not found at ${CNS_DASHBOARD_ROOT} — set CNS_DASHBOARD_ROOT if relocated"
+fi
+
 # Trend ingest (Epic 44) — structured log + reliability audit unit tests
 if [[ -f scripts/trend-ingest.py ]]; then
   echo "==> python3 -m unittest tests.test_trend_ingest tests.test_trend_ingest_reliability"
-  python3 -m unittest tests.test_trend_ingest tests.test_trend_ingest_reliability -q
+  python3 -m unittest tests.test_trend_ingest tests.test_trend_ingest_reliability tests.test_trend_analytics_soak -q
 fi
 
 # Python projects

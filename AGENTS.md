@@ -20,7 +20,7 @@ All mutations go through WriteGate and the PAKE validation layer.
 - Install: npm install
 - Build: npm run build
 - Test: npm test
-- Verify: bash scripts/verify.sh
+- Verify: bash scripts/verify.sh (CNS + sibling cns-dashboard tests when present; `CNS_DASHBOARD_ROOT` to override)
 
 ## Safe Edit Policy
 Ask before: changing MCP tool signatures, modifying the audit log path,

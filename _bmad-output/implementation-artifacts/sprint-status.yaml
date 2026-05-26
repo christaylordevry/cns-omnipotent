@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-26T15:00:00+10:00
+# last_updated: 2026-05-27T00:00:00+00:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-26T14:30:00+00:00"
+last_updated: "2026-05-27T15:40:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -322,3 +322,13 @@ development_status:
   44-4-2-seven-day-pipeline-reliability-verification: review
   44-5-1-wire-trend-stub-panel-live-convex-queries: done
   44-5-2-flat-active-stale-signal-states-ui: done
+
+  epic-45: in-progress
+  45-1-schema-and-query-layer: review
+  45-2-trend-analyzer: done
+  45-3-trend-analysis-service: done
+  45-4-analytics-action-wire-schedule: done
+  45-5-anomaly-detection: done
+  45-6-arima-forecasting: done
+  45-7-reliability-soak-query-polish: review
+  45-7-soak: review
