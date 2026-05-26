@@ -552,3 +552,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - Log lines with `activeSources` length ≠ 1 are dropped from per-source stats — safe for cron (single source per run); manual multi-source runs are mis-counted.
 - Full log file read into memory on each audit — acceptable for 7-day JSONL at expected operator volume.
+
+## Deferred from: code review of 44-5-1-wire-trend-stub-panel-live-convex-queries (2026-05-26)
+
+- `docs/DEPLOY.md` cron/NVM troubleshooting rows are unrelated to Trend panel wire-up — commit separately from 44-5-1.
+- Ingest health footer does not show `errorCount` or `lastError` from `getSignalSources` rows — story 44-5-2 deepens FR36/UX-DR11 panel polish.

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-26T05:00:00+00:00"
+last_updated: "2026-05-26T14:30:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -320,3 +320,4 @@ development_status:
   44-3-3-cli-sources-polish-logging: done
   44-4-1-cron-install-documentation-env-example: done
   44-4-2-seven-day-pipeline-reliability-verification: review
+  44-5-1-wire-trend-stub-panel-live-convex-queries: done
