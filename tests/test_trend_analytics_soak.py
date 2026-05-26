@@ -32,6 +32,24 @@ class AnalyticsSoakAuditTests(unittest.TestCase):
         gap = max_computed_at_gap_minutes([base, base + 120 * 60_000])
         self.assertAlmostEqual(gap, 120.0)
 
+    def test_pass_timestamps_ignores_non_finite_computed_at(self) -> None:
+        pass_ms = 1_700_000_000_000
+        ts = datetime.fromtimestamp(pass_ms / 1000, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z"
+        )
+        records = [
+            {
+                "ts": ts,
+                "outcome": "ok",
+                "topics": [
+                    {"topicSlug": "a", "computedAt": float("nan"), "scored": True},
+                    {"topicSlug": "a", "computedAt": pass_ms, "scored": True},
+                ],
+            }
+        ]
+        by_topic = soak_mod._pass_timestamps_by_topic(records)
+        self.assertEqual(by_topic["a"], [pass_ms, pass_ms])
+
     def test_build_soak_report_fresh_scores(self) -> None:
         now = datetime.now(timezone.utc)
         ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")

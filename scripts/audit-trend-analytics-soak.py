@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+# Hourly cron (60m): freshness = period + 15m slack; gap = period + one missed pass (30m).
 SCORE_FRESHNESS_MAX_MINUTES = 75
 COMPUTED_AT_GAP_MAX_MINUTES = 90
 
@@ -80,6 +82,14 @@ def _records_in_window(
     return out
 
 
+def _finite_epoch_ms(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        return int(value)
+    return None
+
+
 def _pass_timestamps_by_topic(records: list[dict[str, Any]]) -> dict[str, list[int]]:
     by_topic: dict[str, list[int]] = {}
     for record in records:
@@ -104,8 +114,8 @@ def _pass_timestamps_by_topic(records: list[dict[str, Any]]) -> dict[str, list[i
                 continue
             if not entry.get("scored"):
                 continue
-            computed = entry.get("computedAt")
-            ts_ms = int(computed) if isinstance(computed, (int, float)) and computed else pass_ms
+            computed_ms = _finite_epoch_ms(entry.get("computedAt"))
+            ts_ms = computed_ms if computed_ms is not None else pass_ms
             by_topic.setdefault(slug, []).append(ts_ms)
     return by_topic
 
@@ -119,7 +129,9 @@ def _latest_computed_at_by_topic(records: list[dict[str, Any]]) -> dict[str, int
 
 
 def max_computed_at_gap_minutes(timestamps_ms: list[int]) -> float:
-    sorted_ts = sorted(t for t in timestamps_ms if isinstance(t, int))
+    sorted_ts = sorted(
+        int(t) for t in timestamps_ms if isinstance(t, (int, float)) and math.isfinite(t)
+    )
     if len(sorted_ts) < 2:
         return 0.0
     max_gap = 0.0
@@ -175,7 +187,12 @@ def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Audit trend analytics soak log (computedAt gaps and score freshness)."
     )
-    parser.add_argument("--log", type=Path, default=None, help="Analytics pass JSONL log path")
+    parser.add_argument(
+        "--log",
+        type=Path,
+        default=None,
+        help="Analytics pass JSONL log (default: TREND_ANALYTICS_LOG or ~/.hermes/logs/trend-analytics.log)",
+    )
     parser.add_argument("--days", type=float, default=7.0, help="Rolling window in days")
     parser.add_argument(
         "--max-gap-minutes",

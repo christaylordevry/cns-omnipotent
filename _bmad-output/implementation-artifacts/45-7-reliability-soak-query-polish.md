@@ -63,6 +63,14 @@ python3 scripts/audit-trend-analytics-soak.py --days 7
 - `Omnipotent.md/tests/test_trend_analytics_soak.py`
 - `Omnipotent.md/scripts/verify.sh`
 
+### Review Findings
+
+- [x] [Review][Patch] Document `TREND_ANALYTICS_LOG` in `scripts/trend-ingest.env.example` — fixed 2026-05-27
+- [x] [Review][Patch] Python soak audit `computedAt` used truthiness (`and computed`) — mis-handled `0`/NaN vs TS `Number.isFinite` [`scripts/audit-trend-analytics-soak.py`] — fixed 2026-05-27
+- [x] [Review][Patch] Document 75m/90m thresholds vs 60m hourly cron headroom [`convex/lib/analyticsSoak.ts`, `audit-trend-analytics-soak.py`] — fixed 2026-05-27
+- [x] [Review][Patch] `normalizeSignalDisplayValue` — add `Infinity` Vitest parity with `NaN` [`tests/lib/analytics-soak.test.ts`] — fixed 2026-05-27
+
 ### Change Log
 
 - 2026-05-27: Story 45-7 — soak logging, analytics audit script, query polish, tests.
+- 2026-05-27: Code review patches — env doc, soak threshold comments, Python finite-ms parity, Infinity clamp test.
