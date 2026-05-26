@@ -3,14 +3,14 @@ story_id: 44-3-3
 epic: 44
 planning_epic: "Epic 44 / Epic 3 Story 3.3"
 title: cli-sources-polish-logging
-status: review
+status: done
 output_repo: Omnipotent.md
 cns_repo_touch: scripts/trend-ingest.py
 ---
 
 # Story 44-3-3: Collector CLI source selection and logging
 
-Status: review
+Status: done
 
 **Planning map:** Epic 44 Story 3.3 — `44-3-3-cli-sources-polish-logging`.
 
@@ -78,6 +78,14 @@ So that **I can debug NewsAPI quota or Reddit token issues without reading cron 
 - [x] Unit tests for CLI polish + logging; regression on single-source collector gating
 - [x] Run `python3 -m unittest tests.test_trend_ingest` and `bash scripts/verify.sh`
 - [x] Update sprint-status → `review` after implementation (dev-story agent)
+
+### Review Findings
+
+- [x] [Review][Patch] Convex mutation body error omits httpStatus on HTTP 200 [`scripts/trend-ingest.py:463-474`] — Fixed: mutation/body errors raise `Convex HTTP {status}: …` so ingest log records `httpStatus`.
+- [x] [Review][Patch] Unhandled collector exceptions log misleading outcome ok [`scripts/trend-ingest.py:1363-1370`] — Fixed: `except Exception` sets `outcome: error` before `finally` writes the log line.
+- [x] [Review][Patch] No test for TREND_INGEST_LOG env override [`tests/test_trend_ingest.py`] — Fixed: `test_trend_ingest_log_env_override` plus `test_push_convex_body_error_logs_http_status_200` and `test_unhandled_collector_error_logs_error_outcome`.
+- [x] [Review][Defer] Operator guide logging section not updated — deferred to story 44-4-1 per Dev Agent Record.
+- [x] [Review][Defer] Story 44-3-3 code shipped in commit e4dc309 (dashboard-sync cron message) — pre-existing process gap; no functional defect.
 
 ## Dev Notes
 
@@ -183,6 +191,7 @@ Composer (dev-story)
 
 - 2026-05-26: Story 44-3-3 created — CLI `--source` polish + structured ingest logging (ready-for-dev).
 - 2026-05-26: Implemented CLI polish, ingest JSON logging, push HTTP status return, tests (review).
+- 2026-05-26: Code review patches — HTTP status on mutation errors, unhandled-exception log outcome, TREND_INGEST_LOG test (done).
 
 ### References
 

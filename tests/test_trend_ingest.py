@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -1533,6 +1534,78 @@ class IngestLogTests(unittest.TestCase):
             self.assertEqual(lines[0]["httpStatus"], 503)
             self.assertIn("error", lines[0])
 
+    def test_push_convex_body_error_logs_http_status_200(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            env = Path(tmp) / "trend-ingest.env"
+            env.write_text(
+                "CONVEX_URL=https://example.convex.cloud\n"
+                "CONVEX_DEPLOY_KEY=test-key\n",
+                encoding="utf-8",
+            )
+            log_path = Path(tmp) / "ingest.log"
+
+            def fail_push(*_a: object, **_k: object) -> int:
+                raise RuntimeError("Convex HTTP 200: validator rejected batch")
+
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(trend_ingest, "_default_ingest_env_path", return_value=env):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        with patch.object(trend_ingest, "push_signal_batch", side_effect=fail_push):
+                            code = run([])
+            self.assertEqual(code, 1)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(lines[0]["outcome"], "error")
+            self.assertEqual(lines[0]["httpStatus"], 200)
+            self.assertIn("validator rejected batch", lines[0]["error"])
+
+    def test_trend_ingest_log_env_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            log_path = Path(tmp) / "from-env.log"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.dict(os.environ, {"TREND_INGEST_LOG": str(log_path)}):
+                        from io import StringIO
+
+                        buf = StringIO()
+                        with patch("sys.stdout", buf):
+                            code = run(["--dry-run"])
+            self.assertEqual(code, 0)
+            self.assertTrue(log_path.is_file())
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(lines[0]["outcome"], "dry_run")
+
+    def test_unhandled_collector_error_logs_error_outcome(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wl = self._watchlist_file(tmp)
+            log_path = Path(tmp) / "ingest.log"
+            with patch.object(trend_ingest, "_default_watchlist_path", return_value=wl):
+                with patch.object(
+                    trend_ingest,
+                    "_default_ingest_env_path",
+                    return_value=Path(tmp) / "missing.env",
+                ):
+                    with patch.object(
+                        trend_ingest, "_default_ingest_log_path", return_value=log_path
+                    ):
+                        with patch.object(
+                            trend_ingest,
+                            "collect_news",
+                            side_effect=KeyError("unexpected collector fault"),
+                        ):
+                            code = run(["--dry-run", "--sources", "news"])
+            self.assertEqual(code, 1)
+            lines = self._read_log_lines(log_path)
+            self.assertEqual(lines[0]["outcome"], "error")
+            self.assertIn("unexpected collector fault", lines[0]["error"])
+
     def test_watchlist_only_live_push_logs_outcome(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wl = self._watchlist_file(tmp)
@@ -1576,6 +1649,51 @@ class IngestLogTests(unittest.TestCase):
                         code = run(["--dry-run"])
         self.assertEqual(code, 0)
         self.assertFalse(log_path.exists())
+
+    def test_trend_ingest_env_example_lists_required_keys(self) -> None:
+        example = (REPO_ROOT / "scripts" / "trend-ingest.env.example").read_text(
+            encoding="utf-8"
+        )
+        for key in (
+            "CONVEX_URL",
+            "CONVEX_DEPLOY_KEY",
+            "REDDIT_CLIENT_ID",
+            "REDDIT_CLIENT_SECRET",
+            "REDDIT_USER_AGENT",
+            "NEWSAPI_API_KEY",
+        ):
+            self.assertIn(key, example)
+        self.assertIn("chmod 600", example)
+
+    def test_collect_reddit_reuses_single_praw_client(self) -> None:
+        entries = [
+            trend_ingest.WatchlistEntry("alpha", "alpha", "us", 1),
+            trend_ingest.WatchlistEntry("beta", "beta", "us", 2),
+        ]
+        fake_reddit = object()
+        env = {
+            "REDDIT_CLIENT_ID": "id",
+            "REDDIT_CLIENT_SECRET": "secret",
+            "REDDIT_USER_AGENT": "test-agent",
+        }
+        with patch.object(
+            trend_ingest, "create_reddit_client", return_value=fake_reddit
+        ) as mock_create:
+            with patch.object(
+                trend_ingest, "fetch_reddit_mention_count", return_value=5.0
+            ) as mock_fetch:
+                events, patch_doc = trend_ingest.collect_reddit(
+                    entries,
+                    ingest_run_id="run-1",
+                    norm_cache={"version": 1, "entries": {}},
+                    env=env,
+                )
+        mock_create.assert_called_once_with(env)
+        self.assertEqual(mock_fetch.call_count, 2)
+        for call in mock_fetch.call_args_list:
+            self.assertIs(call.kwargs["reddit"], fake_reddit)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(patch_doc["name"], "reddit")
 
 
 if __name__ == "__main__":

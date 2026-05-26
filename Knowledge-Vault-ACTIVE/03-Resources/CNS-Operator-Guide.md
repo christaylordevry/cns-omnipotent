@@ -434,6 +434,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-23 | 1.32.1 | Session close **npm PATH:** Step 6.7 / `AUTO:TESTS` exports NVM `bin` before `npm test` in Hermes; dry-run skips vault-lint scan side effects | 43-1-cns-daily-rhythm-auto-blocks-via-session-close |
 | 2026-05-25 | 1.33.0 | **CNS Dashboard (Epic 42):** §16 production URL, Vercel password protection, Convex `PUBLIC_CONVEX_URL`, sync cron via `install-dashboard-sync-cron.sh` and `~/.hermes/dashboard-sync.env`; deploy runbook in `cns-dashboard/docs/DEPLOY.md` | 42-9-vercel-production-deploy |
 | 2026-05-26 | 1.33.1 | Dashboard sync cron exports NVM `bin` before `npx` (cron minimal PATH); reinstall via `install-dashboard-sync-cron.sh` | 42-9-vercel-production-deploy |
+| 2026-05-26 | 1.34.0 | **Trend ingest (Epic 44):** §16.5 watchlist, `trend-ingest.env`, cron install via `install-trend-ingest-cron.sh`, structured ingest log + NewsAPI quota notes | 44-4-1-cron-install-documentation-env-example |
 
 ---
 
@@ -945,4 +946,68 @@ From `cns-dashboard/`: `npx convex deploy` — use the same deployment URL for `
 2. Confirm header **last sync** is recent; if **stale banner** shows, check cron and `dashboard-sync.log`.
 3. Panels update via Convex subscriptions after each successful sync (no manual refresh).
 
-Epic 44 replaces the trend stub with live analytics; no operator change required until that epic ships.
+### 16.5 Trend ingest (Epic 44, operator)
+
+Scheduled **Python** pipeline pushes normalised trend signals to the same Convex deployment as dashboard sync. The browser never calls Google Trends, Reddit, or NewsAPI — ingest runs on WSL cron only.
+
+| Item | Location |
+|------|----------|
+| Ingest script | `Omnipotent.md/scripts/trend-ingest.py` |
+| Watchlist (authority) | `~/.hermes/trend-watchlist.yaml` |
+| Env file (mode **600**) | `~/.hermes/trend-ingest.env` |
+| Env example | `Omnipotent.md/scripts/trend-ingest.env.example` |
+| Norm cache (operator machine) | `~/.hermes/trend-norm-cache.json` |
+| Structured run log | `~/.hermes/logs/trend-ingest.log` (override: `TREND_INGEST_LOG`) |
+
+**First-time setup:**
+
+1. Create watchlist YAML with keywords (see PRD / architecture for schema).
+2. Copy env example and lock permissions:
+
+```sh
+cp /home/christ/ai-factory/projects/Omnipotent.md/scripts/trend-ingest.env.example ~/.hermes/trend-ingest.env
+chmod 600 ~/.hermes/trend-ingest.env
+```
+
+3. Edit `~/.hermes/trend-ingest.env`: `CONVEX_URL`, `CONVEX_DEPLOY_KEY` (same deployment as §16.2), plus Reddit (`REDDIT_*`) and NewsAPI (`NEWSAPI_API_KEY`) when those sources are enabled.
+4. Install Python deps on WSL: `pip install pytrends praw` (google_trends and reddit collectors).
+5. Dry-run smoke from Omnipotent.md repo root:
+
+```sh
+python3 scripts/trend-ingest.py --dry-run --sources news
+python3 scripts/trend-ingest.py --dry-run --source reddit
+python3 scripts/trend-ingest.py --dry-run --sources google_trends
+```
+
+6. Live push smoke (one source at a time):
+
+```sh
+python3 scripts/trend-ingest.py --sources news
+```
+
+**Cron install** (news + reddit every 15 min, google_trends hourly):
+
+```sh
+bash /home/christ/ai-factory/projects/Omnipotent.md/scripts/install-trend-ingest-cron.sh
+```
+
+Uses `scripts/run-trend-ingest-cron.sh` — do not `. trend-ingest.env` directly in crontab (same `/bin/sh` quoting issue as dashboard sync). Re-run the install script to refresh lines after repo moves. The wrapper exports `TREND_INGEST_LOG` (from `trend-ingest.env` or default) so Python JSON lines land in the same file as cron stderr; set a custom path in the env file, not only when running install. Cron uses system `python3` from `/usr/bin` (wrapper prepends `/usr/bin:/bin` to `PATH`).
+
+**Log troubleshooting:**
+
+Each successful run appends one JSON line from Python. Filter structured lines:
+
+```sh
+tail -1 ~/.hermes/logs/trend-ingest.log | jq .
+grep '"activeSources":\["news"\]' ~/.hermes/logs/trend-ingest.log | tail -3 | jq -c '{ts,outcome,httpStatus,error}'
+```
+
+Fields include `ingestRunId`, `activeSources`, `eventsEmitted`, `durationMs`, `httpStatus`, and `outcome` (`ok`, `error`, `watchlist_only`, `dry_run`). Cron may also append stderr from the wrapper — use `grep '^{'` when piping to `jq`.
+
+**NewsAPI quota (Journey 4):**
+
+Free/developer tier on [newsapi.org](https://newsapi.org) is typically **~100 requests/day**. Each watchlist keyword triggers one `/everything` call per **news** cron tick (every 15 minutes). A five-keyword watchlist can exhaust the free tier in one day.
+
+When news ingest fails with quota errors, check `signalSources` on the dashboard (Epic 44 panel) or ingest log `outcome: error`. Remediation: reduce watchlist size, widen news cron interval temporarily, rotate to a new dev key, or upgrade to NewsAPI **Business** tier for production-scale polling.
+
+**Partial degradation:** Reddit and google_trends crons are independent — a NewsAPI outage does not block other sources (FR16).

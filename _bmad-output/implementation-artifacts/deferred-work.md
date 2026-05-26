@@ -537,4 +537,13 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 ## Deferred from: code review of 44-3-2-reddit-news-collectors-norm-cache (2026-05-26)
 
-- New PRAW `Reddit()` client per keyword in `fetch_reddit_mention_count` — rate-limit/perf risk acceptable for v1 operator-scale watchlist; revisit with Epic 44 cron hardening (44-4-1).
+- ~~New PRAW `Reddit()` client per keyword~~ — **Resolved in 44-4-1:** `create_reddit_client` + one client per `collect_reddit` run.
+
+## Deferred from: code review of 44-4-1-cron-install-documentation-env-example (2026-05-26)
+
+- PRAW `Reddit()` client not explicitly closed after each cron run — low impact at operator watchlist scale; revisit if connection leaks show up in 44-4-2 reliability pass.
+
+## Deferred from: code review of 44-3-3-cli-sources-polish-logging (2026-05-26)
+
+- ~~Operator guide **Trend ingest logging** section~~ — **Resolved in 44-4-1:** CNS-Operator-Guide §16.5 (cron, log path, `jq`, NewsAPI quota).
+- Story 44-3-3 implementation landed in commit `e4dc309` (dashboard-sync cron message) — no functional defect; consider a dedicated commit message on future touch for traceability.

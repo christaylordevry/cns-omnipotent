@@ -462,16 +462,16 @@ def push_signal_batch(
 
     if payload.get("status") == "error":
         message = payload.get("errorMessage")
-        raise RuntimeError(
-            message if isinstance(message, str) else "Convex mutation failed"
-        )
+        detail = message if isinstance(message, str) else "Convex mutation failed"
+        raise RuntimeError(f"Convex HTTP {status}: {detail}")
     if payload.get("status") != "success":
         message = payload.get("errorMessage")
-        raise RuntimeError(
+        detail = (
             message
             if isinstance(message, str)
             else "Convex mutation returned unexpected status"
         )
+        raise RuntimeError(f"Convex HTTP {status}: {detail}")
 
     return int(status)
 
@@ -851,6 +851,38 @@ def require_reddit_credentials(env: dict[str, str]) -> tuple[str, str, str]:
     return client_id, client_secret, user_agent
 
 
+def create_reddit_client(env: dict[str, str]) -> Any:
+    """One PRAW client per reddit ingest run (cron hardening — 44-4-1)."""
+    if _praw is None:
+        raise RuntimeError("praw is required (pip install praw)")
+    client_id, client_secret, user_agent = require_reddit_credentials(env)
+    return _praw.Reddit(
+        client_id=client_id,
+        client_secret=client_secret,
+        user_agent=user_agent,
+    )
+
+
+def fetch_reddit_mention_count(
+    entry: WatchlistEntry,
+    *,
+    env: dict[str, str] | None = None,
+    reddit: Any | None = None,
+    window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
+) -> float:
+    if reddit is None:
+        if env is None:
+            raise ValueError("fetch_reddit_mention_count requires reddit or env")
+        reddit = create_reddit_client(env)
+    time_filter = _reddit_time_filter_for_window(window_hours)
+    count = 0
+    for _ in reddit.subreddit("all").search(
+        entry.keyword, time_filter=time_filter, limit=REDDIT_SEARCH_LIMIT
+    ):
+        count += 1
+    return float(count)
+
+
 def require_newsapi_key(env: dict[str, str]) -> str:
     api_key = env.get("NEWSAPI_API_KEY", "").strip()
     if not api_key:
@@ -866,29 +898,6 @@ def _reddit_time_filter_for_window(window_hours: int) -> str:
     if window_hours <= 720:
         return "month"
     return "year"
-
-
-def fetch_reddit_mention_count(
-    entry: WatchlistEntry,
-    *,
-    env: dict[str, str],
-    window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
-) -> float:
-    if _praw is None:
-        raise RuntimeError("praw is required (pip install praw)")
-    client_id, client_secret, user_agent = require_reddit_credentials(env)
-    reddit = _praw.Reddit(
-        client_id=client_id,
-        client_secret=client_secret,
-        user_agent=user_agent,
-    )
-    time_filter = _reddit_time_filter_for_window(window_hours)
-    count = 0
-    for _ in reddit.subreddit("all").search(
-        entry.keyword, time_filter=time_filter, limit=REDDIT_SEARCH_LIMIT
-    ):
-        count += 1
-    return float(count)
 
 
 def fetch_news_article_count(
@@ -1034,11 +1043,13 @@ def collect_reddit(
     count_fetcher: Callable[[WatchlistEntry], float] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     run_at = collected_at_ms or int(time.time() * 1000)
-    fetch = count_fetcher or (
-        lambda entry: fetch_reddit_mention_count(
-            entry, env=env, window_hours=REDDIT_NEWS_WINDOW_HOURS
+    if count_fetcher is None:
+        reddit = create_reddit_client(env)
+        fetch: Callable[[WatchlistEntry], float] = lambda entry: fetch_reddit_mention_count(
+            entry, reddit=reddit, window_hours=REDDIT_NEWS_WINDOW_HOURS
         )
-    )
+    else:
+        fetch = count_fetcher
     return collect_minmax_source(
         entries,
         source="reddit",
@@ -1360,6 +1371,13 @@ def run(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 0
+    except Exception as err:
+        if log_outcome == "ok":
+            print(f"FATAL: {err}", file=sys.stderr)
+            log_outcome = "error"
+            log_error = str(err)
+            exit_code = 1
+        return exit_code
     finally:
         write_run_log()
 
