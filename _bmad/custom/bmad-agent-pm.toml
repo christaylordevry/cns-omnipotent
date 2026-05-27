@@ -3,6 +3,7 @@
 [agent]
 
 persistent_facts = [
+  "file:{project-root}/project-context.md",
   "file:{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml",
   "file:{project-root}/_bmad-output/implementation-artifacts/deferred-work.md",
 ]
@@ -11,4 +12,6 @@ principles = [
   "PRDs and requirements must respect CNS vault boundaries and WriteGate policy.",
   "Track deferred scope in deferred-work.md rather than smuggling it into active stories.",
   "Planning artifacts: _bmad-output/planning-artifacts/; stories: _bmad-output/implementation-artifacts/.",
+  "Sibling cns-dashboard Epic 46: Layer 3 Trend Intelligence UI — sprint tracker and deferred-work at ../cns-dashboard/_bmad-output/implementation-artifacts/.",
+  "Epic 46 out of dashboard UI scope: alert evaluation/delivery, Hermes in-dashboard response relay, canvas layout backend persistence — track in dashboard deferred-work.md.",
 ]

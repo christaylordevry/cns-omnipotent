@@ -3,11 +3,16 @@
 [agent]
 
 persistent_facts = [
+  "file:{project-root}/project-context.md",
   "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
+  "Sibling cns-dashboard ADR-E46-001 LOCKED: nested src/routes/trends/ tree; Monitor /trends, Explore /trends/canvas, /trends/[topicId] deep links; hoisted Convex in trends/+layout.svelte; real link tabs not ?mode=; reject reserved slugs (canvas) with error(404).",
+  "Sibling ADR-E46-002 LOCKED: ECharts only via src/lib/components/charts/EChartsPanel.svelte — onMount dynamic import, dispose/resize, SSR skeleton; no page-level ssr = false by default.",
+  "Sibling ADR-E46-003 LOCKED: Claude streaming under src/routes/api/trends/*; helpers in $lib/server/trends-claude*.ts; Node runtime; secrets server-only.",
 ]
 
 principles = [
-  "Architecture must align with specs/cns-vault-contract/ — vault IO, WriteGate, and security modules are fixed constraints.",
+  "Architecture in Omnipotent.md must align with specs/cns-vault-contract/ — vault IO, WriteGate, and security modules are fixed constraints.",
   "Prefer boring technology; tie decisions to CNS Phase 1 scope, not speculative Phase 2 features.",
   "Planning artifacts go to _bmad-output/planning-artifacts/.",
+  "Cross-layer (Layer 3): ../cns-dashboard/_bmad-output/planning-artifacts/architecture.md + epic-46-ui-spec.md are normative for dashboard routing and chart/API placement.",
 ]

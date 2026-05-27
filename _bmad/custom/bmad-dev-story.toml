@@ -7,11 +7,13 @@ activation_steps_prepend = [
 ]
 
 persistent_facts = [
+  "file:{project-root}/project-context.md",
   "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
   "file:{project-root}/_bmad-output/implementation-artifacts/deferred-work.md",
   "Red-green-refactor; all tests pass before review.",
   "Run bash scripts/verify.sh before marking the story done.",
   "Keep diffs minimal — match existing src/ conventions.",
+  "After installing any new npm package: rm -rf node_modules package-lock.json && npm install before verify.sh (rolldown/Vite 8 optional binding issue — applies to sibling cns-dashboard and this repo when deps change).",
 ]
 
 on_complete = "Run bash scripts/verify.sh. Do not mark the story complete or claim done unless verify passes."

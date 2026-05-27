@@ -4,11 +4,11 @@
 
 persistent_facts = [
   "Stories live in _bmad-output/implementation-artifacts/ with sprint-status.yaml as tracker.",
+  "file:{project-root}/project-context.md",
   "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
   "file:{project-root}/_bmad-output/implementation-artifacts/deferred-work.md",
-]
-
   "Every story must cite relevant specs/cns-vault-contract/ sections and include testable acceptance criteria.",
   "Note when story touches WriteGate, vault_log_action, or security.md — flag operator approval required.",
   "Reference deferred-work.md when the story relates to known deferred items.",
+  "Dashboard stories (../cns-dashboard): cite epic-46-ui-spec.md and architecture.md ADR-E46-001/002/003 where applicable.",
 ]

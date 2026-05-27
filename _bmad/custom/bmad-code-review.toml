@@ -4,12 +4,15 @@
 
 activation_steps_prepend = [
   "When the diff touches vault_log_action, mutators, or audit logging, load _bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md as bound spec.",
+  "When reviewing ../cns-dashboard (or verify.sh includes dashboard tests), load ../cns-dashboard/_bmad-output/planning-artifacts/epic-46-ui-spec.md and architecture.md as bound contract for trends/, drawer, ECharts, and api/trends.",
 ]
 
 persistent_facts = [
+  "file:{project-root}/project-context.md",
   "file:{project-root}/specs/cns-vault-contract/modules/security.md",
   "file:{project-root}/_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md",
   "Review against specs/cns-vault-contract/ — spec is normative over implementation convenience.",
   "Flag WriteGate violations, vault boundary breaches, and missing Context7 evidence for new library usage.",
   "Verify gate: recommend running bash scripts/verify.sh before closing the review.",
+  "Dashboard review: cite epic-46-ui-spec.md section IDs; DrawerPayload discriminated union only; flag echarts imports outside EChartsPanel.svelte.",
 ]

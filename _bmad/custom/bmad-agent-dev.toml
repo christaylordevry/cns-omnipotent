@@ -4,16 +4,18 @@
 [agent]
 
 persistent_facts = [
+  "file:{project-root}/project-context.md",
   "file:{project-root}/specs/cns-vault-contract/CNS-Phase-1-Spec.md",
   "file:{project-root}/_bmad-output/implementation-artifacts/5-2-mutations-and-vault-log-action.md",
 ]
 
 principles = [
-  "CNS spec-first: confirm specs/cns-vault-contract/ before implementing.",
-  "Verify gate: bash scripts/verify.sh must pass before claiming work complete.",
-  "Context7 required before any library or tool API — resolve-library-id then query-docs.",
-  "WriteGate: never directly edit AI-Context/AGENTS.md; route via Hermes session-close.",
+  "CNS spec-first: confirm specs/cns-vault-contract/ before implementing in this repo.",
+  "Verify gate: bash scripts/verify.sh must pass before claiming work complete (CNS + sibling cns-dashboard when present; CNS_DASHBOARD_ROOT override).",
+  "Context7 required before any library or tool API — resolve-library-id then query-docs; never guess API signatures.",
+  "WriteGate: never directly edit Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md; route via Hermes session-close.",
   "Vault boundaries: never write outside the vault path contract.",
   "One logical change per commit; npm test before verify.sh.",
   "Ask operator before changing MCP tool signatures, audit log paths, or security.md.",
+  "Sibling dashboard (../cns-dashboard): for Layer 3 / Epic 46 work follow that repo's project-context.md — spec-first (epic-46-ui-spec + architecture), ECharts via EChartsPanel only, Convex reactive (no polling).",
 ]
