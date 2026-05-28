@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.3
+version: 1.0.4
 author: CNS Operator
 license: MIT
 metadata:
@@ -30,7 +30,7 @@ Use terminal toolset only. First action is always:
 node "${OMNIPOTENT_REPO}/scripts/session-close/run-deterministic.mjs" [--dry-run]
 ```
 
-If `.session-close/context-pack.json` is missing after Phase A, stop and report failure from `close-report.json`.
+If Phase A fails, stop and report from `close-report.json` (`failure_class`, `steps.*`).
 
 ## Bounded LLM pass (Section 8 only)
 
@@ -47,7 +47,11 @@ Real close only, apply the draft:
 node "${OMNIPOTENT_REPO}/scripts/session-close/gate-apply-section8.mjs" --draft ".session-close/section8-draft.md"
 ```
 
-`--draft` is relative to `OMNIPOTENT_REPO`, not the shell cwd. If the gate exits **1** with stderr containing `phase B token check ABORTED`, treat it as a **controlled skip** (§8 not applied): read `phase_b_token_check` from `.session-close/close-report.json`, still render the Discord reply, and surface the ABORT in the reply. Do not fail the whole session close for token ABORT alone.
+`--draft` is relative to `OMNIPOTENT_REPO`, not the shell cwd.
+
+**Phase A gate (inside `gate-apply-section8.mjs`):** Before token check or apply, the gate may **re-run Phase A once** when `context-pack.json` / `close-report.json` are missing or incomplete. If Phase A still cannot proceed, the gate exits **1** with stderr mentioning `Phase A incomplete` or `Phase A failed`; read `phase_a_gate` and `failure_class` from `.session-close/close-report.json`. Do not call `apply-section8.mjs` directly.
+
+**Phase B token ABORT:** If the gate exits **1** with stderr containing `phase B token check ABORTED`, treat it as a **controlled skip** (§8 not applied): read `phase_b_token_check` from `.session-close/close-report.json`, still render the Discord reply, and surface the ABORT in the reply. Do not fail the whole session close for token ABORT alone.
 
 ## Reply and NotebookLM fan-out
 

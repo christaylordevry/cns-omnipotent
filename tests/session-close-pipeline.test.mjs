@@ -20,6 +20,8 @@ import { buildContextPack } from "../scripts/session-close/prepare-context.mjs";
 import {
   buildCloseReport,
   enrichNotebooklmTargets,
+  ensurePhaseAComplete,
+  evaluatePhaseACompletion,
   parseVitestTestsSummary,
   runDeterministicPipeline,
 } from "../scripts/session-close/run-deterministic.mjs";
@@ -459,6 +461,115 @@ describe("session-close run-deterministic", () => {
     assert.equal(report.deterministic.export_bytes, 42);
     assert.equal(report.notebooklm_targets[0].export_path, "/p");
     assert.ok(!JSON.stringify(report).includes("api_key"));
+  });
+
+  it("evaluatePhaseACompletion PASSED after dry-run pipeline", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-phase-a-pass-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      await runDeterministicPipeline({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      const result = await evaluatePhaseACompletion({
+        contextPackPath: join(fixtureRoot, ".session-close", "context-pack.json"),
+        closeReportPath: join(fixtureRoot, ".session-close", "close-report.json"),
+      });
+      assert.equal(result.status, "PASSED");
+      assert.equal(result.reasons.length, 0);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("evaluatePhaseACompletion INCOMPLETE when context-pack missing", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-phase-a-missing-"));
+    const packPath = join(fixtureRoot, ".session-close", "context-pack.json");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+
+    try {
+      const result = await evaluatePhaseACompletion({
+        contextPackPath: packPath,
+        closeReportPath: reportPath,
+      });
+      assert.equal(result.status, "INCOMPLETE");
+      assert.ok(result.reasons.some((r) => r.includes("context-pack.json missing")));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("ensurePhaseAComplete retries Phase A when artifacts missing", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-phase-a-retry-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      const result = await ensurePhaseAComplete({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(result.status, "PASSED");
+      await access(join(fixtureRoot, ".session-close", "context-pack.json"));
+      await access(join(fixtureRoot, ".session-close", "close-report.json"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("ensurePhaseAComplete aborts when prepare_context failed", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-phase-a-fail-"));
+    const vault = join(fixtureRoot, "vault");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    const packPath = join(fixtureRoot, ".session-close", "context-pack.json");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        mode: "real",
+        failure_class: "pipeline",
+        steps: { prepare_context: { status: "failed", message: "boom" } },
+      })}\n`,
+      "utf8",
+    );
+    await writeFile(
+      packPath,
+      `${JSON.stringify({
+        generated_at: new Date().toISOString(),
+        mode: "real",
+        repo_root: fixtureRoot,
+        vault_root: vault,
+        agents: {},
+        sprint: {},
+        recent_stories: [],
+        deterministic: {},
+        notebooklm_targets: [],
+        token_budget: {},
+      })}\n`,
+      "utf8",
+    );
+
+    try {
+      await assert.rejects(
+        () =>
+          ensurePhaseAComplete({
+            repoRoot: fixtureRoot,
+            vaultRoot: vault,
+            retry: false,
+          }),
+        /Phase A failed: cannot proceed to Phase B/,
+      );
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.phase_a_gate.status, "ABORTED");
+      assert.equal(report.failure_class, "pipeline");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
   });
 });
 

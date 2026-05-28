@@ -15,8 +15,15 @@ import { promisify } from "node:util";
 
 import { buildContextPack, writeContextPack } from "./prepare-context.mjs";
 import { runRefreshDailyRhythm } from "./refresh-daily-rhythm.mjs";
+import {
+  evaluatePhaseACompletion,
+  formatPhaseAGateError,
+  recordPhaseAGateFailure,
+} from "./lib/phase-a-completion-gate.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
 import { runWriteMemory } from "./write-memory.mjs";
+
+export { evaluatePhaseACompletion, PHASE_A_REQUIRED_PACK_KEYS } from "./lib/phase-a-completion-gate.mjs";
 
 /**
  * SC-3 / ADR: MEMORY and daily rhythm run after apply-section8 in the full Hermes
@@ -411,6 +418,50 @@ export async function runDeterministicPipeline(opts = {}) {
   await writeFile(paths.closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   return { pack, report, paths };
+}
+
+/**
+ * Hard gate before Phase B: require Phase A artifacts; retry Phase A once when incomplete.
+ *
+ * @param {{
+ *   dryRun?: boolean;
+ *   repoRoot?: string;
+ *   vaultRoot?: string;
+ *   contextPackPath?: string;
+ *   closeReportPath?: string;
+ *   retry?: boolean;
+ * }} [opts]
+ */
+export async function ensurePhaseAComplete(opts = {}) {
+  const paths = resolvePaths({
+    repoRoot: opts.repoRoot,
+    vaultRoot: opts.vaultRoot,
+  });
+  const contextPackPath = opts.contextPackPath ?? paths.contextPackPath;
+  const closeReportPath = opts.closeReportPath ?? paths.closeReportPath;
+  const dryRun = Boolean(opts.dryRun);
+  const allowRetry = opts.retry !== false;
+
+  let result = await evaluatePhaseACompletion({ contextPackPath, closeReportPath });
+  if (result.status === "PASSED") {
+    return result;
+  }
+
+  if (result.status === "INCOMPLETE" && allowRetry) {
+    await runDeterministicPipeline({
+      dryRun,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    result = await evaluatePhaseACompletion({ contextPackPath, closeReportPath });
+    if (result.status === "PASSED") {
+      return result;
+    }
+  }
+
+  await recordPhaseAGateFailure(closeReportPath, result);
+  const retryHint = `node scripts/session-close/run-deterministic.mjs${dryRun ? " --dry-run" : ""}`;
+  throw new Error(`${formatPhaseAGateError(result)}. Re-run Phase A: ${retryHint}`);
 }
 
 async function main() {

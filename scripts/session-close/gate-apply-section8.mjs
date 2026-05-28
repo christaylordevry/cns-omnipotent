@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import { parseApplySection8Argv, runApplySection8 } from "./apply-section8.mjs";
 import { evaluatePhaseBDraftTokens, recordPhaseBTokenCheck } from "./lib/phase-b-token-gate.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { ensurePhaseAComplete } from "./run-deterministic.mjs";
 import { SECTION8_DRAFT_TOKEN_LIMIT } from "./lib/token-estimate.mjs";
 
 /**
@@ -43,6 +44,15 @@ export async function runGateApplySection8(opts) {
     vaultRoot: opts.vaultRoot,
   });
   const closeReportPath = opts.closeReportPath ?? paths.closeReportPath;
+
+  await ensurePhaseAComplete({
+    dryRun: opts.dryRun,
+    repoRoot: paths.repoRoot,
+    vaultRoot: paths.vaultRoot,
+    contextPackPath: opts.contextPackPath ?? paths.contextPackPath,
+    closeReportPath,
+  });
+
   const draftPath = resolveGateDraftPath(opts.draftPath, paths.repoRoot);
 
   let draftRaw;
