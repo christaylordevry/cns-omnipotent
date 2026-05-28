@@ -186,9 +186,13 @@ async function runNpmTest(repoRoot, env) {
  */
 export async function runDeterministicPipeline(opts = {}) {
   const dryRun = Boolean(opts.dryRun);
+  const OMNIPOTENT_REPO =
+    process.env.OMNIPOTENT_REPO || "/home/christ/ai-factory/projects/Omnipotent.md";
+  const CNS_VAULT_ROOT =
+    process.env.CNS_VAULT_ROOT || "/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE";
   const paths = resolvePaths({
-    repoRoot: opts.repoRoot,
-    vaultRoot: opts.vaultRoot,
+    repoRoot: opts.repoRoot ?? OMNIPOTENT_REPO,
+    vaultRoot: opts.vaultRoot ?? CNS_VAULT_ROOT,
   });
 
   /** @type {Record<string, string>} */
