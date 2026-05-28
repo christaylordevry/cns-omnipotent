@@ -218,9 +218,38 @@ export async function readHermesProviderLine() {
  * @returns {Promise<unknown[]>}
  */
 export async function readNotebookLmTargets(vaultRoot, exportPath) {
-  const rawEnv = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-  if (typeof rawEnv === "string") {
-    const ids = rawEnv
+  /** @type {string} */
+  let notebookIds = typeof process.env.NOTEBOOKLM_NOTEBOOK_IDS === "string" ? process.env.NOTEBOOKLM_NOTEBOOK_IDS : "";
+  if (!notebookIds.trim()) {
+    const envPath = join(homedir(), ".hermes", "session-close.env");
+    try {
+      const rawEnvFile = await readFile(envPath, "utf8");
+      for (const line of rawEnvFile.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) {
+          continue;
+        }
+        const match = trimmed.match(/^(?:export\s+)?NOTEBOOKLM_NOTEBOOK_IDS\s*=\s*(.*)$/);
+        if (!match) {
+          continue;
+        }
+        let value = (match[1] ?? "").trim();
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1).trim();
+        }
+        notebookIds = value;
+        break;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (notebookIds.trim()) {
+    const ids = notebookIds
       .split(",")
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
