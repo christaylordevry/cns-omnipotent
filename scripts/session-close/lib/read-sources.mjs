@@ -214,9 +214,25 @@ export async function readHermesProviderLine() {
 
 /**
  * @param {string} vaultRoot
- * @returns {Promise<{ notebook_id: string, title: string }[]>}
+ * @param {string} exportPath
+ * @returns {Promise<unknown[]>}
  */
-export async function readNotebookLmTargets(vaultRoot) {
+export async function readNotebookLmTargets(vaultRoot, exportPath) {
+  const rawEnv = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+  if (typeof rawEnv === "string") {
+    const ids = rawEnv
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    if (ids.length > 0) {
+      return ids.map((notebook_id) => ({
+        notebook_id,
+        source_name: "CNS Vault Export",
+        source_type: "file",
+        file_path: exportPath,
+      }));
+    }
+  }
   for (const rel of PROJECT_MAP_CANDIDATES) {
     const abs = join(vaultRoot, rel);
     let raw;

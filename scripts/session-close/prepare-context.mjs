@@ -29,10 +29,10 @@ export async function buildContextPack(opts = {}) {
   const sprint = await readSprintSnapshot(paths.sprintPath, paths.repoRoot);
   const recent_stories = await selectRecentStories(paths.artifactsDir, 3);
   const vault_lint = await readVaultLintSummary(paths.vaultRoot);
-  const notebooklm_targets = await readNotebookLmTargets(paths.vaultRoot);
   const hermes_provider = await readHermesProviderLine();
 
   const exportPath = join(paths.repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+  const notebooklm_targets = await readNotebookLmTargets(paths.vaultRoot, exportPath);
 
   /** @type {Record<string, unknown>} */
   const pack = {
