@@ -31,7 +31,14 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("run-deterministic.mjs"));
     assert.ok(body.includes(".session-close/context-pack.json"));
     assert.ok(body.includes("section8-draft.md"));
-    assert.ok(body.includes("apply-section8.mjs"));
+    assert.ok(body.includes("gate-apply-section8.mjs"));
+    assert.ok(body.includes("phase B token check ABORTED"));
+    assert.ok(body.includes("phase_b_token_check"));
+    assert.ok(body.includes("relative to `OMNIPOTENT_REPO`"));
+    assert.ok(
+      !body.includes("scripts/session-close/apply-section8.mjs"),
+      "Phase B must invoke gate-apply-section8, not apply-section8 directly",
+    );
     assert.ok(body.includes("close-report.json"));
     assert.ok(body.includes("title: \"My Knowledge Base\""));
     assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");

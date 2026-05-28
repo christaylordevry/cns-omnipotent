@@ -4,7 +4,8 @@ Use the close report at `.session-close/close-report.json` as the only source of
 
 Notes:
 
-- `close-report.json` contains `mode`, `failure_class`, and a `steps` object. Most human-friendly fields below are derived from `steps.*`.
+- `close-report.json` contains `mode`, `failure_class`, `phase_b_token_check` (when Phase B ran), and a `steps` object. Most human-friendly fields below are derived from `steps.*`.
+- If `phase_b_token_check.status` is `ABORTED`, §8 was not applied; mention token count and reason (do not treat as `failure_class: section8`).
 - Keep the reply short. Do not paste raw vault export content, sprint YAML, or AGENTS text.
 
 ```markdown

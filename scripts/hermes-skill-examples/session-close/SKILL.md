@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.1
+version: 1.0.3
 author: CNS Operator
 license: MIT
 metadata:
@@ -44,8 +44,10 @@ Write `.session-close/section8-draft.md` within 1,500 tokens.
 Real close only, apply the draft:
 
 ```bash
-node "${OMNIPOTENT_REPO}/scripts/session-close/apply-section8.mjs" --draft ".session-close/section8-draft.md"
+node "${OMNIPOTENT_REPO}/scripts/session-close/gate-apply-section8.mjs" --draft ".session-close/section8-draft.md"
 ```
+
+`--draft` is relative to `OMNIPOTENT_REPO`, not the shell cwd. If the gate exits **1** with stderr containing `phase B token check ABORTED`, treat it as a **controlled skip** (§8 not applied): read `phase_b_token_check` from `.session-close/close-report.json`, still render the Discord reply, and surface the ABORT in the reply. Do not fail the whole session close for token ABORT alone.
 
 ## Reply and NotebookLM fan-out
 

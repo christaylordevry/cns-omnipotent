@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-25
+modified: 2026-05-29
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -437,6 +437,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-26 | 1.34.0 | **Trend ingest (Epic 44):** §16.5 watchlist, `trend-ingest.env`, cron install via `install-trend-ingest-cron.sh`, structured ingest log + NewsAPI quota notes | 44-4-1-cron-install-documentation-env-example |
 | 2026-05-26 | 1.34.1 | §16.5 reliability verification — `audit-trend-ingest-reliability.py`, 7-day NFR-R1 audit, partial degradation + NFR-R2/R5 checks | 44-4-2-seven-day-pipeline-reliability-verification |
 | 2026-05-28 | 1.35.0 | Session close §15.4 updated: two-phase pipeline, env file, dry-run behavior, token cap, no git commit | 48-6-session-close-operator-guide-and-hermes-smoke |
+| 2026-05-29 | 1.36.0 | **Morning digest skill (49-6):** §15.11 trend briefing (Google Trends + NewsAPI + Perplexity, no vault writes, 08:00 machine-local cron); §15.2 legacy 26-7 WSL cron line **disabled (commented)** — scripts retained as fallback | 49-6-morning-digest-upgrade |
 
 ---
 
@@ -604,7 +605,9 @@ Hermes is a separate agent stack from Nexus. It uses the **Hermes Discord gatewa
 
 Discord Developer Portal must enable **Message Content Intent** for the Hermes application when upstream returns `PrivilegedIntentsRequired`.
 
-### 15.2 Morning digest (HI-7, 07:00 Australia/Sydney)
+### 15.2 Legacy morning digest — Mode B inbox (Story 26-7, manual fallback)
+
+> [!note] **Superseded for daily automation by §15.11 (Story 49-6).** When the **`morning-digest`** Hermes skill is installed, **comment out** the WSL crontab line below so you do not get two Discord briefings (~07:00 Mode B + ~08:00 trend digest). **Keep** all scripts in this section for manual runs or inbox capture if the new digest misses something.
 
 **Vault persistence mode:** **Mode B (inbox file).** `vault_append_daily` in the Vault IO MCP server keys the daily note filename from **UTC** `YYYY-MM-DD` only. At 07:00 civil time in `Australia/Sydney`, the Sydney calendar date can differ from the UTC date, so this digest uses **direct filesystem write** under `00-Inbox/` only: `00-Inbox/hermes-morning-digest-YYYY-MM-DD.md` where the date is computed in `Australia/Sydney`. Governed folders are not touched without Vault IO MCP.
 
@@ -619,13 +622,14 @@ Discord Developer Portal must enable **Message Content Intent** for the Hermes a
 
 **WSL limitation:** User `crontab` does not run when WSL or the host is off. Same class of limitation as other WSL automation; use tmux or systemd user units for gateway persistence per Hermes docs.
 
-**Exact WSL crontab line (env var names only; no secrets):**
+**WSL crontab line (disable when using §15.11 — comment out, do not delete scripts):**
 
 ```cron
-0 7 * * * CRON_TZ=Australia/Sydney /usr/bin/env bash -lc 'mkdir -p "$HOME/.hermes/logs" && /home/christ/ai-factory/projects/Omnipotent.md/scripts/hermes-morning-digest.sh >>"$HOME/.hermes/logs/morning-digest-cron.log" 2>&1'
+# DISABLED — Story 49-6 morning-digest skill supersedes scheduled 26-7 runs (scripts kept as fallback)
+# 0 7 * * * CRON_TZ=Australia/Sydney /usr/bin/env bash -lc 'mkdir -p "$HOME/.hermes/logs" && /home/christ/ai-factory/projects/Omnipotent.md/scripts/hermes-morning-digest.sh >>"$HOME/.hermes/logs/morning-digest-cron.log" 2>&1'
 ```
 
-Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the Hermes job once before relying on cron: `bash scripts/install-hermes-morning-digest-job.sh` from the repo root (requires `.env.live-chain` with `HERMES_DISCORD_TOKEN`). **Re-run the install script** after editing `scripts/hermes-morning-digest-prompt.md` so the Hermes-stored job text picks up changes.
+Adjust the script path if your Omnipotent.md clone lives elsewhere. For **manual** 26-7 runs: `bash scripts/hermes-morning-digest.sh` with gateway up. Install the Hermes job once before manual/cron use: `bash scripts/install-hermes-morning-digest-job.sh` from the repo root (requires `.env.live-chain` with `HERMES_DISCORD_TOKEN`). **Re-run the install script** after editing `scripts/hermes-morning-digest-prompt.md` so the Hermes-stored job text picks up changes.
 
 **Evidence discipline:** Keep redacted Discord links or channel IDs only; never commit tokens or `.env` bodies.
 
@@ -916,6 +920,33 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - Install helper: `bash scripts/install-hermes-skill-vault-lint.sh`
 - Destination: `~/.hermes/skills/cns/vault-lint/`
 - Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.
+
+### 15.11 Morning digest skill (`morning-digest`, Story 49-6)
+
+**Skill version:** **1.0.0** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend. **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+
+**Differs from §15.2 (26-7):** Legacy digest is **Mode B inbox** constitution/open-loops at **07:00**; this skill is **read-only research** at default **08:00 machine-local**. Disable the §15.2 WSL cron line (comment out) when this skill is active; keep 26-7 scripts for manual fallback.
+
+| Item | Value |
+|------|--------|
+| Manual trigger | Post `morning-digest` in `#hermes` (case-insensitive, single line) |
+| Default schedule | **08:00 machine-local** (`0 8 * * *`) — uses WSL system TZ / `process.env.TZ`, not hardcoded `Australia/Sydney` |
+| Schedule override | `MORNING_DIGEST_CRON` env or `morning_digest.cron` in `~/.hermes/config.yaml` |
+| Repo mirror | `scripts/hermes-skill-examples/morning-digest/` |
+| Install helper | `bash scripts/install-hermes-skill-morning-digest.sh` |
+| Cron docs | `references/cron-snippet.md` in skill mirror |
+| Credentials | `~/.hermes/trend-ingest.env` (`NEWSAPI_API_KEY`), `~/.hermes/trend-watchlist.yaml`, optional `OMNIPOTENT_REPO` |
+| Coexistence | **`investigate-trend`** uses a different trigger prefix; bind both to `#hermes` if needed |
+
+**Install and smoke test:**
+
+1. `bash scripts/install-hermes-skill-morning-digest.sh`
+2. Add **`morning-digest`** to `#hermes` `discord.channel_skill_bindings` (see `references/config-snippet.md`).
+3. Ensure Hermes gateway is running; post **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Recommended focus).
+4. Optional cron: `hermes cron create "0 8 * * *" ... --name morning-digest --deliver discord` (see skill `references/cron-snippet.md`).
+5. **Migration:** comment out §15.2 WSL crontab line; do **not** delete `scripts/hermes-morning-digest.sh` or related 26-7 files.
+
+**Gateway dependency:** Same as §15.2 — cron wrappers must not claim delivery if `hermes gateway status` shows gateway down.
 
 ---
 
