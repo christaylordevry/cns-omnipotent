@@ -18,6 +18,7 @@ cp -a "$SRC_DIR/." "$DEST_DIR/"
 for f in \
   "SKILL.md" \
   "references/section8-synthesis.md" \
+  "references/discord-reply-template.md" \
   "references/trigger-pattern.md"; do
   if ! cmp -s "$SRC_DIR/$f" "$DEST_DIR/$f"; then
     echo "install-hermes-skill-session-close: parity check failed for $f" >&2

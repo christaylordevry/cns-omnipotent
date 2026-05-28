@@ -4,7 +4,7 @@ baseline_commit: 1bb635898d59403fa8684fa9014a93de835669cd
 
 # Story 48.5 (SC-5): Session-close slim skill package and tests
 
-Status: in-progress
+Status: done
 
 Epic: **48** (Session-close context reduction — FR-17..19)  
 Tracked in sprint-status as: **`48-5-session-close-slim-skill-package-and-tests`**
@@ -89,10 +89,16 @@ so that **`/session-close` uses ≤6k LLM tokens** while preserving close parity
 
 ## Tasks / Subtasks
 
-- [ ] Refactor `SKILL.md` to router (AC: skill, metadata, dry-run, pipeline)
-- [ ] Add synthesis + discord + config refs; archive task-prompt (AC: references)
-- [ ] Update install script if paths change (AC: install)
-- [ ] Extend hermes-session-close + pipeline tests (AC: verify)
+- [x] Refactor `SKILL.md` to router (AC: skill, metadata, dry-run, pipeline)
+- [x] Add synthesis + discord + config refs; archive task-prompt (AC: references)
+- [x] Update install script if paths change (AC: install)
+- [x] Extend hermes-session-close + pipeline tests (AC: verify)
+
+### Review Findings
+
+- [x] [Review][Patch] Installer parity check omits `discord-reply-template.md` [`scripts/install-hermes-skill-session-close.sh`]
+- [x] [Review][Patch] Discord reply template placeholders do not match `close-report.json` schema [`scripts/hermes-skill-examples/session-close/references/discord-reply-template.md`]
+- [x] [Review][Patch] Router trigger validation needs explicit reject behavior (not just “only accept” list) [`scripts/hermes-skill-examples/session-close/SKILL.md`]
 
 ## Dev Notes
 
@@ -103,10 +109,33 @@ so that **`/session-close` uses ≤6k LLM tokens** while preserving close parity
 
 ## Dev Agent Record
 
-_(pending dev-story)_
+### Debug Log
+
+- Updated `scripts/hermes-skill-examples/session-close/` to a slim router package.
+- Updated install parity checks and hardened tests to enforce the new router contract.
+- Verified `npm test` passes, and `bash scripts/verify.sh` is green (642 tests).
+
+### Completion Notes
+
+- Slimmed `session-close` skill into a router that hard-gates on `run-deterministic.mjs`, reads only `.session-close/context-pack.json` + `references/section8-synthesis.md`, writes `.session-close/section8-draft.md`, and applies via `apply-section8.mjs`.
+- Added new reference files: `section8-synthesis.md`, `discord-reply-template.md`, and archived monolith as `task-prompt.legacy.md`.
+- Updated installer to `cmp` parity-check `SKILL.md`, `section8-synthesis.md`, and `trigger-pattern.md`.
+- Updated regression tests to assert router behavior and absence of monolithic activation content.
+
+### File List
+
+- `scripts/hermes-skill-examples/session-close/SKILL.md`
+- `scripts/hermes-skill-examples/session-close/references/config-snippet.md`
+- `scripts/hermes-skill-examples/session-close/references/section8-synthesis.md` (new)
+- `scripts/hermes-skill-examples/session-close/references/discord-reply-template.md` (new)
+- `scripts/hermes-skill-examples/session-close/references/task-prompt.legacy.md` (new)
+- `scripts/hermes-skill-examples/session-close/references/task-prompt.md` (deleted)
+- `scripts/install-hermes-skill-session-close.sh`
+- `tests/hermes-session-close-skill.test.mjs`
 
 ## Change Log
 
 | Date | Change |
 |------|--------|
 | 2026-05-28 | Story SC-5 created from ADR |
+| 2026-05-28 | Implemented slim session-close skill router package, installer parity checks, and regression tests; verify gate green |

@@ -20,6 +20,8 @@ Follow `references/trigger-pattern.md`. Only accept:
 - `/session-close`
 - `/session-close --dry-run`
 
+Reject everything else (extra flags, trailing text, multi-line input). Do not run any tools.
+
 ## Hard gate (Phase A, deterministic)
 
 Use terminal toolset only. First action is always:

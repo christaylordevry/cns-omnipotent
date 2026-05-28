@@ -35,6 +35,9 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("close-report.json"));
     assert.ok(body.includes("title: \"My Knowledge Base\""));
     assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
+
+    const installScript = readFileSync(join(root, "scripts/install-hermes-skill-session-close.sh"), "utf8");
+    assert.ok(installScript.includes("references/discord-reply-template.md"));
   });
 
   it("documents bounded Section 8 synthesis and reply template", () => {
