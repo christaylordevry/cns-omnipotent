@@ -1,6 +1,10 @@
+---
+baseline_commit: 1bb635898d59403fa8684fa9014a93de835669cd
+---
+
 # Story 48.5 (SC-5): Session-close slim skill package and tests
 
-Status: ready-for-dev
+Status: in-progress
 
 Epic: **48** (Session-close context reduction — FR-17..19)  
 Tracked in sprint-status as: **`48-5-session-close-slim-skill-package-and-tests`**

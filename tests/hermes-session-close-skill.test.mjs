@@ -7,104 +7,47 @@ import { describe, it } from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skillDir = join(root, "scripts/hermes-skill-examples/session-close");
 const skillPath = join(skillDir, "SKILL.md");
-const taskPromptPath = join(skillDir, "references/task-prompt.md");
+const section8SynthesisPath = join(skillDir, "references/section8-synthesis.md");
+const discordReplyTemplatePath = join(skillDir, "references/discord-reply-template.md");
+const taskPromptLegacyPath = join(skillDir, "references/task-prompt.legacy.md");
 const triggerPatternPath = join(skillDir, "references/trigger-pattern.md");
 const dailyRhythmStaticPath = join(skillDir, "references/daily-rhythm-static-rows.md");
 const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md");
 
-const AUTO_MARKERS = [
-  "PROVIDER",
-  "VAULT_NOTES",
-  "VAULT_HEALTH",
-  "SPRINT",
-  "AGENTS_VERSION",
-  "SKILLS_COUNT",
-  "TESTS",
-  "LAST_SESSION",
-  "ACTIVE_PROJECTS",
-  "DEFERRED_SUMMARY",
-  "ROADMAP",
-];
 
 describe("Story 28.1 Hermes session-close skill mirror", () => {
-  it("defines the HI-8 skill package and install helper", () => {
+  it("defines the slim skill package and install helper", () => {
     assert.ok(existsSync(skillPath));
-    assert.ok(existsSync(taskPromptPath));
     assert.ok(existsSync(triggerPatternPath));
+    assert.ok(existsSync(section8SynthesisPath));
+    assert.ok(existsSync(discordReplyTemplatePath));
+    assert.ok(existsSync(taskPromptLegacyPath));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-session-close.sh")));
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: session-close"));
     assert.ok(body.includes("/session-close"));
-    assert.ok(body.includes("## When to use"));
-    assert.ok(body.includes("## Tools"));
-    assert.ok(body.includes("## Pitfalls"));
-    assert.ok(body.includes("ERRNO 18"));
-    assert.ok(body.includes("ready: false"));
-    assert.ok(body.includes("## Non-goals"));
-    assert.ok(body.includes("OMNIPOTENT_REPO"));
-    assert.ok(body.includes("source_add"));
-    assert.ok(body.includes("vault_update_frontmatter"));
+    assert.ok(body.includes("requires_toolsets: [terminal]"));
+    assert.ok(body.includes("run-deterministic.mjs"));
+    assert.ok(body.includes(".session-close/context-pack.json"));
+    assert.ok(body.includes("section8-draft.md"));
+    assert.ok(body.includes("apply-section8.mjs"));
+    assert.ok(body.includes("close-report.json"));
+    assert.ok(body.includes("title: \"My Knowledge Base\""));
+    assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
   });
 
-  it("documents deterministic sprint, artifact, Section 8, and sync rules", () => {
-    const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("OMNIPOTENT_REPO"));
-    assert.ok(body.includes("/home/christ/ai-factory/projects/Omnipotent.md"));
-    assert.ok(body.includes("resolved_repo_root"));
-    assert.ok(body.includes("_bmad-output/implementation-artifacts/sprint-status.yaml"));
-    assert.ok(body.includes("development_status"));
-    assert.ok(body.includes("three most recently modified"));
-    assert.ok(body.includes("cns-session-handoff-"));
-    assert.ok(body.includes("## 8. Current Focus"));
-    assert.ok(body.includes("## 9. Agent Behavior Guidelines"));
-    assert.ok(body.includes("Version:"));
-    assert.ok(body.includes("Last updated:"));
-    assert.ok(body.includes("specs/cns-vault-contract/AGENTS.md"));
-    assert.ok(body.includes("/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md"));
-    assert.ok(body.includes("byte-for-byte"));
-    assert.ok(body.includes("Story 28.1"));
-  });
+  it("documents bounded Section 8 synthesis and reply template", () => {
+    const synth = readFileSync(section8SynthesisPath, "utf8");
+    assert.ok(synth.includes("context-pack.json"));
+    assert.ok(synth.includes("section8-draft.md"));
+    assert.ok(synth.includes("≤ 1,500"));
+    assert.ok(synth.includes("Do not invent epics"));
 
-  it("keeps protected AGENTS updates out of Vault IO mutators", () => {
-    const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("Do not call Vault IO mutators for AGENTS.md"));
-    assert.ok(body.includes("PROTECTED_PATH"));
-    assert.ok(body.includes("filesystem edits"));
-    assert.ok(body.includes("vault_read"));
-    assert.ok(body.includes("vault_search"));
-    for (const forbidden of ["vault_create_note", "vault_update_frontmatter", "vault_append_daily", "vault_log_action"]) {
-      assert.ok(body.includes(forbidden), `missing forbidden mutator ${forbidden}`);
-    }
-  });
-
-  it("defines Step 6.6 vault-fast-scan index (Story 29-9)", () => {
-    const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("## Step 6.6: Regenerate vault-fast-scan-index.md"));
-    assert.ok(body.includes("vault-fast-scan-index.md"));
-    assert.ok(body.includes("01-Projects/"));
-    assert.ok(body.includes("02-Areas/"));
-    assert.ok(body.includes("03-Resources/"));
-    assert.ok(body.includes("vault_fast_scan"));
-    assert.ok(body.includes("AI-Context/vault-fast-scan-index.md"));
-  });
-
-  it("defines export and NotebookLM fan-out semantics", () => {
-    const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("bash scripts/export-vault-for-notebooklm.sh"));
-    assert.ok(body.includes("CNS_VAULT_ROOT"));
-    assert.ok(body.includes("scripts/output/vault-export-for-notebooklm.md"));
-    assert.ok(body.includes("03-Resources/notebooklm-project-map.md"));
-    assert.ok(body.includes("Status"));
-    assert.ok(body.includes("Include"));
-    assert.ok(body.includes("Skip this entire step in dry-run mode"));
-    assert.ok(body.includes("notebook_id"));
-    assert.ok(body.includes("source_name"));
-    assert.ok(body.includes("My Knowledge Base"));
-    assert.ok(body.includes("source_type"));
-    assert.ok(body.includes("file"));
-    assert.ok(body.includes("file_path"));
-    assert.ok(body.includes("per-notebook"));
+    const reply = readFileSync(discordReplyTemplatePath, "utf8");
+    assert.ok(reply.includes("close-report.json"));
+    assert.ok(reply.includes("Session close complete"));
+    assert.ok(reply.includes("NotebookLM targets"));
   });
 
   it("documents /session-close trigger exclusivity and config binding", () => {
@@ -136,30 +79,11 @@ describe("Story 43.1 CNS-Daily-Rhythm AUTO blocks via session-close", () => {
     assert.ok(staticBody.includes("LinkedIn Profile System"));
     assert.ok(staticBody.includes("## Roadmap — epic theme fallbacks"));
 
-    const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("## Step 6.7: Refresh CNS-Daily-Rhythm AUTO blocks"));
-    assert.ok(body.includes("CNS-Daily-Rhythm.md"));
-    assert.ok(body.includes("daily-rhythm-static-rows.md"));
-    assert.ok(body.includes("deferred-work.md"));
-    assert.ok(body.includes("vault-lint-"));
-    assert.ok(body.includes("bulk_scan.py"));
-    assert.ok(body.includes("daily_rhythm:"));
-    assert.ok(body.includes("failure_class: tests"));
-    assert.ok(body.includes("Do **not** write `CNS-Daily-Rhythm.md`"));
-    assert.ok(body.includes("Hermes npm PATH"));
-    assert.ok(body.includes(".nvm/versions/node"));
-    const step67 = body.slice(body.indexOf("## Step 6.7"), body.indexOf("## Step 7:"));
-    assert.ok(step67.includes("Hard constraint 7"));
-    assert.ok(step67.includes("Dry-run:") && step67.includes("Do **not** invoke `/vault-lint`"));
-    for (const tag of AUTO_MARKERS) {
-      const documented =
-        step67.includes(`AUTO:${tag}`) || step67.includes(`| \`${tag}\` |`);
-      assert.ok(documented, `missing marker ${tag} in Step 6.7`);
-    }
+    // Step 6.7 is now enforced by scripts/session-close tests, not by a monolithic skill prompt.
   });
 
   it("forbids Vault IO mutators for CNS-Daily-Rhythm path", () => {
-    const body = readFileSync(taskPromptPath, "utf8");
+    const body = readFileSync(taskPromptLegacyPath, "utf8");
     const step67 = body.slice(body.indexOf("## Step 6.7"), body.indexOf("## Step 7:"));
     assert.ok(step67.includes("Do **not** call `vault_create_note`"));
     for (const forbidden of ["vault_create_note", "vault_update_frontmatter", "vault_append_daily", "vault_log_action"]) {
@@ -167,12 +91,11 @@ describe("Story 43.1 CNS-Daily-Rhythm AUTO blocks via session-close", () => {
     }
   });
 
-  it("SKILL.md documents CNS-Daily-Rhythm refresh pitfalls", () => {
+  it("SKILL.md does not include retired Step 6.7 generation prose", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("CNS-Daily-Rhythm.md"));
-    assert.ok(body.includes("Step 6.7"));
-    assert.ok(body.includes("AUTO:xxx"));
-    assert.ok(body.includes("hermes_tools.read_file"));
+    assert.ok(!body.includes("## Step 6.7"));
+    assert.ok(!body.includes("AUTO:xxx"));
+    assert.ok(!body.includes("hermes_tools.read_file"));
   });
 
   it("operator guide documents Step 6.7 and no git commit in session-close", () => {

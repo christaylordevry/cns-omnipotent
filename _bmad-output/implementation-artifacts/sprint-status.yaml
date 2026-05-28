@@ -339,6 +339,6 @@ development_status:
   48-2-session-close-deterministic-orchestrator: done # SC-2 (depends SC-1)
   48-3-session-close-memory-and-daily-rhythm-scripts: done # SC-3 (depends SC-1, SC-2)
   48-4-session-close-apply-section8-agents-sync: done # SC-4 (depends SC-1)
-  48-5-session-close-slim-skill-package-and-tests: ready-for-dev # SC-5 (depends SC-1..4)
+  48-5-session-close-slim-skill-package-and-tests: in-progress # SC-5 (depends SC-1..4)
   48-6-session-close-operator-guide-and-hermes-smoke: ready-for-dev # SC-6 (depends SC-1..5)
   epic-48-retrospective: optional

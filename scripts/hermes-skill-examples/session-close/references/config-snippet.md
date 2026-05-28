@@ -23,3 +23,14 @@ discord:
 ```
 
 Set `OMNIPOTENT_REPO` only when the checkout moves.
+
+Recommended env file:
+
+- `~/.hermes/session-close.env`
+
+Example:
+
+```bash
+OMNIPOTENT_REPO=/home/christ/ai-factory/projects/Omnipotent.md
+CNS_VAULT_ROOT=/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE
+```
