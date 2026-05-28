@@ -436,6 +436,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-26 | 1.33.1 | Dashboard sync cron exports NVM `bin` before `npx` (cron minimal PATH); reinstall via `install-dashboard-sync-cron.sh` | 42-9-vercel-production-deploy |
 | 2026-05-26 | 1.34.0 | **Trend ingest (Epic 44):** §16.5 watchlist, `trend-ingest.env`, cron install via `install-trend-ingest-cron.sh`, structured ingest log + NewsAPI quota notes | 44-4-1-cron-install-documentation-env-example |
 | 2026-05-26 | 1.34.1 | §16.5 reliability verification — `audit-trend-ingest-reliability.py`, 7-day NFR-R1 audit, partial degradation + NFR-R2/R5 checks | 44-4-2-seven-day-pipeline-reliability-verification |
+| 2026-05-28 | 1.35.0 | Session close §15.4 updated: two-phase pipeline, env file, dry-run behavior, token cap, no git commit | 48-6-session-close-operator-guide-and-hermes-smoke |
 
 ---
 
@@ -678,36 +679,60 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. Install the 
 
 **Routing note:** Hermes upstream supports per-channel skill bindings (see HI-6). Bind `#hermes` to skill `triage` in `~/.hermes/config.yaml` if needed; reference: `~/.hermes/skills/cns/triage/references/config-snippet.md`.
 
-### 15.4 Session close (`/session-close`, Epic 28)
+### 15.4 Session close (`/session-close`, Epic 48)
 
-`/session-close` is the Hermes closure command for keeping the operator-facing sprint narrative and NotebookLM sources fresh at the end of a work session.
+`/session-close` is the Hermes closure command for refreshing operator-facing context and NotebookLM sources at the end of a work session.
 
 **Operator usage (Discord `#hermes`):**
 
 - **Real close:** `/session-close`
 - **Preview only:** `/session-close --dry-run`
 
-**What the skill does:**
+**Two-phase pipeline (Epic 48, FR-17..19):**
 
-- Resolves the Omnipotent repo from absolute `OMNIPOTENT_REPO`; if unset, falls back to `/home/christ/ai-factory/projects/Omnipotent.md`.
-- Selects the three newest story artifacts matching `{epic}-{story}-*.md`, excluding handoffs and retros.
-- Rewrites `AGENTS.md` **Section 8** from `## 8. Current Focus` to just before `## 9. Agent Behavior Guidelines`.
-- Syncs the repo mirror and canonical vault constitution byte-for-byte:
-  - `specs/cns-vault-contract/AGENTS.md`
-  - `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
-- Runs `bash scripts/export-vault-for-notebooklm.sh`.
-- Overwrites **`AI-Context/MEMORY.md`** (Step 6.5) and **`AI-Context/vault-fast-scan-index.md`** (Step 6.6) on each real close using operator filesystem writes (same WriteGate boundary as `AGENTS.md`; not `vault_create_note`). Dry-run skips both files.
-- Refreshes **`AI-Context/CNS-Daily-Rhythm.md`** (Step 6.7): all eleven `<!-- AUTO:xxx -->` regions plus the footer `*Last auto-update: …*` line from sprint status, `~/.hermes/config.yaml`, newest vault-lint report, `npm test`, `deferred-work.md`, and static supplement rows in `references/daily-rhythm-static-rows.md`. Dry-run computes preview values for the Discord reply only.
-- Runs **`npm test`** in the Omnipotent repo to populate the `AUTO:TESTS` block on real close. Hermes `execute_code` may not have `npm` on PATH — the skill exports `$HOME/.nvm/versions/node/*/bin` (newest install, fallback `v24.14.0`) before `cd` + `npm test`. Failures set `FAILED (see session-close log)` and `failure_class: tests` without rolling back earlier steps.
-- Reads the NotebookLM project map and calls `source_add` once per active mapped notebook with `notebook_id`, `title: "My Knowledge Base"` (live connector; `source_name` is ignored), `source_type: "file"`, and `file_path` pointing at the fresh export file. If the active map lacks IDs, the live proof must record the connector-accepted fallback.
+- **Phase A (deterministic, mandatory first step):** runs `scripts/session-close/run-deterministic.mjs` to generate a bounded `.session-close/context-pack.json` and `.session-close/close-report.json`. This is the required first step on both real close and dry-run.
+- **Phase B (LLM, bounded):** the LLM reads only the context pack, then drafts replacement content for **AGENTS.md Section 8**. On real close, the pipeline applies that draft via `scripts/session-close/apply-section8.mjs` to update and sync both AGENTS copies.
+- **Phase C (optional, MCP):** NotebookLM fan-out using `source_add` based on notebook IDs listed in the close report.
+
+**Token budget (FR-19):**
+
+- Target: ≤5000 input tokens typical after Phase A completes
+- Hard ceiling: **≤6000** input tokens
+
+**Environment variables:**
+
+- `OMNIPOTENT_REPO`: absolute path to this repo (used by scripts)
+- `CNS_VAULT_ROOT`: absolute path to the vault root
+
+Recommended env file:
+
+- `~/.hermes/session-close.env`
+
+Example (no secrets):
+
+```bash
+OMNIPOTENT_REPO=/home/christ/ai-factory/projects/Omnipotent.md
+CNS_VAULT_ROOT=/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE
+```
+
+Source `~/.hermes/session-close.env` from the Hermes gateway launcher before Discord sessions (same pattern as `~/.hermes/dashboard-sync.env` for dashboard sync). See `scripts/hermes-skill-examples/session-close/references/config-snippet.md`.
+
+**Dry-run vs real close:**
+
+- **Dry-run:** generates the context pack and a Discord preview only. It must not write AGENTS, MEMORY, daily rhythm, fast-scan index, export, or call `source_add`.
+- **Real close:** applies the Section 8 draft, then completes the remaining deterministic writes, then optionally runs NotebookLM fan-out.
 
 **Guardrails:**
 
-- Do not use Vault IO mutators for `AI-Context/AGENTS.md`, `CNS-Daily-Rhythm.md`, `MEMORY.md`, or `vault-fast-scan-index.md`. WriteGate protects `AI-Context/**`, so the skill uses operator filesystem edits and records that boundary in its reply.
-- Vault IO use is read-only for project map discovery: `vault_read`, `vault_search`, `vault_list`, and `vault_read_frontmatter`.
+- Do not use Vault IO mutators for `AI-Context/AGENTS.md`, `CNS-Daily-Rhythm.md`, `MEMORY.md`, or `vault-fast-scan-index.md`. WriteGate protects `AI-Context/**`; session-close uses operator filesystem scripts and records that boundary in its reply.
+- Vault IO is read-only for project map discovery: `vault_read`, `vault_search`, `vault_list`, and `vault_read_frontmatter`.
 - Dry-run never writes AGENTS files, runs export, calls `source_add`, or writes `MEMORY.md`, `vault-fast-scan-index.md`, or `CNS-Daily-Rhythm.md`.
-- Session-close does **not** run `git commit` or `git push`. Commit from Cursor after BMAD stories; see `CNS-Daily-Rhythm.md` for the operator rhythm (session-close updates living docs only).
-- If NotebookLM MCP tools are unavailable, the skill reports the fan-out as blocked and does not invent `source_add` results.
+- Session-close does **not** run `git commit` or `git push`. Commit from Cursor after BMAD stories; see `CNS-Daily-Rhythm.md` for the operator rhythm.
+- If NotebookLM MCP tools are unavailable, the pipeline reports fan-out as blocked and does not invent `source_add` results.
+
+**Gateway cache note (Hermes skill reinstall):**
+
+If Hermes appears to run an older monolithic session-close skill, bump the skill `version`, run `bash scripts/install-hermes-skill-session-close.sh`, and restart the Hermes gateway so it reloads the updated skill files.
 
 **Skill install (operator filesystem):**
 

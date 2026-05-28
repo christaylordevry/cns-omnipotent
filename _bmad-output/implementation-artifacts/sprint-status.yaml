@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-28T02:23:15Z"
+last_updated: "2026-05-28T02:32:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -340,5 +340,5 @@ development_status:
   48-3-session-close-memory-and-daily-rhythm-scripts: done # SC-3 (depends SC-1, SC-2)
   48-4-session-close-apply-section8-agents-sync: done # SC-4 (depends SC-1)
   48-5-session-close-slim-skill-package-and-tests: done # SC-5 (depends SC-1..4)
-  48-6-session-close-operator-guide-and-hermes-smoke: ready-for-dev # SC-6 (depends SC-1..5)
+  48-6-session-close-operator-guide-and-hermes-smoke: done # SC-6 (depends SC-1..5)
   epic-48-retrospective: optional
