@@ -9,7 +9,7 @@
 After trimming leading/trailing whitespace, the **entire message** must match (case-insensitive):
 
 ```text
-morning-digest
+/morning-digest
 ```
 
 Rules:
@@ -21,7 +21,7 @@ Rules:
 ### Positive examples
 
 ```text
-morning-digest
+/morning-digest
 ```
 
 ```text

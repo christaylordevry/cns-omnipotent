@@ -5,7 +5,7 @@
 1. **Channel**: Discord `#hermes` only.
 2. **No vault writes**: no Vault IO mutators, no files under `Knowledge-Vault-ACTIVE/`, no `00-Inbox/` captures.
 3. **No dashboard relay**, no NotebookLM fan-out, no digest archive JSONL.
-4. **Google Trends**: call the Hermes `terminal` tool with command `python3 scripts/trend-ingest.py --dry-run --sources google_trends` (never omit `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
+4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`).
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
 7. **Cross-source failures**: run all three sources independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
@@ -31,7 +31,7 @@ Use that stdout value for `<YYYY-MM-DD>`.
 
 Call `terminal` exactly once for Google Trends:
 
-`terminal(command="python3 scripts/trend-ingest.py --dry-run --sources google_trends", workdir=resolved_repo_root, timeout=60)`
+`terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", workdir=resolved_repo_root, timeout=60)`
 
 `--dry-run` is mandatory: stdout JSON only; ingest does **not** call Convex or persist norm-cache updates.
 
@@ -52,7 +52,7 @@ Requires `~/.hermes/trend-watchlist.yaml` and `pytrends` (Operator Guide §16.5)
 Call `terminal` exactly once for NewsAPI. This command reads credentials only from the absolute `$HOME/.hermes/trend-ingest.env` path and prints JSON with either `{"headlines":[...]}` or `{"error":"..."}`:
 
 ```text
-terminal(command="python3 - <<'PY'\nimport json, os, urllib.parse, urllib.request\nfrom pathlib import Path\n\nenv_path = Path(os.environ['HOME']) / '.hermes' / 'trend-ingest.env'\nkey = ''\nif env_path.exists():\n    for line in env_path.read_text(encoding='utf-8').splitlines():\n        line = line.strip()\n        if not line or line.startswith('#') or '=' not in line:\n            continue\n        name, value = line.split('=', 1)\n        if name.strip() == 'NEWSAPI_API_KEY':\n            key = value.strip().strip('\"').strip(\"'\")\n            break\nif not key:\n    print(json.dumps({'error': 'missing NEWSAPI_API_KEY'}))\n    raise SystemExit(0)\nparams = urllib.parse.urlencode({\n    'q': '(\"artificial intelligence\" OR \"AI agents\" OR automation) AND NOT sports',\n    'sortBy': 'publishedAt',\n    'pageSize': '5',\n    'language': 'en',\n    'apiKey': key,\n})\ntry:\n    with urllib.request.urlopen('https://newsapi.org/v2/everything?' + params, timeout=20) as response:\n        payload = json.loads(response.read().decode('utf-8'))\nexcept Exception as exc:\n    print(json.dumps({'error': type(exc).__name__}))\n    raise SystemExit(0)\nif payload.get('status') != 'ok':\n    print(json.dumps({'error': payload.get('code') or payload.get('message') or 'newsapi error'}))\n    raise SystemExit(0)\nheadlines = [a.get('title', '').strip() for a in payload.get('articles', []) if a.get('title', '').strip()]\nprint(json.dumps({'headlines': headlines[:5]}))\nPY", workdir=resolved_repo_root, timeout=45)
+terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
 Load `NEWSAPI_API_KEY` from that path only. **Do not** use repo-relative or cwd-relative env paths.
