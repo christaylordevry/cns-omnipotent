@@ -66,7 +66,7 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
   it("operator guide documents session-close and version history", () => {
     const body = readFileSync(operatorGuidePath, "utf8");
     assert.ok(body.includes("28-1-automate-agents-md-section-8-via-hermes-session-close"));
-    assert.ok(body.includes("### 15.4 Session close (`/session-close`, Epic 28)"));
+    assert.ok(body.includes("### 15.4 Session close (`/session-close`, Epic 48)"));
     assert.ok(body.includes("Section 8"));
     assert.ok(body.includes("NotebookLM"));
     assert.ok(body.includes("session-close"));
