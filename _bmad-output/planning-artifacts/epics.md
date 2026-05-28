@@ -7,6 +7,7 @@ stepsCompleted:
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
+  - _bmad-output/planning-artifacts/architecture-session-close-fr17-19.md
   - _bmad-output/planning-artifacts/cns-vault-contract/CNS-Phase-1-Spec.md
   - _bmad-output/planning-artifacts/cns-vault-contract/AGENTS.md
 ---
@@ -1046,3 +1047,76 @@ I want **`/session-close` to replace every `<!-- AUTO:xxx -->` block in `AI-Cont
 So that **the daily rhythm doc reflects real system state** without manual edits.
 
 **Acceptance criteria:** See `_bmad-output/implementation-artifacts/43-1-cns-daily-rhythm-auto-blocks-via-session-close.md` (Step 6.7 in session-close task-prompt, eleven AUTO markers, dry-run preview, filesystem-only writes, Operator Guide update).
+
+### Epic 48: Session-Close Context Reduction (FR-17..19)
+
+Refactor Hermes `/session-close` to a **two-phase pipeline**: deterministic scripts (Phase A, zero LLM) then bounded AGENTS §8 synthesis (Phase B, ≤5k tokens, 6k hard ceiling). Sole requirements source: `_bmad-output/planning-artifacts/architecture-session-close-fr17-19.md` (no dashboard PRD in repo).
+
+**Functional requirements (session-close slice):**
+
+| ID | Intent |
+|----|--------|
+| **FR-SC-17** | Run vault export, fast-scan, MEMORY, CNS-Daily-Rhythm AUTO blocks, and related filesystem work without LLM reads of source files |
+| **FR-SC-18** | Invoke LLM only for AGENTS.md Section 8 synthesis from `context-pack.json` |
+| **FR-SC-19** | Enforce token budget, document skill/Hermes config contract, verify in CI |
+
+**Stories (implementation order):** SC-1 → SC-6 — see implementation-artifacts `48-*`
+
+**Phase:** 7  
+**Status:** in-progress
+
+#### Story 48.1 (SC-1): Context pack scaffold
+
+As the **operator**,  
+I want **`prepare-context.mjs` to emit a token-bounded `context-pack.json`**,  
+So that **§8 synthesis never loads full sprint YAML, AGENTS, or story bodies**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-1-session-close-context-pack-scaffold.md`.
+
+#### Story 48.2 (SC-2): Deterministic orchestrator
+
+As the **operator**,  
+I want **`run-deterministic.mjs` to run export, fast-scan, and test capture with `close-report.json`**,  
+So that **FR-SC-17 filesystem work is script-owned**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-2-session-close-deterministic-orchestrator.md`.
+
+#### Story 48.3 (SC-3): MEMORY and daily rhythm scripts
+
+As the **operator**,  
+I want **`write-memory.mjs` and `refresh-daily-rhythm.mjs` to port Steps 6.5–6.7 deterministically**,  
+So that **Epic 43 AUTO blocks and MEMORY no longer require LLM prose**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-3-session-close-memory-and-daily-rhythm-scripts.md`.
+
+#### Story 48.4 (SC-4): Apply Section 8 and AGENTS sync
+
+As the **operator**,  
+I want **`apply-section8.mjs` to patch §8 and byte-sync both AGENTS copies**,  
+So that **FR-SC-18 LLM output is applied deterministically**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-4-session-close-apply-section8-agents-sync.md`.
+
+#### Story 48.5 (SC-5): Slim skill package and tests
+
+As the **operator**,  
+I want **a router SKILL that gates on Phase A scripts and bounded §8 synthesis**,  
+So that **`/session-close` meets the FR-SC-19 token ceiling**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-5-session-close-slim-skill-package-and-tests.md`.
+
+#### Story 48.6 (SC-6): Operator guide and Hermes smoke test
+
+As the **operator**,  
+I want **§15.4 documentation and a dry-run smoke test in `#hermes`**,  
+So that **the two-phase pipeline is operable and token metrics are recorded**.
+
+**Acceptance criteria:** See `_bmad-output/implementation-artifacts/48-6-session-close-operator-guide-and-hermes-smoke.md`.
+
+### FR Coverage Map (Epic 48 supplement)
+
+```
+FR-SC-17: Epic 48 — Stories 48.2, 48.3 (orchestrator + MEMORY/rhythm scripts)
+FR-SC-18: Epic 48 — Stories 48.1, 48.4, 48.5 (context pack, apply-section8, slim skill)
+FR-SC-19: Epic 48 — Stories 48.1, 48.5, 48.6 (token tests, skill contract, operator guide + smoke)
+```

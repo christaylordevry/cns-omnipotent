@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 48-1-session-close-context-pack-scaffold (2026-05-28)
+
+- Hardcoded `DEFAULT_OMNIPOTENT_REPO` / `DEFAULT_CNS_VAULT_ROOT` in `paths.mjs` — matches ADR operator defaults; env overrides are the supported portability path.
+
 **Triaged:** 2026-04-02 (before Epic 6).  
 **Classification key:** **(a)** Epic 6 scope, **(b)** Phase 2 backlog (or operator-only docs), **(c)** closed or resolved by shipped work (Epics 4–5 and earlier).
 
