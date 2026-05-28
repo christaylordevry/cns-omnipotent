@@ -584,3 +584,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - `docs/DEPLOY.md` cron/NVM troubleshooting rows are unrelated to Trend panel wire-up — commit separately from 44-5-1.
 - ~~Ingest health footer `errorCount` / `lastError`~~ — resolved in 44-5-2 (FR36/UX-DR11).
+
+## Deferred from: Story 49-6 morning-digest (2026-05-29)
+
+- **49-6:** morning-digest task-prompt never injected (journalctl confirms zero hits). Hermes skill-loading for free-text triggers may require slash-command registration or a different config key — investigate skill loader source. Compare **investigate-trend** (works) vs **morning-digest** (doesn't): both bound identically; difference likely in `trigger-pattern.md` format — compare cold next session.
