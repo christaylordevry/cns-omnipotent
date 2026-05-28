@@ -287,7 +287,7 @@ development_status:
   37-2-03-resources-topic-hub-indexes: done
   epic-37-retrospective: done
 
-  epic-38: in-progress
+  epic-38: done
   38-1-provider-migration-documentation: done
   38-2-kimi-k2-6-evaluation-run-chain: done
   38-3-prompt-cache-hit-rate-verification: done
