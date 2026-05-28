@@ -243,8 +243,8 @@ export async function readNotebookLmTargets(vaultRoot, exportPath) {
         notebookIds = value;
         break;
       }
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error("[notebooklm-router] session-close.env read failed:", err.message);
     }
   }
 

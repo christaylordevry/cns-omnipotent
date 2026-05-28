@@ -37,6 +37,7 @@ import {
   excerptStoryBullet,
   parseAgentsSection8,
   parseDevelopmentStatus,
+  readNotebookLmTargets,
 } from "../scripts/session-close/lib/read-sources.mjs";
 import {
   enforceTokenBudget,
@@ -246,6 +247,60 @@ describe("session-close read-sources", () => {
     const raw = `# Story\n\nStatus: review\n\n${"word ".repeat(80)}`;
     const bullet = excerptStoryBullet(raw, 200);
     assert.ok(bullet.length <= 200);
+  });
+
+  it("reads NotebookLM env file targets with upload file metadata", async () => {
+    const oldHome = process.env.HOME;
+    const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+    const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
+
+    try {
+      delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+      process.env.HOME = home;
+      await mkdir(join(home, ".hermes"), { recursive: true });
+      await writeFile(
+        join(home, ".hermes", "session-close.env"),
+        [
+          "NOTEBOOKLM_NOTEBOOK_IDS=981466f0-de1c-4551-93a9-f3bc2a24b184,dc6abf1a-99d2-428d-af63-107591ff2c2e,f037c741-f7e1-4a90-880f-d2d38986767b",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const targets = await readNotebookLmTargets("/fake/vault", "/fake/export.md");
+      assert.deepEqual(targets, [
+        {
+          notebook_id: "981466f0-de1c-4551-93a9-f3bc2a24b184",
+          source_name: "CNS Vault Export",
+          source_type: "file",
+          file_path: "/fake/export.md",
+        },
+        {
+          notebook_id: "dc6abf1a-99d2-428d-af63-107591ff2c2e",
+          source_name: "CNS Vault Export",
+          source_type: "file",
+          file_path: "/fake/export.md",
+        },
+        {
+          notebook_id: "f037c741-f7e1-4a90-880f-d2d38986767b",
+          source_name: "CNS Vault Export",
+          source_type: "file",
+          file_path: "/fake/export.md",
+        },
+      ]);
+    } finally {
+      if (oldHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = oldHome;
+      }
+      if (oldIds === undefined) {
+        delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+      } else {
+        process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
+      }
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });
 
