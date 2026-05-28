@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 48-2-session-close-deterministic-orchestrator (2026-05-28)
+
+- No integration test for partial close on export or test failure — Story AC verify only required dry-run orchestrator fixture.
+- Vitest summary regex is format-specific — only `Tests N passed` recognized; other vitest output yields false `failure_class: tests`.
+- `npm-env.sh` hardcodes Node `v24.14.0` fallback when nvm has no versions — matches 43-1 pattern.
+
 ## Deferred from: code review of 48-1-session-close-context-pack-scaffold (2026-05-28)
 
 - Hardcoded `DEFAULT_OMNIPOTENT_REPO` / `DEFAULT_CNS_VAULT_ROOT` in `paths.mjs` — matches ADR operator defaults; env overrides are the supported portability path.

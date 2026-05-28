@@ -6,6 +6,12 @@ import { describe, it } from "node:test";
 
 import { buildContextPack } from "../scripts/session-close/prepare-context.mjs";
 import {
+  buildCloseReport,
+  enrichNotebooklmTargets,
+  parseVitestTestsSummary,
+  runDeterministicPipeline,
+} from "../scripts/session-close/run-deterministic.mjs";
+import {
   buildActiveEpics,
   excerptStoryBullet,
   parseAgentsSection8,
@@ -177,6 +183,90 @@ async function seedSessionCloseFixture(root, vault) {
     "utf8",
   );
 }
+
+describe("session-close run-deterministic", () => {
+  it("parses vitest summary into passing count", () => {
+    const out = parseVitestTestsSummary("Tests 609 passed (609)\n", "", 0);
+    assert.equal(out.tests, "609 passing");
+    assert.equal(out.failureClass, null);
+  });
+
+  it("marks tests failed on non-zero exit or missing regex", () => {
+    const failed = parseVitestTestsSummary("no summary\n", "", 1);
+    assert.equal(failed.tests, "FAILED (see session-close log)");
+    assert.equal(failed.failureClass, "tests");
+    const noMatch = parseVitestTestsSummary("ok\n", "", 0);
+    assert.equal(noMatch.failureClass, "tests");
+  });
+
+  it("dry-run orchestrator writes close-report with skip flags and context pack", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-orch-dry-"));
+    const vault = join(fixtureRoot, "vault");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    const packPath = join(fixtureRoot, ".session-close", "context-pack.json");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      const { report, pack } = await runDeterministicPipeline({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+
+      assert.equal(report.mode, "dry-run");
+      assert.equal(report.steps.export.status, "skipped");
+      assert.ok(report.steps.export.message.includes("dry-run"));
+      assert.equal(report.steps.fast_scan.status, "skipped");
+      assert.equal(report.steps.tests.status, "skipped");
+      assert.equal(report.failure_class, null);
+      assert.ok("prepare_context" in report.steps);
+      assert.ok(Array.isArray(report.notebooklm_targets));
+      for (const row of report.notebooklm_targets) {
+        assert.ok(row.export_path);
+        assert.ok(!("body" in row));
+      }
+      assert.ok(report.deterministic.export_path);
+      assert.equal(pack.mode, "dry-run");
+
+      const onDiskReport = JSON.parse(await readFile(reportPath, "utf8"));
+      const onDiskPack = JSON.parse(await readFile(packPath, "utf8"));
+      assert.equal(onDiskReport.steps.export.status, "skipped");
+      assert.equal(onDiskPack.mode, "dry-run");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("enrichNotebooklmTargets uses pack.deterministic.export_path", () => {
+    const pack = {
+      deterministic: {
+        export_path: "/install/scripts/output/vault-export-for-notebooklm.md",
+      },
+      notebooklm_targets: [{ notebook_id: "id", title: "T" }],
+    };
+    const enriched = enrichNotebooklmTargets(pack);
+    assert.equal(enriched[0].export_path, pack.deterministic.export_path);
+  });
+
+  it("buildCloseReport omits secrets and includes failure_class", () => {
+    const report = buildCloseReport({
+      mode: "real",
+      repoRoot: "/repo",
+      vaultRoot: "/vault",
+      contextPackPath: "/repo/.session-close/context-pack.json",
+      steps: { export: { status: "failed", message: "boom" } },
+      failureClass: "export",
+      deterministic: { export_bytes: 42, tests: "609 passing" },
+      notebooklm_targets: [
+        { notebook_id: "00000000-0000-4000-8000-000000000001", title: "T", export_path: "/p" },
+      ],
+    });
+    assert.equal(report.failure_class, "export");
+    assert.equal(report.deterministic.export_bytes, 42);
+    assert.equal(report.notebooklm_targets[0].export_path, "/p");
+    assert.ok(!JSON.stringify(report).includes("api_key"));
+  });
+});
 
 describe("session-close prepare-context integration", () => {
   it("emits normative schema and respects pack token limit on golden fixture repo", async () => {

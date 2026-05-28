@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-28T10:31:00Z
+# last_updated: 2026-05-28T10:52:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-28T18:00:00Z"
+last_updated: "2026-05-28T20:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -336,7 +336,7 @@ development_status:
   # Epic 48 — session-close FR-17..19; strict order SC-1 → SC-6 (architecture-session-close-fr17-19.md)
   epic-48: in-progress
   48-1-session-close-context-pack-scaffold: done # SC-1
-  48-2-session-close-deterministic-orchestrator: ready-for-dev # SC-2 (depends SC-1)
+  48-2-session-close-deterministic-orchestrator: done # SC-2 (depends SC-1)
   48-3-session-close-memory-and-daily-rhythm-scripts: ready-for-dev # SC-3 (depends SC-1, SC-2)
   48-4-session-close-apply-section8-agents-sync: ready-for-dev # SC-4 (depends SC-1)
   48-5-session-close-slim-skill-package-and-tests: ready-for-dev # SC-5 (depends SC-1..4)

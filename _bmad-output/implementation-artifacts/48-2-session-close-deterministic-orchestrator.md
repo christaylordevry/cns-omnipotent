@@ -1,6 +1,10 @@
+---
+baseline_commit: 4ed0ed52edaf75e7090beeaa1f20310e9aece3e8
+---
+
 # Story 48.2 (SC-2): Session-close deterministic orchestrator
 
-Status: ready-for-dev
+Status: done
 
 Epic: **48** (Session-close context reduction — FR-17..19)  
 Tracked in sprint-status as: **`48-2-session-close-deterministic-orchestrator`**  
@@ -73,9 +77,23 @@ so that **session-close filesystem mutations are deterministic and report failur
 
 ## Tasks / Subtasks
 
-- [ ] Implement `run-deterministic.mjs` + `lib/npm-env.sh` (AC: cli, export, fast-scan, tests, report, dry-run)
-- [ ] Wire `prepare-context.mjs` as first step (AC: pack)
-- [ ] Extend pipeline tests (AC: verify)
+- [x] Implement `run-deterministic.mjs` + `lib/npm-env.sh` (AC: cli, export, fast-scan, tests, report, dry-run)
+- [x] Wire `prepare-context.mjs` as first step (AC: pack)
+- [x] Extend pipeline tests (AC: verify)
+
+### Review Findings
+
+- [x] [Review][Decision] Vault export output root when `OMNIPOTENT_REPO` ≠ script install tree — **Resolved (2026-05-28): option A — document only.** Operator contract: `OMNIPOTENT_REPO` must resolve to the same repo tree as `run-deterministic.mjs` (install root). Export output always lives under that tree at `scripts/output/vault-export-for-notebooklm.md`. Documented in `run-deterministic.mjs` header.
+
+- [x] [Review][Patch] `notebooklm_targets.export_path` can disagree with `deterministic.export_path` on success [`scripts/session-close/run-deterministic.mjs`] — Fixed: `enrichNotebooklmTargets(pack)` reads `pack.deterministic.export_path`.
+
+- [x] [Review][Patch] `prepare_context` failure leaves no `close-report.json` [`scripts/session-close/run-deterministic.mjs`] — Fixed: on prepare failure, writes `close-report.json` with `failure_class: pipeline` before rethrow.
+
+- [x] [Review][Defer] No integration test for partial close on export or test failure [`tests/session-close-pipeline.test.mjs`] — Story AC verify only required dry-run orchestrator fixture; export/test failure paths are untested. deferred, acceptable for SC-2 MVP.
+
+- [x] [Review][Defer] Vitest summary regex is format-specific [`run-deterministic.mjs:25`] — Only `Tests N passed` is recognized; other vitest/npm output shapes yield false `failure_class: tests`. deferred, operator can read logs.
+
+- [x] [Review][Defer] `npm-env.sh` hardcodes Node `v24.14.0` fallback [`scripts/session-close/lib/npm-env.sh:5`] — If nvm has no versions, PATH falls back to a fixed version that may not exist on the host. deferred, matches 43-1 pattern.
 
 ## Dev Notes
 
@@ -94,10 +112,36 @@ so that **session-close filesystem mutations are deterministic and report failur
 
 ## Dev Agent Record
 
-_(pending dev-story)_
+### Agent Model Used
+
+Composer (dev-story)
+
+### Implementation Plan
+
+- `run-deterministic.mjs` spawns `prepare-context.mjs` first, then export / fast-scan / `npm test` with partial-close policy (tests failure does not roll back prior steps).
+- `lib/npm-env.sh` prepends newest nvm node bin to PATH before npm (Hermes gap from 43-1).
+- Dry-run skips export, fast-scan write, and tests; still writes `context-pack.json` and `close-report.json` under target `OMNIPOTENT_REPO/.session-close/`.
+
+### Completion Notes
+
+- Phase A orchestrator: `node scripts/session-close/run-deterministic.mjs [--dry-run]`.
+- `close-report.json`: per-step status, optional `failure_class`, `notebooklm_targets` with `export_path`, deterministic counts only.
+- Extended `tests/session-close-pipeline.test.mjs` with vitest parser unit tests and dry-run orchestrator fixture.
+- `bash scripts/verify.sh` passed.
+
+## File List
+
+| Path | Action |
+|------|--------|
+| `scripts/session-close/run-deterministic.mjs` | New |
+| `scripts/session-close/lib/npm-env.sh` | New |
+| `scripts/session-close/lib/paths.mjs` | Modified (`closeReportPath`) |
+| `tests/session-close-pipeline.test.mjs` | Modified |
 
 ## Change Log
 
 | Date | Change |
 |------|--------|
 | 2026-05-28 | Story SC-2 created from ADR |
+| 2026-05-28 | SC-2 implemented: run-deterministic orchestrator, npm-env prelude, pipeline tests; status → review |
+| 2026-05-28 | Code review: patches applied (export_path enrich, pipeline failure report); status → done |

@@ -98,5 +98,6 @@ export function resolvePaths(overrides = {}) {
     artifactsDir: join(repoRoot, "_bmad-output", "implementation-artifacts"),
     sessionCloseDir: join(repoRoot, ".session-close"),
     contextPackPath: join(repoRoot, ".session-close", "context-pack.json"),
+    closeReportPath: join(repoRoot, ".session-close", "close-report.json"),
   };
 }
