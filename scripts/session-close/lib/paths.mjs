@@ -94,6 +94,11 @@ export function resolvePaths(overrides = {}) {
     repoRoot,
     vaultRoot,
     agentsPath: join(vaultRoot, "AI-Context", "AGENTS.md"),
+    repoAgentsPath: join(repoRoot, "specs/cns-vault-contract/AGENTS.md"),
+    planningAgentsPath: join(
+      repoRoot,
+      "_bmad-output/planning-artifacts/cns-vault-contract/AGENTS.md",
+    ),
     sprintPath: join(repoRoot, "_bmad-output", "implementation-artifacts", "sprint-status.yaml"),
     artifactsDir: join(repoRoot, "_bmad-output", "implementation-artifacts"),
     sessionCloseDir: join(repoRoot, ".session-close"),

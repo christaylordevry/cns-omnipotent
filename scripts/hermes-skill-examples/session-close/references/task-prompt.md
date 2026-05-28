@@ -77,6 +77,8 @@ For each selected story, read only enough to extract title, status, acceptance o
 
 ## Step 3: Synthesize Section 8
 
+**SC-4 draft file (`section8-draft.md`):** Write a **fragment only** (subsections and bullets under §8). Do **not** include a `## 8.` heading. `apply-section8.mjs` adds `## 8. Current Focus`, bumps version/changelog, and syncs both AGENTS copies.
+
 Replace exactly from the heading `## 8. Current Focus` through the line immediately before `## 9. Agent Behavior Guidelines`.
 
 Preserve these intro blockquote lines when still accurate:

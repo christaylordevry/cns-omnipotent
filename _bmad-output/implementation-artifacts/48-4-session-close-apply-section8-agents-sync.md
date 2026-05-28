@@ -1,6 +1,10 @@
+---
+baseline_commit: 4edb5df1370c613cc6db40cda4158d6b0133a042
+---
+
 # Story 48.4 (SC-4): Session-close apply Section 8 and AGENTS sync
 
-Status: ready-for-dev
+Status: done
 
 Epic: **48** (Session-close context reduction — FR-17..19)  
 Tracked in sprint-status as: **`48-4-session-close-apply-section8-agents-sync`**  
@@ -74,9 +78,16 @@ so that **Section 8 updates are deterministic and testable without loading 800+ 
 
 ## Tasks / Subtasks
 
-- [ ] Implement `apply-section8.mjs` (AC: cli, replace, version, sync, dry-run, failure)
-- [ ] Golden AGENTS fixtures + tests (AC: verify, draft-limit)
-- [ ] Document draft boundary convention in skill prep for SC-5 (AC: replace)
+- [x] Implement `apply-section8.mjs` (AC: cli, replace, version, sync, dry-run, failure)
+- [x] Golden AGENTS fixtures + tests (AC: verify, draft-limit)
+- [x] Document draft boundary convention in skill prep for SC-5 (AC: replace)
+
+### Review Findings
+
+- [x] [Review][Patch] Roll back AGENTS mirror writes when the second target fails so repo and vault cannot diverge mid-apply. [`scripts/session-close/apply-section8.mjs`]
+- [x] [Review][Patch] Align default changelog row text with session-close apply path when context pack is absent. [`scripts/session-close/lib/apply-section8-body.mjs`]
+- [x] [Review][Defer] `indexOf("## 8.")` boundary matching is shared with `prepare-context.mjs` / `read-sources.mjs`; tightening to `## 8. Current Focus` only is a cross-pipeline follow-up, not SC-4-only.
+- [x] [Review][Defer] No committed byte-for-byte golden snapshot file; inline golden assertions cover version, §9+ preservation, and changelog insertion (AC: verify satisfied pragmatically).
 
 ## Dev Notes
 
@@ -88,10 +99,33 @@ so that **Section 8 updates are deterministic and testable without loading 800+ 
 
 ## Dev Agent Record
 
-_(pending dev-story)_
+### Implementation Plan
+
+- **Draft convention (AC: replace):** `section8-draft.md` is a **fragment only** (no `## 8.` heading). If the LLM includes `## 8.`, the apply script strips it and normalizes to `## 8. Current Focus`. Documented in `task-prompt.md` Step 3 for SC-5.
+- **Patch order:** read specs mirror (fallback vault) → replace `## 8.`..`## 9.` → patch `> Version:` / `Last updated:` → insert changelog row (message from pack anchor third column when present, else session-close default) → write identical bytes to `specs/cns-vault-contract/AGENTS.md` and vault `AI-Context/AGENTS.md`.
+- **Dry-run:** writes `.session-close/section8-apply-preview.md` only.
+- **Failure:** `recordSection8Failure` sets `failure_class: section8` on existing `close-report.json` without deleting Phase A artifacts.
+
+### Completion Notes
+
+- Shipped `scripts/session-close/apply-section8.mjs` + `lib/apply-section8-body.mjs`; `SECTION8_DRAFT_TOKEN_LIMIT` (1500) in `lib/token-estimate.mjs`; `repoAgentsPath` on `resolvePaths`.
+- Golden fixture `tests/fixtures/session-close/section8-draft-fragment.md`; nine tests in `tests/session-close-pipeline.test.mjs` (golden apply, byte-sync, dry-run, oversize rejection, failure report, CLI argv).
+- `npm test` and `bash scripts/verify.sh` passed.
+
+## File List
+
+- `scripts/session-close/apply-section8.mjs` (new)
+- `scripts/session-close/lib/apply-section8-body.mjs` (new)
+- `scripts/session-close/lib/paths.mjs` (modified)
+- `scripts/session-close/lib/token-estimate.mjs` (modified)
+- `scripts/hermes-skill-examples/session-close/references/task-prompt.md` (modified)
+- `tests/fixtures/session-close/section8-draft-fragment.md` (new)
+- `tests/session-close-pipeline.test.mjs` (modified)
 
 ## Change Log
 
 | Date | Change |
 |------|--------|
 | 2026-05-28 | Story SC-4 created from ADR |
+| 2026-05-28 | SC-4 implemented: apply-section8.mjs, golden tests, task-prompt draft convention |
+| 2026-05-28 | Code review: mirror rollback on partial write; changelog default aligned |

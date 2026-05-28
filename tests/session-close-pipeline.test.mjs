@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+
+import {
+  parseApplySection8Argv,
+  recordSection8Failure,
+  runApplySection8,
+} from "../scripts/session-close/apply-section8.mjs";
+import {
+  applySection8ToAgentsText,
+  bumpPatchVersion,
+  normalizeSection8Draft,
+  replaceSection8InAgents,
+} from "../scripts/session-close/lib/apply-section8-body.mjs";
 
 import { buildContextPack } from "../scripts/session-close/prepare-context.mjs";
 import {
@@ -30,6 +42,7 @@ import {
   enforceTokenBudget,
   estimateTokens,
   PACK_TOKEN_LIMIT,
+  SECTION8_DRAFT_TOKEN_LIMIT,
   SECTION8_EXCERPT_LIMIT,
   truncateToTokens,
 } from "../scripts/session-close/lib/token-estimate.mjs";
@@ -240,6 +253,7 @@ describe("session-close read-sources", () => {
 async function seedSessionCloseFixture(root, vault) {
   const artifacts = join(root, "_bmad-output", "implementation-artifacts");
   const planning = join(root, "_bmad-output", "planning-artifacts");
+  const specsAgents = join(root, "specs/cns-vault-contract");
   const skillRefs = join(
     root,
     "scripts/hermes-skill-examples/session-close/references",
@@ -249,8 +263,10 @@ async function seedSessionCloseFixture(root, vault) {
   await mkdir(join(root, "scripts"), { recursive: true });
   await mkdir(artifacts, { recursive: true });
   await mkdir(planning, { recursive: true });
+  await mkdir(specsAgents, { recursive: true });
   await mkdir(skillRefs, { recursive: true });
   await writeFile(join(vault, "AI-Context", "AGENTS.md"), SAMPLE_AGENTS, "utf8");
+  await writeFile(join(specsAgents, "AGENTS.md"), SAMPLE_AGENTS, "utf8");
   await writeFile(join(vault, "AI-Context", "CNS-Daily-Rhythm.md"), RHYTHM_FIXTURE, "utf8");
   await writeFile(join(artifacts, "sprint-status.yaml"), SAMPLE_SPRINT, "utf8");
   await writeFile(join(artifacts, "deferred-work.md"), SAMPLE_DEFERRED, "utf8");
@@ -606,6 +622,192 @@ describe("session-close SC-3 memory and daily rhythm", () => {
     const once = applyAutoMarkers(base, markers);
     const twice = applyAutoMarkers(once, markers);
     assert.equal(once, twice);
+  });
+});
+
+describe("session-close SC-4 apply-section8", () => {
+  it("bumpPatchVersion increments patch segment", () => {
+    assert.equal(bumpPatchVersion("9.9.9"), "9.9.10");
+    assert.equal(bumpPatchVersion("2.1.12"), "2.1.13");
+  });
+
+  it("normalizeSection8Draft accepts fragment or strips ## 8. header", () => {
+    const fragment = "### Project Status\n\n- epic-48: in-progress\n";
+    const fromFragment = normalizeSection8Draft(fragment);
+    assert.ok(fromFragment.startsWith("## 8. Current Focus"));
+    assert.ok(fromFragment.includes("### Project Status"));
+
+    const withHeader = normalizeSection8Draft(`## 8. Current Focus\n\n${fragment}`);
+    assert.equal(fromFragment, withHeader);
+  });
+
+  it("replaceSection8InAgents leaves ## 9. and changelog tail intact", () => {
+    const draft = normalizeSection8Draft("### Project Status\n\n- epic-48: done\n");
+    const next = replaceSection8InAgents(SAMPLE_AGENTS, draft);
+    assert.ok(next.includes("## 9. Agent Behavior Guidelines"));
+    assert.ok(next.includes("rules\n"));
+    assert.ok(next.includes("## Changelog"));
+    assert.ok(next.includes("| 2026-01-01 | 9.9.9 | fixture row |"));
+    assert.ok(!next.includes("Reconcile sprint state for Epic 48."));
+    assert.ok(next.includes("epic-48: done"));
+  });
+
+  it("golden apply produces expected version bump and changelog row", async () => {
+    const draftPath = join(import.meta.dirname, "fixtures/session-close/section8-draft-fragment.md");
+    const draft = await readFile(draftPath, "utf8");
+    const { text, newVersion } = applySection8ToAgentsText(SAMPLE_AGENTS, draft, {
+      dateStr: "2026-05-28",
+    });
+    assert.equal(newVersion, "9.9.10");
+    assert.ok(text.includes("> Version: 9.9.10 | Last updated: 2026-05-28"));
+    assert.ok(text.includes("| 2026-05-28 | 9.9.10 |"));
+    assert.ok(text.includes("Ship session-close SC-4"));
+    const section9Idx = text.indexOf("## 9. Agent Behavior Guidelines");
+    const changelogIdx = text.indexOf("## Changelog");
+    assert.ok(section9Idx > 0 && changelogIdx > section9Idx);
+    assert.equal(
+      text.slice(section9Idx, changelogIdx),
+      SAMPLE_AGENTS.slice(
+        SAMPLE_AGENTS.indexOf("## 9."),
+        SAMPLE_AGENTS.indexOf("## Changelog"),
+      ),
+    );
+    assert.ok(text.includes("| 2026-05-28 | 9.9.10 |"));
+    assert.ok(text.includes("| 2026-01-01 | 9.9.9 | fixture row |"));
+  });
+
+  it("runApplySection8 byte-syncs repo and vault AGENTS copies", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
+    const vaultAgents = join(vault, "AI-Context", "AGENTS.md");
+    const beforeRepo = await readFile(repoAgents, "utf8");
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        dateStr: "2026-05-28",
+      });
+      assert.equal(result.written, true);
+      const repoAfter = await readFile(repoAgents, "utf8");
+      const vaultAfter = await readFile(vaultAgents, "utf8");
+      assert.equal(repoAfter, vaultAfter);
+      assert.notEqual(repoAfter, beforeRepo);
+      assert.ok(repoAfter.includes("9.9.10"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("dry-run writes preview only and does not mutate AGENTS", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-dry-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
+    const before = await readFile(repoAgents, "utf8");
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        dateStr: "2026-05-28",
+      });
+      assert.equal(result.written, false);
+      assert.ok(result.previewPath);
+      const onDisk = await readFile(repoAgents, "utf8");
+      assert.equal(onDisk, before);
+      const preview = await readFile(result.previewPath, "utf8");
+      assert.ok(preview.includes("9.9.10"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects oversize draft before mutating AGENTS", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-big-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    await writeFile(draftPath, huge, "utf8");
+    const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
+    const before = await readFile(repoAgents, "utf8");
+
+    try {
+      await assert.rejects(
+        () =>
+          runApplySection8({
+            draftPath,
+            dryRun: false,
+            repoRoot: fixtureRoot,
+            vaultRoot: vault,
+          }),
+        /exceeds 1500 tokens/,
+      );
+      const after = await readFile(repoAgents, "utf8");
+      assert.equal(after, before);
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.failure_class, "section8");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("recordSection8Failure sets failure_class on close-report.json", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-fail-"));
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({ mode: "real", steps: { export: { status: "ok" } } })}\n`,
+      "utf8",
+    );
+
+    try {
+      await recordSection8Failure(reportPath, "regex drift");
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.failure_class, "section8");
+      assert.equal(report.steps.export.status, "ok");
+      assert.equal(report.steps.section8.status, "failed");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("parseApplySection8Argv reads --draft and --dry-run", () => {
+    const parsed = parseApplySection8Argv([
+      "node",
+      "apply-section8.mjs",
+      "--draft",
+      ".session-close/section8-draft.md",
+      "--dry-run",
+    ]);
+    assert.equal(parsed.draftPath, ".session-close/section8-draft.md");
+    assert.equal(parsed.dryRun, true);
   });
 });
 

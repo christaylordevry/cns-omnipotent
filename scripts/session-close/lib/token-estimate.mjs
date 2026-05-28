@@ -1,5 +1,7 @@
 export const PACK_TOKEN_LIMIT = 3500;
 export const SECTION8_EXCERPT_LIMIT = 1200;
+/** ADR-SC-002: LLM section8-draft.md hard ceiling for apply-section8.mjs */
+export const SECTION8_DRAFT_TOKEN_LIMIT = 1500;
 
 /**
  * @param {string} text

@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 48-4-session-close-apply-section8-agents-sync (2026-05-28)
+
+- `indexOf("## 8.")` section boundaries are shared with `prepare-context.mjs` and `read-sources.mjs`; prefer `## 8. Current Focus` anchoring in a single shared helper when tightening regex drift mitigation.
+- Golden tests use inline assertions rather than a committed expected-output bytes fixture; acceptable for SC-4 verify AC.
+
 ## Deferred from: code review of 48-3-session-close-memory-and-daily-rhythm-scripts (2026-05-28)
 
 - `AUTO:AGENTS_VERSION` reflects pre-`apply-section8` AGENTS during Phase A — SC-4/SC-5 will reorder full close; story AC 5 already allows fixture timing.
