@@ -693,25 +693,37 @@ def fetch_google_trends_interest(
     """Live pytrends fetch for one watchlist keyword (0–100 interest)."""
     geo = _trends_geo_for_entry(entry)
     try:
-        trend_client.build_payload([entry.keyword], timeframe="today 7-d", geo=geo)
+        trend_client.build_payload([entry.keyword], timeframe="now 7-d", geo=geo)
         frame = trend_client.interest_over_time()
     except Exception as err:
         if _exception_is_trends_rate_limit(err):
             raise TrendsRateLimitError(str(err)) from err
         if "captcha" in str(err).lower():
             raise TrendsEmptyResponseError(str(err)) from err
+        try:
+            from pytrends import exceptions as _pt_exc
+
+            if isinstance(err, _pt_exc.ResponseError) and re.search(r"\b400\b", str(err)):
+                raise TrendsEmptyResponseError(f"400 no-data: {err}") from err
+        except Exception:
+            pass
         raise
 
     if frame is None or frame.empty:
         raise TrendsEmptyResponseError("empty interest_over_time")
 
     if "isPartial" in frame.columns:
+        partial = frame["isPartial"]
         frame = frame.drop(columns=["isPartial"])
+    else:
+        partial = None
 
     if entry.keyword not in frame.columns:
         raise TrendsEmptyResponseError("keyword column missing")
 
     series = frame[entry.keyword].dropna()
+    if partial is not None and hasattr(partial, "loc") and hasattr(series, "index"):
+        series = series[partial.loc[series.index] == False]  # noqa: E712
     if series.empty:
         raise TrendsEmptyResponseError("no interest values")
 
