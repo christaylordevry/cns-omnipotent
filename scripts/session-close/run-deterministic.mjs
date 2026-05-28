@@ -14,7 +14,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { buildContextPack, writeContextPack } from "./prepare-context.mjs";
+import { runRefreshDailyRhythm } from "./refresh-daily-rhythm.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { runWriteMemory } from "./write-memory.mjs";
+
+/**
+ * SC-3 / ADR: MEMORY and daily rhythm run after apply-section8 in the full Hermes
+ * close (steps 6–7). This orchestrator invokes them after test capture on real
+ * close so AGENTS_VERSION and MEMORY reflect vault AGENTS as of Phase A; SC-5
+ * skill ordering may re-run post-apply-section8 when SC-4 ships.
+ */
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -81,6 +90,8 @@ export function enrichNotebooklmTargets(pack) {
  *   failureClass: string | null;
  *   deterministic: Record<string, unknown>;
  *   notebooklm_targets: unknown[];
+ *   memory_preview?: string | null;
+ *   daily_rhythm_preview?: Record<string, string> | null;
  * }} input
  */
 export function buildCloseReport(input) {
@@ -94,6 +105,8 @@ export function buildCloseReport(input) {
     failure_class: input.failureClass,
     deterministic: input.deterministic,
     notebooklm_targets: input.notebooklm_targets,
+    memory_preview: input.memory_preview ?? null,
+    daily_rhythm_preview: input.daily_rhythm_preview ?? null,
   };
 }
 
@@ -234,6 +247,8 @@ export async function runDeterministicPipeline(opts = {}) {
       failureClass,
       deterministic: { .../** @type {{ deterministic: Record<string, unknown> }} */ (pack).deterministic },
       notebooklm_targets: enrichNotebooklmTargets(pack),
+      memory_preview: null,
+      daily_rhythm_preview: null,
     });
     await writeFile(
       paths.closeReportPath,
@@ -288,17 +303,87 @@ export async function runDeterministicPipeline(opts = {}) {
     }
   }
 
+  let testsLine = null;
   if (dryRun) {
     steps.tests = { status: "skipped", message: "tests: skipped (dry-run)" };
     pack.deterministic.tests = null;
   } else {
     const testResult = await runNpmTest(paths.repoRoot, env);
+    testsLine = testResult.tests;
     pack.deterministic.tests = testResult.tests;
     if (testResult.failureClass) {
       steps.tests = { status: "failed", message: testResult.tests };
       setFailure(testResult.failureClass);
     } else {
       steps.tests = { status: "ok", message: testResult.tests };
+    }
+  }
+
+  /** @type {string | null} */
+  let memoryPreview = null;
+  /** @type {Record<string, string> | null} */
+  let dailyRhythmPreview = null;
+
+  if (dryRun) {
+    steps.memory = { status: "skipped", message: "memory: skipped (dry-run)" };
+    steps.daily_rhythm = { status: "skipped", message: "daily_rhythm: preview-only (dry-run)" };
+    try {
+      const memory = await runWriteMemory({
+        dryRun: true,
+        repoRoot: paths.repoRoot,
+        vaultRoot: paths.vaultRoot,
+        contextPack: pack,
+      });
+      memoryPreview = memory.body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      steps.memory = { status: "failed", message };
+      setFailure("memory");
+    }
+    try {
+      const rhythm = await runRefreshDailyRhythm({
+        dryRun: true,
+        repoRoot: paths.repoRoot,
+        vaultRoot: paths.vaultRoot,
+        testsLine,
+      });
+      dailyRhythmPreview = rhythm.markers;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      steps.daily_rhythm = { status: "failed", message };
+      setFailure("daily_rhythm");
+    }
+  } else {
+    try {
+      const memory = await runWriteMemory({
+        dryRun: false,
+        repoRoot: paths.repoRoot,
+        vaultRoot: paths.vaultRoot,
+        contextPack: pack,
+      });
+      steps.memory = {
+        status: "ok",
+        message: `MEMORY written (${memory.body.length} chars)`,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      steps.memory = { status: "failed", message };
+      setFailure("memory");
+    }
+
+    try {
+      const rhythm = await runRefreshDailyRhythm({
+        dryRun: false,
+        repoRoot: paths.repoRoot,
+        vaultRoot: paths.vaultRoot,
+        testsLine,
+      });
+      steps.daily_rhythm = { status: "ok", message: "daily rhythm AUTO blocks updated" };
+      dailyRhythmPreview = rhythm.markers;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      steps.daily_rhythm = { status: "failed", message };
+      setFailure("daily_rhythm");
     }
   }
 
@@ -315,6 +400,8 @@ export async function runDeterministicPipeline(opts = {}) {
     failureClass,
     deterministic: { ...pack.deterministic },
     notebooklm_targets: reportTargets,
+    memory_preview: memoryPreview,
+    daily_rhythm_preview: dailyRhythmPreview,
   });
 
   await writeFile(paths.closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");

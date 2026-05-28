@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 48-3-session-close-memory-and-daily-rhythm-scripts (2026-05-28)
+
+- `AUTO:AGENTS_VERSION` reflects pre-`apply-section8` AGENTS during Phase A — SC-4/SC-5 will reorder full close; story AC 5 already allows fixture timing.
+- Full ADR step 6–7 after §8 apply not enforced in `run-deterministic.mjs` — documented; Hermes skill SC-5 owns end-to-end ordering.
+- No non–dry-run orchestrator E2E test for memory/rhythm — covered by script unit tests and `verify.sh`.
+
 ## Deferred from: code review of 48-2-session-close-deterministic-orchestrator (2026-05-28)
 
 - No integration test for partial close on export or test failure — Story AC verify only required dry-run orchestrator fixture.

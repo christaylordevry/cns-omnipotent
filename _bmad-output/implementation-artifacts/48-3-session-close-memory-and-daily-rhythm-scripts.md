@@ -1,6 +1,10 @@
+---
+baseline_commit: 4870fd8eb57aaa95372e0b32ffcf9693f3802bb2
+---
+
 # Story 48.3 (SC-3): Session-close MEMORY and daily rhythm scripts
 
-Status: ready-for-dev
+Status: done
 
 Epic: **48** (Session-close context reduction — FR-17..19)  
 Tracked in sprint-status as: **`48-3-session-close-memory-and-daily-rhythm-scripts`**  
@@ -71,10 +75,30 @@ so that **session-close no longer relies on LLM prose for Steps 6.5–6.7** (FR-
 
 ## Tasks / Subtasks
 
-- [ ] Implement `write-memory.mjs` (AC: memory)
-- [ ] Port Step 6.7 logic to `refresh-daily-rhythm.mjs` (AC: rhythm, footer, idempotent)
-- [ ] Wire into `run-deterministic.mjs` with documented ordering vs SC-4 (AC: orchestrator)
-- [ ] Pipeline tests (AC: verify)
+- [x] Implement `write-memory.mjs` (AC: memory)
+- [x] Port Step 6.7 logic to `refresh-daily-rhythm.mjs` (AC: rhythm, footer, idempotent)
+- [x] Wire into `run-deterministic.mjs` with documented ordering vs SC-4 (AC: orchestrator)
+- [x] Pipeline tests (AC: verify)
+
+### Review Findings
+
+- [x] [Review][Patch] `write-memory` must load `context-pack.json` when present — **Operator decision (2026-05-28):** prefer pack fields; fallback to direct `read-sources`. Fixed: `load-context-pack.mjs`, orchestrator passes in-memory `pack`.
+
+- [x] [Review][Patch] MEMORY body hardcodes operator vault path — fixed: `vaultRoot` from `resolvePaths` in `buildMemoryMarkdown`.
+
+- [x] [Review][Patch] Stale vault-lint not visible in rhythm output — fixed: `AUTO:VAULT_HEALTH` suffix when `stale: true`.
+
+- [x] [Review][Patch] `deferred-work.md` read is fail-hard — fixed: `.catch(() => "")` in `loadRhythmRefreshInputs`.
+
+- [x] [Review][Patch] Static rows file read is fail-hard — fixed: `.catch(() => "")` in `loadRhythmRefreshInputs`.
+
+- [x] [Review][Patch] `replaceAuto` uses `RegExp.test` then `replace` — fixed: single `exec` + slice splice.
+
+- [x] [Review][Defer] `AUTO:AGENTS_VERSION` reflects pre-`apply-section8` AGENTS in Phase A — expected until SC-4/SC-5; story AC agents-version allows fixture timing.
+
+- [x] [Review][Defer] Full ADR ordering (MEMORY/rhythm after §8 apply) not in Phase A orchestrator — documented in `run-deterministic.mjs` comment; SC-5 skill re-order pending.
+
+- [x] [Review][Defer] No non–dry-run orchestrator integration test for memory/rhythm steps — unit tests cover scripts; heavy E2E left to verify.sh / operator smoke.
 
 ## Dev Notes
 
@@ -86,10 +110,32 @@ so that **session-close no longer relies on LLM prose for Steps 6.5–6.7** (FR-
 
 ## Dev Agent Record
 
-_(pending dev-story)_
+### Implementation Plan
+
+- Shared `lib/replace-auto.mjs`, `lib/rhythm-markers.mjs` (eleven AUTO markers + footer), `lib/write-memory-body.mjs` (Step 6.5 template).
+- CLI: `write-memory.mjs`, `refresh-daily-rhythm.mjs`; orchestrator runs both after test capture on real close; dry-run fills `memory_preview` / `daily_rhythm_preview` on `close-report.json`.
+- Vault-lint: reuse newest `vault-lint-*.md` by basename date via `readVaultLintSummary` (≤7 days fresh; stale flag when older — no bulk scan in Phase A scripts).
+
+### Completion Notes
+
+- All eleven AUTO markers + footer wired; idempotence covered in tests.
+- `bash scripts/verify.sh` passed (CNS + cns-dashboard when present).
+
+## File List
+
+- `scripts/session-close/write-memory.mjs` (new)
+- `scripts/session-close/refresh-daily-rhythm.mjs` (new)
+- `scripts/session-close/lib/replace-auto.mjs` (new)
+- `scripts/session-close/lib/rhythm-markers.mjs` (new)
+- `scripts/session-close/lib/write-memory-body.mjs` (new)
+- `scripts/session-close/lib/load-context-pack.mjs` (new, code-review)
+- `scripts/session-close/run-deterministic.mjs` (modified)
+- `tests/session-close-pipeline.test.mjs` (modified)
 
 ## Change Log
 
 | Date | Change |
 |------|--------|
 | 2026-05-28 | Story SC-3 created from ADR |
+| 2026-05-28 | SC-3 implemented: write-memory, refresh-daily-rhythm, orchestrator hooks, pipeline tests |
+| 2026-05-28 | Code review patches: context-pack preference, dynamic vault path, stale lint in VAULT_HEALTH, graceful missing inputs, replaceAuto fix |

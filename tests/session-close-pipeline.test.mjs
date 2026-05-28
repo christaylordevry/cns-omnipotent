@@ -11,6 +11,15 @@ import {
   parseVitestTestsSummary,
   runDeterministicPipeline,
 } from "../scripts/session-close/run-deterministic.mjs";
+import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
+import { replaceAuto, applyAutoMarkers } from "../scripts/session-close/lib/replace-auto.mjs";
+import {
+  AUTO_MARKER_TAGS,
+  buildAutoMarkerValues,
+  buildSprintNarrative,
+} from "../scripts/session-close/lib/rhythm-markers.mjs";
+import { buildMemoryMarkdown } from "../scripts/session-close/lib/write-memory-body.mjs";
+import { runWriteMemory } from "../scripts/session-close/write-memory.mjs";
 import {
   buildActiveEpics,
   excerptStoryBullet,
@@ -50,6 +59,17 @@ const SAMPLE_AGENTS = `# AGENTS
 
 - epic-1: in-progress
 
+### Current Priorities
+
+1. Reconcile sprint state for Epic 48.
+2. Ship session-close SC-3 scripts.
+
+### Recent Session Context
+
+- 48-1-session-close: context pack scaffold shipped.
+- 48-2-session-close: deterministic orchestrator shipped.
+- 43-1-cns-daily-rhythm: AUTO blocks via session-close shipped.
+
 ## 9. Agent Behavior Guidelines
 
 rules
@@ -66,6 +86,60 @@ const SAMPLE_SPRINT = `development_status:
   48-1-session-close-context-pack-scaffold: ready-for-dev
   48-2-session-close-deterministic-orchestrator: ready-for-dev
   epic-37: done
+`;
+
+const RHYTHM_FIXTURE = `# CNS Daily Rhythm (fixture)
+
+<!-- AUTO:PROVIDER -->seed-provider<!-- /AUTO:PROVIDER -->
+<!-- AUTO:VAULT_NOTES -->0<!-- /AUTO:VAULT_NOTES -->
+<!-- AUTO:VAULT_HEALTH -->seed-health<!-- /AUTO:VAULT_HEALTH -->
+<!-- AUTO:SPRINT -->seed-sprint<!-- /AUTO:SPRINT -->
+<!-- AUTO:AGENTS_VERSION -->v0.0.0<!-- /AUTO:AGENTS_VERSION -->
+<!-- AUTO:SKILLS_COUNT -->0 available<!-- /AUTO:SKILLS_COUNT -->
+<!-- AUTO:TESTS -->seed-tests<!-- /AUTO:TESTS -->
+<!-- AUTO:LAST_SESSION -->1970-01-01<!-- /AUTO:LAST_SESSION -->
+<!-- AUTO:ACTIVE_PROJECTS -->
+| Project | Status | Next action |
+|---|---|---|
+| Seed | seed | seed |
+<!-- /AUTO:ACTIVE_PROJECTS -->
+<!-- AUTO:DEFERRED_SUMMARY -->
+| Item | Priority | Class |
+|---|---|---|
+| Seed | P9 | (b) seed |
+<!-- /AUTO:DEFERRED_SUMMARY -->
+<!-- AUTO:ROADMAP -->
+| Epic | Theme | Status |
+|---|---|---|
+| 38 | Seed | seed |
+<!-- /AUTO:ROADMAP -->
+
+*Last auto-update: 1970-01-01 | AGENTS.md 0.0.0 | Provider: seed/seed*
+`;
+
+const SAMPLE_DEFERRED = `# Deferred work
+
+## Summary table
+
+| Item (short) | Class |
+|--------------|-------|
+| Vault-lint Rule 2 filename-stem matching | (b) Phase 2 backlog |
+| normalizeAbsolute duplicated | (b) Phase 2 hygiene |
+`;
+
+const SAMPLE_STATIC_ROWS = `# static
+
+## Active projects — operator business rows
+
+| Project | Status | Next action |
+|---|---|---|
+| LinkedIn Profile System | ready | Deploy |
+
+## Roadmap — epic theme fallbacks
+
+| Epic key | Theme fallback | Status fallback |
+|---|---|---|
+| epic-39 | VPS Deployment | deferred |
 `;
 
 describe("session-close token estimate", () => {
@@ -165,16 +239,36 @@ describe("session-close read-sources", () => {
 /** @param {string} root @param {string} vault */
 async function seedSessionCloseFixture(root, vault) {
   const artifacts = join(root, "_bmad-output", "implementation-artifacts");
+  const planning = join(root, "_bmad-output", "planning-artifacts");
+  const skillRefs = join(
+    root,
+    "scripts/hermes-skill-examples/session-close/references",
+  );
   await mkdir(join(vault, "AI-Context"), { recursive: true });
   await mkdir(join(vault, "_meta", "reports"), { recursive: true });
   await mkdir(join(root, "scripts"), { recursive: true });
   await mkdir(artifacts, { recursive: true });
+  await mkdir(planning, { recursive: true });
+  await mkdir(skillRefs, { recursive: true });
   await writeFile(join(vault, "AI-Context", "AGENTS.md"), SAMPLE_AGENTS, "utf8");
+  await writeFile(join(vault, "AI-Context", "CNS-Daily-Rhythm.md"), RHYTHM_FIXTURE, "utf8");
   await writeFile(join(artifacts, "sprint-status.yaml"), SAMPLE_SPRINT, "utf8");
+  await writeFile(join(artifacts, "deferred-work.md"), SAMPLE_DEFERRED, "utf8");
+  await writeFile(join(skillRefs, "daily-rhythm-static-rows.md"), SAMPLE_STATIC_ROWS, "utf8");
+  await writeFile(
+    join(vault, "_meta", "reports", "vault-lint-2026-05-20.md"),
+    "## Summary\n\n- Scanned: 42\n- Clean: 42\n- Errors: 0\n- Warnings: 0\n",
+    "utf8",
+  );
   await writeFile(join(root, "scripts", "export-vault-for-notebooklm.sh"), "#!/bin/bash\n", "utf8");
   await writeFile(
     join(root, "CLAUDE.md"),
     "## Phase Status\nPhase 6 complete. Epics 48 in progress.\n",
+    "utf8",
+  );
+  await writeFile(
+    join(planning, "epics.md"),
+    "### Epic 48: Session-close context reduction\n",
     "utf8",
   );
   await writeFile(
@@ -197,6 +291,35 @@ describe("session-close run-deterministic", () => {
     assert.equal(failed.failureClass, "tests");
     const noMatch = parseVitestTestsSummary("ok\n", "", 0);
     assert.equal(noMatch.failureClass, "tests");
+  });
+
+  it("dry-run orchestrator includes memory and daily_rhythm previews", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-sc3-dry-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      const { report } = await runDeterministicPipeline({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(report.steps.memory.status, "skipped");
+      assert.equal(report.steps.daily_rhythm.status, "skipped");
+      assert.ok(report.memory_preview);
+      assert.ok(report.memory_preview.length <= 2000);
+      assert.ok(report.daily_rhythm_preview);
+      for (const tag of AUTO_MARKER_TAGS) {
+        assert.ok(tag in report.daily_rhythm_preview, `missing preview ${tag}`);
+      }
+      const rhythmOnDisk = await readFile(
+        join(vault, "AI-Context", "CNS-Daily-Rhythm.md"),
+        "utf8",
+      );
+      assert.ok(rhythmOnDisk.includes("seed-provider"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
   });
 
   it("dry-run orchestrator writes close-report with skip flags and context pack", async () => {
@@ -265,6 +388,224 @@ describe("session-close run-deterministic", () => {
     assert.equal(report.deterministic.export_bytes, 42);
     assert.equal(report.notebooklm_targets[0].export_path, "/p");
     assert.ok(!JSON.stringify(report).includes("api_key"));
+  });
+});
+
+describe("session-close SC-3 memory and daily rhythm", () => {
+  it("replaceAuto swaps inner content only", () => {
+    const text = "<!-- AUTO:TESTS -->old<!-- /AUTO:TESTS -->";
+    const next = replaceAuto(text, "TESTS", "609 passing");
+    assert.ok(next.includes("<!-- AUTO:TESTS -->609 passing<!-- /AUTO:TESTS -->"));
+    assert.ok(!next.includes("old"));
+  });
+
+  it("buildMemoryMarkdown stays under 2000 chars and uses section 8 excerpts", () => {
+    const body = buildMemoryMarkdown({
+      agentsText: SAMPLE_AGENTS,
+      sprintYaml: SAMPLE_SPRINT,
+      projectStatusLine: "Phase 6 complete. Epics 48 in progress.",
+      vaultRoot: "/tmp/fixture-vault",
+    });
+    assert.ok(body.length <= 2000);
+    assert.ok(body.includes("## CNS State"));
+    assert.ok(body.includes("Epic 48 in-progress"));
+    assert.ok(body.includes("## Next Session"));
+    assert.ok(body.includes("Reconcile sprint state"));
+    assert.ok(body.includes("Vault: /tmp/fixture-vault/"));
+  });
+
+  it("buildAutoMarkerValues covers all eleven AUTO tags", () => {
+    const markers = buildAutoMarkerValues({
+      agentsText: SAMPLE_AGENTS,
+      sprintYaml: SAMPLE_SPRINT,
+      testsLine: "609 passing",
+      sessionDate: "2026-05-28",
+      realClose: true,
+      staticRowsMd: SAMPLE_STATIC_ROWS,
+      deferredMd: SAMPLE_DEFERRED,
+      epicsMd: "### Epic 48: Session-close context reduction\n",
+      vaultLint: { scanned: 42, clean: 42, errors: 0, warnings: 0, stale: false },
+      providerLine: "openai-codex / gpt-5.5",
+      skillsCount: 12,
+    });
+    for (const tag of AUTO_MARKER_TAGS) {
+      assert.ok(markers[tag], `missing marker ${tag}`);
+      assert.ok(!String(markers[tag]).includes("seed-"), `stale seed in ${tag}`);
+    }
+    assert.equal(markers.AGENTS_VERSION, "v9.9.9");
+    assert.equal(markers.VAULT_NOTES, "42");
+    assert.ok(markers.SPRINT.includes("Epic 48"));
+    assert.equal(markers.LAST_SESSION, "2026-05-28");
+  });
+
+  it("buildAutoMarkerValues surfaces stale vault-lint in VAULT_HEALTH", () => {
+    const markers = buildAutoMarkerValues({
+      agentsText: SAMPLE_AGENTS,
+      sprintYaml: SAMPLE_SPRINT,
+      testsLine: "609 passing",
+      sessionDate: "2026-05-28",
+      realClose: true,
+      staticRowsMd: "",
+      deferredMd: "",
+      epicsMd: "",
+      vaultLint: { scanned: 10, clean: 8, errors: 1, warnings: 1, stale: true },
+      providerLine: "p / m",
+      skillsCount: 0,
+    });
+    assert.ok(markers.VAULT_HEALTH.includes("STALE REPORT"));
+    assert.ok(markers.VAULT_HEALTH.includes("/vault-lint"));
+  });
+
+  it("write-memory prefers context-pack project_status_line when pack present", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-memory-pack-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    const packPath = join(fixtureRoot, ".session-close", "context-pack.json");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(
+      packPath,
+      `${JSON.stringify({ sprint: { project_status_line: "From context-pack only." } })}\n`,
+      "utf8",
+    );
+
+    try {
+      const result = await runWriteMemory({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(result.usedContextPack, true);
+      assert.ok(result.body.includes("From context-pack only."));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("refresh-daily-rhythm replaces all eleven markers on fixture rhythm file", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-rhythm-"));
+    const vault = join(fixtureRoot, "vault");
+    const rhythmPath = join(vault, "AI-Context", "CNS-Daily-Rhythm.md");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    const before = await readFile(rhythmPath, "utf8");
+
+    try {
+      const result = await runRefreshDailyRhythm({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        testsLine: "609 passing",
+      });
+      assert.equal(result.written, true);
+      const after = await readFile(rhythmPath, "utf8");
+      assert.notEqual(after, before);
+      for (const tag of AUTO_MARKER_TAGS) {
+        assert.ok(after.includes(`<!-- AUTO:${tag} -->`), tag);
+      }
+      assert.ok(!after.includes("seed-provider"));
+      assert.ok(!after.includes("seed-tests"));
+      assert.ok(!after.includes("1970-01-01"));
+      assert.ok(after.includes("*Last auto-update: "));
+      assert.ok(after.includes("v9.9.9") || after.includes("9.9.9"));
+
+      const second = await runRefreshDailyRhythm({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        testsLine: "609 passing",
+      });
+      const afterAgain = await readFile(rhythmPath, "utf8");
+      assert.equal(second.updated, afterAgain);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("refresh-daily-rhythm dry-run does not write rhythm file", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-rhythm-dry-"));
+    const vault = join(fixtureRoot, "vault");
+    const rhythmPath = join(vault, "AI-Context", "CNS-Daily-Rhythm.md");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    const before = await readFile(rhythmPath, "utf8");
+
+    try {
+      const result = await runRefreshDailyRhythm({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        testsLine: "609 passing",
+      });
+      assert.equal(result.written, false);
+      const onDisk = await readFile(rhythmPath, "utf8");
+      assert.equal(onDisk, before);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("write-memory dry-run skips vault write", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-memory-dry-"));
+    const vault = join(fixtureRoot, "vault");
+    const memoryPath = join(vault, "AI-Context", "MEMORY.md");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      const result = await runWriteMemory({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(result.written, false);
+      await assert.rejects(() => access(memoryPath), { code: "ENOENT" });
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("write-memory real close writes MEMORY.md under 2000 chars", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-memory-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+
+    try {
+      const first = await runWriteMemory({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(first.written, true);
+      assert.ok(first.body.length <= 2000);
+      const second = await runWriteMemory({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      assert.equal(first.body, second.body);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("buildSprintNarrative truncates to 120 characters", () => {
+    const entries = [{ key: "epic-48", status: "in-progress" }];
+    for (let i = 0; i < 20; i += 1) {
+      entries.push({
+        key: `48-${i}-very-long-story-name-for-truncation-test`,
+        status: "ready-for-dev",
+      });
+    }
+    const line = buildSprintNarrative(entries);
+    assert.ok(line.length <= 120);
+  });
+
+  it("idempotent applyAutoMarkers on unchanged marker map", () => {
+    const markers = {
+      PROVIDER: "p / m",
+      TESTS: "1 passing",
+    };
+    const base = "<!-- AUTO:PROVIDER -->x<!-- /AUTO:PROVIDER -->\n<!-- AUTO:TESTS -->y<!-- /AUTO:TESTS -->";
+    const once = applyAutoMarkers(base, markers);
+    const twice = applyAutoMarkers(once, markers);
+    assert.equal(once, twice);
   });
 });
 
