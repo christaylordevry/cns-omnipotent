@@ -1,0 +1,16 @@
+[
+  {
+    "id": "fixture-ai-factory",
+    "title": "AI Factory Systems",
+    "watch": false,
+    "domain": "ai-factory",
+    "last_updated": null
+  },
+  {
+    "id": "fixture-general",
+    "title": "Misc capture",
+    "watch": false,
+    "domain": "general",
+    "last_updated": null
+  }
+]
