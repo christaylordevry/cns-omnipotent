@@ -2,6 +2,11 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import {
+  DEFAULT_REGISTRY_PATH,
+  readRegistry,
+} from "../sync-notebooks.mjs";
+
 const STORY_BASENAME_RE = /^[0-9]+-[0-9]+-.+\.md$/;
 const STORY_EXCLUDE_RE =
   /^(cns-session-handoff-|deferred-work\.md$|epic-.*-retro|.*-retrospective)/i;
@@ -213,11 +218,32 @@ export async function readHermesProviderLine() {
 }
 
 /**
+ * @param {import('../sync-notebooks.mjs').NotebookRegistryEntry[]} entries
+ * @param {string} exportPath
+ * @returns {unknown[] | null} targets when watch-list non-empty; otherwise null
+ */
+export function notebookTargetsFromWatchRegistry(entries, exportPath) {
+  const watched = (Array.isArray(entries) ? entries : []).filter((row) => row.watch === true);
+  if (watched.length === 0) {
+    return null;
+  }
+
+  return watched.map((row) => ({
+    notebook_id: row.id,
+    title: row.title,
+    source_name: "CNS Vault Export",
+    source_type: "file",
+    file_path: exportPath,
+  }));
+}
+
+/**
  * @param {string} vaultRoot
  * @param {string} exportPath
+ * @param {{ registryPath?: string }} [options]
  * @returns {Promise<unknown[]>}
  */
-export async function readNotebookLmTargets(vaultRoot, exportPath) {
+export async function readNotebookLmTargets(vaultRoot, exportPath, options = {}) {
   /** @type {string} */
   let notebookIds = typeof process.env.NOTEBOOKLM_NOTEBOOK_IDS === "string" ? process.env.NOTEBOOKLM_NOTEBOOK_IDS : "";
   if (!notebookIds.trim()) {
@@ -262,6 +288,19 @@ export async function readNotebookLmTargets(vaultRoot, exportPath) {
       }));
     }
   }
+
+  const registryPath = options.registryPath ?? DEFAULT_REGISTRY_PATH;
+  try {
+    const registry = await readRegistry(registryPath);
+    const fromRegistry = notebookTargetsFromWatchRegistry(registry, exportPath);
+    if (fromRegistry) {
+      return fromRegistry;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[notebooklm-router] registry read failed:", message);
+  }
+
   for (const rel of PROJECT_MAP_CANDIDATES) {
     const abs = join(vaultRoot, rel);
     let raw;
