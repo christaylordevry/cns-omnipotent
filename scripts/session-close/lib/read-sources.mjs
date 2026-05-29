@@ -6,6 +6,11 @@ import {
   DEFAULT_REGISTRY_PATH,
   readRegistry,
 } from "../sync-notebooks.mjs";
+import {
+  disambiguateRoute,
+  extractScoringTopic,
+} from "./notebook-disambiguate.mjs";
+import { scoreNotebooks } from "./notebook-scorer.mjs";
 
 const STORY_BASENAME_RE = /^[0-9]+-[0-9]+-.+\.md$/;
 const STORY_EXCLUDE_RE =
@@ -218,6 +223,49 @@ export async function readHermesProviderLine() {
 }
 
 /**
+ * @param {string} val
+ * @returns {boolean}
+ */
+function isTruthy(val) {
+  return val !== "" && val !== "0" && val !== "false";
+}
+
+/**
+ * Run the scorer → disambiguator pipeline and return a single routed target, or null.
+ * Never throws — errors fall through silently (except stderr log).
+ * @param {import('../sync-notebooks.mjs').NotebookRegistryEntry[]} registry
+ * @param {string} exportPath
+ * @param {unknown} contextPack
+ * @returns {unknown[] | null}
+ */
+function smartRoute(registry, exportPath, contextPack) {
+  try {
+    const topic = extractScoringTopic(contextPack);
+    const scoreResult = scoreNotebooks(topic, registry);
+    const route = disambiguateRoute(scoreResult, registry);
+    if (route.status === "ROUTED") {
+      process.stderr.write(
+        `[smart-routing] ROUTED → ${route.title} (${route.id}) via ${route.reason ?? "unknown"}\n`,
+      );
+      return [
+        {
+          notebook_id: route.id,
+          title: route.title,
+          source_name: "CNS Vault Export",
+          source_type: "file",
+          file_path: exportPath,
+        },
+      ];
+    }
+    return null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[smart-routing] error: ${message}\n`);
+    return null;
+  }
+}
+
+/**
  * @param {import('../sync-notebooks.mjs').NotebookRegistryEntry[]} entries
  * @param {string} exportPath
  * @returns {unknown[] | null} targets when watch-list non-empty; otherwise null
@@ -240,7 +288,7 @@ export function notebookTargetsFromWatchRegistry(entries, exportPath) {
 /**
  * @param {string} vaultRoot
  * @param {string} exportPath
- * @param {{ registryPath?: string }} [options]
+ * @param {{ registryPath?: string, contextPack?: unknown }} [options]
  * @returns {Promise<unknown[]>}
  */
 export async function readNotebookLmTargets(vaultRoot, exportPath, options = {}) {
@@ -290,8 +338,9 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
   }
 
   const registryPath = options.registryPath ?? DEFAULT_REGISTRY_PATH;
+  let registry = [];
   try {
-    const registry = await readRegistry(registryPath);
+    registry = await readRegistry(registryPath);
     const fromRegistry = notebookTargetsFromWatchRegistry(registry, exportPath);
     if (fromRegistry) {
       return fromRegistry;
@@ -299,6 +348,14 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[notebooklm-router] registry read failed:", message);
+  }
+
+  const smartRoutingEnv = process.env.NOTEBOOK_SMART_ROUTING ?? "";
+  if (isTruthy(smartRoutingEnv)) {
+    const routed = smartRoute(registry, exportPath, options.contextPack);
+    if (routed) {
+      return routed;
+    }
   }
 
   for (const rel of PROJECT_MAP_CANDIDATES) {

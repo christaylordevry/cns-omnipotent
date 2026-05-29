@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 50-1-notebook-registry-sync (2026-05-29)
+
+- Stable sort order for `notebook-registry.json` output (e.g. by `id`) — not required by story AC; optional for cleaner git diffs on operator sync.
+
 ## Deferred from: code review of 48-4-session-close-apply-section8-agents-sync (2026-05-28)
 
 - `indexOf("## 8.")` section boundaries are shared with `prepare-context.mjs` and `read-sources.mjs`; prefer `## 8. Current Focus` anchoring in a single shared helper when tightening regex drift mitigation.
@@ -584,6 +588,23 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - `docs/DEPLOY.md` cron/NVM troubleshooting rows are unrelated to Trend panel wire-up — commit separately from 44-5-1.
 - ~~Ingest health footer `errorCount` / `lastError`~~ — resolved in 44-5-2 (FR36/UX-DR11).
+
+## Deferred from: code review of 50-3-conservative-notebook-scorer (2026-05-29)
+
+- Duplicate tokenizer implementations — identical logic in `tokenizePatternForLexicon` (infer-notebook-domain.mjs) and `tokenizeForScoring` (notebook-scorer.mjs); no circular-dep-free consolidation path in current module graph; extract to shared `scoring-utils.mjs` in a future pass.
+- `id.localeCompare` without locale pin in the `scoreNotebooks` sort comparator — harmless for ASCII slugs but inconsistent with the title comparison above it; add `{ sensitivity: 'base' }` option on next touch.
+
+## Deferred from: code review of 50-4-disambiguation (2026-05-29)
+
+- `slugToKeywords` allows 2-char stopwords ("in", "to", "of") — semantic noise in topic string; add a small stopword set or raise minimum token length on next touch.
+- `DisambiguationResult` typedef not exported — JSDoc consumers must duplicate the return type; add `@exports DisambiguationResult` or a companion `.d.ts` in a future pass.
+- `slugToKeywords` `token.length >= 2` filter is an undocumented addition beyond the spec's stated "strip numeric prefixes and hyphens" — benign for CNS story slugs but out-of-spec; document intent or align with spec on next touch.
+
+## Deferred from: code review of 50-5-smart-routing (2026-05-29)
+
+- ROUTED target shape includes `title` field but env-ID targets omit it — inconsistent across source types; align shapes in a future pass.
+- `process.stderr.write` in `smartRoute` vs `console.error` in the adjacent registry-fail catch block — style inconsistency in the same module; normalise on next touch.
+- `route.title`/`route.id` undefined if `disambiguateRoute` (50-4) violates its own ROUTED contract — add explicit guards or tighten the 50-4 typedef when the disambiguator is next touched.
 
 ## Deferred from: Story 49-6 morning-digest (2026-05-29)
 

@@ -32,7 +32,9 @@ export async function buildContextPack(opts = {}) {
   const hermes_provider = await readHermesProviderLine();
 
   const exportPath = join(paths.repoRoot, "scripts/output/vault-export-for-notebooklm.md");
-  const notebooklm_targets = await readNotebookLmTargets(paths.vaultRoot, exportPath);
+  const notebooklm_targets = await readNotebookLmTargets(paths.vaultRoot, exportPath, {
+    contextPack: { sprint, recent_stories },
+  });
 
   /** @type {Record<string, unknown>} */
   const pack = {
