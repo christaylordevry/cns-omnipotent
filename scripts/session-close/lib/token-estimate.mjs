@@ -79,6 +79,41 @@ function shortenNotebooklmTitles(targets, maxTitleChars) {
 }
 
 /**
+ * @param {unknown} targets
+ * @returns {{ id: string, title: string }[]}
+ */
+function routingNotebooksFromTargets(targets) {
+  if (!Array.isArray(targets)) {
+    return [];
+  }
+  return targets
+    .filter((target) => target && typeof target === "object" && !Array.isArray(target))
+    .map((target) => {
+      const row = /** @type {{ notebook_id?: unknown, title?: unknown }} */ (target);
+      const id = typeof row.notebook_id === "string" ? row.notebook_id : "";
+      const title = typeof row.title === "string" && row.title.trim() ? row.title : id;
+      return { id, title };
+    })
+    .filter((notebook) => notebook.id.length > 0);
+}
+
+/**
+ * Keep the routing report aligned with the targets that survive budget pruning.
+ * @param {Record<string, unknown>} pack
+ */
+function syncNotebooklmRoutingWithTargets(pack) {
+  if (
+    !pack.notebooklm_routing ||
+    typeof pack.notebooklm_routing !== "object" ||
+    Array.isArray(pack.notebooklm_routing)
+  ) {
+    return;
+  }
+  const routing = /** @type {Record<string, unknown>} */ (pack.notebooklm_routing);
+  routing.notebooks = routingNotebooksFromTargets(pack.notebooklm_targets);
+}
+
+/**
  * Enforce ADR-SC-002: drop section8 first, then shorten story bullets; never drop sprint.active_epics.
  * Further reductions trim notebooklm targets and other non-sprint fields until pack_tokens <= limit.
  *
@@ -130,11 +165,13 @@ export function enforceTokenBudget(pack, limit = PACK_TOKEN_LIMIT) {
   }
 
   shortenNotebooklmTitles(next.notebooklm_targets, 80);
+  syncNotebooklmRoutingWithTargets(next);
   if (refreshTokenBudget(next, limit)) {
     return next;
   }
 
   shortenNotebooklmTitles(next.notebooklm_targets, 40);
+  syncNotebooklmRoutingWithTargets(next);
   if (refreshTokenBudget(next, limit)) {
     return next;
   }
@@ -151,6 +188,7 @@ export function enforceTokenBudget(pack, limit = PACK_TOKEN_LIMIT) {
     guard += 1;
     if (Array.isArray(next.notebooklm_targets) && next.notebooklm_targets.length > 0) {
       next.notebooklm_targets.pop();
+      syncNotebooklmRoutingWithTargets(next);
       continue;
     }
     if (Array.isArray(next.recent_stories) && next.recent_stories.length > 0) {

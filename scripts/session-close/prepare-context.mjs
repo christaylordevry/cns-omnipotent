@@ -7,7 +7,7 @@ import { resolvePaths } from "./lib/paths.mjs";
 import {
   parseAgentsSection8,
   readHermesProviderLine,
-  readNotebookLmTargets,
+  readNotebookLmTargetsWithMeta,
   readSprintSnapshot,
   readVaultLintSummary,
   selectRecentStories,
@@ -32,9 +32,10 @@ export async function buildContextPack(opts = {}) {
   const hermes_provider = await readHermesProviderLine();
 
   const exportPath = join(paths.repoRoot, "scripts/output/vault-export-for-notebooklm.md");
-  const notebooklm_targets = await readNotebookLmTargets(paths.vaultRoot, exportPath, {
-    contextPack: { sprint, recent_stories },
-  });
+  const { targets: notebooklm_targets, routing: notebooklm_routing } =
+    await readNotebookLmTargetsWithMeta(paths.vaultRoot, exportPath, {
+      contextPack: { sprint, recent_stories },
+    });
 
   /** @type {Record<string, unknown>} */
   const pack = {
@@ -58,6 +59,7 @@ export async function buildContextPack(opts = {}) {
       hermes_provider,
     },
     notebooklm_targets,
+    notebooklm_routing,
     token_budget: {
       pack_tokens: 0,
       pack_limit: PACK_TOKEN_LIMIT,

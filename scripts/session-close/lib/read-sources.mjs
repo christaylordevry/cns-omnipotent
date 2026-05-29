@@ -28,6 +28,11 @@ const PROJECT_MAP_CANDIDATES = [
 ];
 
 /**
+ * @typedef {'env-override' | 'watch-flag' | 'smart-route' | 'project-map' | 'empty'} RoutingMethod
+ * @typedef {{ method: RoutingMethod, notebooks: { id: string, title: string }[], reason?: string }} NotebookRoutingMeta
+ */
+
+/**
  * @param {string} yaml
  * @returns {{ key: string, status: string }[]}
  */
@@ -236,7 +241,7 @@ function isTruthy(val) {
  * @param {import('../sync-notebooks.mjs').NotebookRegistryEntry[]} registry
  * @param {string} exportPath
  * @param {unknown} contextPack
- * @returns {unknown[] | null}
+ * @returns {{ targets: unknown[], reason: string | undefined } | null}
  */
 function smartRoute(registry, exportPath, contextPack) {
   try {
@@ -247,15 +252,18 @@ function smartRoute(registry, exportPath, contextPack) {
       process.stderr.write(
         `[smart-routing] ROUTED → ${route.title} (${route.id}) via ${route.reason ?? "unknown"}\n`,
       );
-      return [
-        {
-          notebook_id: route.id,
-          title: route.title,
-          source_name: "CNS Vault Export",
-          source_type: "file",
-          file_path: exportPath,
-        },
-      ];
+      return {
+        targets: [
+          {
+            notebook_id: route.id,
+            title: route.title,
+            source_name: "CNS Vault Export",
+            source_type: "file",
+            file_path: exportPath,
+          },
+        ],
+        reason: route.reason,
+      };
     }
     return null;
   } catch (err) {
@@ -286,12 +294,27 @@ export function notebookTargetsFromWatchRegistry(entries, exportPath) {
 }
 
 /**
+ * @param {unknown[]} targets
+ * @returns {{ id: string, title: string }[]}
+ */
+function routingNotebooksFromTargets(targets) {
+  return targets
+    .filter((target) => target && typeof target === "object" && !Array.isArray(target))
+    .map((target) => {
+      const row = /** @type {{ notebook_id?: unknown, title?: unknown }} */ (target);
+      const id = typeof row.notebook_id === "string" ? row.notebook_id : "";
+      const title = typeof row.title === "string" && row.title.trim() ? row.title : id;
+      return { id, title };
+    });
+}
+
+/**
  * @param {string} vaultRoot
  * @param {string} exportPath
  * @param {{ registryPath?: string, contextPack?: unknown }} [options]
- * @returns {Promise<unknown[]>}
+ * @returns {Promise<{ targets: unknown[], routing: NotebookRoutingMeta }>}
  */
-export async function readNotebookLmTargets(vaultRoot, exportPath, options = {}) {
+export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, options = {}) {
   /** @type {string} */
   let notebookIds = typeof process.env.NOTEBOOKLM_NOTEBOOK_IDS === "string" ? process.env.NOTEBOOKLM_NOTEBOOK_IDS : "";
   if (!notebookIds.trim()) {
@@ -328,12 +351,19 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
     if (ids.length > 0) {
-      return ids.map((notebook_id) => ({
+      const targets = ids.map((notebook_id) => ({
         notebook_id,
         source_name: "CNS Vault Export",
         source_type: "file",
         file_path: exportPath,
       }));
+      return {
+        targets,
+        routing: {
+          method: "env-override",
+          notebooks: ids.map((id) => ({ id, title: id })),
+        },
+      };
     }
   }
 
@@ -343,7 +373,13 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
     registry = await readRegistry(registryPath);
     const fromRegistry = notebookTargetsFromWatchRegistry(registry, exportPath);
     if (fromRegistry) {
-      return fromRegistry;
+      return {
+        targets: fromRegistry,
+        routing: {
+          method: "watch-flag",
+          notebooks: routingNotebooksFromTargets(fromRegistry),
+        },
+      };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -352,9 +388,16 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
 
   const smartRoutingEnv = process.env.NOTEBOOK_SMART_ROUTING ?? "";
   if (isTruthy(smartRoutingEnv)) {
-    const routed = smartRoute(registry, exportPath, options.contextPack);
-    if (routed) {
-      return routed;
+    const sr = smartRoute(registry, exportPath, options.contextPack);
+    if (sr) {
+      return {
+        targets: sr.targets,
+        routing: {
+          method: "smart-route",
+          notebooks: routingNotebooksFromTargets(sr.targets),
+          ...(sr.reason !== undefined ? { reason: sr.reason } : {}),
+        },
+      };
     }
   }
 
@@ -386,10 +429,27 @@ export async function readNotebookLmTargets(vaultRoot, exportPath, options = {})
       targets.push({ notebook_id: idMatch[0], title });
     }
     if (targets.length > 0) {
-      return targets;
+      return {
+        targets,
+        routing: {
+          method: "project-map",
+          notebooks: routingNotebooksFromTargets(targets),
+        },
+      };
     }
   }
-  return [];
+  return { targets: [], routing: { method: "empty", notebooks: [] } };
+}
+
+/**
+ * @param {string} vaultRoot
+ * @param {string} exportPath
+ * @param {{ registryPath?: string, contextPack?: unknown }} [options]
+ * @returns {Promise<unknown[]>}
+ */
+export async function readNotebookLmTargets(vaultRoot, exportPath, options = {}) {
+  const { targets } = await readNotebookLmTargetsWithMeta(vaultRoot, exportPath, options);
+  return targets;
 }
 
 /**

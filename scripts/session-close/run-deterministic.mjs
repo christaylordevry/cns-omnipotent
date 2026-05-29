@@ -97,6 +97,7 @@ export function enrichNotebooklmTargets(pack) {
  *   failureClass: string | null;
  *   deterministic: Record<string, unknown>;
  *   notebooklm_targets: unknown[];
+ *   notebooklm_routing?: import('./lib/read-sources.mjs').NotebookRoutingMeta | null;
  *   memory_preview?: string | null;
  *   daily_rhythm_preview?: Record<string, string> | null;
  * }} input
@@ -112,6 +113,7 @@ export function buildCloseReport(input) {
     failure_class: input.failureClass,
     deterministic: input.deterministic,
     notebooklm_targets: input.notebooklm_targets,
+    notebooklm_routing: input.notebooklm_routing ?? null,
     memory_preview: input.memory_preview ?? null,
     daily_rhythm_preview: input.daily_rhythm_preview ?? null,
   };
@@ -258,6 +260,7 @@ export async function runDeterministicPipeline(opts = {}) {
       failureClass,
       deterministic: { .../** @type {{ deterministic: Record<string, unknown> }} */ (pack).deterministic },
       notebooklm_targets: enrichNotebooklmTargets(pack),
+      notebooklm_routing: null,
       memory_preview: null,
       daily_rhythm_preview: null,
     });
@@ -411,6 +414,7 @@ export async function runDeterministicPipeline(opts = {}) {
     failureClass,
     deterministic: { ...pack.deterministic },
     notebooklm_targets: reportTargets,
+    notebooklm_routing: pack.notebooklm_routing ?? null,
     memory_preview: memoryPreview,
     daily_rhythm_preview: dailyRhythmPreview,
   });
