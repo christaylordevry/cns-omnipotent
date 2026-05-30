@@ -921,9 +921,11 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - Destination: `~/.hermes/skills/cns/vault-lint/`
 - Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.
 
-### 15.11 Morning digest skill (`morning-digest`, Story 49-6)
+### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1)
 
-**Skill version:** **1.0.4** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend. **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+**Skill version:** **1.1.0** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+
+**Vault context (Story 52-1):** After Sources 1–3, the skill builds up to five trend keywords plus five headline titles (deduped), runs `scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs` against watched notebooks in `scripts/session-close/lib/notebook-registry.json`, and on a match invokes `scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs` (same `nlm` / `uvx` prerequisite as §15.x notebook-query — not the NotebookLM MCP). Answers appear under **`Vault context`** in Discord (max 500 characters). Failed routing or query shows `- (source unavailable: …)` without aborting the digest.
 
 **Differs from §15.2 (26-7):** Legacy digest is **Mode B inbox** constitution/open-loops at **07:00**; this skill is **read-only research** at default **08:00 machine-local**. Disable the §15.2 WSL cron line (comment out) when this skill is active; keep 26-7 scripts for manual fallback.
 
@@ -942,7 +944,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 1. `bash scripts/install-hermes-skill-morning-digest.sh`
 2. Add **`morning-digest`** to `#hermes` `discord.channel_skill_bindings` (see `references/config-snippet.md`).
-3. Ensure Hermes gateway is running; post **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Recommended focus).
+3. Ensure Hermes gateway is running; post **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Vault context / Recommended focus).
 4. Optional cron: `MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 8 * * *}" hermes cron create "$MORNING_DIGEST_CRON" ... --skill morning-digest --name morning-digest --deliver discord` (see skill `references/cron-snippet.md`; recreate the Hermes cron job after schedule changes).
 5. **Migration:** comment out §15.2 WSL crontab line; do **not** delete `scripts/hermes-morning-digest.sh` or related 26-7 files.
 

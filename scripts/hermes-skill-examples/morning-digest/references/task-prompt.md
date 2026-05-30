@@ -1,14 +1,15 @@
-# Task: `morning-digest` (Story 49-6)
+# Task: `morning-digest` (Story 49-6 + 52-1)
 
 ## Hard constraints (must follow)
 
 1. **Channel**: Discord `#hermes` only.
 2. **No vault writes**: no Vault IO mutators, no files under `Knowledge-Vault-ACTIVE/`, no `00-Inbox/` captures.
-3. **No dashboard relay**, no NotebookLM fan-out, no digest archive JSONL.
+3. **No dashboard relay**, no digest archive JSONL. **NotebookLM:** read-only via `query-notebook.mjs` after signal scoring — no `source_add`, no session-close fan-out, no `mcp__notebooklm__notebook_query`.
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`).
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
-7. **Cross-source failures**: run all three sources independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources 1–4 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 4 `NOTEBOOK_REMAINING_S` (see Source 4).
 
 ## Tool-call rule
 
@@ -33,7 +34,7 @@ Call `terminal` exactly once for Google Trends:
 
 `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", workdir=resolved_repo_root, timeout=60)`
 
-`--dry-run` is mandatory: stdout JSON only; ingest does **not** call Convex or persist norm-cache updates.
+The wrapper runs `trend-ingest.py` with **`--dry-run`** (mandatory): stdout JSON only; ingest does **not** call Convex or persist norm-cache updates.
 
 If the command exits non-zero or stdout is not valid JSON, treat Source 1 as failed and **continue** to Source 2.
 
@@ -77,6 +78,79 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 - Soft cap **45s** — on timeout, write `- (source unavailable: perplexity timeout)`.
 - Missing top trend keyword: write `- (source unavailable: no top trend keyword)`.
 
+## Source 4 — Vault context (NotebookLM)
+
+Run **after** Source 3 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+
+### Build `signals` (for scoring)
+
+From parsed Source 1 and Source 2 only (skip a source that failed with `source unavailable`):
+
+- Up to **5** trend **keywords** from Source 1 (same sort/top-5 as Trending Now bullets).
+- Up to **5** headline **titles** from Source 2.
+- Dedupe case-insensitively (keep first; trends before headlines).
+
+Serialize as JSON array string for `SIGNALS_JSON`.
+
+Before building any Source 4 terminal command, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
+
+```text
+shellQuote(value) = "'" + String(value).replaceAll("'", "'\\''") + "'"
+```
+
+Use `shellQuote(...)` for `SIGNALS_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT`. Do not pass raw headline text, matched signals, or NotebookLM queries inside shell quotes.
+
+### Pick notebook
+
+Call `terminal` once:
+
+```text
+terminal(command="SIGNALS_JSON=<shellQuote(signals_json)> node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs", workdir=resolved_repo_root, timeout=30)
+```
+
+The script also supports `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs <registryPath>` when `SIGNALS_JSON` is set, and legacy `node ... '<json-array>' <registryPath>` when it is not.
+
+Parse stdout JSON: `{ route, winning_signal, winning_score, elapsed_ms }`.
+
+- `route.status === 'NO_ROUTE'` → Vault context unavailable (no watched notebook matched).
+- `route.status === 'ROUTED'` → continue to query step.
+
+Registry path: `scripts/session-close/lib/notebook-registry.json` (override via `CNS_NOTEBOOK_REGISTRY_PATH` on the script env if needed).
+
+### Query notebook (ROUTED only)
+
+Compute remaining seconds:
+
+```text
+remaining_s = Math.max(15, Math.min(60, 120 - (Date.now() - digest_start_ms) / 1000))
+```
+
+Resolve query script (do not copy into morning-digest):
+
+```text
+query_script = resolved_repo_root + "/scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs"
+```
+
+If that repo path is unavailable, use the installed fallback: `$HOME/.hermes/skills/cns/notebook-query/scripts/query-notebook.mjs`.
+
+Call `terminal` once:
+
+```text
+terminal(command="QUERY_SCRIPT=<shellQuote(query_script)> NOTEBOOK_ID=<shellQuote(route.id)> NOTEBOOK_QUERY=<shellQuote(note_query)> NOTEBOOK_REMAINING_S=<shellQuote(String(remaining_s))> node \"$QUERY_SCRIPT\"", workdir=resolved_repo_root, timeout=90)
+```
+
+Where `note_query` is exactly: `Morning digest context for: <winning_signal>. Summarize what this notebook adds for an operator brief today (2–3 sentences, vault-aligned, no fluff).`
+
+Parse stdout JSON `{ answer, elapsed_ms }`. Truncate `answer` to **500** characters for Discord (append `…` if truncated).
+
+**Failure mapping:**
+
+- Non-zero exit or invalid JSON → `- (source unavailable: <short reason>)`
+- Stderr contains `notebook query timed out` → unavailable with that reason
+- Missing `nlm` on PATH → `- (source unavailable: notebooklm CLI not found)`
+
+Vault context failure does **not** abort the digest.
+
 ## Output contract (post to `#hermes`)
 
 ```text
@@ -95,7 +169,25 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 **Deep Signal** (Perplexity — top trend: "<keyword>")
 <2–3 sentence sweep summary or - (source unavailable: <short reason>)>
 
+**Vault context** (NotebookLM — <route.title>)
+<answer text, max 500 chars; if longer truncate with … suffix>
+_Matched signal:_ <winning_signal>
+
 **Recommended focus:** <top keyword to watch today or (none — trends unavailable)>
+```
+
+**Vault context** when `route.status === 'NO_ROUTE'`:
+
+```text
+**Vault context** (NotebookLM)
+- (source unavailable: no watched notebook matched today's signals)
+```
+
+**Vault context** when ROUTED but query fails:
+
+```text
+**Vault context** (NotebookLM — <route.title>)
+- (source unavailable: <short reason>)
 ```
 
 **Recommended focus:** same keyword as Source 3 unless Source 1 failed entirely; then use `(none — trends unavailable)`.
@@ -104,11 +196,11 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; `trend-ingest.py --dry-run`; NewsAPI fetch |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; `pick-signal-notebook.mjs`; `query-notebook.mjs` |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 
-**Forbidden:** `vault_write`, `vault_append_daily`, `vault_create_note`, NotebookLM, Firecrawl, dashboard APIs.
+**Forbidden:** `vault_write`, `vault_append_daily`, `vault_create_note`, `mcp__notebooklm__notebook_query`, Firecrawl, dashboard APIs, session-close NotebookLM fan-out.
 
 ## Partial failure
 

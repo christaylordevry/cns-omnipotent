@@ -42,4 +42,4 @@ Pseudo-trigger label for logs: `cron:morning-digest`.
 ## Operator-visible notes
 
 - Posts back to **`#hermes`** only.
-- No vault writes. No dashboard relay.
+- No vault writes. No dashboard relay. Source order: Trends → NewsAPI → Perplexity → NotebookLM vault context (CLI only).

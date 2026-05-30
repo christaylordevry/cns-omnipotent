@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-30T21:10:00+10:00
+# last_updated: 2026-05-30T22:55:52+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-30T21:02:00+10:00"
+last_updated: "2026-05-30T22:55:52+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -362,3 +362,7 @@ development_status:
   epic-51: in-progress
   51-1-notebook-query-discord-command: done
   51-2-notebook-query-history-log: done
+
+  # Epic 52 — Morning Digest × NotebookLM (vault-context section in daily briefing)
+  epic-52: in-progress
+  52-1-morning-digest-notebooklm-synthesis: done

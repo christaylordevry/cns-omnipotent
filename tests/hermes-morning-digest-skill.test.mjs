@@ -13,6 +13,14 @@ const cronSnippetPath = join(skillDir, "references/cron-snippet.md");
 const configSnippetPath = join(skillDir, "references/config-snippet.md");
 const trendIngestWrapperPath = join(root, "scripts/session-close/hermes-run-trend-ingest.sh");
 const newsapiWrapperPath = join(root, "scripts/session-close/hermes-run-newsapi.sh");
+const pickSignalScriptPath = join(
+  skillDir,
+  "scripts/pick-signal-notebook.mjs",
+);
+const queryNotebookScriptPath = join(
+  root,
+  "scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs",
+);
 
 describe("Story 49-6 Hermes morning-digest skill mirror", () => {
   it("SKILL.md exists and declares name, triggers, sources, and no-vault-writes policy", () => {
@@ -22,7 +30,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.0.4"));
+    assert.ok(body.includes("version: 1.1.0"));
     assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
@@ -39,7 +47,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("hermes-run-trend-ingest.sh"));
     assert.ok(body.includes("hermes-run-newsapi.sh"));
     assert.ok(body.includes("mcp__perplexity__search"));
+    assert.ok(body.includes("pick-signal-notebook.mjs"));
+    assert.ok(body.includes("query-notebook.mjs"));
+    assert.ok(body.includes("**Vault context**"));
     assert.ok(body.includes("No vault writes"));
+    assert.ok(body.includes("no NotebookLM MCP") || body.includes("not the NotebookLM MCP"));
     assert.ok(body.includes("process.env.TZ"));
     assert.ok(!body.includes("Australia/Sydney"));
     assert.ok(!body.includes("python3 - <<'PY'"));
@@ -78,7 +90,17 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("**Headlines**"));
     assert.ok(body.includes("**Deep Signal**"));
     assert.ok(body.includes("**Recommended focus:**"));
+    assert.ok(body.includes("**Vault context**"));
+    assert.ok(body.includes("pick-signal-notebook.mjs"));
+    assert.ok(body.includes("query-notebook.mjs"));
+    assert.ok(body.includes("Source 4"));
+    assert.ok(body.includes("shellQuote(value)"));
+    assert.ok(body.includes("QUERY_SCRIPT=<shellQuote(query_script)>"));
+    assert.ok(!body.includes("SIGNALS_JSON='<json-array>'"));
+    assert.ok(!body.includes("NOTEBOOK_QUERY='Morning digest context for: <winning_signal>"));
     assert.ok(body.includes("No vault writes"));
+    assert.ok(!body.includes("No NotebookLM fan-out"));
+    assert.ok(body.includes("mcp__notebooklm__notebook_query"));
   });
 
   it("task-prompt requires explicit Hermes tool calls instead of passive shell snippets", () => {
@@ -99,7 +121,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(body.includes("Call `terminal` exactly once for NewsAPI"));
     assert.ok(body.includes("Call `mcp__perplexity__search` exactly once"));
-    assert.ok(body.includes("| `terminal` | Machine-local date; `trend-ingest.py --dry-run`; NewsAPI fetch |"));
+    assert.ok(
+      body.includes("pick-signal-notebook.mjs") && body.includes("query-notebook.mjs"),
+    );
     assert.ok(!body.includes("python3 - <<'PY'"));
     assert.ok(!body.includes("export PATH="));
   });
@@ -148,8 +172,23 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("Never abort") || body.includes("never abort"));
   });
 
+  it("SKILL.md inline fallback preserves exact Vault context fallback variants", () => {
+    const body = readFileSync(skillPath, "utf8");
+    assert.ok(body.includes("**Vault context** (NotebookLM)"));
+    assert.ok(body.includes("- (source unavailable: no watched notebook matched today's signals)"));
+    assert.ok(body.includes("For ROUTED query failure, use exactly"));
+    assert.ok(body.includes("**Vault context** (NotebookLM — <route.title>)"));
+  });
+
   it("install script source dir exists", () => {
     assert.ok(existsSync(skillDir));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-morning-digest.sh")));
+  });
+
+  it("pick-signal script exists and query-notebook path is referenced (Story 52-1)", () => {
+    assert.ok(existsSync(pickSignalScriptPath));
+    assert.ok(existsSync(queryNotebookScriptPath));
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
   });
 });
