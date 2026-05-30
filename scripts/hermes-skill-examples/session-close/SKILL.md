@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.5
+version: 1.0.6
 author: CNS Operator
 license: MIT
 metadata:
@@ -27,7 +27,10 @@ Reject everything else (extra flags, trailing text, multi-line input). Do not ru
 Use terminal toolset only. First action is always:
 
 ```bash
-node "${OMNIPOTENT_REPO}/scripts/session-close/run-deterministic.mjs" [--dry-run]
+OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
+# wrapper required: systemd service environment does not inherit nvm PATH
+# wrapper executes run-deterministic.mjs
+"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-session-close.sh" [--dry-run]
 ```
 
 If Phase A fails, stop and report from `close-report.json` (`failure_class`, `steps.*`).
