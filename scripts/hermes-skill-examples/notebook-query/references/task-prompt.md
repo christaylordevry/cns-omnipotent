@@ -1,13 +1,8 @@
 ---
-⚠️ HARD RULES — read before anything else:
-1. After the resolver outputs ROUTED, your ONLY next action is to call
-   mcp__notebooklm__notebook_query. Do NOT assess whether it is available.
-   Do NOT check your toolset. Do NOT decide it might be missing. JUST CALL IT.
-   The tool is available. Trust the system. Call it now.
-2. There is no query-notebook.js. There is no helper script for step 3.
-   The MCP tool IS the query mechanism. Call mcp__notebooklm__notebook_query.
-3. If the tool call itself throws an error, THEN report the error per the
-   error handling table. Until it throws, assume it works and call it.
+# HARD RULES - read before anything else:
+1. This skill is fully script-driven. The model only runs bash commands and formats their stdout.
+2. Run `resolve-notebook.mjs` first. If it returns `NO_ROUTE`, post the no-match reply and stop.
+3. After a `ROUTED` result, run `query-notebook.mjs` with the routed notebook ID, original question, and remaining time budget.
 4. If NO_ROUTE: post exactly:
    "📚 notebook-query: no confident match for your question.
     Try rephrasing or use /vault-lint to check notebook coverage."
@@ -34,7 +29,7 @@ Complete implementation instructions for the Hermes agent when a `/notebook-quer
 
 ## 1) Run resolver
 
-Via `execute_code bash` — pass the question in **`NOTEBOOK_QUERY`** (never as a shell argument):
+Via `execute_code bash` - pass the question in **`NOTEBOOK_QUERY`**:
 
 ```bash
 SKILL_DIR="$HOME/.hermes/skills/cns/notebook-query"
@@ -42,7 +37,6 @@ NOTEBOOK_QUERY='<question>' node "$SKILL_DIR/scripts/resolve-notebook.mjs"
 ```
 
 - Set `NOTEBOOK_QUERY` to the extracted question string using a **single-quoted** value. If the question contains a single quote (`'`), escape each `'` as `'\''` inside the quoted string.
-- Do **not** pass the question as `argv` to `node`; env-only avoids shell metacharacter injection from Discord input.
 - Parse the single JSON line from stdout. Extract `route` and `elapsed_ms`.
 
 **Error handling (check exit code before parsing stdout):**
@@ -59,7 +53,7 @@ NOTEBOOK_QUERY='<question>' node "$SKILL_DIR/scripts/resolve-notebook.mjs"
 
 After parsing `{ route, elapsed_ms }`:
 
-**Case A — `route.status === 'NO_ROUTE'`:**
+**Case A - `route.status === 'NO_ROUTE'`:**
 
 Post to `#hermes`:
 ```
@@ -67,9 +61,9 @@ Post to `#hermes`:
 Try rephrasing or use /vault-lint to check notebook coverage.
 ```
 
-Then **stop**. Do not call `mcp__notebooklm__notebook_query`.
+Then **stop**.
 
-**Case B — `route.status === 'ROUTED'`:**
+**Case B - `route.status === 'ROUTED'`:**
 
 - If `route.id` is missing or `route.title` is missing/blank after trim: post `📚 notebook-query: error — could not resolve notebook routing` and **stop**.
 - Otherwise continue to step 3.
@@ -78,43 +72,59 @@ Then **stop**. Do not call `mcp__notebooklm__notebook_query`.
 
 ## 3) Query notebook
 
-**CALL mcp__notebooklm__notebook_query NOW. The tool is available.
-Do not second-guess this. Do not check. Just call it with these args:**
-
 Compute remaining time budget from **command receipt** (`start_time` from step 0), not resolver `elapsed_ms` alone:
 
 ```
 remaining_s = Math.min(30, Math.max(5, 30 - (Date.now() - start_time) / 1000))
 ```
 
-Call `mcp__notebooklm__notebook_query` with:
-- `notebook_id`: `route.id`
-- `query`: original question (verbatim, full length — do NOT truncate for the MCP call)
-- `timeout`: `remaining_s`
+Run:
+
+```bash
+node "$HOME/.hermes/skills/cns/notebook-query/scripts/query-notebook.mjs" \
+  "$NOTEBOOK_ID" "$QUESTION"
+```
+
+Or with env vars:
+
+```bash
+NOTEBOOK_ID="<route.id>" NOTEBOOK_QUERY="<question>" \
+NOTEBOOK_REMAINING_S="<remaining_s>" \
+node "$HOME/.hermes/skills/cns/notebook-query/scripts/query-notebook.mjs"
+```
+
+Use:
+- `NOTEBOOK_ID`: `route.id`
+- `QUESTION` or `NOTEBOOK_QUERY`: original question (verbatim, full length)
+- `NOTEBOOK_REMAINING_S`: `remaining_s`
+
+Parse stdout JSON: `{ answer, elapsed_ms }`
 
 **Error handling:**
 
-- Timeout (tool error indicating timeout / time exceeded): post `📚 notebook-query: timeout — answer not received within 30s. Try again.` and **stop**.
-- Any other MCP error or exception: post `📚 notebook-query: error — <concise description of the error>` and **stop**.
+- Exit `0`: if stdout parses and `answer` is non-empty, use `answer` for the formatted response.
+- Exit `0` but stdout is empty, invalid JSON, or lacks a non-empty `answer`: post `📚 notebook-query: error — could not query notebook` and **stop**.
+- Exit non-zero with stderr indicating timeout / time exceeded: post `📚 notebook-query: timeout — answer not received within 30s. Try again.` and **stop**.
+- Any other non-zero exit: post `📚 notebook-query: error — <concise description of the error>` and **stop**.
 
 ---
 
 ## 4) Post answer
 
-When `notebook_query` returns successfully:
+When `query-notebook.mjs` returns successfully:
 
 Format the response exactly as:
 
 ```
 📚 **notebook-query:** <question_display>
 **Notebook:** <notebook_title_display>
-**Answer:** <answer text from notebook_query>
+**Answer:** <answer text from query-notebook.mjs>
 ```
 
 Where:
 - `<question_display>` = original question, truncated to 80 chars with `…` suffix if longer than 80 chars
 - `<notebook_title_display>` = `route.title` with any newline characters replaced by spaces, then trimmed (single line)
-- `<answer text>` = the answer string returned by `notebook_query` (verbatim, no truncation)
+- `<answer text>` = `answer` from `query-notebook.mjs` (verbatim, no truncation)
 
 **Example output:**
 
@@ -134,6 +144,6 @@ Where:
 | Resolver exit `2` (registry read/parse/malformed) | `📚 notebook-query: error — could not load notebook registry` |
 | Resolver exit `1`, bad stdout JSON, or invalid ROUTED payload | `📚 notebook-query: error — could not resolve notebook routing` |
 | `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match for your question.\nTry rephrasing or use /vault-lint to check notebook coverage.` |
-| `notebook_query` timeout | `📚 notebook-query: timeout — answer not received within 30s. Try again.` |
-| `notebook_query` MCP error | `📚 notebook-query: error — <concise error description>` |
+| Query script timeout | `📚 notebook-query: timeout — answer not received within 30s. Try again.` |
+| Query script error | `📚 notebook-query: error — <concise error description>` |
 | Success | Formatted answer block (see step 4) |
