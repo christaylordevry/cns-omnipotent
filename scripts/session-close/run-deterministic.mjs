@@ -9,6 +9,7 @@
  */
 import { execFile } from "node:child_process";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -38,6 +39,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const OMNIPOTENT_INSTALL_ROOT = dirname(dirname(SCRIPT_DIR));
 const NPM_ENV_SH = join(SCRIPT_DIR, "lib", "npm-env.sh");
 const NOTEBOOK_HEALTH_MUTATION_PATH = "notebookHealth:upsertNotebookHealthSnapshot";
+const DEFAULT_TREND_INGEST_ENV_PATH = join(homedir(), ".hermes", "trend-ingest.env");
 
 const FAST_SCAN_ROW_RE = /^(SRC|INS|SYN|DLY|OTH)\s/;
 
@@ -126,6 +128,84 @@ function normalizeConvexUrl(convexUrl) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function stripEnvQuotes(value) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+/**
+ * @param {string} raw
+ * @returns {Record<string, string>}
+ */
+export function parseKeyValueEnv(raw) {
+  const values = {};
+  for (const rawLine of raw.split("\n")) {
+    let line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    if (line.startsWith("export ")) {
+      line = line.slice("export ".length).trim();
+    }
+    const separator = line.indexOf("=");
+    if (separator <= 0) {
+      continue;
+    }
+    const key = line.slice(0, separator).trim();
+    if (!key) {
+      continue;
+    }
+    values[key] = stripEnvQuotes(line.slice(separator + 1));
+  }
+  return values;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {string}
+ */
+function trendIngestEnvPath(env) {
+  const override = env.TREND_INGEST_ENV?.trim();
+  return override || DEFAULT_TREND_INGEST_ENV_PATH;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<{ convexUrl: string; convexDeployKey: string } | null>}
+ */
+async function resolveConvexPushEnv(env) {
+  const convexUrl = env.CONVEX_URL?.trim();
+  const convexDeployKey = env.CONVEX_DEPLOY_KEY?.trim();
+  if (convexUrl && convexDeployKey) {
+    return { convexUrl, convexDeployKey };
+  }
+
+  try {
+    const parsed = parseKeyValueEnv(await readFile(trendIngestEnvPath(env), "utf8"));
+    const fallbackUrl = convexUrl || parsed.CONVEX_URL?.trim();
+    const fallbackKey = convexDeployKey || parsed.CONVEX_DEPLOY_KEY?.trim();
+    if (fallbackUrl && fallbackKey) {
+      return { convexUrl: fallbackUrl, convexDeployKey: fallbackKey };
+    }
+  } catch (err) {
+    if (!(err && typeof err === "object" && "code" in err && err.code === "ENOENT")) {
+      throw err;
+    }
+  }
+
+  return null;
+}
+
+/**
  * @param {{
  *   dryRun: boolean;
  *   pack: Record<string, unknown>;
@@ -136,14 +216,13 @@ function normalizeConvexUrl(convexUrl) {
  */
 export async function pushNotebookHealthSnapshot(opts) {
   if (opts.dryRun) {
-    return;
+    return { status: "skipped", rows: 0, reason: "dry-run" };
   }
 
   const env = opts.env ?? process.env;
-  const convexUrl = env.CONVEX_URL;
-  const convexDeployKey = env.CONVEX_DEPLOY_KEY;
-  if (!convexUrl || !convexDeployKey) {
-    return;
+  const convexEnv = await resolveConvexPushEnv(env);
+  if (!convexEnv) {
+    return { status: "skipped", rows: 0, reason: "missing-convex-env" };
   }
 
   const registry = await readRegistry(opts.registryPath ?? DEFAULT_REGISTRY_PATH);
@@ -156,19 +235,20 @@ export async function pushNotebookHealthSnapshot(opts) {
   const routingNotebooks = Array.isArray(routing) ? routing : [];
   const rows = buildNotebookHealthRows(registry, routingNotebooks);
   if (rows.length === 0) {
-    return;
+    return { status: "skipped", rows: 0, reason: "no-notebook-health-rows" };
   }
 
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
-  const response = await fetchFn(`${normalizeConvexUrl(convexUrl)}/api/mutation`, {
+  const response = await fetchFn(`${normalizeConvexUrl(convexEnv.convexUrl)}/api/mutation`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Convex ${convexDeployKey}`,
+      Authorization: `Convex ${convexEnv.convexDeployKey}`,
     },
     body: JSON.stringify({
       path: NOTEBOOK_HEALTH_MUTATION_PATH,
       args: { rows },
+      format: "json",
     }),
   });
 
@@ -196,6 +276,8 @@ export async function pushNotebookHealthSnapshot(opts) {
       throw new Error("Convex mutation returned unexpected status");
     }
   }
+
+  return { status: "ok", rows: rows.length, reason: "pushed" };
 }
 
 /**
@@ -259,6 +341,7 @@ export function enrichNotebooklmTargets(pack) {
  *   notebooklm_routing?: import('./lib/read-sources.mjs').NotebookRoutingMeta | null;
  *   memory_preview?: string | null;
  *   daily_rhythm_preview?: Record<string, string> | null;
+ *   convex_push?: { status: string; rows: number; reason: string } | null;
  * }} input
  */
 export function buildCloseReport(input) {
@@ -275,6 +358,7 @@ export function buildCloseReport(input) {
     notebooklm_routing: input.notebooklm_routing ?? null,
     memory_preview: input.memory_preview ?? null,
     daily_rhythm_preview: input.daily_rhythm_preview ?? null,
+    convex_push: input.convex_push ?? null,
   };
 }
 
@@ -563,6 +647,21 @@ export async function runDeterministicPipeline(opts = {}) {
   await mkdir(paths.sessionCloseDir, { recursive: true });
   await writeContextPack(pack, paths.contextPackPath, { dryRun: false });
 
+  let convexPush;
+  try {
+    convexPush = await pushNotebookHealthSnapshot({
+      dryRun,
+      pack,
+      env: process.env,
+      fetchFn: globalThis.fetch,
+      registryPath: DEFAULT_REGISTRY_PATH,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn("[knowledge-pulse] Convex push failed (non-fatal):", message);
+    convexPush = { status: "error", rows: 0, reason: message };
+  }
+
   const reportTargets = enrichNotebooklmTargets(pack);
   const report = buildCloseReport({
     mode: dryRun ? "dry-run" : "real",
@@ -576,21 +675,10 @@ export async function runDeterministicPipeline(opts = {}) {
     notebooklm_routing: pack.notebooklm_routing ?? null,
     memory_preview: memoryPreview,
     daily_rhythm_preview: dailyRhythmPreview,
+    convex_push: convexPush,
   });
 
   await writeFile(paths.closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-  try {
-    await pushNotebookHealthSnapshot({
-      dryRun,
-      pack,
-      env: process.env,
-      fetchFn: globalThis.fetch,
-      registryPath: DEFAULT_REGISTRY_PATH,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn("[knowledge-pulse] Convex push failed (non-fatal):", message);
-  }
 
   return { pack, report, paths };
 }

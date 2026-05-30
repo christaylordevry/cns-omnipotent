@@ -23,6 +23,7 @@ import {
   enrichNotebooklmTargets,
   ensurePhaseAComplete,
   evaluatePhaseACompletion,
+  parseKeyValueEnv,
   parseVitestTestsSummary,
   pushNotebookHealthSnapshot,
   runDeterministicPipeline,
@@ -568,6 +569,11 @@ describe("session-close run-deterministic", () => {
       const onDiskReport = JSON.parse(await readFile(reportPath, "utf8"));
       const onDiskPack = JSON.parse(await readFile(packPath, "utf8"));
       assert.equal(onDiskReport.steps.export.status, "skipped");
+      assert.deepEqual(onDiskReport.convex_push, {
+        status: "skipped",
+        rows: 0,
+        reason: "dry-run",
+      });
       assert.equal(onDiskPack.mode, "dry-run");
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
@@ -597,10 +603,12 @@ describe("session-close run-deterministic", () => {
       notebooklm_targets: [
         { notebook_id: "00000000-0000-4000-8000-000000000001", title: "T", export_path: "/p" },
       ],
+      convex_push: { status: "skipped", rows: 0, reason: "dry-run" },
     });
     assert.equal(report.failure_class, "export");
     assert.equal(report.deterministic.export_bytes, 42);
     assert.equal(report.notebooklm_targets[0].export_path, "/p");
+    assert.equal(report.convex_push.status, "skipped");
     assert.ok(!JSON.stringify(report).includes("api_key"));
   });
 
@@ -669,7 +677,7 @@ describe("session-close run-deterministic", () => {
     );
 
     try {
-      await pushNotebookHealthSnapshot({
+      const result = await pushNotebookHealthSnapshot({
         dryRun: false,
         registryPath,
         pack: {
@@ -692,6 +700,7 @@ describe("session-close run-deterministic", () => {
         },
       });
 
+      assert.deepEqual(result, { status: "ok", rows: 2, reason: "pushed" });
       assert.equal(calls.length, 1);
       assert.equal(calls[0].url, "https://example.convex.cloud/api/mutation");
       assert.equal(calls[0].init.headers.Authorization, "Convex deploy-key-secret");
@@ -715,6 +724,7 @@ describe("session-close run-deterministic", () => {
             },
           ],
         },
+        format: "json",
       });
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
@@ -733,7 +743,7 @@ describe("session-close run-deterministic", () => {
       };
     };
 
-    await pushNotebookHealthSnapshot({
+    const dryRunResult = await pushNotebookHealthSnapshot({
       dryRun: true,
       pack: {},
       env: {
@@ -742,14 +752,119 @@ describe("session-close run-deterministic", () => {
       },
       fetchFn,
     });
-    await pushNotebookHealthSnapshot({
+    const missingEnvResult = await pushNotebookHealthSnapshot({
       dryRun: false,
       pack: {},
-      env: { CONVEX_URL: "https://example.convex.cloud" },
+      env: {
+        CONVEX_URL: "https://example.convex.cloud",
+        TREND_INGEST_ENV: "/tmp/session-close-missing-trend-ingest.env",
+      },
       fetchFn,
     });
 
+    assert.deepEqual(dryRunResult, { status: "skipped", rows: 0, reason: "dry-run" });
+    assert.deepEqual(missingEnvResult, {
+      status: "skipped",
+      rows: 0,
+      reason: "missing-convex-env",
+    });
     assert.equal(calls.length, 0);
+  });
+
+  it("pushNotebookHealthSnapshot falls back to trend-ingest env file", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "notebook-health-env-"));
+    const registryPath = join(fixtureRoot, "notebook-registry.json");
+    const envPath = join(fixtureRoot, "trend-ingest.env");
+    const calls = [];
+    await writeFile(
+      registryPath,
+      `${JSON.stringify([
+        {
+          id: "watched-1",
+          title: "Watched Notebook",
+          watch: true,
+          domain: "cns-brain",
+          last_updated: null,
+        },
+      ])}\n`,
+      "utf8",
+    );
+    await writeFile(
+      envPath,
+      "CONVEX_URL=https://fallback.convex.cloud\nCONVEX_DEPLOY_KEY='fallback-key'\n",
+      "utf8",
+    );
+
+    try {
+      const result = await pushNotebookHealthSnapshot({
+        dryRun: false,
+        registryPath,
+        pack: {},
+        env: { TREND_INGEST_ENV: envPath },
+        fetchFn: async (url, init) => {
+          calls.push({ url, init });
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ status: "success" }),
+          };
+        },
+      });
+
+      assert.deepEqual(result, { status: "ok", rows: 1, reason: "pushed" });
+      assert.equal(calls[0].url, "https://fallback.convex.cloud/api/mutation");
+      assert.equal(calls[0].init.headers.Authorization, "Convex fallback-key");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("pushNotebookHealthSnapshot reports empty rows without calling fetch", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "notebook-health-empty-"));
+    const registryPath = join(fixtureRoot, "notebook-registry.json");
+    const calls = [];
+    await writeFile(registryPath, "[]\n", "utf8");
+
+    try {
+      const result = await pushNotebookHealthSnapshot({
+        dryRun: false,
+        registryPath,
+        pack: {},
+        env: {
+          CONVEX_URL: "https://example.convex.cloud",
+          CONVEX_DEPLOY_KEY: "deploy-key-secret",
+        },
+        fetchFn: async (url, init) => {
+          calls.push({ url, init });
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ status: "success" }),
+          };
+        },
+      });
+
+      assert.deepEqual(result, {
+        status: "skipped",
+        rows: 0,
+        reason: "no-notebook-health-rows",
+      });
+      assert.equal(calls.length, 0);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("parseKeyValueEnv supports export and quoted values", () => {
+    assert.deepEqual(
+      parseKeyValueEnv("export CONVEX_URL=https://x.convex.cloud\nCONVEX_DEPLOY_KEY='a|b'\n"),
+      {
+        CONVEX_URL: "https://x.convex.cloud",
+        CONVEX_DEPLOY_KEY: "a|b",
+      },
+    );
   });
 
   it("evaluatePhaseACompletion PASSED after dry-run pipeline", async () => {

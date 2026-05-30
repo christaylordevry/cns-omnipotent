@@ -96,10 +96,10 @@ export function sanitizeRegistryEntry(row) {
 }
 
 /**
- * @param {string} registryPath
+ * @param {string} [registryPath]
  * @returns {Promise<import('./lib/sync-notebook-registry.mjs').NotebookRegistryEntry[]>}
  */
-export async function readRegistry(registryPath) {
+export async function readRegistry(registryPath = DEFAULT_REGISTRY_PATH) {
   try {
     const raw = await readFile(registryPath, "utf8");
     const parsed = JSON.parse(raw);

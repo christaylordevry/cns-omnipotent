@@ -10,6 +10,7 @@ import {
 } from "../scripts/session-close/lib/infer-notebook-domain.mjs";
 import { mergeNotebookRegistry } from "../scripts/session-close/lib/sync-notebook-registry.mjs";
 import {
+  DEFAULT_REGISTRY_PATH,
   parseNlmNotebookList,
   readRegistry,
   runSyncNotebooksCli,
@@ -298,6 +299,12 @@ describe("parseNlmNotebookList + syncNotebookRegistry", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("readRegistry defaults to the installed registry path", async () => {
+    const rows = await readRegistry();
+    assert.ok(rows.length > 0);
+    assert.equal(typeof DEFAULT_REGISTRY_PATH, "string");
   });
 
   it("readRegistry drops rows without id", async () => {
