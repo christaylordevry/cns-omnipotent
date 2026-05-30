@@ -349,7 +349,7 @@ development_status:
   49-6-morning-digest-upgrade: review
 
   # Epic 50 — NotebookLM Full Integration (registry SSOT → routing/scoring in later stories)
-  epic-50: in-progress
+  epic-50: done
   50-1-notebook-registry-sync: done
   50-2-watch-flag-fanout: done
   50-3-conservative-notebook-scorer: done
