@@ -136,6 +136,29 @@ Where:
 
 ---
 
+## 5) Log to Convex
+
+After posting the formatted answer to `#hermes`, log the successful query for the `/trends` dashboard history panel. Run **after** step 4 — fire-and-forget; do not edit or retract the Discord answer if logging fails.
+
+Via `execute_code bash`:
+
+```bash
+NOTEBOOK_QUERY='<question>' \
+NOTEBOOK_ANSWER='<answer>' \
+NOTEBOOK_ID='<route.id>' \
+NOTEBOOK_TITLE='<route.title>' \
+NOTEBOOK_DOMAIN='<route.domain or general>' \
+node "$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs"
+```
+
+- Use the same single-quote escaping rules as step 1 (`'\''` for embedded quotes).
+- `NOTEBOOK_ANSWER` = `answer` from `query-notebook.mjs` stdout (verbatim).
+- `NOTEBOOK_DOMAIN` = `route.domain` when present; otherwise `'general'`.
+- **Only invoke on success path** — do not run for `NO_ROUTE`, timeout, or any error path.
+- Exit `0` on skip (missing Convex env) or success; exit `1` on malformed input or HTTP error. Silence is acceptable on failure — do not append to the Discord answer.
+
+---
+
 ## Summary of all reply strings
 
 | Situation | Reply |

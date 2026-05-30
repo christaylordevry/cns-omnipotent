@@ -58,4 +58,13 @@ const scoreResult = scoreNotebooks(question, watchedRegistry);
 const route = disambiguateRoute(scoreResult, watchedRegistry);
 const elapsed_ms = Date.now() - start;
 
-process.stdout.write(JSON.stringify({ route, elapsed_ms }) + '\n');
+let routeOutput = route;
+if (route.status === 'ROUTED') {
+  const entry = watchedRegistry.find((e) => e && e.id === route.id);
+  routeOutput = {
+    ...route,
+    domain: typeof entry?.domain === 'string' ? entry.domain : '',
+  };
+}
+
+process.stdout.write(JSON.stringify({ route: routeOutput, elapsed_ms }) + '\n');

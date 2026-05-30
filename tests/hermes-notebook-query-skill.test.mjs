@@ -169,6 +169,7 @@ describe('resolve-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'cns-watch-1');
+    assert.equal(payload.route.domain, 'cns-brain');
     assert.equal(typeof payload.elapsed_ms, 'number');
   });
 
@@ -206,6 +207,19 @@ describe('resolve-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'cns-watch-1');
+    assert.equal(payload.route.domain, 'cns-brain');
+  });
+
+  it('TC-9: ROUTED resolver output includes domain from registry entry', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runResolver({
+      question: 'AI factory blueprint architecture',
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+    assert.equal(payload.route.domain, 'ai-factory');
   });
 });
 
