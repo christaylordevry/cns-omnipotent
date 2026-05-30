@@ -1,12 +1,19 @@
 ---
 ⚠️ HARD RULES — read before anything else:
 1. After the resolver outputs ROUTED, your ONLY next action is to call
-   mcp__notebooklm__notebook_query. Do NOT look for scripts. Do NOT search
-   the vault. Do NOT improvise an alternative. Call the MCP tool directly.
+   mcp__notebooklm__notebook_query. Do NOT assess whether it is available.
+   Do NOT check your toolset. Do NOT decide it might be missing. JUST CALL IT.
+   The tool is available. Trust the system. Call it now.
 2. There is no query-notebook.js. There is no helper script for step 3.
-   The MCP tool IS the query mechanism.
-3. If mcp__notebooklm__notebook_query is unavailable, post:
-   "📚 notebook-query: error — notebooklm MCP not available" and stop.
+   The MCP tool IS the query mechanism. Call mcp__notebooklm__notebook_query.
+3. If the tool call itself throws an error, THEN report the error per the
+   error handling table. Until it throws, assume it works and call it.
+4. If NO_ROUTE: post exactly:
+   "📚 notebook-query: no confident match for your question.
+    Try rephrasing or use /vault-lint to check notebook coverage."
+   Then stop. Do not search the vault. Do not offer alternatives.
+5. Never offer to "search the vault manually" or "provide information from
+   memory" as a fallback. The only valid fallback is the error message above.
 ---
 
 # Task prompt: `notebook-query` (Story 51-1)
@@ -56,8 +63,8 @@ After parsing `{ route, elapsed_ms }`:
 
 Post to `#hermes`:
 ```
-📚 notebook-query: no confident match
-No watched notebook scored ≥ 0.75 for that question. Try more specific keywords, or check `watch: true` flags in the notebook registry.
+📚 notebook-query: no confident match for your question.
+Try rephrasing or use /vault-lint to check notebook coverage.
 ```
 
 Then **stop**. Do not call `mcp__notebooklm__notebook_query`.
@@ -71,7 +78,8 @@ Then **stop**. Do not call `mcp__notebooklm__notebook_query`.
 
 ## 3) Query notebook
 
-**CALL mcp__notebooklm__notebook_query NOW. Do not use any other tool or script. Do not search the vault. The only valid action here is the MCP call.**
+**CALL mcp__notebooklm__notebook_query NOW. The tool is available.
+Do not second-guess this. Do not check. Just call it with these args:**
 
 Compute remaining time budget from **command receipt** (`start_time` from step 0), not resolver `elapsed_ms` alone:
 
@@ -125,7 +133,7 @@ Where:
 | Empty question | `notebook-query: bad-trigger (question required)` |
 | Resolver exit `2` (registry read/parse/malformed) | `📚 notebook-query: error — could not load notebook registry` |
 | Resolver exit `1`, bad stdout JSON, or invalid ROUTED payload | `📚 notebook-query: error — could not resolve notebook routing` |
-| `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match\nNo watched notebook scored ≥ 0.75 for that question. Try more specific keywords, or check \`watch: true\` flags in the notebook registry.` |
+| `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match for your question.\nTry rephrasing or use /vault-lint to check notebook coverage.` |
 | `notebook_query` timeout | `📚 notebook-query: timeout — answer not received within 30s. Try again.` |
 | `notebook_query` MCP error | `📚 notebook-query: error — <concise error description>` |
 | Success | Formatted answer block (see step 4) |
