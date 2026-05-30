@@ -1,3 +1,14 @@
+---
+⚠️ HARD RULES — read before anything else:
+1. After the resolver outputs ROUTED, your ONLY next action is to call
+   mcp__notebooklm__notebook_query. Do NOT look for scripts. Do NOT search
+   the vault. Do NOT improvise an alternative. Call the MCP tool directly.
+2. There is no query-notebook.js. There is no helper script for step 3.
+   The MCP tool IS the query mechanism.
+3. If mcp__notebooklm__notebook_query is unavailable, post:
+   "📚 notebook-query: error — notebooklm MCP not available" and stop.
+---
+
 # Task prompt: `notebook-query` (Story 51-1)
 
 Complete implementation instructions for the Hermes agent when a `/notebook-query` message is received in `#hermes`.
@@ -59,6 +70,8 @@ Then **stop**. Do not call `mcp__notebooklm__notebook_query`.
 ---
 
 ## 3) Query notebook
+
+**CALL mcp__notebooklm__notebook_query NOW. Do not use any other tool or script. Do not search the vault. The only valid action here is the MCP call.**
 
 Compute remaining time budget from **command receipt** (`start_time` from step 0), not resolver `elapsed_ms` alone:
 
