@@ -75,7 +75,7 @@ Then **stop**.
 Compute remaining time budget from **command receipt** (`start_time` from step 0), not resolver `elapsed_ms` alone:
 
 ```
-remaining_s = Math.min(30, Math.max(5, 30 - (Date.now() - start_time) / 1000))
+remaining_s = Math.min(90, Math.max(10, 90 - (Date.now() - start_time) / 1000))
 ```
 
 Run:
@@ -104,7 +104,7 @@ Parse stdout JSON: `{ answer, elapsed_ms }`
 
 - Exit `0`: if stdout parses and `answer` is non-empty, use `answer` for the formatted response.
 - Exit `0` but stdout is empty, invalid JSON, or lacks a non-empty `answer`: post `📚 notebook-query: error — could not query notebook` and **stop**.
-- Exit non-zero with stderr indicating timeout / time exceeded: post `📚 notebook-query: timeout — answer not received within 30s. Try again.` and **stop**.
+- Exit non-zero with stderr indicating timeout / time exceeded: post `📚 notebook-query: timeout — answer not received within 90s. Try again.` and **stop**.
 - Any other non-zero exit: post `📚 notebook-query: error — <concise description of the error>` and **stop**.
 
 ---
@@ -144,6 +144,6 @@ Where:
 | Resolver exit `2` (registry read/parse/malformed) | `📚 notebook-query: error — could not load notebook registry` |
 | Resolver exit `1`, bad stdout JSON, or invalid ROUTED payload | `📚 notebook-query: error — could not resolve notebook routing` |
 | `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match for your question.\nTry rephrasing or use /vault-lint to check notebook coverage.` |
-| Query script timeout | `📚 notebook-query: timeout — answer not received within 30s. Try again.` |
+| Query script timeout | `📚 notebook-query: timeout — answer not received within 90s. Try again.` |
 | Query script error | `📚 notebook-query: error — <concise error description>` |
 | Success | Formatted answer block (see step 4) |
