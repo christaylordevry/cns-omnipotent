@@ -12,10 +12,30 @@ import { mergeNotebookRegistry } from "../scripts/session-close/lib/sync-noteboo
 import {
   parseNlmNotebookList,
   readRegistry,
+  runSyncNotebooksCli,
   sanitizeRegistryEntry,
   syncNotebookRegistry,
   writeRegistry,
 } from "../scripts/session-close/sync-notebooks.mjs";
+
+async function captureStderr(fn) {
+  const originalWrite = process.stderr.write;
+  let output = "";
+  process.stderr.write = (chunk, encoding, cb) => {
+    output += String(chunk);
+    if (typeof cb === "function") {
+      cb();
+    }
+    return true;
+  };
+
+  try {
+    await fn();
+    return output;
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+}
 
 describe("inferNotebookDomain", () => {
   const cases = [
@@ -200,6 +220,72 @@ describe("parseNlmNotebookList + syncNotebookRegistry", () => {
       assert.ok(Array.isArray(onDisk));
       assert.equal(onDisk[0].id, "981466f0-de1c-4551-93a9-f3bc2a24b184");
     } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI path invokes stale alerts after writing the registry", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "notebook-registry-"));
+    const registryPath = join(dir, "notebook-registry.json");
+
+    try {
+      const nlmFixture = [
+        {
+          id: "alert-me",
+          title: "CNS Vault Architecture",
+          updated_at: "2026-05-28T15:52:05Z",
+        },
+      ];
+      const alertCalls = [];
+
+      await runSyncNotebooksCli({
+        registryPath,
+        runNlmFn: async () => JSON.stringify(nlmFixture),
+        alertStaleNotebooksFn: async (entries, options) => {
+          alertCalls.push({ entries, options });
+          const onDisk = JSON.parse(await readFile(registryPath, "utf8"));
+          assert.deepEqual(onDisk, entries);
+        },
+        env: { CNS_DISCORD_HERMES_CHANNEL_ID: "channel" },
+      });
+
+      assert.equal(alertCalls.length, 1);
+      assert.equal(alertCalls[0].entries.length, 1);
+      assert.equal(alertCalls[0].options.registryPath, registryPath);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI path logs stale-alert failures without failing sync", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "notebook-registry-"));
+    const registryPath = join(dir, "notebook-registry.json");
+    const priorExitCode = process.exitCode;
+
+    try {
+      const stderr = await captureStderr(async () => {
+        await runSyncNotebooksCli({
+          registryPath,
+          runNlmFn: async () =>
+            JSON.stringify([
+              {
+                id: "alert-error",
+                title: "CNS Vault Architecture",
+                updated_at: "2026-05-28T15:52:05Z",
+              },
+            ]),
+          alertStaleNotebooksFn: async () => {
+            throw new Error("alert down");
+          },
+        });
+      });
+
+      assert.equal(process.exitCode, priorExitCode);
+      assert.match(stderr, /\[stale-alerts\] unexpected error: alert down/);
+      const onDisk = JSON.parse(await readFile(registryPath, "utf8"));
+      assert.equal(onDisk.length, 1);
+    } finally {
+      process.exitCode = priorExitCode;
       await rm(dir, { recursive: true, force: true });
     }
   });
