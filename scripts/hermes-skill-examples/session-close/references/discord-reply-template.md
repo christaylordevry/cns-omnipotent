@@ -4,7 +4,7 @@ Use the close report at `.session-close/close-report.json` as the only source of
 
 Notes:
 
-- `close-report.json` contains `mode`, `failure_class`, `phase_b_token_check` (when Phase B ran), and a `steps` object. Most human-friendly fields below are derived from `steps.*`.
+- `close-report.json` contains `mode`, `failure_class`, `phase_b_token_check` (when Phase B ran), `nlm_auth` (after NotebookLM fan-out), and a `steps` object. Most human-friendly fields below are derived from `steps.*`.
 - If `phase_b_token_check.status` is `ABORTED`, §8 was not applied; mention token count and reason (do not treat as `failure_class: section8`).
 - Keep the reply short. Do not paste raw vault export content, sprint YAML, or AGENTS text.
 
@@ -18,6 +18,7 @@ Notes:
 - **notebooklm:** {{notebooklm}} (derive from notebooklm_targets or steps.notebooklm if present)
 - **vault_fast_scan:** {{vault_fast_scan}} (derive from steps.fast_scan if present)
 - **daily_rhythm:** {{daily_rhythm}} (derive from steps.daily_rhythm if present)
+- **nlm_auth:** {{nlm_auth}} (derive from nlm_auth.status + nlm_auth.reason; dry-run says `skipped in dry-run`)
 - **failure_class:** {{failure_class}}
 
 ### NotebookLM targets
@@ -29,3 +30,5 @@ Rules:
 
 - Do not paste vault export bodies, story bodies, sprint YAML, or AGENTS text.
 - Summarize failures with short classes only.
+- If `nlm_auth.warning` is present, post exactly that warning separately or include it as a clearly labeled final line. It must contain `nlm auth warning`, one of `missing-cli`, `timeout`, `unauthenticated`, or `check-failed`, and `run nlm login`.
+- Never include Google account email, cookies, tokens, raw CLI debug output, or raw env values in the `nlm_auth` line or warning.

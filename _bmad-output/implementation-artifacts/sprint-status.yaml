@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-31T12:00:00+10:00
+# last_updated: 2026-05-31T08:43:37+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-31T12:00:00+10:00"
+last_updated: "2026-05-31T08:43:37+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -367,3 +367,7 @@ development_status:
   epic-52: done
   52-1-morning-digest-notebooklm-synthesis: done
   52-2-morning-digest-notebooklm-convex-log: done
+
+  # Epic 53 - NotebookLM operational resilience
+  epic-53: in-progress
+  53-1-nlm-auth-watchdog: done

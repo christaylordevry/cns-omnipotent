@@ -41,6 +41,8 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     );
     assert.ok(body.includes("close-report.json"));
     assert.ok(body.includes("title: \"My Knowledge Base\""));
+    assert.ok(body.includes("Real close only"));
+    assert.ok(body.includes("Dry-run must not call `source_add`"));
     assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
 
     const installScript = readFileSync(join(root, "scripts/install-hermes-skill-session-close.sh"), "utf8");
@@ -58,6 +60,32 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(reply.includes("close-report.json"));
     assert.ok(reply.includes("Session close complete"));
     assert.ok(reply.includes("NotebookLM targets"));
+  });
+
+  it("documents nlm auth watchdog after NotebookLM fan-out as non-blocking", () => {
+    const body = readFileSync(skillPath, "utf8");
+    const fanOut = body.indexOf("Real close only: for NotebookLM");
+    const watchdog = body.indexOf("nlm auth watchdog");
+    const reply = body.indexOf("Render the Discord reply");
+    assert.ok(fanOut >= 0, "NotebookLM fan-out instruction missing");
+    assert.ok(watchdog > fanOut, "watchdog must be ordered after NotebookLM fan-out");
+    assert.ok(watchdog < reply, "watchdog result must be recorded before final reply rendering");
+    assert.ok(body.includes("non-blocking"));
+    assert.ok(body.includes("hermes-run-nlm-auth-watchdog.sh"));
+    assert.ok(body.includes("${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"));
+    assert.ok(body.includes("--dry-run"));
+    assert.ok(body.includes("Treat NotebookLM fan-out as best-effort"));
+    assert.ok(body.includes("always continue to the auth watchdog"));
+    assert.ok(body.includes("partial or failed"));
+
+    const template = readFileSync(discordReplyTemplatePath, "utf8");
+    assert.ok(template.includes("nlm_auth"));
+    assert.ok(template.includes("nlm auth warning"));
+    assert.ok(template.includes("run nlm login"));
+    assert.ok(template.includes("missing-cli"));
+    assert.ok(template.includes("timeout"));
+    assert.ok(template.includes("unauthenticated"));
+    assert.ok(template.includes("check-failed"));
   });
 
   it("documents /session-close trigger exclusivity and config binding", () => {

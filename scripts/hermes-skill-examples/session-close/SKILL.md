@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.7
+version: 1.0.8
 author: CNS Operator
 license: MIT
 metadata:
@@ -56,10 +56,21 @@ Real close only, apply the draft:
 
 **Phase B token ABORT:** If the gate exits **1** with stderr containing `phase B token check ABORTED`, treat it as a **controlled skip** (§8 not applied): read `phase_b_token_check` from `.session-close/close-report.json`, still render the Discord reply, and surface the ABORT in the reply. Do not fail the whole session close for token ABORT alone.
 
-## Reply and NotebookLM fan-out
+## NotebookLM fan-out and reply
+
+Real close only: for NotebookLM, use report-provided IDs only and call `source_add` with `title: "My Knowledge Base"`, `wait: false`. Dry-run must not call `source_add`; render NotebookLM as `skipped in dry-run`.
+
+Treat NotebookLM fan-out as best-effort. Attempt every report-provided target, record or summarize per-target failures, and always continue to the auth watchdog after the loop, including when target results are partial or failed.
+
+After the NotebookLM `source_add` loop or dry-run skip is complete, run the non-blocking nlm auth watchdog:
+
+```bash
+"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh" [--dry-run]
+```
+
+Use `--dry-run` only for `/session-close --dry-run`. The watchdog records `nlm_auth` in `.session-close/close-report.json`; it must not change `failure_class` or mask export, Section 8, MEMORY, fast-scan, daily rhythm, Convex health push, or NotebookLM fan-out results. If `nlm_auth.warning` is present, post it to `#hermes` as the auth warning. Do not include raw CLI output, emails, cookies, tokens, or raw env values.
 
 Render the Discord reply from `.session-close/close-report.json` using `references/discord-reply-template.md`.
-For NotebookLM, use report-provided IDs only and call `source_add` with `title: "My Knowledge Base"`, `wait: false`.
 
 ## Pitfalls (keep this short)
 

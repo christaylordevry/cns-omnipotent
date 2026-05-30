@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath, URL } from "node:url";
+import { promisify } from "node:util";
 
 import {
   parseApplySection8Argv,
@@ -29,6 +32,12 @@ import {
   runDeterministicPipeline,
 } from "../scripts/session-close/run-deterministic.mjs";
 import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
+import {
+  formatNlmAuthWarning,
+  mergeNlmAuthIntoCloseReport,
+  resolveNlmCommand,
+  runNlmAuthWatchdog,
+} from "../scripts/session-close/lib/nlm-auth-watchdog.mjs";
 import { replaceAuto, applyAutoMarkers } from "../scripts/session-close/lib/replace-auto.mjs";
 import {
   AUTO_MARKER_TAGS,
@@ -53,6 +62,11 @@ import {
   SECTION8_EXCERPT_LIMIT,
   truncateToTokens,
 } from "../scripts/session-close/lib/token-estimate.mjs";
+
+const execFileAsync = promisify(execFile);
+const TEST_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const NLM_AUTH_WATCHDOG_SCRIPT = join(TEST_ROOT, "scripts/session-close/lib/nlm-auth-watchdog.mjs");
+const NLM_AUTH_WATCHDOG_WRAPPER = join(TEST_ROOT, "scripts/session-close/hermes-run-nlm-auth-watchdog.sh");
 
 const REQUIRED_PACK_KEYS = [
   "generated_at",
@@ -971,6 +985,249 @@ describe("session-close run-deterministic", () => {
       const report = JSON.parse(await readFile(reportPath, "utf8"));
       assert.equal(report.phase_a_gate.status, "ABORTED");
       assert.equal(report.failure_class, "pipeline");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("session-close nlm auth watchdog", () => {
+  it("resolves NLM_BIN before PATH and operator-local fallback", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "nlm-auth-path-"));
+    const customDir = join(fixtureRoot, "custom-bin");
+    const pathDir = join(fixtureRoot, "path-bin");
+    const localDir = join(fixtureRoot, "local-bin");
+    await mkdir(customDir, { recursive: true });
+    await mkdir(pathDir, { recursive: true });
+    await mkdir(localDir, { recursive: true });
+    await writeFile(join(customDir, "nlm"), "#!/bin/sh\n", { mode: 0o755 });
+    await writeFile(join(pathDir, "nlm"), "#!/bin/sh\n", { mode: 0o755 });
+    await writeFile(join(localDir, "nlm"), "#!/bin/sh\n", { mode: 0o755 });
+
+    try {
+      assert.equal(
+        await resolveNlmCommand({
+          env: { NLM_BIN: join(customDir, "nlm"), PATH: pathDir },
+          localNlmPath: join(localDir, "nlm"),
+        }),
+        join(customDir, "nlm"),
+      );
+      assert.equal(
+        await resolveNlmCommand({ env: { PATH: pathDir }, localNlmPath: join(localDir, "nlm") }),
+        join(pathDir, "nlm"),
+      );
+      assert.equal(
+        await resolveNlmCommand({ env: { PATH: "" }, localNlmPath: join(localDir, "nlm") }),
+        join(localDir, "nlm"),
+      );
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("falls through stale NLM_BIN to PATH", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "nlm-auth-stale-bin-"));
+    const pathDir = join(fixtureRoot, "path-bin");
+    await mkdir(pathDir, { recursive: true });
+    await writeFile(join(pathDir, "nlm"), "#!/bin/sh\n", { mode: 0o755 });
+
+    try {
+      assert.equal(
+        await resolveNlmCommand({
+          env: { NLM_BIN: join(fixtureRoot, "missing-nlm"), PATH: pathDir },
+          localNlmPath: join(fixtureRoot, "missing-local-nlm"),
+        }),
+        join(pathDir, "nlm"),
+      );
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("treats exit 0 as authenticated", async () => {
+    let capturedArgs = null;
+    let capturedTimeout = null;
+    const result = await runNlmAuthWatchdog({
+      runCommand: async (_command, args, opts) => {
+        capturedArgs = args;
+        capturedTimeout = opts.timeout;
+        return { stdout: "Authenticated\n", stderr: "" };
+      },
+      resolveCommand: async () => "nlm",
+    });
+    assert.deepEqual(result, {
+      status: "authenticated",
+      reason: "ok",
+      message: "nlm auth check passed",
+    });
+    assert.deepEqual(capturedArgs, ["login", "--check"]);
+    assert.equal(capturedTimeout, 10_000);
+  });
+
+  it("does not false-fail authenticated output that mentions non-stale cache state", async () => {
+    const result = await runNlmAuthWatchdog({
+      runCommand: async () => ({ stdout: "Authenticated; cache not stale\n", stderr: "" }),
+      resolveCommand: async () => "nlm",
+    });
+    assert.equal(result.status, "authenticated");
+    assert.equal(result.reason, "ok");
+  });
+
+  it("treats non-zero unauthenticated output as unauthenticated", async () => {
+    const result = await runNlmAuthWatchdog({
+      runCommand: async () => {
+        const err = new Error("exit 1");
+        err.code = 1;
+        err.stdout = "Please login: user@example.com expired";
+        err.stderr = "";
+        throw err;
+      },
+      resolveCommand: async () => "nlm",
+    });
+    assert.equal(result.status, "unauthenticated");
+    assert.equal(result.reason, "unauthenticated");
+    assert.ok(!JSON.stringify(result).includes("user@example.com"));
+  });
+
+  it("does not persist raw diagnostics for check-failed output", async () => {
+    const result = await runNlmAuthWatchdog({
+      runCommand: async () => {
+        const err = new Error("exit 2");
+        err.code = 2;
+        err.stdout = "";
+        err.stderr = "Authorization: Bearer secret-token refresh_token=secret user@example.com";
+        throw err;
+      },
+      resolveCommand: async () => "nlm",
+    });
+    assert.equal(result.status, "unknown");
+    assert.equal(result.reason, "check-failed");
+    assert.equal(result.message, "nlm auth check failed");
+    assert.ok(!JSON.stringify(result).includes("secret-token"));
+    assert.ok(!JSON.stringify(result).includes("refresh_token"));
+    assert.ok(!JSON.stringify(result).includes("user@example.com"));
+  });
+
+  it("reports missing CLI without falling back to uvx", async () => {
+    const result = await runNlmAuthWatchdog({
+      resolveCommand: async () => null,
+      runCommand: async () => {
+        throw new Error("should not run");
+      },
+    });
+    assert.equal(result.status, "unknown");
+    assert.equal(result.reason, "missing-cli");
+  });
+
+  it("reports timeout as unknown", async () => {
+    const result = await runNlmAuthWatchdog({
+      runCommand: async () => {
+        const err = new Error("timed out");
+        err.killed = true;
+        err.signal = "SIGTERM";
+        throw err;
+      },
+      resolveCommand: async () => "nlm",
+    });
+    assert.equal(result.status, "unknown");
+    assert.equal(result.reason, "timeout");
+  });
+
+  it("formats a tiny redacted Discord warning", () => {
+    const warning = formatNlmAuthWarning({
+      status: "unauthenticated",
+      reason: "unauthenticated",
+      message: "user@example.com SAPISID=secret",
+    });
+    assert.ok(warning.includes("nlm auth warning"));
+    assert.ok(warning.includes("unauthenticated"));
+    assert.ok(warning.includes("run nlm login"));
+    assert.ok(!warning.includes("user@example.com"));
+    assert.ok(!warning.includes("secret"));
+  });
+
+  it("dry-run skips the watchdog", async () => {
+    const result = await runNlmAuthWatchdog({
+      dryRun: true,
+      runCommand: async () => {
+        throw new Error("should not run");
+      },
+      resolveCommand: async () => "nlm",
+    });
+    assert.deepEqual(result, {
+      status: "skipped",
+      reason: "skipped-dry-run",
+      message: "nlm_auth: skipped in dry-run",
+    });
+  });
+
+  it("merges nlm_auth without changing failure_class", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "nlm-auth-report-"));
+    const reportPath = join(fixtureRoot, "close-report.json");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({ mode: "real", failure_class: "tests", steps: {} }, null, 2)}\n`,
+      "utf8",
+    );
+
+    try {
+      const merged = await mergeNlmAuthIntoCloseReport(reportPath, {
+        status: "unknown",
+        reason: "missing-cli",
+        message: "nlm CLI not found",
+      });
+      assert.equal(merged.failure_class, "tests");
+      assert.equal(merged.nlm_auth.reason, "missing-cli");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI exits zero and emits nlm_auth when report merge fails", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "nlm-auth-cli-"));
+    const missingReport = join(fixtureRoot, "missing", "close-report.json");
+
+    try {
+      const result = await execFileAsync(process.execPath, [
+        NLM_AUTH_WATCHDOG_SCRIPT,
+        "--dry-run",
+        "--report",
+        missingReport,
+      ]);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.status, "skipped");
+      assert.equal(payload.reason, "skipped-dry-run");
+      assert.match(result.stderr, /could not update close-report\.json/);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("Hermes wrapper supplies repo fallback under a clean environment", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "nlm-auth-wrapper-"));
+    const reportPath = join(fixtureRoot, "close-report.json");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({ mode: "dry-run", failure_class: null, steps: {} }, null, 2)}\n`,
+      "utf8",
+    );
+
+    try {
+      const result = await execFileAsync("env", [
+        "-i",
+        `HOME=${process.env.HOME ?? "/home/christ"}`,
+        "PATH=/usr/bin:/bin",
+        NLM_AUTH_WATCHDOG_WRAPPER,
+        "--dry-run",
+        "--report",
+        reportPath,
+      ]);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.status, "skipped");
+      assert.equal(payload.reason, "skipped-dry-run");
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.failure_class, null);
+      assert.equal(report.nlm_auth.reason, "skipped-dry-run");
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }
