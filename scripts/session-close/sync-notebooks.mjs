@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { alertStaleNotebooks } from "./lib/notebook-stale-alert.mjs";
 import { mergeNotebookRegistry } from "./lib/sync-notebook-registry.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -146,12 +147,37 @@ function printError(message) {
   process.stderr.write(`${NLM_HINT}\n`);
 }
 
-async function main() {
+/**
+ * @param {{
+ *   registryPath?: string,
+ *   runNlmFn?: () => Promise<string>,
+ *   alertStaleNotebooksFn?: typeof alertStaleNotebooks,
+ *   fetchFn?: typeof fetch,
+ *   env?: NodeJS.ProcessEnv,
+ * }} [options]
+ */
+export async function runSyncNotebooksCli(options = {}) {
+  const registryPath = options.registryPath ?? DEFAULT_REGISTRY_PATH;
+  const alertFn = options.alertStaleNotebooksFn ?? alertStaleNotebooks;
+
   try {
-    const merged = await syncNotebookRegistry();
+    const merged = await syncNotebookRegistry({
+      registryPath,
+      runNlmFn: options.runNlmFn,
+    });
     process.stdout.write(
-      `Wrote ${merged.length} notebook(s) to ${DEFAULT_REGISTRY_PATH}\n`,
+      `Wrote ${merged.length} notebook(s) to ${registryPath}\n`,
     );
+    try {
+      await alertFn(merged, {
+        registryPath,
+        fetchFn: options.fetchFn ?? globalThis.fetch,
+        env: options.env ?? process.env,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[stale-alerts] unexpected error: ${message}\n`);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
@@ -166,5 +192,5 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  await runSyncNotebooksCli();
 }
