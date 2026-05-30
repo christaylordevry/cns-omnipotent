@@ -188,9 +188,18 @@ if (isMainModule()) {
   const result = pickSignalNotebook(signals, watchedRegistry);
   const elapsed_ms = Date.now() - start;
 
+  let routeOutput = result.route;
+  if (result.route.status === 'ROUTED') {
+    const entry = watchedRegistry.find((e) => e && e.id === result.route.id);
+    routeOutput = {
+      ...result.route,
+      domain: typeof entry?.domain === 'string' ? entry.domain : '',
+    };
+  }
+
   process.stdout.write(
     JSON.stringify({
-      route: result.route,
+      route: routeOutput,
       winning_signal: result.winning_signal,
       winning_score: result.winning_score,
       elapsed_ms,

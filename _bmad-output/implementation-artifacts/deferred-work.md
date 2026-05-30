@@ -1,5 +1,14 @@
 # Deferred work
 
+## Deferred from: code review of 52-2-morning-digest-notebooklm-convex-log (2026-05-31)
+
+- Fire-and-forget via awaited `terminal(timeout=30)` — same 51-2 pattern; Hermes agent semantics, not a 52-2 regression.
+- No idempotency/dedupe on `notebookQueries` rows — out of scope for 52-2; same as `/notebook-query` log path.
+- `pickSignalNotebook()` export lacks domain enrichment (CLI-only) — no non-CLI consumer today.
+- `OMNIPOTENT_REPO` vs `CNS_REPO_ROOT` env split — pre-existing 52-1 Source 4 wiring.
+- `readLogPayload` trims `NOTEBOOK_ANSWER` — pre-existing 51-2 log script; AC "verbatim" means pre-Discord-truncation, not no-trim.
+- Large `NOTEBOOK_ANSWER` shell env / ARG_MAX — pre-existing 51-2 pattern; Convex truncates at insert.
+
 ## Deferred from: code review of 51-1-notebook-query-discord-command (2026-05-30)
 
 - `CNS_REPO_ROOT` controls dynamic import path — operator-trusted env; same deployment model as session-close (`resolve-notebook.mjs`).

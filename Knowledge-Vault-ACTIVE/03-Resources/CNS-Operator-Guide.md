@@ -921,11 +921,13 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - Destination: `~/.hermes/skills/cns/vault-lint/`
 - Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.
 
-### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1)
+### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1 + 52-2)
 
-**Skill version:** **1.1.0** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+**Skill version:** **1.2.0** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no trend Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
 
 **Vault context (Story 52-1):** After Sources 1–3, the skill builds up to five trend keywords plus five headline titles (deduped), runs `scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs` against watched notebooks in `scripts/session-close/lib/notebook-registry.json`, and on a match invokes `scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs` (same `nlm` / `uvx` prerequisite as §15.x notebook-query — not the NotebookLM MCP). Answers appear under **`Vault context`** in Discord (max 500 characters). Failed routing or query shows `- (source unavailable: …)` without aborting the digest.
+
+**Convex log (Story 52-2):** On ROUTED + successful Vault context query only, the skill fire-and-forget logs to the shared **`notebookQueries`** Convex table via `log-notebook-query.mjs` (same script as `/notebook-query`). History appears on dashboard **`/trends`** → Notebook Query History. Trend dry-run still does **not** push to Convex; logging failures are silent and do not alter the Discord digest. Prerequisite: `bash scripts/install-hermes-skill-notebook-query.sh` (log script lives in the notebook-query skill, not morning-digest).
 
 **Differs from §15.2 (26-7):** Legacy digest is **Mode B inbox** constitution/open-loops at **07:00**; this skill is **read-only research** at default **08:00 machine-local**. Disable the §15.2 WSL cron line (comment out) when this skill is active; keep 26-7 scripts for manual fallback.
 

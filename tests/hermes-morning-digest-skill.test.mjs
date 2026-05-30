@@ -30,7 +30,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.1.0"));
+    assert.ok(body.includes("version: 1.2.0"));
     assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
@@ -190,5 +190,31 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(existsSync(queryNotebookScriptPath));
     const taskBody = readFileSync(taskPromptPath, "utf8");
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
+  });
+
+  it("task-prompt documents post-post Convex log for successful Vault context (Story 52-2)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    assert.ok(taskBody.includes("log-notebook-query.mjs"));
+    assert.ok(taskBody.includes("Post-post — Log Vault context to Convex"));
+    assert.ok(taskBody.includes("fire-and-forget"));
+    assert.ok(taskBody.includes("**After** posting"));
+    assert.ok(taskBody.includes("do not edit or retract the Discord message"));
+    assert.ok(taskBody.includes("NOTEBOOK_QUERY=<shellQuote(winning_signal)>"));
+    assert.ok(taskBody.includes("NOTEBOOK_ANSWER=<shellQuote(answer_full)>"));
+    assert.ok(taskBody.includes("answer_full"));
+    assert.ok(taskBody.includes("before Discord 500-char truncation"));
+    assert.ok(taskBody.includes("NO_ROUTE"));
+    assert.ok(taskBody.includes("source unavailable"));
+    assert.ok(taskBody.includes("exits 1"));
+  });
+
+  it("SKILL.md v1.2.0 documents Vault context Convex log policy (Story 52-2)", () => {
+    const body = readFileSync(skillPath, "utf8");
+    assert.ok(body.includes("version: 1.2.0"));
+    assert.ok(body.includes("log-notebook-query.mjs"));
+    assert.ok(body.includes("No trend Convex push"));
+    assert.ok(body.includes("Vault context Convex log"));
+    assert.ok(body.includes("fire-and-forget"));
+    assert.ok(body.includes("trend-ingest.py"));
   });
 });

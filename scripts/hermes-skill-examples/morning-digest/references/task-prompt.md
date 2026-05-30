@@ -1,4 +1,4 @@
-# Task: `morning-digest` (Story 49-6 + 52-1)
+# Task: `morning-digest` (Story 49-6 + 52-1 + 52-2)
 
 ## Hard constraints (must follow)
 
@@ -98,7 +98,7 @@ Before building any Source 4 terminal command, shell-quote every dynamic environ
 shellQuote(value) = "'" + String(value).replaceAll("'", "'\\''") + "'"
 ```
 
-Use `shellQuote(...)` for `SIGNALS_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT`. Do not pass raw headline text, matched signals, or NotebookLM queries inside shell quotes.
+Use `shellQuote(...)` for `SIGNALS_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT` (Source 4), and for `LOG_SCRIPT`, `NOTEBOOK_ANSWER`, `NOTEBOOK_TITLE`, and `NOTEBOOK_DOMAIN` (post-post log). Do not pass raw headline text, matched signals, or NotebookLM queries unquoted.
 
 ### Pick notebook
 
@@ -141,7 +141,7 @@ terminal(command="QUERY_SCRIPT=<shellQuote(query_script)> NOTEBOOK_ID=<shellQuot
 
 Where `note_query` is exactly: `Morning digest context for: <winning_signal>. Summarize what this notebook adds for an operator brief today (2–3 sentences, vault-aligned, no fluff).`
 
-Parse stdout JSON `{ answer, elapsed_ms }`. Truncate `answer` to **500** characters for Discord (append `…` if truncated).
+Parse stdout JSON `{ answer, elapsed_ms }`. Save **`answer_full = answer`** (full CLI stdout text) **before** any Discord formatting. Truncate a **separate** display copy to **500** characters for Discord (append `…` if truncated). Do **not** reuse the truncated string for Convex logging.
 
 **Failure mapping:**
 
@@ -192,11 +192,42 @@ _Matched signal:_ <winning_signal>
 
 **Recommended focus:** same keyword as Source 3 unless Source 1 failed entirely; then use `(none — trends unavailable)`.
 
+## Post-post — Log Vault context to Convex (ROUTED + query success only)
+
+Run **only** when Source 4 finished with `route.status === 'ROUTED'` and `query-notebook.mjs` returned valid stdout JSON `{ answer, elapsed_ms }` where **`answer` is non-empty after trim** (Vault context section is **not** `(source unavailable: …)`).
+
+**After** posting the full digest to `#hermes`, call `terminal` once (fire-and-forget; do not block operator completion on result; do not edit or retract the Discord message if logging fails):
+
+```text
+terminal(
+  command="LOG_SCRIPT=<shellQuote(log_script)> NOTEBOOK_QUERY=<shellQuote(winning_signal)> NOTEBOOK_ANSWER=<shellQuote(answer_full)> NOTEBOOK_ID=<shellQuote(route.id)> NOTEBOOK_TITLE=<shellQuote(route.title)> NOTEBOOK_DOMAIN=<shellQuote(route.domain or 'general')> node \"$LOG_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Where:
+
+```text
+log_script = resolved_repo_root + "/scripts/hermes-skill-examples/notebook-query/scripts/log-notebook-query.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs`
+
+- `NOTEBOOK_QUERY` = `winning_signal` (matched trend keyword or headline — **not** the templated NotebookLM prompt).
+- `NOTEBOOK_ANSWER` = `answer_full` from Source 4 (**full** `query-notebook.mjs` stdout `answer`, saved before Discord 500-char truncation).
+- `NOTEBOOK_DOMAIN` = `route.domain` when present; otherwise `'general'`.
+- Use the same `shellQuote(value)` transform as Source 4 for all dynamic env values.
+
+**Do not run** for `NO_ROUTE`, query failure/timeout/invalid JSON, empty/whitespace-only `answer`, or when Vault context shows `(source unavailable: …)`.
+
+**Failure handling:** ignore non-zero exit; do not append to or edit the Discord digest. Missing `CONVEX_URL` / `CONVEX_DEPLOY_KEY` → script exits 0 (skip, stderr only). Malformed required env or Convex HTTP error → script exits 1 (silent to operator).
+
 ## Allowed tools
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; `pick-signal-notebook.mjs`; `query-notebook.mjs` |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 

@@ -131,8 +131,24 @@ describe('pick-signal-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'cns-watch-1');
+    assert.equal(payload.route.domain, 'cns-brain');
     assert.equal(payload.winning_signal, 'CNS vault architecture');
     assert.equal(typeof payload.elapsed_ms, 'number');
+  });
+
+  it('emits empty route.domain when registry entry omits domain (Story 52-2)', async () => {
+    const noDomainRegistry = [
+      { id: 'cns-watch-1', title: 'CNS Vault Architecture', watch: true, last_updated: null },
+    ];
+    const registryPath = await writeRegistry(noDomainRegistry);
+    const { stdout } = await runPick({
+      signals: ['CNS vault architecture'],
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'cns-watch-1');
+    assert.equal(payload.route.domain, '');
   });
 
   it('supports legacy argv signals with registry path as second argument', async () => {
@@ -152,6 +168,7 @@ describe('pick-signal-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'cns-watch-1');
+    assert.equal(payload.route.domain, 'cns-brain');
   });
 
   it('exit 2 when registry file is missing', async () => {
