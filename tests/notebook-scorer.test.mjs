@@ -25,6 +25,14 @@ describe("tokenizeForScoring", () => {
   it("drops tokens shorter than 2 characters", () => {
     assert.deepEqual(tokenizeForScoring("a bb ccc"), ["bb", "ccc"]);
   });
+
+  it("drops natural-language filler words before scoring", () => {
+    assert.deepEqual(tokenizeForScoring("what is the CNS vault architecture?"), [
+      "cns",
+      "vault",
+      "architecture",
+    ]);
+  });
 });
 
 describe("f1", () => {
@@ -84,6 +92,14 @@ describe("scoreNotebooks", () => {
     assert.equal(result.matches.length, 1);
     assert.equal(result.matches[0].id, "nb-cns-1");
     assert.ok(result.matches[0].score >= 0.75);
+  });
+
+  it("natural-language title question routes after filler words are ignored", () => {
+    const result = scoreNotebooks("what is the CNS vault architecture?", [cnsNotebook]);
+    assert.equal(result.status, "OK");
+    assert.equal(result.matches.length, 1);
+    assert.equal(result.matches[0].id, "nb-cns-1");
+    assert.equal(result.matches[0].score, 1);
   });
 
   it("domain-only match when domain axis clears threshold", () => {

@@ -4,6 +4,20 @@ import {
 } from "./infer-notebook-domain.mjs";
 
 const SCORE_THRESHOLD = 0.75;
+const SCORING_STOPWORDS = new Set([
+  "about",
+  "are",
+  "for",
+  "how",
+  "is",
+  "me",
+  "of",
+  "on",
+  "the",
+  "to",
+  "what",
+  "whats",
+]);
 
 /**
  * @typedef {import('./sync-notebook-registry.mjs').NotebookRegistryEntry} NotebookRegistryEntry
@@ -19,7 +33,7 @@ export function tokenizeForScoring(text) {
   return String(text)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 2);
+    .filter((token) => token.length >= 2 && !SCORING_STOPWORDS.has(token));
 }
 
 /**

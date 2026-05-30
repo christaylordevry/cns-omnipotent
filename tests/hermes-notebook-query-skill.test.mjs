@@ -64,6 +64,12 @@ describe('notebook-query routing pipeline', () => {
     assert.equal(route.id, 'cns-watch-1');
   });
 
+  it('TC-1b: natural-language title question routes to cns-watch-1', () => {
+    const route = resolveForQuestion('what is the CNS vault architecture?', watchRegistry);
+    assert.equal(route.status, 'ROUTED');
+    assert.equal(route.id, 'cns-watch-1');
+  });
+
   it('TC-2: domain keyword match routes to cns-watch-1', () => {
     const route = resolveForQuestion('pake brain vault', watchRegistry);
     assert.equal(route.status, 'ROUTED');
@@ -153,7 +159,7 @@ describe('resolve-notebook.mjs CLI', () => {
   it('emits JSON on stdout with exit 0 for a valid registry', async () => {
     const registryPath = await writeRegistry(watchRegistry);
     const { stdout } = await runResolver({
-      question: 'CNS vault architecture',
+      question: 'what is the CNS vault architecture?',
       registryPath,
     });
     const payload = JSON.parse(stdout.trim());
