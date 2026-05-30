@@ -69,12 +69,13 @@ On failure (missing key, HTTP error, empty results): `- (source unavailable: <sh
 
 ## Source 3 — Perplexity deep signal
 
-Call `mcp__perplexity__search` exactly once.
+Call `mcp__perplexity__search` exactly once when Source 1 produced at least one trend keyword. If Source 1 failed or returned no usable keyword, do **not** invent a fallback keyword from headlines; mark Deep Signal unavailable with the required bullet.
 
 - Keyword: **top** item from Source 1 (after sort).
 - Query: `<keyword> — latest news and developments last 24 hours — CNS operator brief`
-- Target **2–3 sentences** in **Deep Signal** section (no bullets in that section).
-- Soft cap **45s** — on timeout, write `(source unavailable: perplexity timeout)` in Deep Signal body.
+- Target **2–3 sentences** in **Deep Signal** section when Perplexity succeeds.
+- Soft cap **45s** — on timeout, write `- (source unavailable: perplexity timeout)`.
+- Missing top trend keyword: write `- (source unavailable: no top trend keyword)`.
 
 ## Output contract (post to `#hermes`)
 
@@ -92,12 +93,12 @@ Call `mcp__perplexity__search` exactly once.
 ...up to 5
 
 **Deep Signal** (Perplexity — top trend: "<keyword>")
-<2–3 sentence sweep summary>
+<2–3 sentence sweep summary or - (source unavailable: <short reason>)>
 
-**Recommended focus:** <top keyword to watch today>
+**Recommended focus:** <top keyword to watch today or (none — trends unavailable)>
 ```
 
-**Recommended focus:** same keyword as Source 3 unless Source 1 failed entirely (then use best available signal or `(none — trends unavailable)`).
+**Recommended focus:** same keyword as Source 3 unless Source 1 failed entirely; then use `(none — trends unavailable)`.
 
 ## Allowed tools
 
@@ -113,4 +114,4 @@ Call `mcp__perplexity__search` exactly once.
 
 Still post the full template with all section headers. Never invent headlines or trend keywords.
 
-Never stop the run because an earlier source failed — only the failing section gets `(source unavailable: …)`.
+Never stop the run because an earlier source failed — only the failing section gets `- (source unavailable: …)`.

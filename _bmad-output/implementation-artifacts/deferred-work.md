@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 51-1-notebook-query-discord-command (2026-05-30)
+
+- `CNS_REPO_ROOT` controls dynamic import path — operator-trusted env; same deployment model as session-close (`resolve-notebook.mjs`).
+- `argv[3]` registry path override — only Hermes `execute_code` invokes script; not Discord-exposed (`resolve-notebook.mjs`).
+- Install `cp -R` fallback permissions — matches `install-hermes-skill-investigate-trend.sh` pattern (`install-hermes-skill-notebook-query.sh`).
+
 ## Deferred from: code review of 50-1-notebook-registry-sync (2026-05-29)
 
 - Stable sort order for `notebook-registry.json` output (e.g. by `id`) — not required by story AC; optional for cleaner git diffs on operator sync.
@@ -609,3 +615,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: Story 49-6 morning-digest (2026-05-29)
 
 - **49-6:** morning-digest task-prompt never injected (journalctl confirms zero hits). Hermes skill-loading for free-text triggers may require slash-command registration or a different config key — investigate skill loader source. Compare **investigate-trend** (works) vs **morning-digest** (doesn't): both bound identically; difference likely in `trigger-pattern.md` format — compare cold next session.
+
+## Deferred from: code review of 49-6-morning-digest-upgrade (2026-05-30)
+
+- Sprint-status diff bundles unrelated Epic 38 and Epic 50 state changes into the 49-6 review scope. Deferred by operator decision: Epic 38 and Epic 50 sprint-status changes are legitimate completed work, not something to revert; handle sprint-status ownership / commit-splitting separately.

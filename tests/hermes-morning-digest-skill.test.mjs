@@ -23,7 +23,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
     assert.ok(body.includes("version: 1.0.4"));
-    assert.ok(body.includes("requires_toolsets: [terminal]"));
+    assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
     assert.ok(body.includes("execute the digest immediately"));
@@ -126,6 +126,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("0 8"));
     assert.ok(body.includes("MORNING_DIGEST_CRON"));
     assert.ok(body.includes("morning_digest.cron") || body.includes("morning_digest:"));
+    assert.ok(body.includes("--skill morning-digest"));
     assert.ok(body.includes("hermes-morning-digest.sh"));
     assert.ok(!body.includes("CRON_TZ=Australia/Sydney"));
   });
@@ -136,7 +137,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     assert.ok(body.includes("morning_digest"));
     assert.ok(body.includes("channel_skill_bindings"));
+    assert.ok(body.includes("<hermes-channel-id>"));
     assert.ok(body.includes("do not wipe") || body.includes("do **not** replace"));
+    assert.ok(!body.includes("1500733488897462382"));
     assert.ok(!body.includes("Australia/Sydney"));
   });
 

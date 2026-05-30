@@ -2,7 +2,7 @@
 # Format: [TYPE] [path] | [title] | [created]
 # Token budget: ≤2,000 tokens | Cap: 100 most-recently-modified notes
 
-SRC 03-Resources/CNS-Operator-Guide.md | CNS Operator Guide | 2026-05-28
+SRC 03-Resources/CNS-Operator-Guide.md | CNS Operator Guide | 2026-05-30
 OTH 02-Areas/Credentials/api-keys-and-credentials-registry.md | API Keys and Credentials Registry | 2026-05-27
 SRC 03-Resources/Vault-Intelligence-Discovery-Workflow.md | Vault Intelligence Discovery Workflow | 2026-04-05
 SRC 03-Resources/NotebookLM-Project-Map.md | NotebookLM Project Map | 2026-04-05

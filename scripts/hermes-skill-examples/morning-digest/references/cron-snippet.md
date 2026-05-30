@@ -15,11 +15,15 @@ Overrides:
 Gateway must be running (same posture as Story 26-7 launcher).
 
 ```bash
-hermes cron create "0 8 * * *" \
+MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 8 * * *}"
+hermes cron create "$MORNING_DIGEST_CRON" \
   "Run morning-digest skill: collect Google Trends, NewsAPI, Perplexity; post Morning Digest contract to Discord." \
+  --skill morning-digest \
   --name morning-digest \
   --deliver discord
 ```
+
+If you use `morning_digest.cron` in `~/.hermes/config.yaml`, copy that value into `MORNING_DIGEST_CRON` before creating or recreating the Hermes cron job. Hermes stores the schedule on the cron job; changing the env var or YAML later requires removing and recreating the job.
 
 Record job id (optional operator file):
 

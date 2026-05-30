@@ -16,14 +16,14 @@ If `#hermes` already binds other skills (`triage`, `session-close`, `investigate
 discord:
   channel_skill_bindings:
     # Example only — merge with your live bindings; do not wipe existing skills.
-    "1500733488897462382":
+    "<hermes-channel-id>":
       - triage
       - session-close
       - investigate-trend
       - morning-digest
 ```
 
-Replace the channel ID with your live `#hermes` id if different. If your Hermes build uses a string binding per channel, follow upstream docs and keep coexistence notes in Operator Guide §15.11.
+Replace `<hermes-channel-id>` with your live `#hermes` id. If your Hermes build uses a string binding per channel, follow upstream docs and keep coexistence notes in Operator Guide §15.11.
 
 ## Optional schedule keys
 

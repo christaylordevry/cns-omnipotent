@@ -923,7 +923,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 ### 15.11 Morning digest skill (`morning-digest`, Story 49-6)
 
-**Skill version:** **1.0.0** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend. **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+**Skill version:** **1.0.4** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend. **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
 
 **Differs from §15.2 (26-7):** Legacy digest is **Mode B inbox** constitution/open-loops at **07:00**; this skill is **read-only research** at default **08:00 machine-local**. Disable the §15.2 WSL cron line (comment out) when this skill is active; keep 26-7 scripts for manual fallback.
 
@@ -943,7 +943,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 1. `bash scripts/install-hermes-skill-morning-digest.sh`
 2. Add **`morning-digest`** to `#hermes` `discord.channel_skill_bindings` (see `references/config-snippet.md`).
 3. Ensure Hermes gateway is running; post **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Recommended focus).
-4. Optional cron: `hermes cron create "0 8 * * *" ... --name morning-digest --deliver discord` (see skill `references/cron-snippet.md`).
+4. Optional cron: `MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 8 * * *}" hermes cron create "$MORNING_DIGEST_CRON" ... --skill morning-digest --name morning-digest --deliver discord` (see skill `references/cron-snippet.md`; recreate the Hermes cron job after schedule changes).
 5. **Migration:** comment out §15.2 WSL crontab line; do **not** delete `scripts/hermes-morning-digest.sh` or related 26-7 files.
 
 **Gateway dependency:** Same as §15.2 — cron wrappers must not claim delivery if `hermes gateway status` shows gateway down.

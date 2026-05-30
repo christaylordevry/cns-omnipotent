@@ -4,7 +4,7 @@ baseline_commit: 3dc67e9b26033249020715d95321a749b983f839
 
 # Story 49.6: Morning digest upgrade
 
-Status: review
+Status: done
 
 <!-- Operator brief 2026-05-29. Validation optional: validate-create-story before dev-story. -->
 
@@ -93,6 +93,17 @@ so that **I start each day with a structured, source-backed briefing without vau
 - [x] Add `tests/hermes-morning-digest-skill.test.mjs` (AC: 4, 5)
 - [x] Operator Guide §15.x subsection: install, manual test, cron, migration note from Story 26-7 (AC: 2)
 - [x] Run `bash scripts/verify.sh` (AC: 5)
+
+### Review Findings
+
+- [x] [Review][Patch] Manual trigger contract is contradictory across artifacts [`scripts/hermes-skill-examples/morning-digest/SKILL.md:19`]
+- [x] [Review][Patch] Perplexity fallback and timeout formatting deviate from the top-trend and partial-failure contract [`scripts/hermes-skill-examples/morning-digest/references/task-prompt.md:72`]
+- [x] [Review][Patch] Schedule override is documented but not wired to an executable cron setup path [`scripts/hermes-skill-examples/morning-digest/references/cron-snippet.md:28`]
+- [x] [Review][Patch] Story 49-6 relies on runtime wrapper scripts that are absent from the story file list/scoped change inventory [`_bmad-output/implementation-artifacts/49-6-morning-digest-upgrade.md:287`]
+- [x] [Review][Patch] Perplexity usage is omitted from Hermes tool metadata even though the skill requires `mcp__perplexity__search` [`scripts/hermes-skill-examples/morning-digest/SKILL.md:10`]
+- [x] [Review][Patch] Config snippet exposes a concrete Discord channel id instead of a placeholder [`scripts/hermes-skill-examples/morning-digest/references/config-snippet.md:19`]
+- [x] [Review][Patch] Skill version is inconsistent between Operator Guide and `SKILL.md` [`scripts/hermes-skill-examples/morning-digest/SKILL.md:4`]
+- [x] [Review][Defer] Sprint status diff bundles unrelated Epic 38 and Epic 50 state changes into the 49-6 review scope [`_bmad-output/implementation-artifacts/sprint-status.yaml:290`] — deferred, legitimate completed Epic 38/Epic 50 sprint state; handle commit-splitting / sprint-status ownership separately
 
 ## Dev Notes
 
@@ -280,6 +291,7 @@ Composer (Cursor Agent)
 ### Completion Notes List
 
 - Implemented `morning-digest` Hermes skill mirror (49-4 pattern): SKILL + task-prompt, trigger, config, cron references.
+- Added dedicated Hermes runtime wrappers for Google Trends dry-run and NewsAPI headline fetch.
 - Timezone: machine-local (`process.env.TZ` / OS default); no region hardcoding in skill artifacts.
 - Operator Guide §15.11 (v1.36.0): install, smoke test, 08:00 local cron; §15.2 WSL line commented as DISABLED; 26-7 scripts retained.
 - `bash scripts/verify.sh` green (includes `tests/hermes-morning-digest-skill.test.mjs`).
@@ -291,6 +303,8 @@ Composer (Cursor Agent)
 - `scripts/hermes-skill-examples/morning-digest/references/trigger-pattern.md` (new)
 - `scripts/hermes-skill-examples/morning-digest/references/config-snippet.md` (new)
 - `scripts/hermes-skill-examples/morning-digest/references/cron-snippet.md` (new)
+- `scripts/session-close/hermes-run-trend-ingest.sh` (new)
+- `scripts/session-close/hermes-run-newsapi.sh` (new)
 - `scripts/install-hermes-skill-morning-digest.sh` (new)
 - `tests/hermes-morning-digest-skill.test.mjs` (new)
 - `Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md` (updated §15.2, §15.11, v1.36.0)
@@ -300,4 +314,5 @@ Composer (Cursor Agent)
 ## Story completion status
 
 - Implementation complete; operator decisions (2026-05-29) applied.
-- Status: **review**
+- Code review patches applied; sprint-status scope drift deferred by operator decision because Epic 38 and Epic 50 statuses are legitimate completed work.
+- Status: **done**

@@ -9,19 +9,19 @@
 After trimming leading/trailing whitespace, the **entire message** must match (case-insensitive):
 
 ```text
-/morning-digest
+morning-digest
 ```
 
 Rules:
 
 - Single line only (no extra words on the same message).
-- No leading slash required.
+- No leading slash.
 - Do not run on messages that merely *contain* `morning-digest` as a substring.
 
 ### Positive examples
 
 ```text
-/morning-digest
+morning-digest
 ```
 
 ```text
