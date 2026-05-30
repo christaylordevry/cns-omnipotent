@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const resolverScript = join(
   repoRoot,
   'scripts/hermes-skill-examples/notebook-query/scripts/resolve-notebook.mjs',
+);
+const queryScript = join(
+  repoRoot,
+  'scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs',
 );
 
 // ---------------------------------------------------------------------------
@@ -202,5 +206,128 @@ describe('resolve-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'cns-watch-1');
+  });
+});
+
+describe('query-notebook.mjs CLI', () => {
+  /** @type {string[]} */
+  let tempDirs = [];
+
+  afterEach(async () => {
+    await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+    tempDirs = [];
+  });
+
+  async function writeMockNlm(source) {
+    const dir = await mkdtemp(join(tmpdir(), 'notebook-query-nlm-'));
+    tempDirs.push(dir);
+    const path = join(dir, 'nlm');
+    await writeFile(path, source, { mode: 0o755 });
+    await chmod(path, 0o755);
+    return path;
+  }
+
+  async function runQuery({ args = [], env = {} }) {
+    return execFileAsync('node', [queryScript, ...args], {
+      env: {
+        ...process.env,
+        NOTEBOOK_NLM_BIN: env.NOTEBOOK_NLM_BIN,
+        NOTEBOOK_ID: env.NOTEBOOK_ID,
+        NOTEBOOK_QUERY: env.NOTEBOOK_QUERY,
+        NOTEBOOK_REMAINING_S: env.NOTEBOOK_REMAINING_S,
+      },
+    });
+  }
+
+  it('queries nlm and emits answer JSON from env inputs', async () => {
+    const mockNlm = await writeMockNlm(`#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] !== 'query' || args[1] !== 'notebook') process.exit(9);
+if (!args.includes('--json') || !args.includes('--timeout')) process.exit(8);
+process.stdout.write(JSON.stringify({ answer: 'CNS uses a vault-based control plane.' }));
+`);
+
+    const { stdout } = await runQuery({
+      env: {
+        NOTEBOOK_NLM_BIN: mockNlm,
+        NOTEBOOK_ID: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+        NOTEBOOK_QUERY: 'what is the CNS vault architecture?',
+        NOTEBOOK_REMAINING_S: '7',
+      },
+    });
+
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.answer, 'CNS uses a vault-based control plane.');
+    assert.equal(typeof payload.elapsed_ms, 'number');
+  });
+
+  it('accepts notebook-id first argv form used by the task prompt', async () => {
+    const mockNlm = await writeMockNlm(`#!/usr/bin/env node
+const args = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  answer: args[2] === '981466f0-de1c-4551-93a9-f3bc2a24b184' && args[3] === 'question text' ? 'ok' : ''
+}));
+`);
+
+    const { stdout } = await runQuery({
+      args: ['981466f0-de1c-4551-93a9-f3bc2a24b184', 'question text'],
+      env: { NOTEBOOK_NLM_BIN: mockNlm },
+    });
+
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.answer, 'ok');
+  });
+
+  it('accepts question first argv form documented by the script usage', async () => {
+    const mockNlm = await writeMockNlm(`#!/usr/bin/env node
+const args = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  response: args[2] === '981466f0-de1c-4551-93a9-f3bc2a24b184' && args[3] === 'question text' ? 'ok' : ''
+}));
+`);
+
+    const { stdout } = await runQuery({
+      args: ['question text', '981466f0-de1c-4551-93a9-f3bc2a24b184'],
+      env: { NOTEBOOK_NLM_BIN: mockNlm },
+    });
+
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.answer, 'ok');
+  });
+
+  it('extracts answer from nlm value.answer JSON shape', async () => {
+    const mockNlm = await writeMockNlm(`#!/usr/bin/env node
+process.stdout.write(JSON.stringify({ value: { answer: 'nested ok' } }));
+`);
+
+    const { stdout } = await runQuery({
+      args: ['981466f0-de1c-4551-93a9-f3bc2a24b184', 'question text'],
+      env: { NOTEBOOK_NLM_BIN: mockNlm },
+    });
+
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.answer, 'nested ok');
+  });
+
+  it('exits 1 when nlm fails', async () => {
+    const mockNlm = await writeMockNlm(`#!/usr/bin/env node
+console.error('notebooklm exploded');
+process.exit(3);
+`);
+
+    await assert.rejects(
+      () => runQuery({
+        env: {
+          NOTEBOOK_NLM_BIN: mockNlm,
+          NOTEBOOK_ID: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+          NOTEBOOK_QUERY: 'question',
+        },
+      }),
+      (err) => {
+        assert.equal(err.code, 1);
+        assert.match(err.stderr, /notebooklm exploded/);
+        return true;
+      },
+    );
   });
 });
