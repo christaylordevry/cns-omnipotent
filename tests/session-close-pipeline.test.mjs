@@ -19,10 +19,12 @@ import {
 import { buildContextPack } from "../scripts/session-close/prepare-context.mjs";
 import {
   buildCloseReport,
+  buildNotebookHealthRows,
   enrichNotebooklmTargets,
   ensurePhaseAComplete,
   evaluatePhaseACompletion,
   parseVitestTestsSummary,
+  pushNotebookHealthSnapshot,
   runDeterministicPipeline,
 } from "../scripts/session-close/run-deterministic.mjs";
 import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
@@ -600,6 +602,154 @@ describe("session-close run-deterministic", () => {
     assert.equal(report.deterministic.export_bytes, 42);
     assert.equal(report.notebooklm_targets[0].export_path, "/p");
     assert.ok(!JSON.stringify(report).includes("api_key"));
+  });
+
+  it("buildNotebookHealthRows includes watched and routed notebooks", () => {
+    const rows = buildNotebookHealthRows(
+      [
+        {
+          id: "watched-1",
+          title: "Watched Notebook",
+          watch: true,
+          domain: "cns-brain",
+          last_updated: "2026-05-28T15:52:05Z",
+        },
+        {
+          id: "ignored-1",
+          title: "Ignored Notebook",
+          watch: false,
+          domain: "learning",
+          last_updated: "2026-05-28T15:52:00Z",
+        },
+      ],
+      [
+        { id: "watched-1", title: "Watched Notebook" },
+        { id: "routed-1", title: "Routed Notebook" },
+      ],
+    );
+
+    assert.deepEqual(rows, [
+      {
+        notebookId: "watched-1",
+        title: "Watched Notebook",
+        domain: "cns-brain",
+        watch: true,
+        lastUpdated: "2026-05-28T15:52:05Z",
+      },
+      {
+        notebookId: "routed-1",
+        title: "Routed Notebook",
+        domain: "unknown",
+        watch: false,
+        lastUpdated: null,
+      },
+    ]);
+  });
+
+  it("pushNotebookHealthSnapshot posts Convex mutation payload when configured", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "notebook-health-push-"));
+    const registryPath = join(fixtureRoot, "notebook-registry.json");
+    const calls = [];
+    await writeFile(
+      registryPath,
+      `${JSON.stringify(
+        [
+          {
+            id: "watched-1",
+            title: "Watched Notebook",
+            watch: true,
+            domain: "cns-brain",
+            last_updated: "2026-05-28T15:52:05Z",
+          },
+        ],
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    try {
+      await pushNotebookHealthSnapshot({
+        dryRun: false,
+        registryPath,
+        pack: {
+          notebooklm_routing: {
+            notebooks: [{ id: "routed-1", title: "Routed Notebook" }],
+          },
+        },
+        env: {
+          CONVEX_URL: "https://example.convex.cloud/",
+          CONVEX_DEPLOY_KEY: "deploy-key-secret",
+        },
+        fetchFn: async (url, init) => {
+          calls.push({ url, init });
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ status: "success" }),
+          };
+        },
+      });
+
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "https://example.convex.cloud/api/mutation");
+      assert.equal(calls[0].init.headers.Authorization, "Convex deploy-key-secret");
+      assert.deepEqual(JSON.parse(calls[0].init.body), {
+        path: "notebookHealth:upsertNotebookHealthSnapshot",
+        args: {
+          rows: [
+            {
+              notebookId: "watched-1",
+              title: "Watched Notebook",
+              domain: "cns-brain",
+              watch: true,
+              lastUpdated: "2026-05-28T15:52:05Z",
+            },
+            {
+              notebookId: "routed-1",
+              title: "Routed Notebook",
+              domain: "unknown",
+              watch: false,
+              lastUpdated: null,
+            },
+          ],
+        },
+      });
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("pushNotebookHealthSnapshot skips dry-run and missing Convex env", async () => {
+    const calls = [];
+    const fetchFn = async (url, init) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ status: "success" }),
+      };
+    };
+
+    await pushNotebookHealthSnapshot({
+      dryRun: true,
+      pack: {},
+      env: {
+        CONVEX_URL: "https://example.convex.cloud",
+        CONVEX_DEPLOY_KEY: "deploy-key-secret",
+      },
+      fetchFn,
+    });
+    await pushNotebookHealthSnapshot({
+      dryRun: false,
+      pack: {},
+      env: { CONVEX_URL: "https://example.convex.cloud" },
+      fetchFn,
+    });
+
+    assert.equal(calls.length, 0);
   });
 
   it("evaluatePhaseACompletion PASSED after dry-run pipeline", async () => {

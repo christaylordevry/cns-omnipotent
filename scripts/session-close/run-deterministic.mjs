@@ -15,6 +15,7 @@ import { promisify } from "node:util";
 
 import { buildContextPack, writeContextPack } from "./prepare-context.mjs";
 import { runRefreshDailyRhythm } from "./refresh-daily-rhythm.mjs";
+import { DEFAULT_REGISTRY_PATH, readRegistry } from "./sync-notebooks.mjs";
 import {
   evaluatePhaseACompletion,
   formatPhaseAGateError,
@@ -36,8 +37,166 @@ const execFileAsync = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const OMNIPOTENT_INSTALL_ROOT = dirname(dirname(SCRIPT_DIR));
 const NPM_ENV_SH = join(SCRIPT_DIR, "lib", "npm-env.sh");
+const NOTEBOOK_HEALTH_MUTATION_PATH = "notebookHealth:upsertNotebookHealthSnapshot";
 
 const FAST_SCAN_ROW_RE = /^(SRC|INS|SYN|DLY|OTH)\s/;
+
+/**
+ * @param {unknown} row
+ * @returns {string | null}
+ */
+function getNotebookLastUpdated(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    return null;
+  }
+  const record = /** @type {{ last_updated?: unknown; updated_at?: unknown }} */ (row);
+  if (typeof record.last_updated === "string") {
+    return record.last_updated;
+  }
+  if (typeof record.updated_at === "string") {
+    return record.updated_at;
+  }
+  return null;
+}
+
+/**
+ * @param {unknown} row
+ * @returns {{ id: string; title: string } | null}
+ */
+function parseRoutingNotebook(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    return null;
+  }
+  const record = /** @type {{ id?: unknown; notebook_id?: unknown; title?: unknown }} */ (row);
+  const id =
+    typeof record.id === "string"
+      ? record.id
+      : typeof record.notebook_id === "string"
+        ? record.notebook_id
+        : "";
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    title: typeof record.title === "string" && record.title ? record.title : id,
+  };
+}
+
+/**
+ * @param {import('./lib/sync-notebook-registry.mjs').NotebookRegistryEntry[]} registry
+ * @param {unknown[]} routingNotebooks
+ * @returns {{ notebookId: string; title: string; domain: string; watch: boolean; lastUpdated: string | null }[]}
+ */
+export function buildNotebookHealthRows(registry, routingNotebooks = []) {
+  const rows = registry
+    .filter((notebook) => notebook.watch)
+    .map((notebook) => ({
+      notebookId: notebook.id,
+      title: notebook.title,
+      domain: notebook.domain || "unknown",
+      watch: true,
+      lastUpdated: getNotebookLastUpdated(notebook),
+    }));
+
+  const seen = new Set(rows.map((row) => row.notebookId));
+  for (const notebook of routingNotebooks) {
+    const parsed = parseRoutingNotebook(notebook);
+    if (!parsed || seen.has(parsed.id)) {
+      continue;
+    }
+    rows.push({
+      notebookId: parsed.id,
+      title: parsed.title,
+      domain: "unknown",
+      watch: false,
+      lastUpdated: null,
+    });
+    seen.add(parsed.id);
+  }
+
+  return rows;
+}
+
+/**
+ * @param {string} convexUrl
+ */
+function normalizeConvexUrl(convexUrl) {
+  return convexUrl.replace(/\/$/, "");
+}
+
+/**
+ * @param {{
+ *   dryRun: boolean;
+ *   pack: Record<string, unknown>;
+ *   env?: Record<string, string | undefined>;
+ *   fetchFn?: typeof fetch;
+ *   registryPath?: string;
+ * }} opts
+ */
+export async function pushNotebookHealthSnapshot(opts) {
+  if (opts.dryRun) {
+    return;
+  }
+
+  const env = opts.env ?? process.env;
+  const convexUrl = env.CONVEX_URL;
+  const convexDeployKey = env.CONVEX_DEPLOY_KEY;
+  if (!convexUrl || !convexDeployKey) {
+    return;
+  }
+
+  const registry = await readRegistry(opts.registryPath ?? DEFAULT_REGISTRY_PATH);
+  const routing =
+    opts.pack.notebooklm_routing &&
+    typeof opts.pack.notebooklm_routing === "object" &&
+    !Array.isArray(opts.pack.notebooklm_routing)
+      ? /** @type {{ notebooks?: unknown }} */ (opts.pack.notebooklm_routing).notebooks
+      : [];
+  const routingNotebooks = Array.isArray(routing) ? routing : [];
+  const rows = buildNotebookHealthRows(registry, routingNotebooks);
+  if (rows.length === 0) {
+    return;
+  }
+
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const response = await fetchFn(`${normalizeConvexUrl(convexUrl)}/api/mutation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${convexDeployKey}`,
+    },
+    body: JSON.stringify({
+      path: NOTEBOOK_HEALTH_MUTATION_PATH,
+      args: { rows },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Convex HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("Convex mutation response was not valid JSON");
+  }
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const payloadRecord = /** @type {{ status?: unknown; errorMessage?: unknown }} */ (payload);
+    const status = payloadRecord.status;
+    const errorMessage =
+      typeof payloadRecord.errorMessage === "string"
+        ? payloadRecord.errorMessage
+        : "Convex mutation failed";
+    if (status === "error") {
+      throw new Error(errorMessage);
+    }
+    if (status !== "success") {
+      throw new Error("Convex mutation returned unexpected status");
+    }
+  }
+}
 
 /**
  * @param {string} stdout
@@ -420,6 +579,18 @@ export async function runDeterministicPipeline(opts = {}) {
   });
 
   await writeFile(paths.closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  try {
+    await pushNotebookHealthSnapshot({
+      dryRun,
+      pack,
+      env: process.env,
+      fetchFn: globalThis.fetch,
+      registryPath: DEFAULT_REGISTRY_PATH,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn("[knowledge-pulse] Convex push failed (non-fatal):", message);
+  }
 
   return { pack, report, paths };
 }
