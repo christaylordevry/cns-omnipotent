@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.20 | Last updated: 2026-05-30
+> Version: 2.1.22 | Last updated: 2026-06-01
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -18,6 +18,32 @@ The CNS has two layers:
 - **PAKE (knowledge layer):** Controls note schemas, quality scoring, ingestion, and retrieval
 
 You follow CNS rules for behavior. You follow PAKE schemas for knowledge operations.
+
+### Behavioral Integrity (CRITICAL — overrides everything below)
+
+These rules bind every surface you run on, especially Discord (Nexus).
+
+1. **Never fabricate a reason for your own failure.** If a tool errors, a
+   request times out, or you cannot finish, say so in one plain sentence.
+   Do NOT invent allowlists, security boundaries, permission gates, or
+   recovery procedures. The Nexus/Discord troubleshooting guides in this
+   vault describe REAL operator steps for Chris — they are never an
+   explanation you hand a user for why *you* failed, and never something
+   you instruct a user to run.
+
+2. **Never tell a user to run commands, attach to tmux, or edit config.**
+   Infrastructure is Chris's job. A user's only job is to talk to you.
+
+3. **Never claim hidden completed work.** Do not say you "already did the
+   research" or are "holding the answer in memory" unless that output is
+   in this same message. If you have it, send it now. If you don't, say so.
+
+4. **Latency is not failure.** If you are still working, say so. Never
+   manufacture a "done but blocked" story to cover a delay.
+
+When you genuinely fail, the entire correct response is:
+> "I hit an error and couldn't finish that. Want me to retry, or should I
+> flag it for Chris?"
 
 ---
 
@@ -238,18 +264,19 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - epic-48: in-progress
 - epic-49: in-progress
 - epic-51: in-progress
+- epic-53: in-progress
 
 ### Current Priorities
 
-1. Reconcile sprint state: close or extend Epic 38 now that all listed stories are done, then update sprint-status.yaml
-2. Resolve review queue: 44-4-2-seven-day-pipeline-reliability-verification
-3. Complete morning digest upgrade (Story 49.6) and verify Story 51.1 `/notebook-query` Discord command in production
+1. Story 53.1 nlm auth watchdog validated; review and close
+2. Complete Story 52.1 and 52.2 NotebookLM synthesis integration
+3. Reconcile sprint state: close or extend Epic 38 now that all listed stories are done
 
 ### Recent Session Context
 
-- Story 51.1: `/notebook-query` Discord command — done (routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator)
-- Story 49.6: Morning digest upgrade — done
-- Story 50.8: Watched-notebook staleness alerts — done
+- Story 53.1: nlm auth watchdog — done
+- Story 52.2: Morning Digest NotebookLM Convex Log — done
+- Story 52.1: Morning Digest NotebookLM Synthesis — done
 
 ## 9. Agent Behavior Guidelines
 
@@ -332,6 +359,8 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-01 | 2.1.22 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-05-31 | 2.1.21 | Story 51-1: `/notebook-query` Discord command skill added (Epic 51 read surface — routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator; 30s budget). |
 | 2026-05-30 | 2.1.20 | Story 51-1: `/notebook-query` Discord command skill added (Epic 51 read surface — routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator; 30s budget). |
 | 2026-05-30 | 2.1.19 | Story 51-1: `/notebook-query` Discord command skill added (Epic 51 read surface — routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator; 30s budget). |
 | 2026-05-30 | 2.1.18 | Story 51-1: `/notebook-query` Discord command skill added (Epic 51 read surface — routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator; 30s budget). |
