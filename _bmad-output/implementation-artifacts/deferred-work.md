@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 53-3-add-reason-field-to-no-route-responses (2026-06-01)
+
+- `below_threshold: best=unknown (0.00)` when `watch: true` rows exist but none pass `validRegistryRow` — mislabels registry corruption as weak semantic match; no test coverage.
+- Unescaped notebook titles in `route.reason` (`)`, `=`, newlines) — Discord/regex parsing risk for operators.
+
 ## Deferred from: code review of 52-2-morning-digest-notebooklm-convex-log (2026-05-31)
 
 - Fire-and-forget via awaited `terminal(timeout=30)` — same 51-2 pattern; Hermes agent semantics, not a 52-2 regression.

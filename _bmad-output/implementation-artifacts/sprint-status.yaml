@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-05-31T08:43:37+10:00
+# last_updated: 2026-06-01T00:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-05-31T08:43:37+10:00"
+last_updated: "2026-06-01T00:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -359,7 +359,7 @@ development_status:
   50-8-watched-notebook-staleness-alerts: done
 
   # Epic 51 — NotebookLM Query Surface (read side companion to Epic 50)
-  epic-51: in-progress
+  epic-51: done
   51-1-notebook-query-discord-command: done
   51-2-notebook-query-history-log: done
 
@@ -371,3 +371,4 @@ development_status:
   # Epic 53 - NotebookLM operational resilience
   epic-53: in-progress
   53-1-nlm-auth-watchdog: done
+  53-3-add-reason-field-to-no-route-responses: done

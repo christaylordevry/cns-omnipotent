@@ -221,6 +221,69 @@ describe('resolve-notebook.mjs CLI', () => {
     assert.equal(payload.route.id, 'ai-watch-1');
     assert.equal(payload.route.domain, 'ai-factory');
   });
+
+  it('NO_ROUTE CLI: no watched notebooks → no_watched_notebooks', async () => {
+    const registryPath = await writeRegistry([]);
+    const { stdout } = await runResolver({ question: 'vault architecture', registryPath });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.equal(payload.route.reason, 'no_watched_notebooks');
+    assert.equal(payload.route.id, null);
+    assert.equal(payload.route.title, null);
+  });
+
+  it('NO_ROUTE CLI: all watch false → no_watched_notebooks', async () => {
+    const registryPath = await writeRegistry(
+      watchRegistry.map((e) => ({ ...e, watch: false })),
+    );
+    const { stdout } = await runResolver({ question: 'vault architecture', registryPath });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.equal(payload.route.reason, 'no_watched_notebooks');
+  });
+
+  it('NO_ROUTE CLI: filler-only question → empty_question', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    // Stopwords-only: tokenizeForScoring yields [] (see TC-7 for sub-threshold "is it ok")
+    const { stdout } = await runResolver({ question: 'what is', registryPath });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.equal(payload.route.reason, 'empty_question');
+  });
+
+  it('NO_ROUTE CLI: whitespace-only question → empty_question', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runResolver({ question: '   ', registryPath });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.equal(payload.route.reason, 'empty_question');
+  });
+
+  it('NO_ROUTE CLI: below-threshold overlap → below_threshold reason', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runResolver({
+      question: 'linkedin strategy posts',
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.match(
+      payload.route.reason,
+      /^below_threshold: best=.+\([\d.]+\)$/,
+    );
+    assert.equal(payload.route.reason, 'below_threshold: best=AI Factory Blueprint (0.00)');
+  });
+
+  it('NO_ROUTE CLI: short-token question → below_threshold reason', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runResolver({ question: 'is it ok', registryPath });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'NO_ROUTE');
+    assert.match(
+      payload.route.reason,
+      /^below_threshold: best=.+\([\d.]+\)$/,
+    );
+  });
 });
 
 describe('query-notebook.mjs CLI', () => {

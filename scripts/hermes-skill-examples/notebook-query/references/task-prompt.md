@@ -5,7 +5,8 @@
 3. After a `ROUTED` result, run `query-notebook.mjs` with the routed notebook ID, original question, and remaining time budget.
 4. If NO_ROUTE: post exactly:
    "📚 notebook-query: no confident match for your question.
-    Try rephrasing or use /vault-lint to check notebook coverage."
+   Reason: <route.reason>
+   Try rephrasing or use /vault-lint to check notebook coverage."
    Then stop. Do not search the vault. Do not offer alternatives.
 5. Never offer to "search the vault manually" or "provide information from
    memory" as a fallback. The only valid fallback is the error message above.
@@ -58,8 +59,11 @@ After parsing `{ route, elapsed_ms }`:
 Post to `#hermes`:
 ```
 📚 notebook-query: no confident match for your question.
+Reason: <route.reason>
 Try rephrasing or use /vault-lint to check notebook coverage.
 ```
+
+`<route.reason>` is diagnostic from the resolver, e.g. `no_watched_notebooks`, `empty_question`, or `below_threshold: best=AI Factory Blueprint (0.00)`.
 
 Then **stop**.
 
@@ -166,7 +170,7 @@ node "$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs"
 | Empty question | `notebook-query: bad-trigger (question required)` |
 | Resolver exit `2` (registry read/parse/malformed) | `📚 notebook-query: error — could not load notebook registry` |
 | Resolver exit `1`, bad stdout JSON, or invalid ROUTED payload | `📚 notebook-query: error — could not resolve notebook routing` |
-| `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match for your question.\nTry rephrasing or use /vault-lint to check notebook coverage.` |
+| `route.status === 'NO_ROUTE'` (including empty watch registry) | `📚 notebook-query: no confident match for your question.\nReason: <route.reason>\nTry rephrasing or use /vault-lint to check notebook coverage.` (e.g. `Reason: below_threshold: best=AI Factory Blueprint (0.00)`) |
 | Query script timeout | `📚 notebook-query: timeout — answer not received within 90s. Try again.` |
 | Query script error | `📚 notebook-query: error — <concise error description>` |
 | Success | Formatted answer block (see step 4) |
