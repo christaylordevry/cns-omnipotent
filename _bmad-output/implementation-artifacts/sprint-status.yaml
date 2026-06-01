@@ -334,7 +334,7 @@ development_status:
   45-7-soak: review
 
   # Epic 48 — session-close FR-17..19; strict order SC-1 → SC-6 (architecture-session-close-fr17-19.md)
-  epic-48: in-progress
+  epic-48: done
   48-1-session-close-context-pack-scaffold: done # SC-1
   48-2-session-close-deterministic-orchestrator: done # SC-2 (depends SC-1)
   48-3-session-close-memory-and-daily-rhythm-scripts: done # SC-3 (depends SC-1, SC-2)
@@ -343,7 +343,7 @@ development_status:
   48-6-session-close-operator-guide-and-hermes-smoke: done # SC-6 (depends SC-1..5)
   epic-48-retrospective: optional
 
-  epic-49: in-progress
+  epic-49: done
   49-4-hermes-investigate-trend-skill-mirror: done
   49-5-phase-b-token-check-gate: done
   49-6-morning-digest-upgrade: done
@@ -369,6 +369,6 @@ development_status:
   52-2-morning-digest-notebooklm-convex-log: done
 
   # Epic 53 - NotebookLM operational resilience
-  epic-53: in-progress
+  epic-53: done
   53-1-nlm-auth-watchdog: done
   53-3-add-reason-field-to-no-route-responses: done
