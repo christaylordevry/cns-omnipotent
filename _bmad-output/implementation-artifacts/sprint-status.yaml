@@ -319,11 +319,11 @@ development_status:
   44-3-2-reddit-news-collectors-norm-cache: done
   44-3-3-cli-sources-polish-logging: done
   44-4-1-cron-install-documentation-env-example: done
-  44-4-2-seven-day-pipeline-reliability-verification: review
+  44-4-2-seven-day-pipeline-reliability-verification: done
   44-5-1-wire-trend-stub-panel-live-convex-queries: done
   44-5-2-flat-active-stale-signal-states-ui: done
 
-  epic-45: in-progress
+  epic-45: done
   45-1-schema-and-query-layer: done
   45-2-trend-analyzer: review
   45-3-trend-analysis-service: done
