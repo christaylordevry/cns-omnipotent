@@ -18,10 +18,14 @@ Complete implementation instructions for the Hermes agent when a `/notebook-quer
 
 ---
 
-## 0) Trigger and abort gates
+## 0) REFERENCE ONLY — invocation already confirmed
+> **You have already been invoked.** The config.yaml trigger matched the
+> incoming Discord message. Do not re-check or re-evaluate the trigger prefix.
+> The question has already been extracted for you. Proceed directly to §1.
 
-1. Message must start with `/notebook-query ` (case-sensitive, space-terminated).
-2. Extract question: everything after the `/notebook-query ` prefix, trimmed.
+For documentation purposes only (do not re-evaluate at runtime):
+1. Original message started with `/notebook-query ` (case-sensitive, space-terminated).
+2. Question = everything after the `/notebook-query ` prefix, trimmed.
 3. If question is empty or whitespace-only: reply `notebook-query: bad-trigger (question required)` and **stop**.
 4. Truncate question to 500 chars silently if longer.
 5. Record `start_time` = wall clock timestamp (milliseconds since epoch).
