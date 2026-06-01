@@ -38,3 +38,7 @@ question     = "What are the PAKE validation rules?"
 - This skill posts back to **`#hermes`** only.
 - No vault writes. No dashboard relay. No NotebookLM fan-out.
 - The `/notebook-query` prefix is case-sensitive. `/Notebook-Query` will not trigger.
+
+## Runtime (agents)
+
+> **REFERENCE ONLY at runtime.** Hermes `channel_skill_bindings` already matched this skill before the agent runs. Binding grammar in this file is for operators and `config.yaml` authors. At runtime, follow `references/task-prompt.md` §0 — do not re-check the prefix against extracted question text; validate question content only.

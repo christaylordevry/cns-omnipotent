@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 54-4-trigger-contract-audit (2026-06-02)
+
+- Contract test scans only first 120 lines of SKILL.md for REFERENCE ONLY — AC 6 sketch; full-file scan is follow-up hardening.
+- `references/trigger-pattern.md` not in contract manifest — AC 6 scope is task-prompt + SKILL; operator-doc footers tracked separately.
+- `session-close/references/trigger-pattern.md` lacks REFERENCE ONLY banner — SKILL.md fixed; operator doc optional follow-up.
+
 ## Deferred from: code review of 54-3-session-close-fan-out-diagnostics (2026-06-01)
 
 - Broad `\bexceeds\b` size_limit classifier rule — bound by story AC2 hint table; rare misclassify on non-size "exceeds" strings in stderr.

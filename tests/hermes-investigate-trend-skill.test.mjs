@@ -18,8 +18,9 @@ describe("Story 49-4 Hermes investigate-trend skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: investigate-trend"));
-    assert.ok(body.includes("version: 1.0.0"));
+    assert.ok(body.includes("version: 1.0.1"));
     assert.ok(body.includes("Trigger"));
+    assert.match(body, /REFERENCE ONLY|invocation already confirmed/i);
     assert.ok(body.includes("investigate-trend keyword:"));
     assert.ok(body.includes("mcp__perplexity__search"));
     assert.ok(body.includes("30 seconds"));

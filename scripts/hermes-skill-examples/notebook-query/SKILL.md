@@ -1,7 +1,7 @@
 ---
 name: notebook-query
 description: "Hermes /notebook-query for #hermes: routes a freeform question to the most relevant watched NotebookLM notebook using offline scorer+disambiguator (50-3/50-4); posts grounded answer and logs successful queries to Convex for /trends history. 90s total budget."
-version: 1.0.2
+version: 1.0.4
 author: CNS Operator
 license: MIT
 metadata:
@@ -15,13 +15,15 @@ metadata:
 
 This skill handles the `/notebook-query <question>` command posted into Discord **`#hermes`**.
 
-- **Trigger**: message starts with `/notebook-query ` (space-terminated) followed by a non-empty question (see `references/trigger-pattern.md`)
+- **Trigger**: message starts with `/notebook-query ` (space-terminated) followed by a non-empty question (see `references/trigger-pattern.md`). Trigger grammar is **reference-only** at runtime — see `references/task-prompt.md` §0; Hermes already routed the skill.
 - **Tools**: `execute_code bash` (resolver + query); `terminal` with `timeout=15` for `log-notebook-query.mjs` on success (see task-prompt §5)
 - **Hard timeout**: **90 seconds total** — budget is split: resolver first, remainder given to `query-notebook.mjs`
 - **Output**: grounded answer from the matched notebook, or a clear no-match/error message; successful answers are logged to Convex for the `/trends` Notebook Query History panel
 - **Safety**: **No vault writes**, **No fan-out**, Discord `#hermes` only (Convex append-only log for dashboard)
 
 ## When to use
+
+> **REFERENCE ONLY — invocation already confirmed.** See `references/task-prompt.md` §0. Proceed to resolver + query; do not re-check the `/notebook-query` prefix against extracted question text.
 
 A Discord message in `#hermes` begins with `/notebook-query ` (case-sensitive, followed by a space) and contains a non-empty question after the prefix.
 
@@ -33,8 +35,7 @@ Examples:
 
 ## When not to use
 
-- Message is exactly `/notebook-query` with no question (post bad-trigger reply and stop).
-- Message does not start with `/notebook-query `.
+- Question is missing or whitespace-only after the prefix (post `bad-trigger` per task-prompt §1 — **not** a Hermes binding check).
 - No `watch: true` entries exist in the notebook registry (post no-match message).
 
 ## Policy

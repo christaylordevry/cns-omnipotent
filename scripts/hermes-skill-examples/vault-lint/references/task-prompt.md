@@ -1,18 +1,26 @@
 # Task: `/vault-lint` full scan (read-only Vault IO + report file)
 
-## 0) Trigger and abort gates
+## 0) REFERENCE ONLY — invocation already confirmed
 
-1. Treat the operator message as a trigger **only** if, after trimming leading and trailing ASCII whitespace, the body is **exactly** `/vault-lint` (no arguments, no extra text).
-2. If the trigger does not match, reply with one line: `vault-lint: bad-trigger` and **stop** (no MCP reads, no report).
-3. Resolve vault root directory `CNS_VAULT_ROOT`:
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message. Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed directly to **§1** (resolve vault root and run the scan).
+
+For documentation purposes only (do not re-evaluate at runtime):
+
+1. After trim, the operator line is **exactly** `/vault-lint` (no arguments, no extra text).
+
+## 1) Vault root and abort gates
+
+1. If **`raw`** (trimmed operator message) contains any token after `/vault-lint` (extra arguments or trailing text), reply `vault-lint: bad-trigger` and **stop** (no MCP reads, no report). This is **argument** validation only — not a Hermes binding check.
+2. Resolve vault root directory `CNS_VAULT_ROOT`:
 
    - If environment variable `CNS_VAULT_ROOT` is set and non-empty after trim, use it.
    - Else read `~/.hermes/config.yaml` as text, parse YAML mentally, and read `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
    - If still unset: reply `vault-lint: no-vault-root` and **stop**.
 
-4. Set **`today`** = current UTC calendar date `YYYY-MM-DD` at the instant you start step 1 (use for all date math and filenames).
+3. Set **`today`** = current UTC calendar date `YYYY-MM-DD` at the instant you start (use for all date math and filenames).
 
-## 1) Required `vault_search` usage (AC: tool mix)
+## 2) Required `vault_search` usage (AC: tool mix)
 
 Call **`vault_search`** at least **three** times, each with `max_results: 50`:
 
@@ -24,7 +32,7 @@ Call **`vault_search`** at least **three** times, each with `max_results: 50`:
 
 Use results only as a **cross-check** hint; authoritative data is always from `vault_list` + `vault_read` / `vault_read_frontmatter`.
 
-## 2) Inventory paths with `vault_list`
+## 3) Inventory paths with `vault_list`
 
 Use **`vault_list`** with `recursive: true` for each of:
 
@@ -42,13 +50,13 @@ Call this set **`GOVERNED_MD`**.
 
 Separately, call **`vault_list`** with `path: "."` and `recursive: true`. From all `.md` files whose `vaultPath` does **not** start with `00-Inbox/` or `_meta/`, build set **`EDGE_MD`** (edge sources for wikilinks). Include `AI-Context/`, `DailyNotes/`, `04-Archives/`, and governed paths per spec.
 
-## 3) Load frontmatter for governed notes
+## 4) Load frontmatter for governed notes
 
 Batch **`vault_read_frontmatter`** using the `paths` array argument. Keep each request **≤ 40** paths. Cover every path in `GOVERNED_MD`.
 
 If frontmatter is missing or YAML breaks, treat as Rule 4 failures per `vault-lint.md` (invalid `created` blocks Rule 3 for that file).
 
-## 4) Rule 1 — duplicate `source_uri` (ERROR)
+## 5) Rule 1 — duplicate `source_uri` (ERROR)
 
 Scope: notes in `GOVERNED_MD` whose frontmatter `pake_type` is **`SourceNote`**.
 
@@ -64,7 +72,7 @@ For each URI shared by **≥ 2** notes:
 
 - List all member paths with `created` (or `unknown` if missing).
 - **Oldest** = minimum **valid** `YYYY-MM-DD` `created`; ties broken by **lexicographically smallest** vault-relative path.
-- **Fix line (default):** `FS_DELETE_DUPLICATE_OLDEST: rm -f "<CNS_VAULT_ROOT>/<oldest_relative>"` with `<CNS_VAULT_ROOT>` replaced by the **resolved absolute path** from §0 (no `$` variable left in the final Discord or report text for the default fix, so the operator can copy-paste).
+- **Fix line (default):** `FS_DELETE_DUPLICATE_OLDEST: rm -f "<CNS_VAULT_ROOT>/<oldest_relative>"` with `<CNS_VAULT_ROOT>` replaced by the **resolved absolute path** from §1 (no `$` variable left in the final Discord or report text for the default fix, so the operator can copy-paste).
 
 Discord shape for that group (spec **Discord line shape** under Rule 1):
 
@@ -77,7 +85,7 @@ Discord shape for that group (spec **Discord line shape** under Rule 1):
 
 If you emit the quarantine alternative instead, use the exact JSON one-liner from `vault-lint.md` with `destination_path` under `_meta/archive/vault-lint-quarantine/<YYYYMMDD>-<basename>`.
 
-## 5) Rule 2 — orphan notes (WARNING)
+## 6) Rule 2 — orphan notes (WARNING)
 
 **Candidates:** `GOVERNED_MD` (already excludes `_README.md`).
 
@@ -107,7 +115,7 @@ Review: Add `[[<Title from frontmatter title>]]` to the most relevant hub note i
 
 In Discord WARNINGS rows, use parenthetical **`([<pake_type>], n/a days)`** for orphan rows.
 
-## 6) Rule 3 — stale pending verification (WARNING)
+## 7) Rule 3 — stale pending verification (WARNING)
 
 For each path in `GOVERNED_MD` (excluding `_README.md` already), using frontmatter:
 
@@ -127,7 +135,7 @@ Discord line shape (WARNINGS):
 
 (Optional alternate disputed — only as second line in report body if you mention obsolete content.)
 
-## 7) Rule 4 — missing required frontmatter (ERROR / WARNING)
+## 8) Rule 4 — missing required frontmatter (ERROR / WARNING)
 
 On each `GOVERNED_MD` path, validate critical fields per `vault-lint.md` table:
 
@@ -150,13 +158,13 @@ Suggested defaults from spec (`tags` placeholder `["lint-auto"]` with WARNING to
 
 Discord ERROR rows: `[date]` must be meaningful (`created` or `modified`); say which in the description.
 
-## 8) Counts
+## 9) Counts
 
 - **`scanned`** = `|GOVERNED_MD|`.
 - **`issues`** = number of findings with `severity` **ERROR** or **WARNING** in the machine JSON (after dedupe: one JSON finding per distinct rule+path+kind; duplicate URI group emits one ERROR finding per duplicate URI group with `path` set to the lexicographically first path or use one finding with `detail` listing all paths — prefer **one** finding per duplicate URI in JSON with `resolution` equal to the Fix line).
 - **`clean`** = `scanned -` (distinct governed paths that appear in any ERROR or WARNING finding). Implement: count governed paths with **no** ERROR and **no** WARNING.
 
-## 9) Discord output (exact template)
+## 10) Discord output (exact template)
 
 Emit **only** this structure (replace `N`, dates, lines; use `0` when empty). **No** extra text before or after.
 
@@ -177,9 +185,9 @@ Report saved: _meta/reports/vault-lint-<today>.md
 
 When `N` is `0` for a section, print the heading `ERRORS (0)` then **no** `*` lines under it (not even a placeholder).
 
-**Rule 1** groups use the multi-line `*` shape from §4 (not the single-line generic).
+**Rule 1** groups use the multi-line `*` shape from §5 (not the single-line generic).
 
-## 10) On-disk report `{CNS_VAULT_ROOT}/_meta/reports/vault-lint-<today>.md`
+## 11) On-disk report `{CNS_VAULT_ROOT}/_meta/reports/vault-lint-<today>.md`
 
 1. Ensure directory exists: `{CNS_VAULT_ROOT}/_meta/reports/` (shell `mkdir -p` allowed; it is not a note mutation).
 2. Write file with LF endings. **Overwrite** if it already exists for the same `<today>`.
@@ -191,12 +199,12 @@ Section order:
 3. `## Summary` — repeat Scanned / Clean / Issues plus per-rule counts.
 4. `## ERRORS` — for each issue: rule name, description, path, date, frontmatter excerpt up to **40** lines from `vault_read` if needed, same `Fix:` as Discord.
 5. `## WARNINGS` — same, with `Review:`.
-6. `## INFO` — machine-readable JSON block (same schema as §11, pretty-printed).
+6. `## INFO` — machine-readable JSON block (same schema as §12, pretty-printed).
 7. `## Configuration` — absolute `CNS_VAULT_ROOT`, `today`, normalization note (`exact trim, no URL canonicalization v1`), and optional `git rev-parse --short HEAD` from `OMNIPOTENT_REPO` if that env is set and directory exists; else `tool_version: vault-lint-skill-1.0.0`.
 
-Put the **single** machine JSON (§11) inside `## INFO` as a fenced ```json code block. Section **7** is prose only (no second JSON copy).
+Put the **single** machine JSON (§12) inside `## INFO` as a fenced ```json code block. Section **7** is prose only (no second JSON copy).
 
-## 11) Findings JSON (sort order)
+## 12) Findings JSON (sort order)
 
 Sort findings: **ERROR** before **WARNING** before **INFO**; then `rule` name; then `path`.
 
@@ -213,7 +221,7 @@ Allowed `rule` strings: `duplicate_source_uri`, `orphan_note`, `stale_pending`, 
 
 Set `counts.errors` / `counts.warnings` / `counts.infos` to match the `findings` array severities.
 
-## 12) Execution notes
+## 13) Execution notes
 
 - Batch `vault_read` for Rule 2 in groups (sequential or parallel tool calls) to stay within turn limits; if you cannot finish, reply `vault-lint: incomplete` and **do not** claim full scan (operator should retry with smaller vault or session split — avoid this by working in batches across turns if Hermes allows).
 - Never call mutator MCP tools.

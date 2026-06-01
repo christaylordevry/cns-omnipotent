@@ -1,7 +1,7 @@
 ---
 name: vault-think
 description: "Hermes CNS vault cognition for #hermes: /challenge, /emerge, /ideas, /today, /ghost, /drift, /verify (Vault IO; /verify may stamp SynthesisNote verification_status); /trace, /connect (Obsidian Local REST API); /vault-graduate (promote #graduate daily-note lines to InsightNotes in 03-Resources/)."
-version: 1.4.0
+version: 1.4.1
 author: CNS Operator
 license: MIT
 metadata:
@@ -26,7 +26,9 @@ Normative procedures and **exact Discord output shapes** live in **`references/t
 
 ## When to use
 
-- Operator posts one of the **active** triggers in Discord **`#hermes`** while this skill is bound for that channel:
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already selected this skill. Trigger grammar in `references/trigger-pattern.md` is documentation for operators — parse **subcommands** only at runtime.
+
+- Operator posts one of the **active** subcommands in Discord **`#hermes`** while this skill is bound for that channel:
   - **`/challenge `** + non-empty belief or topic text
   - **`/emerge`** or **`emerge`** (slash optional) (exact line, optional trailing whitespace only)
   - **`/ideas`** or **`ideas`** (slash optional) (exact line, optional trailing whitespace only)
@@ -42,7 +44,7 @@ Normative procedures and **exact Discord output shapes** live in **`references/t
 
 ## When not to use
 
-- Message does not match an active trigger shape — triggers may be sent with or without leading slash (reply `vault-think: bad-trigger` and stop; no vault reads).
+- Message does not match a known **subcommand** shape — triggers may be sent with or without leading slash (reply `vault-think: bad-trigger` for unknown subcommand and stop; no vault reads). Do not treat this as “Hermes should not have invoked vault-think”.
 - **`CNS_VAULT_ROOT`** cannot be resolved for v1.0 commands, `/today`, `/ghost`, `/drift`, or `/vault-graduate` (reply `vault-think: no-vault-root` or `vault-graduate: no-vault-root` as appropriate, and stop).
 - **`OBSIDIAN_API_KEY`** unset for `/trace` or `/connect` (reply `vault-think: obsidian-rest-no-api-key` and stop).
 

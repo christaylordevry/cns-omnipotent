@@ -8,19 +8,28 @@
 4. **Timeout**: **30s hard cap**. If Perplexity does not return within 30 seconds, post a timeout notice (template below) and stop.
 5. **Bounded output**: use the response format template exactly; keep **Signals** to 3 bullets.
 
+## 0) REFERENCE ONLY — invocation already confirmed
+
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message. Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed directly to **§1 Parse payload**.
+
+For documentation purposes only (do not re-evaluate at runtime):
+
+- Payload messages start with `investigate-trend keyword:` (see `references/trigger-pattern.md`).
+
 ## Inputs (parse)
 
 Let **`raw`** be the incoming Discord message text.
 
-### 1) Match trigger
+### 1) Parse payload (4-line contract)
 
 The first non-empty line must start with:
 
 `investigate-trend keyword:`
 
-If not, do not run this skill.
+If the payload is malformed, use **§3 On parse error** — do not treat binding mismatch as the failure mode.
 
-### 2) Parse the 4-line payload
+### 2) Parse the 4-line payload fields
 
 Parse these four fields from the message:
 
@@ -35,7 +44,7 @@ Notes:
 - Lines 2–4 may be indented; ignore leading whitespace before the label.
 - Do not accept missing fields. Do not infer defaults.
 
-### 3) On parse error (no tools run)
+### 3) On parse error (no tools run; malformed payload only)
 
 Reply exactly:
 

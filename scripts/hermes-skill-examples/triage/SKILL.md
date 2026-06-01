@@ -1,7 +1,7 @@
 ---
 name: triage
 description: "Hermes CNS Inbox triage for /triage in #hermes. Recursive 00-Inbox/ discovery, deterministic sort, paging (--offset), optional scoped vault_search, non-mutating /triage-approve, governed /triage-execute via vault_move, and auto-synthesis on approval when source_uri qualifies."
-version: 1.7.0
+version: 1.7.1
 author: CNS Operator
 license: MIT
 metadata:
@@ -38,6 +38,8 @@ Hermes triage automation guarantees:
 - **Routing suggestions** (Story 27.3) never propose deletion, discard-as-delete, or archive-as-delete; stale-age guidance appends review text only.
 
 ## When to use
+
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already routed this message to the triage skill. Use `references/trigger-pattern.md` for operator/config documentation only — do not re-validate the Hermes binding at runtime.
 
 - Operator posts **`/triage`** (and optional arguments documented in `references/trigger-pattern.md`) in Discord **`#hermes`**.
 - Operator posts **`triage-approve <00-Inbox/path.md> --to <destination_dir>/`** in Discord to record a non-mutating approval for later execution (Story 27.4).

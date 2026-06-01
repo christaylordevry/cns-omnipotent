@@ -36,6 +36,16 @@
 - The **only** automated relocation remains **`/triage-execute … --to …/`** → exactly **one** **`vault_move`**.
 - **Routing suggestions** must never propose deletion, discard-as-delete, or archive-as-delete; the **stale** bucket still appends “stale capture, review relevance” only (no automated discard language).
 
+## 0) REFERENCE ONLY — invocation already confirmed
+
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message. Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed to **subcommand routing** below.
+
+For documentation purposes only (do not re-evaluate at runtime):
+
+- Hermes `channel_skill_bindings` routes `/triage`, `triage-approve`, and `triage-execute` forms per `references/trigger-pattern.md`.
+- Binding mismatch is **not** your job — only parse which subcommand the operator sent.
+
 ## Discard / delete / archive safety (Story 27.6)
 
 **Vocabulary mapping (operator colloquial → allowed automation):**
@@ -55,9 +65,10 @@
 - **Valid Discord inputs:** `/triage`, `/triage --offset 10`, `triage-approve 00-Inbox/x.md --to 03-Resources/`, `triage-execute 00-Inbox/x.md --to 03-Resources/`.
 - **Refuse (fail-closed, no Vault IO):** “delete this note”, “discard all stale captures”, “archive via rm”, “run rm on 00-Inbox”, “use vault_delete”, natural-language move/delete without valid **`triage-execute`** operator syntax—except when the message **starts with** valid **`triage-execute`** or **`/triage-execute`**, in which case follow **Execute approved move handling** instead.
 
-## Inputs
+## Subcommand routing (invocation confirmed)
 
-- A Discord message that matches the positive trigger grammar in `references/trigger-pattern.md` after trimming.
+Parse **`raw`** = operator message trimmed. Route by subcommand — **not** by whether Hermes should have invoked this skill:
+
 - If the message starts with `triage-approve` or `/triage-approve`, follow **Approval handling (Story 27.4)** and stop.
 - If the message starts with `triage-execute` or `/triage-execute`, follow **Execute approved move handling (Story 27.5)** and stop.
 - Otherwise, treat it as `/triage` and parse **`offset`** (default `0`) and optional **`query`** from the message.
@@ -441,4 +452,4 @@ respond with:
 Mutations are disabled except for one valid `triage-execute` or `/triage-execute` command; no actions taken.
 ```
 
-Then continue with the read-only preview **only if** the message still satisfies the triage trigger grammar; otherwise do not run this skill.
+Then continue with the read-only preview **only if** the message is a valid `/triage` subcommand (per `references/trigger-pattern.md`); otherwise reply with the **Early invalid input** block and stop (unknown subcommand — not a binding mismatch).

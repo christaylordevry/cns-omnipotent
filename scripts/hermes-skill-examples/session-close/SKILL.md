@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.9
+version: 1.0.10
 author: CNS Operator
 license: MIT
 metadata:
@@ -15,12 +15,14 @@ metadata:
 
 ## Trigger
 
-Follow `references/trigger-pattern.md`. Only accept:
+> **REFERENCE ONLY — invocation already confirmed.** Hermes `channel_skill_bindings` already selected this skill. Do not re-check whether the message should have routed here.
+
+Follow `references/trigger-pattern.md` for operator documentation only. After invocation, only accept:
 
 - `/session-close`
 - `/session-close --dry-run`
 
-Reject everything else (extra flags, trailing text, multi-line input). Do not run any tools.
+Reject unsupported **flags or trailing arguments** (extra flags, trailing text, multi-line input) — not a Hermes binding mismatch. Do not run any tools when the subcommand shape is invalid.
 
 ## Hard gate (Phase A, deterministic)
 

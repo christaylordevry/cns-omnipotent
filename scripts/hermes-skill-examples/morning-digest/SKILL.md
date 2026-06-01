@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.1
+version: 1.2.2
 author: CNS Operator
 license: MIT
 metadata:
@@ -23,6 +23,8 @@ Daily operator briefing in Discord **`#hermes`**: trending keywords, CNS-relevan
 - **Safety**: **No vault writes**, **No dashboard relay**, no digest archive files
 
 ## Execution rule
+
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already matched manual `morning-digest` or the cron pseudo-trigger. Do not re-check the binding; proceed immediately.
 
 When the incoming message is the manual trigger or the cron pseudo-trigger, **execute the digest immediately**. Do not summarize this skill, do not ask whether to proceed, and do not substitute old NotebookLM or legacy 26-7 scripts.
 

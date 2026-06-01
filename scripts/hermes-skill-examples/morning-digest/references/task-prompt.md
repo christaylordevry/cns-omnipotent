@@ -1,5 +1,15 @@
 # Task: `morning-digest` (Story 49-6 + 52-1 + 52-2)
 
+## 0) REFERENCE ONLY — invocation already confirmed
+
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message (manual `morning-digest` line or cron pseudo-trigger). Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed directly to **Hard constraints** and source collection — do not ask whether to run the digest.
+
+For documentation purposes only (do not re-evaluate at runtime):
+
+- Manual trigger: single line `morning-digest` (case-insensitive after trim).
+- Cron: operator schedule per `references/cron-snippet.md` / `references/trigger-pattern.md`.
+
 ## Hard constraints (must follow)
 
 1. **Channel**: Discord `#hermes` only.

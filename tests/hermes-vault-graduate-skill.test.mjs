@@ -18,7 +18,7 @@ describe("Story 32-1 Hermes vault-graduate skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-graduate"));
-    assert.ok(body.includes("version: 1.0.0"));
+    assert.ok(body.includes("version: 1.0.1"));
     assert.ok(body.includes("/vault-graduate"));
     assert.ok(body.includes("/vault-graduate --days"));
     assert.ok(body.includes("## When to use"));
@@ -82,8 +82,8 @@ describe("Story 32-1 Hermes vault-graduate skill mirror", () => {
     assert.ok(body.includes("vault_create_note"));
     assert.ok(body.includes("vault_append_daily"));
     const forbiddenSection = body.slice(
-      body.indexOf("## 7) Forbidden tools"),
-      body.indexOf("## 8)"),
+      body.indexOf("## 8) Forbidden tools"),
+      body.indexOf("## 9)"),
     );
     for (const forbidden of [
       "vault_update_frontmatter",

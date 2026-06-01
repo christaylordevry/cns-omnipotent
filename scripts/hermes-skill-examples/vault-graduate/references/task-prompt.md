@@ -2,26 +2,36 @@
 
 Promote **`#graduate`** lines from **`DailyNotes/`** to **`03-Resources/`** InsightNotes. Receipt on **today's** daily only (Option B).
 
-## 0) Vault root, clocks, trigger
+## 0) REFERENCE ONLY — invocation already confirmed
 
-1. Resolve **`CNS_VAULT_ROOT`**: env, else `~/.hermes/config.yaml` → `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`. If unset: `vault-graduate: no-vault-root` and **stop**.
-2. **`today_utc`** = UTC `YYYY-MM-DD` at run start.
-3. **`raw`** = trimmed operator message.
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message. Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed directly to **§1** (resolve vault root and parse `--days`).
+
+For documentation purposes only (do not re-evaluate at runtime):
 
 | Match | `scan_days` |
 |-------|-------------|
 | exactly `/vault-graduate` (optional trailing spaces) | **7** |
 | `/vault-graduate --days <n>` (`<n>` positive integer, no extra tokens) | **`<n>`** |
-| else | `vault-graduate: bad-trigger` and **stop** |
 
-## 1) List and filter dailies (AC2a–b)
+## 1) Vault root, clocks, and subcommand args
+
+1. Resolve **`CNS_VAULT_ROOT`**: env, else `~/.hermes/config.yaml` → `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`. If unset: `vault-graduate: no-vault-root` and **stop**.
+2. **`today_utc`** = UTC `YYYY-MM-DD` at run start.
+3. **`raw`** = trimmed operator message.
+4. Parse **`scan_days`** from **`raw`**:
+   - exactly `/vault-graduate` (optional trailing spaces) → **7**
+   - `/vault-graduate --days <n>` (`<n>` positive integer, no extra tokens) → **`<n>`**
+   - else → reply `vault-graduate: bad-trigger` and **stop** (malformed **arguments** only — not a binding mismatch).
+
+## 2) List and filter dailies (AC2a–b)
 
 1. **`vault_list`** **`DailyNotes/`** (`recursive: true` if needed).
 2. Keep `*.md` basenames matching `^\d{4}-\d{2}-\d{2}\.md$`; **`file_date`** = first 10 chars.
 3. **`cutoff_utc`** = `today_utc` − **`scan_days`** (UTC calendar days).
 4. Include iff **`cutoff_utc <= file_date <= today_utc`**.
 
-## 2) Extract `#graduate` lines (AC2c–d)
+## 3) Extract `#graduate` lines (AC2c–d)
 
 Per included daily: **`vault_read`** → each line with **`#graduate`** (case-insensitive):
 
@@ -34,7 +44,7 @@ Per included daily: **`vault_read`** → each line with **`#graduate`** (case-in
 
 If none: reply only `No #graduate tags found in the last <scan_days> days.` and **stop**.
 
-## 3) Dedup (AC3)
+## 4) Dedup (AC3)
 
 Before each create for **`candidate_title`**:
 
@@ -43,7 +53,7 @@ Before each create for **`candidate_title`**:
 
 No URI dedup.
 
-## 4) Create InsightNotes (AC2e)
+## 5) Create InsightNotes (AC2e)
 
 **`vault_create_note`** per non-deduped hit (body-only `content`; tool sets draft/ai/timestamps):
 
@@ -58,7 +68,7 @@ No URI dedup.
 
 Conflict → `graduate: duplicate-title`; no overwrite. Collect **`promoted[]`**: title, dest_path, source_filename.
 
-## 5) Receipt — Option B (AC2f)
+## 6) Receipt — Option B (AC2f)
 
 If **`promoted[]`** non-empty:
 
@@ -69,7 +79,7 @@ If **`promoted[]`** non-empty:
 
 One **`vault_append_daily`** with that block (default **`DailyNotes/<today_utc>.md`** only). Never append historical dailies; no FS writes under **`DailyNotes/`**.
 
-## 6) Discord report (AC2g)
+## 7) Discord report (AC2g)
 
 Reply **only** template body (no preamble).
 
@@ -90,7 +100,7 @@ Receipt appended (today's daily):
 
 Omit empty sections.
 
-## 7) Forbidden tools (graduate)
+## 8) Forbidden tools (graduate)
 
 Do **not** call:
 
@@ -101,7 +111,7 @@ Do **not** call:
 
 Allowed mutators for this skill: **`vault_create_note`**, **`vault_append_daily`**. Also allowed reads: **`vault_list`**, **`vault_read`**, **`vault_read_frontmatter`**, **`vault_search`**.
 
-## 8) Error classes
+## 9) Error classes
 
 | Class | When |
 |-------|------|

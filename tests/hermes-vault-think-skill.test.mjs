@@ -17,7 +17,7 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: vault-think"));
-    assert.ok(body.includes("version: 1.4.0"));
+    assert.ok(body.includes("version: 1.4.1"));
     assert.ok(body.includes("/verify"));
     assert.ok(body.includes("mutator exception"));
     assert.ok(body.includes("## When to use"));
@@ -42,7 +42,7 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     assert.ok(body.includes("vault_search"));
     assert.ok(body.includes("vault_read"));
-    assert.ok(body.includes("## 4) Forbidden tools reminder"));
+    assert.ok(body.includes("## 5) Forbidden tools reminder"));
     assert.ok(body.includes("**All other commands:** do **not** call **`vault_list`**"));
     assert.ok(body.includes("**`/verify`:**"));
     assert.ok(body.includes("marking subcommands may call **`vault_update_frontmatter`**"));
@@ -79,7 +79,7 @@ describe("Story 31-3 Hermes vault-think skill mirror", () => {
 
   it("documents trace and connect REST procedures with curl and Discord templates", () => {
     const body = readFileSync(taskPromptPath, "utf8");
-    assert.ok(body.includes("## 3) v1.1 live triggers"));
+    assert.ok(body.includes("## 4) v1.1 live triggers"));
     assert.ok(body.includes("curl -sk"));
     assert.ok(body.includes("GET /vault/"));
     assert.ok(body.includes("/search/simple/"));
@@ -105,11 +105,11 @@ describe("Story 32-2 Hermes vault-think /today", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.4.0"));
+    assert.ok(skill.includes("version: 1.4.1"));
     assert.ok(skill.includes("/today"));
     assert.ok(skill.includes("/today --brief"));
 
-    assert.ok(task.includes("### 1b) `/today`"));
+    assert.ok(task.includes("### 2b) `/today`"));
     assert.ok(task.includes("/today` or `/today` + trailing spaces only"));
     assert.ok(task.includes("/today --brief` (+ trailing spaces only)"));
     assert.ok(task.includes("### `/today`"));
@@ -136,7 +136,7 @@ describe("Story 32-2 Hermes vault-think /today", () => {
     const body = readFileSync(taskPromptPath, "utf8");
     const challenge = body.slice(body.indexOf("### `/challenge`"), body.indexOf("### `/emerge`"));
     const emerge = body.slice(body.indexOf("### `/emerge`"), body.indexOf("### `/ideas`"));
-    const ideas = body.slice(body.indexOf("### `/ideas`"), body.indexOf("## 3) v1.1 live triggers"));
+    const ideas = body.slice(body.indexOf("### `/ideas`"), body.indexOf("## 4) v1.1 live triggers"));
 
     for (const section of [challenge, emerge, ideas]) {
       assert.ok(section.includes("vault_search"), "v1.0 section must use vault_search");
@@ -150,12 +150,12 @@ describe("Story 32-3 Hermes vault-think /ghost and /drift", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.4.0"));
+    assert.ok(skill.includes("version: 1.4.1"));
     assert.ok(skill.includes("/ghost "));
     assert.ok(skill.includes("/drift"));
 
-    assert.ok(task.includes("### 1c) `/ghost`"));
-    assert.ok(task.includes("### 1d) `/drift`"));
+    assert.ok(task.includes("### 2c) `/ghost`"));
+    assert.ok(task.includes("### 2d) `/drift`"));
     assert.ok(task.includes("vault-think: ghost requires question"));
     assert.ok(task.includes("### `/ghost`"));
     assert.ok(task.includes("### `/drift`"));
@@ -193,7 +193,7 @@ describe("Story 33-1 Hermes vault-think /verify", () => {
     const skill = readFileSync(skillPath, "utf8");
     const task = readFileSync(taskPromptPath, "utf8");
 
-    assert.ok(skill.includes("version: 1.4.0"));
+    assert.ok(skill.includes("version: 1.4.1"));
     assert.ok(skill.includes("/verify verified "));
     assert.ok(skill.includes("/verify disputed "));
     assert.ok(skill.includes("vault-relative path"));
@@ -201,7 +201,7 @@ describe("Story 33-1 Hermes vault-think /verify", () => {
     assert.ok(skill.includes("vault_update_frontmatter"));
     assert.ok(skill.includes("mutator exception"));
 
-    assert.ok(task.includes("### 1g) `/verify`"));
+    assert.ok(task.includes("### 2g) `/verify`"));
     assert.ok(task.includes("v1.3.0"));
     assert.ok(task.includes("### `/verify`"));
     assert.ok(task.includes("verification_status: pending"));

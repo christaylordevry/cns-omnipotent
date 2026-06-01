@@ -13,7 +13,7 @@ const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Op
 describe("Story 27.5–27.6 Hermes triage skill mirror", () => {
   it("SKILL.md declares scoped discovery, approvals, execution, and version bump", () => {
     const body = readFileSync(join(skillDir, "SKILL.md"), "utf8");
-    assert.ok(body.includes("version: 1.7.0"));
+    assert.ok(body.includes("version: 1.7.1"));
     assert.ok(body.includes("recursive"));
     assert.ok(
       body.includes("vault_search") &&

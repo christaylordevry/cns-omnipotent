@@ -1,7 +1,7 @@
 ---
 name: investigate-trend
 description: "Hermes trend investigation for #hermes: parses a 4-line investigate-trend payload (keyword/topicSlug/context/request), runs a Perplexity sweep via mcp__perplexity__search, and posts a bounded WATCH|IGNORE|ESCALATE recommendation. No vault writes."
-version: 1.0.0
+version: 1.0.1
 author: CNS Operator
 license: MIT
 metadata:
@@ -22,6 +22,8 @@ This skill handles the `cns-dashboard` ⚡ Ask Hermes trend command payload post
 - **Safety**: **No vault writes**, **No dashboard relay**, no NotebookLM fan-out
 
 ## When to use
+
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already routed this skill. Parse the 4-line payload per `references/task-prompt.md` — do not re-check the Hermes binding.
 
 - A Discord message in `#hermes` begins with:
   - `investigate-trend keyword: "..."` (keyword quoted)

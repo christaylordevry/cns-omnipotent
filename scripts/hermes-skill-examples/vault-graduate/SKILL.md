@@ -1,7 +1,7 @@
 ---
 name: vault-graduate
 description: "Hermes CNS daily-note graduate for #hermes: /vault-graduate promotes #graduate-tagged lines to InsightNotes in 03-Resources/ via Vault IO MCP; receipts on today's daily only."
-version: 1.0.0
+version: 1.0.1
 author: CNS Operator
 license: MIT
 metadata:
@@ -20,12 +20,14 @@ On-demand **`/vault-graduate`** in Discord **`#hermes`**: scan **`DailyNotes/`**
 
 ## When to use
 
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already routed vault-graduate. Trigger shapes in `references/trigger-pattern.md` are documentation only — parse `--days` at runtime.
+
 - Operator posts **`/vault-graduate`** (exact, optional trailing whitespace) → scan last **7** calendar days.
 - Operator posts **`/vault-graduate --days <n>`** where **`<n>`** is a positive integer → scan last **`<n>`** calendar days.
 
 ## When not to use
 
-- Message does not match either trigger shape → reply `vault-graduate: bad-trigger` and stop (no vault I/O).
+- Message does not match a valid **`/vault-graduate`** subcommand or **`--days`** argument shape → reply `vault-graduate: bad-trigger` and stop (no vault I/O). Unknown subcommand only — not a Hermes binding mismatch.
 - **`CNS_VAULT_ROOT`** cannot be resolved → reply `vault-graduate: no-vault-root` and stop.
 
 ## Policy

@@ -6,7 +6,16 @@
 - **v1.2.0:** `/ghost`, `/drift` — Vault IO read-only (`vault_search` + `vault_read`; `/drift` also **`vault_list`** + **`vault_read_frontmatter`**).
 - **v1.3.0:** `/verify` — pending **SynthesisNote** queue + review (read-only); **`/verify verified`** / **`/verify disputed`** stamp **`verification_status`** via **`vault_update_frontmatter`** only.
 
-## 0) Vault root, REST env, and clocks
+## 0) REFERENCE ONLY — invocation already confirmed
+
+> **You have already been invoked.** The `config.yaml` trigger matched the incoming Discord message. Do not re-check or re-evaluate the Hermes skill binding.
+> Proceed directly to **§1** (environment) then **§2** (subcommand classification).
+
+For documentation purposes only (do not re-evaluate at runtime):
+
+- Active triggers (`/challenge`, `/emerge`, `/today`, `/trace`, `/vault-graduate`, etc.) are listed in `references/trigger-pattern.md` for operators and `config.yaml` authors.
+
+## 1) Vault root, REST env, and clocks
 
 1. Resolve directory **`CNS_VAULT_ROOT`** (required for v1.0 and **`/today`** commands):
 
@@ -35,55 +44,57 @@
 
 5. For `/emerge` only, set **`since_utc`** = `today_utc` minus **60** calendar days (UTC date roll; if a day is invalid, clamp within the month).
 
-## 1) Line classification (after trim)
+## 2) Subcommand classification (after trim)
 
 Let **`raw`** = operator message with leading and trailing ASCII whitespace removed.
 
-**Slash normalisation:** If `raw` starts with exactly one `/` followed by a letter, also set **`raw_bare`** = `raw` with that leading `/` removed. All trigger matches below accept either form — with or without the leading `/`. This makes `/emerge`, `/ideas`, `/challenge`, `/today`, `/ghost`, `/drift`, `/verify`, `/trace`, `/connect`, `/vault-graduate` work identically when sent without the slash prefix.
+**Slash normalisation:** If `raw` starts with exactly one `/` followed by a letter, also set **`raw_bare`** = `raw` with that leading `/` removed. All subcommand matches below accept either form — with or without the leading `/`. This makes `/emerge`, `/ideas`, `/challenge`, `/today`, `/ghost`, `/drift`, `/verify`, `/trace`, `/connect`, `/vault-graduate` work identically when sent without the slash prefix.
 
-### 1b) `/today` — route to §3
+**Unknown subcommand:** reply `vault-think: bad-trigger` and stop — do **not** infer that Hermes invoked the wrong skill.
+
+### 2b) `/today` — route to §4
 
 - `/today` or `/today` + trailing spaces only → full briefing.
 - `/today --brief` (+ trailing spaces only) → 3-line brief.
 - Other `/today…` → `vault-think: bad-trigger`; no vault I/O.
 
-### 1c) `/ghost` — route to §3
+### 2c) `/ghost` — route to §4
 
-- **`/ghost `** + non-empty remainder → **§3 `/ghost`** (`**question**` = remainder trimmed).
+- **`/ghost `** + non-empty remainder → **§4 `/ghost`** (`**question**` = remainder trimmed).
 - **`/ghost`** only (no question) → `vault-think: ghost requires question`; stop.
 - Other **`/ghost…`** → `vault-think: bad-trigger`; stop.
 
-### 1d) `/drift` — route to §3
+### 2d) `/drift` — route to §4
 
-- **`/drift`** or **`/drift`** + trailing ASCII whitespace only → **§3 `/drift`**.
+- **`/drift`** or **`/drift`** + trailing ASCII whitespace only → **§4 `/drift`**.
 - **`/drift`** + other args → `vault-think: bad-trigger`; stop.
 
-**§1b–1d:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
+**§2b–2d:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**.
 
-### 1g) `/verify` — route to §3
+### 2g) `/verify` — route to §4
 
 Let **`verify_rest`** = substring after `/verify` (trimmed).
 
 | Match | Route |
 |-------|--------|
-| **`raw`** is `/verify` or `/verify` + trailing ASCII whitespace only | **§3 `/verify`** queue (offset **0**) |
-| **`raw`** starts with `/verify --offset ` | **§3 `/verify`** queue; parse non-negative integer **`offset`** after flag (invalid → `vault-think: verify bad-offset`; stop) |
-| **`raw`** starts with `/verify verified ` | **§3 `/verify`** marking; **`mark`** = `verified`; **`target`** = remainder trimmed (non-empty) |
-| **`raw`** starts with `/verify disputed ` | **§3 `/verify`** marking; **`mark`** = `disputed`; **`target`** = remainder trimmed (non-empty) |
-| **`raw`** starts with `/verify ` and **`verify_rest`** non-empty, not `--offset` | **§3 `/verify`** single-note review; **`target`** = **`verify_rest`** |
+| **`raw`** is `/verify` or `/verify` + trailing ASCII whitespace only | **§4 `/verify`** queue (offset **0**) |
+| **`raw`** starts with `/verify --offset ` | **§4 `/verify`** queue; parse non-negative integer **`offset`** after flag (invalid → `vault-think: verify bad-offset`; stop) |
+| **`raw`** starts with `/verify verified ` | **§4 `/verify`** marking; **`mark`** = `verified`; **`target`** = remainder trimmed (non-empty) |
+| **`raw`** starts with `/verify disputed ` | **§4 `/verify`** marking; **`mark`** = `disputed`; **`target`** = remainder trimmed (non-empty) |
+| **`raw`** starts with `/verify ` and **`verify_rest`** non-empty, not `--offset` | **§4 `/verify`** single-note review; **`target`** = **`verify_rest`** |
 | **`/verify`** + other args (e.g. `/verify pending`) | `vault-think: bad-trigger`; stop |
 
-**§1g:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**. Empty **`target`** on marking lines → `vault-think: verify requires target`; stop. Marking lines require a **vault-relative path** (not a title substring).
+**§2g:** need **`CNS_VAULT_ROOT`**; not **`OBSIDIAN_API_KEY`**. Empty **`target`** on marking lines → `vault-think: verify requires target`; stop. Marking lines require a **vault-relative path** (not a title substring).
 
-### 1e) v1.1 live triggers — route to §3 (`/trace`, `/connect`)
+### 2e) v1.1 live triggers — route to §4 (`/trace`, `/connect`)
 
-If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, or starts with `/connect `, continue to **§3** (do not treat as bad-trigger).
+If **`raw`** equals `/trace`, starts with `/trace `, equals `/connect`, or starts with `/connect `, continue to **§4** (do not treat as bad-trigger).
 
-### 1f) v1.0 bad trigger
+### 2f) v1.0 unknown subcommand
 
-If **`raw`** does not match any v1.0 trigger in §2, reply exactly `vault-think: bad-trigger` and **stop** (no MCP calls).
+If **`raw`** does not match any v1.0 subcommand in **§2** (classification table above), reply exactly `vault-think: bad-trigger` and **stop** (no MCP calls).
 
-## 2) v1.0 triggers (Vault IO MCP)
+## 3) v1.0 triggers (Vault IO MCP)
 
 ### `/challenge`
 
@@ -196,9 +207,9 @@ Draft thesis: [one paragraph Hermes would write if asked to]
 - `[note reference]` and `[note references]` use vault-relative paths; separate multiple paths with comma + space.
 - Every substantive bullet must trace to text you read in **`vault_read`** output for this run (no invented people or companies).
 
-## 3) v1.1 live triggers (Obsidian Local REST via `curl -k`)
+## 4) v1.1 live triggers (Obsidian Local REST via `curl -k`)
 
-Use **§0** REST env. All HTTP in this section uses the **terminal** tool only.
+Use **§1** REST env. All HTTP in this section uses the **terminal** tool only.
 
 ### `/trace`
 
@@ -298,7 +309,7 @@ Summary: [1-2 sentences]
 
 ### `/ghost`
 
-§1c. MCP **`vault_search`** + **`vault_read`** only; caps ≤**6** search, ≤**8** read. Cap hit → `vault-think: incomplete`.
+§2c. MCP **`vault_search`** + **`vault_read`** only; caps ≤**6** search, ≤**8** read. Cap hit → `vault-think: incomplete`.
 
 1. **2–4** search strings from **`question`** (≥3 chars; drop stopwords).
 2. **`vault_search`** `max_results: 50`; rotate `01-Projects/`, `02-Areas/`, `03-Resources/`, optional `DailyNotes/` (≤**6** calls).
@@ -319,7 +330,7 @@ Sources: <comma-separated note titles>
 
 ### `/drift`
 
-§1d. MCP **`vault_list`**, **`vault_read`**, **`vault_search`**, **`vault_read_frontmatter`**; caps ≤**1** list, ≤**14** daily reads, ≤**8** search, ≤**8** frontmatter reads. Cap hit → `vault-think: incomplete`.
+§2d. MCP **`vault_list`**, **`vault_read`**, **`vault_search`**, **`vault_read_frontmatter`**; caps ≤**1** list, ≤**14** daily reads, ≤**8** search, ≤**8** frontmatter reads. Cap hit → `vault-think: incomplete`.
 
 1. **`window_start_utc`** = **`today_utc`** − **14** UTC days (same as **`/emerge`**).
 2. **`vault_list`** `DailyNotes/`; pick `YYYY-MM-DD.md` in window, newest first (≤**14**).
@@ -346,7 +357,7 @@ Consider /graduate or run-chain on these.
 
 ### `/verify`
 
-§1g. **Governed scope:** **`03-Resources/`** only. **Pending set:** notes with **`pake_type: SynthesisNote`** and **`verification_status: pending`** (trimmed, case-sensitive per PAKE enum).
+§2g. **Governed scope:** **`03-Resources/`** only. **Pending set:** notes with **`pake_type: SynthesisNote`** and **`verification_status: pending`** (trimmed, case-sensitive per PAKE enum).
 
 **Shared discovery (queue + single-note only):**
 
@@ -448,7 +459,7 @@ Path: [resolved_path]
 
 ### `/today`
 
-§1b match. MCP: **`vault_list`**, **`vault_read`** only. Caps: ≤3 list, ≤6 read (1 daily + ≤5 projects). Cap hit → `vault-think: incomplete`.
+§2b match. MCP: **`vault_list`**, **`vault_read`** only. Caps: ≤3 list, ≤6 read (1 daily + ≤5 projects). Cap hit → `vault-think: incomplete`.
 
 1. **`vault_list`** `DailyNotes/`; match **`{today_utc}.md`**.
 2. Found → **`vault_read`**: tasks `- [ ]`/`- [x]`, **Priorities**/**Focus**/**Today** lines, else 200 chars post-FM; empty → `(empty daily note)`. Missing → `not yet created` (no read).
@@ -481,12 +492,12 @@ Path: [resolved_path]
 
 `<YYYY-MM-DD>`=`today_utc`; title=FM `title` else basename sans `.md`; project `<n>`=bullets shown (≤5).
 
-## 4) Forbidden tools reminder
+## 5) Forbidden tools reminder
 
-**`/today`:** **`vault_list`** + **`vault_read`** per §3. **`/drift`:** **`vault_list`**, **`vault_read`**, **`vault_search`** in **`03-Resources/`**, and **`vault_read_frontmatter`** only to verify candidate synthesis note PAKE type. **`/ghost`:** **`vault_search`** + **`vault_read`** only. **`/verify`:** **`vault_search`**, **`vault_read_frontmatter`**, **`vault_read`** (single-note only); marking subcommands may call **`vault_update_frontmatter`** **once** with **`verification_status`** + **`modified`** only on a resolved **`SynthesisNote`** in **`03-Resources/`**.
+**`/today`:** **`vault_list`** + **`vault_read`** per §4. **`/drift`:** **`vault_list`**, **`vault_read`**, **`vault_search`** in **`03-Resources/`**, and **`vault_read_frontmatter`** only to verify candidate synthesis note PAKE type. **`/ghost`:** **`vault_search`** + **`vault_read`** only. **`/verify`:** **`vault_search`**, **`vault_read_frontmatter`**, **`vault_read`** (single-note only); marking subcommands may call **`vault_update_frontmatter`** **once** with **`verification_status`** + **`modified`** only on a resolved **`SynthesisNote`** in **`03-Resources/`**.
 
 **All other commands:** do **not** call **`vault_list`**, `vault_read_frontmatter`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`, Obsidian CLI, or filesystem writes to vault paths.
 
-## 5) Incomplete work
+## 6) Incomplete work
 
 If caps block completion, reply `vault-think: incomplete` once, optionally with one sentence naming the blocking cap. Do not fabricate unread citations.

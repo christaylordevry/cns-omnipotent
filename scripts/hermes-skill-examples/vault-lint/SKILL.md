@@ -1,7 +1,7 @@
 ---
 name: vault-lint
 description: "Hermes CNS vault lint for /vault-lint in #hermes. Read-only four-rule scan (vault-lint.md) via Vault IO MCP; Discord summary per spec; full report via direct FS write to _meta/reports/vault-lint-YYYY-MM-DD.md only."
-version: 1.0.0
+version: 1.0.1
 author: CNS Operator
 license: MIT
 metadata:
@@ -18,11 +18,13 @@ Normative rules, severities, Discord layout, on-disk report, and JSON machine bl
 
 ## When to use
 
+> **REFERENCE ONLY — invocation already confirmed.** Hermes already selected vault-lint. Exact `/vault-lint` grammar in `references/trigger-pattern.md` is operator documentation only.
+
 - Operator posts **`/vault-lint`** (trimmed, case-sensitive prefix) in Discord **`#hermes`** while this skill is bound for that channel.
 
 ## When not to use
 
-- Message is not exactly **`/vault-lint`** with optional trailing whitespace only (no arguments in v1; if extra tokens appear, refuse with `vault-lint: bad-trigger` and do not scan).
+- **`raw`** has extra tokens after `/vault-lint` (arguments in v1 are forbidden; refuse with `vault-lint: bad-trigger` and do not scan). This is **argument** validation — not a Hermes binding re-check.
 - **`CNS_VAULT_ROOT`** cannot be resolved from environment or `~/.hermes/config.yaml` `mcp_servers.cns_vault_io.env` (short error, no report).
 
 ## Policy
