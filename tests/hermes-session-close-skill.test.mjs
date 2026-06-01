@@ -46,7 +46,11 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
 
     const installScript = readFileSync(join(root, "scripts/install-hermes-skill-session-close.sh"), "utf8");
-    assert.ok(installScript.includes("references/discord-reply-template.md"));
+    assert.ok(installScript.includes("rsync -a --delete"), "install must mirror with rsync --delete");
+    assert.ok(
+      installScript.includes('rm -f "$DEST_DIR/references/task-prompt.md"'),
+      "cp fallback must prune stale task-prompt.md",
+    );
   });
 
   it("documents bounded Section 8 synthesis and reply template", () => {

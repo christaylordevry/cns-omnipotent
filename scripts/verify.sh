@@ -96,4 +96,7 @@ if [[ "$ran_any" -eq 0 ]]; then
   exit 1
 fi
 
+echo "==> Hermes skill install gate"
+node scripts/assert-hermes-skill-install-gate.mjs
+
 echo "==> VERIFY PASSED"

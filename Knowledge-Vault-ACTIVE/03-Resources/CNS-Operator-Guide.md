@@ -952,6 +952,27 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 **Gateway dependency:** Same as §15.2 — cron wrappers must not claim delivery if `hermes gateway status` shows gateway down.
 
+### 15.12 Skill install gate (Story 54-1)
+
+`bash scripts/verify.sh` runs **`scripts/assert-hermes-skill-install-gate.mjs`** after Node tests. On a workstation with Hermes installed it enforces:
+
+1. **Binding existence** — every skill listed under `discord.channel_skill_bindings` in `~/.hermes/config.yaml` has `~/.hermes/skills/cns/<skill>/SKILL.md`.
+2. **NotebookLM parity trio** — `notebook-query`, `morning-digest`, and `session-close` match the repo mirrors under `scripts/hermes-skill-examples/<skill>/` (`diff -rq` must be clean).
+
+**When verify fails**
+
+| Message | Fix |
+|---------|-----|
+| `missing skill "…"` | Install or restore that skill tree under `~/.hermes/skills/cns/`. Use the matching `bash scripts/install-hermes-skill-<name>.sh` from the Omnipotent.md repo root. |
+| `parity drift for "notebook-query"` (or morning-digest / session-close) | Re-run the install helper, then verify again: `bash scripts/install-hermes-skill-notebook-query.sh`, `bash scripts/install-hermes-skill-morning-digest.sh`, `bash scripts/install-hermes-skill-session-close.sh` |
+| `(skip) Hermes config not found` | Normal on CI without `~/.hermes`; no action. |
+
+After installing skills that affect Discord routing, restart the gateway if behavior looks stale: `hermes gateway restart` (or your usual launcher).
+
+**Emergency local override:** `HERMES_SKIP_SKILL_INSTALL_GATE=1 bash scripts/verify.sh` — use only when debugging; do not commit with this set.
+
+**Environment:** `HERMES_HOME` (default `~/.hermes`), optional `OMNIPOTENT_REPO` if the checkout path differs from the script-relative repo root.
+
 ---
 
 ## 16. CNS Dashboard (Epic 42, operator)

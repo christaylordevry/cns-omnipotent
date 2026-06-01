@@ -1,0 +1,23 @@
+{
+  "channel_skill_bindings": [
+    {
+      "id": "1500733488897462382",
+      "skills": [
+        "hermes-url-ingest-vault",
+        "triage",
+        "session-close",
+        "vault-lint",
+        "vault-think",
+        "vault-graduate",
+        "investigate-trend",
+        "morning-digest",
+        "notebook-query"
+      ]
+    },
+    {
+      "id": "1484880486785486951",
+      "skills": ["hermes-url-auto-capture-inbox"]
+    }
+  ],
+  "parity_skills": ["notebook-query", "morning-digest", "session-close"]
+}

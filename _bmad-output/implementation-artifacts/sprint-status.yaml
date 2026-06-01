@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-01T00:00:00+10:00
+# last_updated: 2026-06-01T12:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-01T00:00:00+10:00"
+last_updated: "2026-06-01T12:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -372,3 +372,7 @@ development_status:
   epic-53: done
   53-1-nlm-auth-watchdog: done
   53-3-add-reason-field-to-no-route-responses: done
+
+  # Epic 54 - Hermes deployment parity & NotebookLM observability
+  epic-54: in-progress
+  54-1-skill-install-gate: done

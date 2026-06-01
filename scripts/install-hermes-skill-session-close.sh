@@ -12,19 +12,19 @@ fi
 
 mkdir -p "$DEST_DIR"
 
-# Copy skill payload only. It contains no secrets.
-cp -a "$SRC_DIR/." "$DEST_DIR/"
-
-for f in \
-  "SKILL.md" \
-  "references/section8-synthesis.md" \
-  "references/discord-reply-template.md" \
-  "references/trigger-pattern.md"; do
-  if ! cmp -s "$SRC_DIR/$f" "$DEST_DIR/$f"; then
-    echo "install-hermes-skill-session-close: parity check failed for $f" >&2
-    exit 1
+# Mirror repo tree exactly; prune stale files (e.g. references/task-prompt.md).
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete "$SRC_DIR/" "$DEST_DIR/"
+else
+  rm -rf "$DEST_DIR"
+  mkdir -p "$DEST_DIR"
+  if cp -a "$SRC_DIR/." "$DEST_DIR/" 2>/dev/null; then
+    :
+  else
+    cp -R "$SRC_DIR/." "$DEST_DIR/"
   fi
-done
+  rm -f "$DEST_DIR/references/task-prompt.md"
+fi
 
 echo "Installed Hermes skill to: $DEST_DIR"
 echo "Next: bind /session-close in #hermes via ~/.hermes/config.yaml if needed."

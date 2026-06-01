@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 54-1-skill-install-gate (2026-06-01)
+
+- `vault-fast-scan-index.md` date bump alongside Operator Guide §15.12 — incidental index maintenance, not story File List.
+- notebook-query / morning-digest install scripts still use `cp` without `--delete`; parity gate catches trio drift; rsync-on-all-install deferred beyond 54-1 scope.
+
 ## Deferred from: code review of 53-3-add-reason-field-to-no-route-responses (2026-06-01)
 
 - `below_threshold: best=unknown (0.00)` when `watch: true` rows exist but none pass `validRegistryRow` — mislabels registry corruption as weak semantic match; no test coverage.
