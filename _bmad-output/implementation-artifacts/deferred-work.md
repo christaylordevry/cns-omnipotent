@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 54-2-notebook-query-convex-log-reliability (2026-06-01)
+
+- 15s log `terminal` timeout vs slow Convex HTTP — operator brief explicitly requires 15s cap (AC 1/2).
+- Large `NOTEBOOK_ANSWER` shell env / ARG_MAX — inherited 52-2 `shellQuote` pattern; not introduced by 54-2.
+
 ## Deferred from: code review of 54-1-skill-install-gate (2026-06-01)
 
 - `vault-fast-scan-index.md` date bump alongside Operator Guide §15.12 — incidental index maintenance, not story File List.

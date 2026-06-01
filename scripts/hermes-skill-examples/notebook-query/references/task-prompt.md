@@ -146,24 +146,67 @@ Where:
 
 ## 5) Log to Convex
 
-After posting the formatted answer to `#hermes`, log the successful query for the `/trends` dashboard history panel. Run **after** step 4 — fire-and-forget; do not edit or retract the Discord answer if logging fails.
+After posting the formatted answer to `#hermes` on the **success path only**, log the query for the `/trends` dashboard history panel. Run **after** step 4 completes. **Await** the `terminal` call and emit telemetry before ending the skill turn — do not background or skip this step. Do **not** edit or retract the Discord answer from step 4 regardless of log outcome.
 
-Via `execute_code bash`:
+Resolve paths and quoting (same rules as morning-digest Source 4):
 
-```bash
-NOTEBOOK_QUERY='<question>' \
-NOTEBOOK_ANSWER='<answer>' \
-NOTEBOOK_ID='<route.id>' \
-NOTEBOOK_TITLE='<route.title>' \
-NOTEBOOK_DOMAIN='<route.domain or general>' \
-node "$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs"
+```text
+resolved_repo_root = OMNIPOTENT_REPO when set to a non-empty absolute path, else /home/christ/ai-factory/projects/Omnipotent.md
+shellQuote(value) = "'" + String(value).replaceAll("'", "'\\''") + "'"
+log_script = resolved_repo_root + "/scripts/hermes-skill-examples/notebook-query/scripts/log-notebook-query.mjs"
 ```
 
-- Use the same single-quote escaping rules as step 1 (`'\''` for embedded quotes).
-- `NOTEBOOK_ANSWER` = `answer` from `query-notebook.mjs` stdout (verbatim).
-- `NOTEBOOK_DOMAIN` = `route.domain` when present; otherwise `'general'`.
-- **Only invoke on success path** — do not run for `NO_ROUTE`, timeout, or any error path.
-- Exit `0` on skip (missing Convex env) or success; exit `1` on malformed input or HTTP error. Silence is acceptable on failure — do not append to the Discord answer.
+If the repo `log_script` path is unavailable, use: `$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs`
+
+Invoke the Hermes **`terminal`** tool once (not `execute_code bash`):
+
+```text
+terminal(
+  command="LOG_SCRIPT=<shellQuote(log_script)> NOTEBOOK_QUERY=<shellQuote(question)> NOTEBOOK_ANSWER=<shellQuote(answer)> NOTEBOOK_ID=<shellQuote(route.id)> NOTEBOOK_TITLE=<shellQuote(route.title)> NOTEBOOK_DOMAIN=<shellQuote(route.domain or 'general')> node \"$LOG_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=15
+)
+```
+
+Where:
+- `question` = original extracted question (verbatim)
+- `answer` = `answer` from `query-notebook.mjs` stdout (verbatim)
+- `NOTEBOOK_DOMAIN` = `route.domain` when present; otherwise `'general'`
+
+**Only invoke on success path** — do not run for `NO_ROUTE`, timeout, or any error path.
+
+**After terminal returns**, record exactly one JSON line to **stderr** (or tool transcript):
+
+```json
+{"notebook_query_log":{"status":"<status>","exit_code":<n>,"reason":"<reason>"}}
+```
+
+| status | When |
+|--------|------|
+| `ok` | Exit `0` and stderr does not indicate Convex HTTP/mutation failure or env skip |
+| `skipped-env` | Exit `0` and stderr indicates missing `CONVEX_URL` / deploy key skip |
+| `failed` | Exit non-zero |
+| `timeout` | Terminal tool reports timeout or exceeded 15s |
+
+**stderr → status** (match substrings from `log-notebook-query.mjs` stderr; exit code from terminal):
+
+| stderr contains | exit | status | reason (example) |
+|-----------------|------|--------|------------------|
+| `skipped — missing CONVEX_URL` | `0` | `skipped-env` | `missing-convex-env` |
+| `Convex push failed` | non-zero | `failed` | `convex-http-error` |
+| `missing required env` | non-zero | `failed` | `invalid-input` |
+| `unexpected error` | non-zero | `failed` | `unexpected-error` |
+| (none of the above) | `0` | `ok` | `ok` |
+
+`reason`: short snake_case or kebab token (≤ 80 chars), no secrets, no full `NOTEBOOK_ANSWER` body.
+
+**Discord warning** (only when `status` is `failed` or `timeout`): post one additional line to `#hermes`:
+
+```text
+_(Notebook history log failed — /trends may be missing this query.)_
+```
+
+Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log failure as skill failure.
 
 ---
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -406,5 +407,44 @@ process.exit(3);
         return true;
       },
     );
+  });
+});
+
+describe('notebook-query task-prompt contracts (Story 54-2)', () => {
+  const taskPromptPath = join(
+    repoRoot,
+    'scripts/hermes-skill-examples/notebook-query/references/task-prompt.md',
+  );
+
+  it('§5 uses awaited terminal with 15s timeout and Convex log telemetry', () => {
+    const body = readFileSync(taskPromptPath, 'utf8');
+    const section5 = body.slice(body.indexOf('## 5) Log to Convex'));
+
+    assert.ok(section5.includes('terminal('));
+    assert.ok(section5.includes('timeout=15'));
+    assert.ok(section5.includes('workdir=resolved_repo_root'));
+    assert.ok(section5.includes('log-notebook-query.mjs'));
+    assert.ok(
+      section5.includes(
+        '$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs',
+      ),
+    );
+    assert.ok(section5.includes('skipped — missing CONVEX_URL'));
+    assert.ok(section5.includes('Convex push failed'));
+    assert.ok(section5.includes('NOTEBOOK_QUERY=<shellQuote(question)>'));
+    assert.ok(section5.includes('NOTEBOOK_ANSWER=<shellQuote(answer)>'));
+    assert.ok(section5.includes('NOTEBOOK_ID=<shellQuote(route.id)>'));
+    assert.ok(section5.includes('NOTEBOOK_TITLE=<shellQuote(route.title)>'));
+    assert.ok(section5.includes('NOTEBOOK_DOMAIN=<shellQuote(route.domain'));
+    assert.ok(section5.includes('notebook_query_log'));
+    assert.ok(
+      section5.includes(
+        '_(Notebook history log failed — /trends may be missing this query.)_',
+      ),
+    );
+    assert.ok(section5.includes('Run **after** step 4'));
+    assert.ok(section5.includes('Await'));
+    assert.ok(!section5.includes('fire-and-forget'));
+    assert.ok(!section5.includes('Via `execute_code bash`'));
   });
 });

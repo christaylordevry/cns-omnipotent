@@ -196,13 +196,13 @@ _Matched signal:_ <winning_signal>
 
 Run **only** when Source 4 finished with `route.status === 'ROUTED'` and `query-notebook.mjs` returned valid stdout JSON `{ answer, elapsed_ms }` where **`answer` is non-empty after trim** (Vault context section is **not** `(source unavailable: …)`).
 
-**After** posting the full digest to `#hermes`, call `terminal` once (fire-and-forget; do not block operator completion on result; do not edit or retract the Discord message if logging fails):
+**After** posting the full digest to `#hermes`, call `terminal` once. **Await** completion (15s cap) before ending the task turn. Do not edit or retract the Discord digest regardless of log outcome.
 
 ```text
 terminal(
   command="LOG_SCRIPT=<shellQuote(log_script)> NOTEBOOK_QUERY=<shellQuote(winning_signal)> NOTEBOOK_ANSWER=<shellQuote(answer_full)> NOTEBOOK_ID=<shellQuote(route.id)> NOTEBOOK_TITLE=<shellQuote(route.title)> NOTEBOOK_DOMAIN=<shellQuote(route.domain or 'general')> node \"$LOG_SCRIPT\"",
   workdir=resolved_repo_root,
-  timeout=30
+  timeout=15
 )
 ```
 
@@ -221,7 +221,38 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/notebook-query/scripts/
 
 **Do not run** for `NO_ROUTE`, query failure/timeout/invalid JSON, empty/whitespace-only `answer`, or when Vault context shows `(source unavailable: …)`.
 
-**Failure handling:** ignore non-zero exit; do not append to or edit the Discord digest. Missing `CONVEX_URL` / `CONVEX_DEPLOY_KEY` → script exits 0 (skip, stderr only). Malformed required env or Convex HTTP error → script exits 1 (silent to operator).
+**After terminal returns**, record exactly one JSON line to **stderr** (or tool transcript):
+
+```json
+{"notebook_query_log":{"status":"<status>","exit_code":<n>,"reason":"<reason>"}}
+```
+
+| status | When |
+|--------|------|
+| `ok` | Exit `0` and stderr does not indicate Convex HTTP/mutation failure or env skip |
+| `skipped-env` | Exit `0` and stderr indicates missing `CONVEX_URL` / deploy key skip |
+| `failed` | Exit non-zero |
+| `timeout` | Terminal tool reports timeout or exceeded 15s |
+
+**stderr → status** (match substrings from `log-notebook-query.mjs` stderr; exit code from terminal):
+
+| stderr contains | exit | status | reason (example) |
+|-----------------|------|--------|------------------|
+| `skipped — missing CONVEX_URL` | `0` | `skipped-env` | `missing-convex-env` |
+| `Convex push failed` | non-zero | `failed` | `convex-http-error` |
+| `missing required env` | non-zero | `failed` | `invalid-input` |
+| `unexpected error` | non-zero | `failed` | `unexpected-error` |
+| (none of the above) | `0` | `ok` | `ok` |
+
+`reason`: short snake_case or kebab token (≤ 80 chars), no secrets, no full `NOTEBOOK_ANSWER` body.
+
+**Discord warning** (only when `status` is `failed` or `timeout`): post one additional line to `#hermes`:
+
+```text
+_(Notebook history log failed — /trends may be missing this query.)_
+```
+
+Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log failure as skill failure. Missing `CONVEX_URL` / `CONVEX_DEPLOY_KEY` → script exits 0 (skip path → `skipped-env`). Malformed required env or Convex HTTP error → script exits 1 (`failed`).
 
 ## Allowed tools
 
