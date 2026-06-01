@@ -12,6 +12,7 @@ const discordReplyTemplatePath = join(skillDir, "references/discord-reply-templa
 const taskPromptLegacyPath = join(skillDir, "references/task-prompt.legacy.md");
 const triggerPatternPath = join(skillDir, "references/trigger-pattern.md");
 const dailyRhythmStaticPath = join(skillDir, "references/daily-rhythm-static-rows.md");
+const fanoutDiagnosticsPath = join(skillDir, "references/fanout-diagnostics.md");
 const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md");
 
 
@@ -68,7 +69,7 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
 
   it("documents nlm auth watchdog after NotebookLM fan-out as non-blocking", () => {
     const body = readFileSync(skillPath, "utf8");
-    const fanOut = body.indexOf("Real close only: for NotebookLM");
+    const fanOut = body.indexOf("Real close only:");
     const watchdog = body.indexOf("nlm auth watchdog");
     const reply = body.indexOf("Render the Discord reply");
     assert.ok(fanOut >= 0, "NotebookLM fan-out instruction missing");
@@ -100,6 +101,26 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("channel_skill_bindings"));
     assert.ok(body.includes("triage"));
     assert.ok(body.includes("hermes-url-ingest-vault"));
+  });
+
+  it("documents fan-out diagnostics before nlm auth watchdog", () => {
+    assert.ok(existsSync(fanoutDiagnosticsPath));
+    const body = readFileSync(skillPath, "utf8");
+    const fanoutMerge = body.indexOf("merge-notebooklm-fanout");
+    const fanoutRef = body.indexOf("fanout-diagnostics.md");
+    const watchdog = body.indexOf("nlm auth watchdog");
+    assert.ok(fanoutMerge >= 0, "SKILL must reference merge-notebooklm-fanout");
+    assert.ok(fanoutRef >= 0, "SKILL must link fanout-diagnostics.md");
+    assert.ok(body.includes("error_class"));
+    assert.ok(fanoutMerge < watchdog, "fan-out merge must be ordered before nlm auth watchdog");
+
+    const diagnostics = readFileSync(fanoutDiagnosticsPath, "utf8");
+    assert.ok(diagnostics.includes("merge-notebooklm-fanout"));
+    assert.ok(diagnostics.includes("error_class"));
+    assert.ok(diagnostics.includes("size_limit"));
+
+    const template = readFileSync(discordReplyTemplatePath, "utf8");
+    assert.ok(template.includes("error_class"));
   });
 
   it("operator guide documents session-close and version history", () => {

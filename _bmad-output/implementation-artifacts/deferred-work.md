@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 54-3-session-close-fan-out-diagnostics (2026-06-01)
+
+- Broad `\bexceeds\b` size_limit classifier rule — bound by story AC2 hint table; rare misclassify on non-size "exceeds" strings in stderr.
+
 ## Deferred from: code review of 54-2-notebook-query-convex-log-reliability (2026-06-01)
 
 - 15s log `terminal` timeout vs slow Convex HTTP — operator brief explicitly requires 15s cap (AC 1/2).

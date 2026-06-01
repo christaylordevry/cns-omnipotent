@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-01T20:00:00+10:00"
+last_updated: "2026-06-01T21:30:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -377,3 +377,4 @@ development_status:
   epic-54: in-progress
   54-1-skill-install-gate: done
   54-2-notebook-query-convex-log-reliability: done
+  54-3-session-close-fan-out-diagnostics: done

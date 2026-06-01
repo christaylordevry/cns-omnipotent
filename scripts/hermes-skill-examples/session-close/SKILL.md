@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.8
+version: 1.0.9
 author: CNS Operator
 license: MIT
 metadata:
@@ -58,9 +58,20 @@ Real close only, apply the draft:
 
 ## NotebookLM fan-out and reply
 
-Real close only: for NotebookLM, use report-provided IDs only and call `source_add` with `title: "My Knowledge Base"`, `wait: false`. Dry-run must not call `source_add`; render NotebookLM as `skipped in dry-run`.
+Real close only: read `notebooklm_targets` from `.session-close/close-report.json` only (no re-derive from vault). For each row, call `mcp__notebooklm__source_add` with `title: "My Knowledge Base"`, `source_type: "file"`, `file_path` from row `export_path`, `wait: false`. Dry-run must not call `source_add` and must not write fan-out result fields; render NotebookLM as `skipped in dry-run`.
 
-Treat NotebookLM fan-out as best-effort. Attempt every report-provided target, record or summarize per-target failures, and always continue to the auth watchdog after the loop, including when target results are partial or failed.
+Field shapes, stderr→`error_class` rules, and merge CLI: `references/fanout-diagnostics.md`.
+
+Treat NotebookLM fan-out as best-effort. After **each** `source_add` (success or failure), merge per-target diagnostics into the close report (do not fire-and-forget):
+
+```bash
+"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-merge-notebooklm-fanout.sh" \
+  --notebook-id "<uuid>" \
+  --status ok|failed \
+  --stderr "<error message plus stderr, for classifier>"
+```
+
+Pass combined tool error message and stderr into `--stderr`. Rows gain `fanout_status`, `error_class` (failures), `export_bytes`, `error_snippet`, and `http_status` per the reference. Attempt every report-provided target and always continue to the auth watchdog after the loop, including when target results are partial or failed.
 
 After the NotebookLM `source_add` loop or dry-run skip is complete, run the non-blocking nlm auth watchdog:
 
