@@ -194,7 +194,7 @@ if (route.status === 'ROUTED') {
   const best = bestWatchedMatch(question, watchedRegistry);
   const reason = best
     ? `below_threshold: best=${best.title} (${formatDisplayScore(best.score)})`
-    : 'below_threshold: best=unknown (0.00)';
+    : 'no_watched_notebooks';
   routeOutput = {
     ...route,
     reason,

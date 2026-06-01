@@ -14,7 +14,8 @@ Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/C
 ## Phase Status
 Phase 6 complete. Epics 1–37 done. Epics 38 + 43 in progress.
 - Vault IO MCP: live (10 tools, WriteGate enforced)
-- Hermes: live (Discord gateway, GPT-5.5 via Codex OAuth, watchdog cron every 3 min)
+- Hermes: live (Discord gateway, anthropic/claude-sonnet-4-5 via OpenRouter, watchdog cron every 3 min)
+- Cursor: primary model Claude Sonnet 4.6
 - NotebookLM: live (4 notebooks, fan-out via session-close)
 - CNS-Daily-Rhythm.md: live (AUTO blocks refreshed by session-close Step 6.7)
 - run-chain: dormant (adapters use Anthropic API directly — Epic 38-2 deferred)

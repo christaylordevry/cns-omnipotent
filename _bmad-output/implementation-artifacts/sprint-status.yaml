@@ -324,8 +324,8 @@ development_status:
   44-5-2-flat-active-stale-signal-states-ui: done
 
   epic-45: in-progress
-  45-1-schema-and-query-layer: review
-  45-2-trend-analyzer: done
+  45-1-schema-and-query-layer: done
+  45-2-trend-analyzer: review
   45-3-trend-analysis-service: done
   45-4-analytics-action-wire-schedule: done
   45-5-anomaly-detection: done
