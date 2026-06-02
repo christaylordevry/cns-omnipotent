@@ -1,5 +1,6 @@
 // pick-signal-notebook.mjs
-// Usage: SIGNALS_JSON='["keyword",...]' node pick-signal-notebook.mjs [registryPath]
+// Usage: DIGEST_SOURCES_JSON='{"trends":[...],"headlines":[...],"perplexityText":"..."}' node pick-signal-notebook.mjs [registryPath]
+// Legacy: SIGNALS_JSON='["keyword",...]' node pick-signal-notebook.mjs [registryPath]
 // Legacy: node pick-signal-notebook.mjs '<json-array-string>' [registryPath]
 // Outputs JSON to stdout: { route, winning_signal, winning_score, elapsed_ms }
 // Exit 2 + stderr → registry unreadable/malformed; exit 1 → other routing failure
@@ -12,6 +13,10 @@ import { fileURLToPath } from 'node:url';
 const EXIT_REGISTRY = 2;
 const EXIT_ROUTING = 1;
 const MAX_SIGNALS = 10;
+const MAX_TREND_KEYWORDS = 5;
+const MAX_HEADLINE_TITLES = 5;
+const MAX_PERPLEXITY_SIGNALS = 3;
+const PERPLEXITY_TRUNCATE_CHARS = 200;
 
 const CNS_REPO_ROOT =
   process.env.CNS_REPO_ROOT ??
@@ -29,8 +34,10 @@ function failRouting() {
 }
 
 let resolveNotebookRoute;
+let tokenizeForScoring;
 try {
   ({ resolveNotebookRoute } = await import(join(LIB_PATH, 'notebook-route.mjs')));
+  ({ tokenizeForScoring } = await import(join(LIB_PATH, 'notebook-scorer.mjs')));
 } catch {
   failRouting();
 }
@@ -65,6 +72,93 @@ export function dedupeSignals(raw) {
     }
   }
   return out;
+}
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isStopwordOnlySignal(text) {
+  return tokenizeForScoring(String(text)).length === 0;
+}
+
+/**
+ * @param {unknown} perplexityText
+ * @returns {string[]}
+ */
+export function extractPerplexitySignals(perplexityText) {
+  const trimmed = String(perplexityText ?? '').trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const segments = trimmed
+    .split(/\s*[.;]\s+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length >= 2 && !isStopwordOnlySignal(segment));
+
+  if (segments.length === 0) {
+    const fallback =
+      trimmed.length > PERPLEXITY_TRUNCATE_CHARS
+        ? trimmed.slice(0, PERPLEXITY_TRUNCATE_CHARS).trim()
+        : trimmed;
+    return fallback.length >= 2 && !isStopwordOnlySignal(fallback) ? [fallback] : [];
+  }
+
+  /** @type {string[]} */
+  const signals = [];
+  for (const segment of segments) {
+    const chunk =
+      segment.length > PERPLEXITY_TRUNCATE_CHARS
+        ? segment.slice(0, PERPLEXITY_TRUNCATE_CHARS).trim()
+        : segment;
+    if (chunk.length >= 2 && !isStopwordOnlySignal(chunk)) {
+      signals.push(chunk);
+      if (signals.length >= MAX_PERPLEXITY_SIGNALS) {
+        break;
+      }
+    }
+  }
+  return signals;
+}
+
+/**
+ * @param {{
+ *   trends?: Array<{ keyword?: string, normalizedValue?: number }>,
+ *   headlines?: Array<{ title?: string } | string>,
+ *   perplexityText?: string,
+ * }} sources
+ * @returns {string[]}
+ */
+export function buildDigestSignals(sources = {}) {
+  /** @type {string[]} */
+  const ordered = [];
+
+  const trendList = Array.isArray(sources.trends) ? [...sources.trends] : [];
+  trendList.sort((a, b) => (b?.normalizedValue ?? 0) - (a?.normalizedValue ?? 0));
+  for (const entry of trendList.slice(0, MAX_TREND_KEYWORDS)) {
+    const keyword = typeof entry?.keyword === 'string' ? entry.keyword.trim() : '';
+    if (keyword) {
+      ordered.push(keyword);
+    }
+  }
+
+  const headlineList = Array.isArray(sources.headlines) ? sources.headlines : [];
+  for (const entry of headlineList.slice(0, MAX_HEADLINE_TITLES)) {
+    const title =
+      typeof entry === 'string'
+        ? entry.trim()
+        : typeof entry?.title === 'string'
+          ? entry.title.trim()
+          : '';
+    if (title) {
+      ordered.push(title);
+    }
+  }
+
+  ordered.push(...extractPerplexitySignals(sources.perplexityText).slice(0, MAX_PERPLEXITY_SIGNALS));
+
+  return dedupeSignals(ordered);
 }
 
 /**
@@ -144,21 +238,60 @@ export function pickSignalNotebook(signals, watchedRegistry) {
   };
 }
 
+function hasEnvDigestSources() {
+  const raw = process.env.DIGEST_SOURCES_JSON;
+  return raw !== undefined && String(raw).trim() !== '';
+}
+
 function hasEnvSignals() {
   return process.env.SIGNALS_JSON !== undefined;
 }
 
+function hasEnvSignalInput() {
+  return hasEnvDigestSources() || hasEnvSignals();
+}
+
+/**
+ * @param {unknown} parsed
+ * @returns {string[]}
+ */
+function signalsFromParsedInput(parsed) {
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    ('trends' in parsed || 'headlines' in parsed || 'perplexityText' in parsed)
+  ) {
+    return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
+  }
+  return dedupeSignals(parsed);
+}
+
 function parseSignalsInput() {
-  const raw = hasEnvSignals() ? process.env.SIGNALS_JSON : (process.argv[2] ?? '[]');
+  if (hasEnvDigestSources()) {
+    try {
+      return signalsFromParsedInput(JSON.parse(process.env.DIGEST_SOURCES_JSON ?? '{}'));
+    } catch {
+      return [];
+    }
+  }
+  if (hasEnvSignals()) {
+    try {
+      return dedupeSignals(JSON.parse(process.env.SIGNALS_JSON ?? '[]'));
+    } catch {
+      return [];
+    }
+  }
+  const raw = process.argv[2] ?? '[]';
   try {
-    return dedupeSignals(JSON.parse(raw));
+    return signalsFromParsedInput(JSON.parse(raw));
   } catch {
     return [];
   }
 }
 
 function parseRegistryPath() {
-  const fromArgv = hasEnvSignals() ? process.argv[2] : process.argv[3];
+  const fromArgv = hasEnvSignalInput() ? process.argv[2] : process.argv[3];
   return (
     fromArgv ??
     (process.env.CNS_NOTEBOOK_REGISTRY_PATH ||

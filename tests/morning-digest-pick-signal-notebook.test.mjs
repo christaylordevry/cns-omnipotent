@@ -8,7 +8,13 @@ import { promisify } from 'node:util';
 import { afterEach, describe, it } from 'node:test';
 
 import {
+  rankAllMatches,
+  tokenizeForScoring,
+} from '../scripts/session-close/lib/notebook-scorer.mjs';
+import {
+  buildDigestSignals,
   dedupeSignals,
+  extractPerplexitySignals,
   pickSignalNotebook,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs';
 
@@ -34,6 +40,13 @@ const tieRegistry = [
   { id: 'nb-a', title: 'Alpha Topic Notebook', watch: true, domain: 'alpha', last_updated: null },
 ];
 
+const multiSourceFixture = {
+  trends: [{ keyword: 'weekly tech roundup', normalizedValue: 0.9 }],
+  headlines: [{ title: 'Enterprise AI agents reshape AI Factory Blueprint automation' }],
+  perplexityText:
+    'AI agent orchestration platforms saw major releases for AI Factory Blueprint operators this week.',
+};
+
 describe('pick-signal-notebook.mjs helpers', () => {
   it('dedupes case-insensitively and keeps first occurrence', () => {
     assert.deepEqual(dedupeSignals(['AI Agents', 'ai agents', 'Beta']), ['AI Agents', 'Beta']);
@@ -42,6 +55,76 @@ describe('pick-signal-notebook.mjs helpers', () => {
   it('truncates to 10 signals', () => {
     const many = Array.from({ length: 12 }, (_, i) => `signal-${i}`);
     assert.equal(dedupeSignals(many).length, 10);
+  });
+});
+
+describe('buildDigestSignals', () => {
+  it('orders trends by normalizedValue desc then headlines then perplexity', () => {
+    const signals = buildDigestSignals({
+      trends: [
+        { keyword: 'low', normalizedValue: 0.1 },
+        { keyword: 'high', normalizedValue: 0.9 },
+      ],
+      headlines: [{ title: 'Headline A' }],
+      perplexityText: 'Vault architecture roadmap for CNS operators.',
+    });
+    assert.deepEqual(signals.slice(0, 3), [
+      'high',
+      'low',
+      'Headline A',
+    ]);
+    assert.ok(signals.some((s) => s.includes('Vault architecture')));
+  });
+
+  it('dedupes case-insensitively keeping trend before headline', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'AI Agents', normalizedValue: 1 }],
+      headlines: [{ title: 'Breaking: AI agents in enterprise' }],
+    });
+    assert.equal(signals.filter((s) => s.toLowerCase() === 'ai agents').length, 1);
+    assert.equal(signals[0], 'AI Agents');
+  });
+
+  it('caps combined output at 10 signals', () => {
+    const signals = buildDigestSignals({
+      trends: Array.from({ length: 8 }, (_, i) => ({
+        keyword: `trend-${i}`,
+        normalizedValue: 1 - i * 0.01,
+      })),
+      headlines: Array.from({ length: 8 }, (_, i) => ({ title: `headline-${i}` })),
+      perplexityText: 'One. Two. Three. Four. Five.',
+    });
+    assert.equal(signals.length, 10);
+  });
+
+  it('skips failed or empty sources without throwing', () => {
+    assert.deepEqual(buildDigestSignals({}), []);
+    assert.deepEqual(
+      buildDigestSignals({ trends: [{ keyword: '' }], headlines: null, perplexityText: '   ' }),
+      [],
+    );
+  });
+});
+
+describe('extractPerplexitySignals', () => {
+  it('returns empty for blank or whitespace-only text', () => {
+    assert.deepEqual(extractPerplexitySignals(''), []);
+    assert.deepEqual(extractPerplexitySignals('   \n\t  '), []);
+  });
+
+  it('splits on sentence boundaries up to three segments', () => {
+    const signals = extractPerplexitySignals(
+      'AI agent orchestration update. Vault architecture changes. Stopword only the.',
+    );
+    assert.ok(signals.length >= 2);
+    assert.ok(signals[0].includes('orchestration'));
+    assert.ok(signals.some((s) => s.includes('Vault architecture')));
+  });
+
+  it('filters stopword-only segments', () => {
+    const signals = extractPerplexitySignals('the and for. Real CNS vault architecture news.');
+    assert.ok(signals.every((s) => tokenizeForScoring(s).length > 0));
+    assert.ok(signals.some((s) => s.includes('vault architecture')));
   });
 });
 
@@ -110,6 +193,51 @@ describe('pick-signal-notebook routing', () => {
     assert.notEqual(result.route.reason, 'soft_match');
     assert.ok(result.winning_score >= 0.75);
   });
+
+  it('multi-source fixture ROUTED with winning_score >= 0.20', () => {
+    const signals = buildDigestSignals(multiSourceFixture);
+    const result = pickSignalNotebook(signals, watchRegistry);
+    assert.equal(result.route.status, 'ROUTED');
+    assert.equal(result.route.id, 'ai-watch-1');
+    assert.ok(result.winning_score >= 0.2);
+    assert.ok(result.winning_score < 0.75);
+  });
+
+  it('headline signal routes when trend-only does not in same fixture', () => {
+    const trendOnly = pickSignalNotebook(
+      buildDigestSignals({ trends: multiSourceFixture.trends }),
+      watchRegistry,
+    );
+    assert.equal(trendOnly.route.status, 'NO_ROUTE');
+
+    const headlineOnly = pickSignalNotebook(
+      buildDigestSignals({ headlines: multiSourceFixture.headlines }),
+      watchRegistry,
+    );
+    assert.equal(headlineOnly.route.status, 'ROUTED');
+    assert.equal(headlineOnly.route.id, 'ai-watch-1');
+    assert.ok(headlineOnly.winning_score >= 0.2);
+  });
+
+  it('perplexity-only signal can route to cns-watch-1', () => {
+    const signals = buildDigestSignals({
+      perplexityText: 'Major updates to CNS vault architecture for operators.',
+    });
+    const result = pickSignalNotebook(signals, watchRegistry);
+    assert.equal(result.route.status, 'ROUTED');
+    assert.equal(result.route.id, 'cns-watch-1');
+    assert.ok(result.winning_score >= 0.2);
+  });
+
+  it('exact duplicate trend keyword in headline is deduped before scoring', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'AI Factory Blueprint', normalizedValue: 1 }],
+      headlines: [{ title: 'ai factory blueprint' }],
+    });
+    assert.equal(signals.length, 1);
+    const matches = rankAllMatches(signals[0], watchRegistry);
+    assert.ok(matches.some((m) => m.id === 'ai-watch-1' && m.score >= 0.2));
+  });
 });
 
 describe('pick-signal-notebook.mjs CLI', () => {
@@ -129,15 +257,19 @@ describe('pick-signal-notebook.mjs CLI', () => {
     return registryPath;
   }
 
-  async function runPick({ signals, registryPath, env = {} }) {
-    return execFileAsync('node', [pickScript, registryPath], {
-      env: {
-        ...process.env,
-        CNS_REPO_ROOT: repoRoot,
-        SIGNALS_JSON: JSON.stringify(signals),
-        ...env,
-      },
-    });
+  async function runPick({ signals, registryPath, env = {}, digestSources }) {
+    const baseEnv = {
+      ...process.env,
+      CNS_REPO_ROOT: repoRoot,
+      ...env,
+    };
+    if (digestSources !== undefined) {
+      baseEnv.DIGEST_SOURCES_JSON = JSON.stringify(digestSources);
+      delete baseEnv.SIGNALS_JSON;
+    } else {
+      baseEnv.SIGNALS_JSON = JSON.stringify(signals);
+    }
+    return execFileAsync('node', [pickScript, registryPath], { env: baseEnv });
   }
 
   it('emits JSON on stdout with soft_match for partial trend signal', async () => {
@@ -211,5 +343,48 @@ describe('pick-signal-notebook.mjs CLI', () => {
         return true;
       },
     );
+  });
+
+  it('emits ROUTED pick via DIGEST_SOURCES_JSON env', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runPick({
+      signals: [],
+      digestSources: multiSourceFixture,
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+    assert.ok(payload.winning_score >= 0.2);
+  });
+
+  it('prefers DIGEST_SOURCES_JSON over SIGNALS_JSON when both set', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runPick({
+      signals: ['unrelated xyz topic'],
+      digestSources: multiSourceFixture,
+      registryPath,
+      env: { SIGNALS_JSON: JSON.stringify(['unrelated xyz topic']) },
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+  });
+
+  it('falls back to SIGNALS_JSON when DIGEST_SOURCES_JSON is empty', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runPick({
+      signals: ['ai agent orchestration'],
+      registryPath,
+      env: {
+        DIGEST_SOURCES_JSON: '',
+        SIGNALS_JSON: JSON.stringify(['ai agent orchestration']),
+      },
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+    assert.ok(payload.winning_score >= 0.2);
+    assert.ok(payload.winning_score < 0.75);
   });
 });

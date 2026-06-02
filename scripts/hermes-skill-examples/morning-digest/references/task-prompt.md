@@ -92,15 +92,23 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 
 Run **after** Source 3 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
-### Build `signals` (for scoring)
+### Build `digest_sources` (for scoring)
 
-From parsed Source 1 and Source 2 only (skip a source that failed with `source unavailable`):
+After Sources 1–3 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
-- Up to **5** trend **keywords** from Source 1 (same sort/top-5 as Trending Now bullets).
-- Up to **5** headline **titles** from Source 2.
-- Dedupe case-insensitively (keep first; trends before headlines).
+```json
+{
+  "trends": [{ "keyword": "<string>", "normalizedValue": <number> }],
+  "headlines": [{ "title": "<string>" }],
+  "perplexityText": "<Deep Signal body text only — not the Perplexity query string>"
+}
+```
 
-Serialize as JSON array string for `SIGNALS_JSON`.
+- **trends:** up to **5** keywords from Source 1 (`events[]`), sorted by `normalizedValue` descending (same sort/top-5 as Trending Now).
+- **headlines:** up to **5** headline **titles** from Source 2.
+- **perplexityText:** the **2–3 sentence Deep Signal** answer from Source 3 when Perplexity succeeded; omit or `""` when Deep Signal is unavailable.
+
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building any Source 4 terminal command, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -108,17 +116,17 @@ Before building any Source 4 terminal command, shell-quote every dynamic environ
 shellQuote(value) = "'" + String(value).replaceAll("'", "'\\''") + "'"
 ```
 
-Use `shellQuote(...)` for `SIGNALS_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT` (Source 4), and for `LOG_SCRIPT`, `NOTEBOOK_ANSWER`, `NOTEBOOK_TITLE`, and `NOTEBOOK_DOMAIN` (post-post log). Do not pass raw headline text, matched signals, or NotebookLM queries unquoted.
+Use `shellQuote(...)` for `DIGEST_SOURCES_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT` (Source 4), and for `LOG_SCRIPT`, `NOTEBOOK_ANSWER`, `NOTEBOOK_TITLE`, and `NOTEBOOK_DOMAIN` (post-post log). Do not pass raw headline text, matched signals, or NotebookLM queries unquoted.
 
 ### Pick notebook
 
 Call `terminal` once:
 
 ```text
-terminal(command="SIGNALS_JSON=<shellQuote(signals_json)> node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs", workdir=resolved_repo_root, timeout=30)
+terminal(command="DIGEST_SOURCES_JSON=<shellQuote(JSON.stringify(digest_sources))> node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs", workdir=resolved_repo_root, timeout=30)
 ```
 
-The script also supports `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs <registryPath>` when `SIGNALS_JSON` is set, and legacy `node ... '<json-array>' <registryPath>` when it is not.
+The script also supports legacy `SIGNALS_JSON=<shellQuote(signals_json)>` (JSON array of strings) for manual runs, `node .../pick-signal-notebook.mjs <registryPath>` when `DIGEST_SOURCES_JSON` or `SIGNALS_JSON` is set, and legacy `node ... '<json-array>' <registryPath>` when neither env is set.
 
 Parse stdout JSON: `{ route, winning_signal, winning_score, elapsed_ms }`.
 

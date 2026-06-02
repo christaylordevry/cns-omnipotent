@@ -130,6 +130,10 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("pick-signal-notebook.mjs"));
     assert.ok(body.includes("query-notebook.mjs"));
     assert.ok(body.includes("Source 4"));
+    assert.ok(body.includes("DIGEST_SOURCES_JSON"));
+    assert.ok(body.includes("buildDigestSignals"));
+    assert.ok(body.includes("perplexityText"));
+    assert.ok(body.includes("digest_sources"));
     assert.ok(body.includes("shellQuote(value)"));
     assert.ok(body.includes("QUERY_SCRIPT=<shellQuote(query_script)>"));
     assert.ok(!body.includes("SIGNALS_JSON='<json-array>'"));
@@ -267,6 +271,21 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(existsSync(queryNotebookScriptPath));
     const taskBody = readFileSync(taskPromptPath, "utf8");
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
+  });
+
+  it("task-prompt Source 4 uses DIGEST_SOURCES_JSON builder for three sources (Story 56-4)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source4 = taskBody.slice(taskBody.indexOf("## Source 4"));
+    assert.ok(source4.includes("DIGEST_SOURCES_JSON=<shellQuote"));
+    assert.ok(source4.includes("buildDigestSignals"));
+    assert.ok(source4.includes("perplexityText"));
+    assert.ok(source4.includes('"trends"'));
+    assert.ok(source4.includes('"headlines"'));
+    assert.ok(
+      source4.includes("Do **not** hand-build a `SIGNALS_JSON` array"),
+    );
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("DIGEST_SOURCES_JSON"));
   });
 
   it("task-prompt documents post-post Convex log for successful Vault context (Story 52-2, 54-2)", () => {

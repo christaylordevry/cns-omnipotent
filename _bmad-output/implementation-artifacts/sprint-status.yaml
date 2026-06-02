@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-02T23:30:00+10:00"
+last_updated: "2026-06-02T24:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -391,3 +391,4 @@ development_status:
   56-1-notebooklm-routing-threshold-tuning: done
   56-2-vault-lint-remediation: done
   56-3-session-close-fan-out-error-class-dashboard-widget: done
+  56-4-morning-digest-signal-scoring-improvements: done
