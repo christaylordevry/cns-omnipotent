@@ -7,9 +7,13 @@ import { describe, it } from "node:test";
 import { getDomainKeywordTokens } from "../scripts/session-close/lib/infer-notebook-domain.mjs";
 import {
   f1,
+  rankAllMatches,
   scoreNotebooks,
+  SCORE_THRESHOLD,
+  SOFT_ROUTE_FLOOR,
   tokenizeForScoring,
 } from "../scripts/session-close/lib/notebook-scorer.mjs";
+import { resolveNotebookRoute } from "../scripts/session-close/lib/notebook-route.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -58,6 +62,49 @@ describe("getDomainKeywordTokens", () => {
 
   it("returns no extra lexicon for general", () => {
     assert.deepEqual(getDomainKeywordTokens("general"), []);
+  });
+});
+
+describe("routing constants", () => {
+  it("exports hard threshold 0.75 and soft floor 0.20", () => {
+    assert.equal(SCORE_THRESHOLD, 0.75);
+    assert.equal(SOFT_ROUTE_FLOOR, 0.2);
+  });
+});
+
+describe("rankAllMatches", () => {
+  const aiNotebook = {
+    id: "nb-ai-1",
+    title: "AI Factory Blueprint",
+    watch: true,
+    domain: "ai-factory",
+    last_updated: null,
+  };
+
+  it("returns all entries ranked by score without threshold filter", () => {
+    const ranked = rankAllMatches("ai agent orchestration", [aiNotebook]);
+    assert.equal(ranked.length, 1);
+    assert.equal(ranked[0].id, "nb-ai-1");
+    assert.ok(ranked[0].score >= SOFT_ROUTE_FLOOR);
+    assert.ok(ranked[0].score < SCORE_THRESHOLD);
+  });
+
+  it("returns empty array for empty topic", () => {
+    assert.deepEqual(rankAllMatches("", [aiNotebook]), []);
+  });
+
+  it("soft-route boundary: score at floor routes, just below stays NO_ROUTE", () => {
+    const atFloor = resolveNotebookRoute("ai alpha beta gamma delta epsilon zeta", [aiNotebook]);
+    assert.equal(atFloor.status, "ROUTED");
+    assert.equal(atFloor.reason, "soft_match");
+    assert.ok(atFloor.score >= SOFT_ROUTE_FLOOR);
+
+    const belowFloor = resolveNotebookRoute(
+      "ai alpha beta gamma delta epsilon zeta eta",
+      [aiNotebook],
+    );
+    assert.equal(belowFloor.status, "NO_ROUTE");
+    assert.ok((belowFloor.best?.score ?? 1) < SOFT_ROUTE_FLOOR);
   });
 });
 

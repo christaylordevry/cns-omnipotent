@@ -26,20 +26,14 @@ function failRouting() {
   process.exit(EXIT_ROUTING);
 }
 
-let scoreNotebooks;
-let disambiguateRoute;
+let resolveNotebookRoute;
+let belowThresholdReason;
 let tokenizeForScoring;
-let f1;
-let normalizeDomainSlug;
-let getDomainKeywordTokens;
 try {
-  ({ scoreNotebooks, tokenizeForScoring, f1 } = await import(
-    join(LIB_PATH, 'notebook-scorer.mjs')
+  ({ resolveNotebookRoute, belowThresholdReason } = await import(
+    join(LIB_PATH, 'notebook-route.mjs')
   ));
-  ({ disambiguateRoute } = await import(join(LIB_PATH, 'notebook-disambiguate.mjs')));
-  ({ normalizeDomainSlug, getDomainKeywordTokens } = await import(
-    join(LIB_PATH, 'infer-notebook-domain.mjs')
-  ));
+  ({ tokenizeForScoring } = await import(join(LIB_PATH, 'notebook-scorer.mjs')));
 } catch {
   failRouting();
 }
@@ -63,96 +57,6 @@ if (!Array.isArray(raw)) {
 }
 
 const watchedRegistry = raw.filter((e) => e && e.watch === true);
-
-/**
- * @param {number} value
- * @returns {string}
- */
-function formatDisplayScore(value) {
-  return (Math.round(value * 100) / 100).toFixed(2);
-}
-
-/**
- * @param {number} value
- * @returns {number}
- */
-function roundScore(value) {
-  return Math.round(value * 10_000) / 10_000;
-}
-
-/**
- * @param {object} entry
- * @returns {string[]}
- */
-function domainTokensForEntry(entry) {
-  const slug = normalizeDomainSlug(entry.domain || 'general');
-  const slugTokens = tokenizeForScoring(slug);
-  const lexicon = getDomainKeywordTokens(slug);
-  return [...new Set([...slugTokens, ...lexicon])];
-}
-
-/**
- * @param {unknown} row
- * @returns {object | null}
- */
-function validRegistryRow(row) {
-  if (!row || typeof row !== 'object') {
-    return null;
-  }
-  const id = typeof row.id === 'string' ? row.id.trim() : '';
-  const title = typeof row.title === 'string' ? row.title.trim() : '';
-  if (!id || !title) {
-    return null;
-  }
-  return {
-    id,
-    title,
-    watch: Boolean(row.watch),
-    domain: typeof row.domain === 'string' ? row.domain : '',
-  };
-}
-
-/**
- * @param {string} topic
- * @param {object[]} registry
- * @returns {{ title: string, score: number } | null}
- */
-function bestWatchedMatch(topic, registry) {
-  const queryTokens = tokenizeForScoring(topic);
-  if (queryTokens.length === 0) {
-    return null;
-  }
-
-  const rows = registry.map((row) => validRegistryRow(row)).filter((row) => row !== null);
-  if (rows.length === 0) {
-    return null;
-  }
-
-  /** @type {{ id: string, title: string, score: number }[]} */
-  const ranked = [];
-  for (const entry of rows) {
-    const titleTokens = tokenizeForScoring(entry.title);
-    const domainTokens = domainTokensForEntry(entry);
-    const titleScore = roundScore(f1(queryTokens, titleTokens));
-    const domainScore = roundScore(f1(queryTokens, domainTokens));
-    const score = roundScore(Math.max(titleScore, domainScore));
-    ranked.push({ id: entry.id, title: entry.title, score });
-  }
-
-  ranked.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    const titleCmp = a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
-    if (titleCmp !== 0) {
-      return titleCmp;
-    }
-    return a.id.localeCompare(b.id);
-  });
-
-  const top = ranked[0];
-  return top ? { title: top.title, score: top.score } : null;
-}
 
 /**
  * @param {string} reason
@@ -180,24 +84,25 @@ if (!question || tokenizeForScoring(question).length === 0) {
   process.exit(0);
 }
 
-const scoreResult = scoreNotebooks(question, watchedRegistry);
-const route = disambiguateRoute(scoreResult, watchedRegistry);
+const resolved = resolveNotebookRoute(question, watchedRegistry);
 
-let routeOutput = route;
-if (route.status === 'ROUTED') {
-  const entry = watchedRegistry.find((e) => e && e.id === route.id);
+/** @type {object} */
+let routeOutput;
+if (resolved.status === 'ROUTED') {
+  const entry = watchedRegistry.find((e) => e && e.id === resolved.id);
   routeOutput = {
-    ...route,
+    status: 'ROUTED',
+    id: resolved.id,
+    title: resolved.title,
+    reason: resolved.reason,
     domain: typeof entry?.domain === 'string' ? entry.domain : '',
   };
-} else if (route.status === 'NO_ROUTE') {
-  const best = bestWatchedMatch(question, watchedRegistry);
-  const reason = best
-    ? `below_threshold: best=${best.title} (${formatDisplayScore(best.score)})`
-    : 'no_watched_notebooks';
+} else {
   routeOutput = {
-    ...route,
-    reason,
+    status: 'NO_ROUTE',
+    id: null,
+    title: null,
+    reason: belowThresholdReason(resolved.best),
   };
 }
 

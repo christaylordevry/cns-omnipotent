@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 56-1-notebooklm-routing-threshold-tuning (2026-06-02)
+
+- `read-sources.mjs` `smartRoute` still uses hard-only `scoreNotebooks` + `disambiguateRoute` — morning digest and `/notebook-query` now soft-route; session-close fan-out parity is a follow-up outside 56-1 file list.
+- Soft-route path double-scores via `scoreNotebooks` then `rankAllMatches` — acceptable for now; cache ranked result if hot path matters.
+- `belowThresholdReason(null)` maps to `no_watched_notebooks` — misleading label but unreachable given resolver/pick-signal pre-checks.
+
 ## Deferred from: code review of 55-3-morning-digest-cron-automation (2026-06-02)
 
 - SKILL.md still documents 08:00 machine-local default — out of 55-3 scope; track as doc follow-up.

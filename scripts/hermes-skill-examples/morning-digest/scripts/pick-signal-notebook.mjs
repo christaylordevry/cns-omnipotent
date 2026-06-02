@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 const EXIT_REGISTRY = 2;
 const EXIT_ROUTING = 1;
 const MAX_SIGNALS = 10;
-const SCORE_THRESHOLD = 0.75;
 
 const CNS_REPO_ROOT =
   process.env.CNS_REPO_ROOT ??
@@ -29,11 +28,9 @@ function failRouting() {
   process.exit(EXIT_ROUTING);
 }
 
-let scoreNotebooks;
-let disambiguateRoute;
+let resolveNotebookRoute;
 try {
-  ({ scoreNotebooks } = await import(join(LIB_PATH, 'notebook-scorer.mjs')));
-  ({ disambiguateRoute } = await import(join(LIB_PATH, 'notebook-disambiguate.mjs')));
+  ({ resolveNotebookRoute } = await import(join(LIB_PATH, 'notebook-route.mjs')));
 } catch {
   failRouting();
 }
@@ -105,19 +102,23 @@ function candidateBeatsIncumbent(candidate, incumbent) {
  * @param {unknown[]} watchedRegistry
  */
 export function pickSignalNotebook(signals, watchedRegistry) {
+  const watchedOnly = (Array.isArray(watchedRegistry) ? watchedRegistry : []).filter(
+    (e) => e && e.watch === true,
+  );
   let best = null;
 
   for (let i = 0; i < signals.length; i++) {
     const signal = signals[i];
-    const scoreResult = scoreNotebooks(signal, watchedRegistry);
-    if (scoreResult.status !== 'OK' || scoreResult.matches.length === 0) {
+    const route = resolveNotebookRoute(signal, watchedOnly);
+    if (route.status !== 'ROUTED') {
       continue;
     }
-    const top = scoreResult.matches[0];
-    if (top.score < SCORE_THRESHOLD) {
-      continue;
-    }
-    const candidate = { signal, signalIndex: i, scoreResult, top };
+    const candidate = {
+      signal,
+      signalIndex: i,
+      route,
+      top: { id: route.id, title: route.title, score: route.score },
+    };
     if (!best || candidateBeatsIncumbent(candidate, best)) {
       best = candidate;
     }
@@ -131,9 +132,13 @@ export function pickSignalNotebook(signals, watchedRegistry) {
     };
   }
 
-  const route = disambiguateRoute(best.scoreResult, watchedRegistry);
   return {
-    route,
+    route: {
+      status: 'ROUTED',
+      id: best.route.id,
+      title: best.route.title,
+      reason: best.route.reason,
+    },
     winning_signal: best.signal,
     winning_score: best.top.score,
   };

@@ -1,7 +1,7 @@
 /**
  * @typedef {import('./notebook-scorer.mjs').NotebookScoreResult} NotebookScoreResult
  * @typedef {import('./sync-notebook-registry.mjs').NotebookRegistryEntry} NotebookRegistryEntry
- * @typedef {{ status: 'ROUTED', id: string, title: string, reason: 'single-match' | 'watch-preferred' | 'top-ranked' }
+ * @typedef {{ status: 'ROUTED', id: string, title: string, reason: 'single-match' | 'watch-preferred' | 'top-ranked' | 'soft_match' }
  *         | { status: 'NO_ROUTE', id: null, title: null, reason: 'no-route' }} DisambiguationResult
  */
 

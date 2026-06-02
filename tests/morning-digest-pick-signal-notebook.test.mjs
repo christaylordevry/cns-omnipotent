@@ -92,6 +92,24 @@ describe('pick-signal-notebook routing', () => {
     const result = pickSignalNotebook(['linkedin strategy posts'], mixedRegistry);
     assert.equal(result.route.status, 'NO_ROUTE');
   });
+
+  it('soft-routes trend signal with partial overlap (score >= 0.20, < 0.75)', () => {
+    const result = pickSignalNotebook(['ai agent orchestration'], watchRegistry);
+    assert.equal(result.route.status, 'ROUTED');
+    assert.equal(result.route.id, 'ai-watch-1');
+    assert.equal(result.route.reason, 'soft_match');
+    assert.equal(result.winning_signal, 'ai agent orchestration');
+    assert.ok(result.winning_score >= 0.2);
+    assert.ok(result.winning_score < 0.75);
+  });
+
+  it('hard-route signal keeps disambiguator reason (not soft_match)', () => {
+    const result = pickSignalNotebook(['CNS vault architecture'], watchRegistry);
+    assert.equal(result.route.status, 'ROUTED');
+    assert.equal(result.route.id, 'cns-watch-1');
+    assert.notEqual(result.route.reason, 'soft_match');
+    assert.ok(result.winning_score >= 0.75);
+  });
 });
 
 describe('pick-signal-notebook.mjs CLI', () => {
@@ -121,6 +139,19 @@ describe('pick-signal-notebook.mjs CLI', () => {
       },
     });
   }
+
+  it('emits JSON on stdout with soft_match for partial trend signal', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runPick({
+      signals: ['ai agent orchestration'],
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+    assert.equal(payload.route.reason, 'soft_match');
+    assert.equal(payload.winning_signal, 'ai agent orchestration');
+  });
 
   it('emits JSON on stdout with exit 0 for ROUTED pick', async () => {
     const registryPath = await writeRegistry(watchRegistry);

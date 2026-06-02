@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, describe, it } from 'node:test';
 
-import { scoreNotebooks } from '../scripts/session-close/lib/notebook-scorer.mjs';
 import { disambiguateRoute } from '../scripts/session-close/lib/notebook-disambiguate.mjs';
+import { resolveNotebookRoute } from '../scripts/session-close/lib/notebook-route.mjs';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,9 +42,21 @@ const mixedRegistry = [
 // ---------------------------------------------------------------------------
 
 function resolveForQuestion(question, registry) {
-  const watched = registry.filter((e) => e && e.watch === true);
-  const scoreResult = scoreNotebooks(question, watched);
-  return disambiguateRoute(scoreResult, watched);
+  const resolved = resolveNotebookRoute(question, registry);
+  if (resolved.status === 'ROUTED') {
+    return {
+      status: 'ROUTED',
+      id: resolved.id,
+      title: resolved.title,
+      reason: resolved.reason,
+    };
+  }
+  return {
+    status: 'NO_ROUTE',
+    id: null,
+    title: null,
+    reason: resolved.reason,
+  };
 }
 
 async function runResolver({ question, registryPath, env = {} }) {
@@ -84,6 +96,22 @@ describe('notebook-query routing pipeline', () => {
   it('TC-3: no keyword overlap returns NO_ROUTE', () => {
     const route = resolveForQuestion('linkedin strategy posts', watchRegistry);
     assert.equal(route.status, 'NO_ROUTE');
+  });
+
+  it('soft-route: partial overlap routes with soft_match via resolveNotebookRoute', () => {
+    const route = resolveNotebookRoute('ai agent orchestration', watchRegistry);
+    assert.equal(route.status, 'ROUTED');
+    assert.equal(route.id, 'ai-watch-1');
+    assert.equal(route.reason, 'soft_match');
+    assert.ok(route.score >= 0.2);
+    assert.ok(route.score < 0.75);
+  });
+
+  it('hard-route unchanged: strong match reason is not soft_match', () => {
+    const route = resolveNotebookRoute('CNS vault architecture', watchRegistry);
+    assert.equal(route.status, 'ROUTED');
+    assert.equal(route.id, 'cns-watch-1');
+    assert.notEqual(route.reason, 'soft_match');
   });
 
   it('TC-4: unwatch-flagged entry is excluded from mixedRegistry', () => {
@@ -258,6 +286,19 @@ describe('resolve-notebook.mjs CLI', () => {
     const payload = JSON.parse(stdout.trim());
     assert.equal(payload.route.status, 'NO_ROUTE');
     assert.equal(payload.route.reason, 'empty_question');
+  });
+
+  it('ROUTED CLI: soft-route partial overlap → soft_match', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runResolver({
+      question: 'ai agent orchestration',
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, 'ai-watch-1');
+    assert.equal(payload.route.reason, 'soft_match');
+    assert.equal(payload.route.domain, 'ai-factory');
   });
 
   it('NO_ROUTE CLI: below-threshold overlap → below_threshold reason', async () => {
