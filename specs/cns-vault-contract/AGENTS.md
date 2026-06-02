@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.23 | Last updated: 2026-06-01
+> Version: 2.1.25 | Last updated: 2026-06-02
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -260,22 +260,21 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Project Status
 
-- epic-45: in-progress (45-1-schema-and-query-layer review, 45-7-reliability-soak-query-polish review, 45-7-soak review)
-- epic-48: in-progress
-- epic-49: in-progress
-- epic-53: in-progress
+- epic-54: in-progress
+- epic-55: in-progress
+- epic-56: in-progress
 
 ### Current Priorities
 
-1. Review and close Story 53.3 (NO_ROUTE reason field)
-2. Reconcile sprint state: close or extend Epic 38 now that all listed stories are done
-3. Plan next sprint increment: prioritize Epic 45 reviews or new stories
+1. Review Epics 54, 55, 56: all listed stories done — reconcile sprint state and close or extend epics
+2. Verify Story 56.5 (notebookQueries dedupe), 56.4 (signal scoring improvements), and 56.3 (error_class widget) are committed and stable
+3. Plan next increment: prioritize new stories or reviews from Epic backlog
 
 ### Recent Session Context
 
-- Story 53.3: Add reason field to NO_ROUTE responses in notebook-query scorer — done
-- Story 53.1: nlm auth watchdog — done
-- Story 52.2: Morning Digest NotebookLM Convex Log — done
+- Story 56.5: notebookQueries Convex table dedupe — done
+- Story 56.4: Morning digest signal scoring improvements — done
+- Story 56.3: Session-close fan-out error_class dashboard widget — done
 
 ## 9. Agent Behavior Guidelines
 
@@ -358,6 +357,8 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-02 | 2.1.25 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-06-02 | 2.1.24 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-01 | 2.1.23 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-01 | 2.1.22 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-05-31 | 2.1.21 | Story 51-1: `/notebook-query` Discord command skill added (Epic 51 read surface — routes freeform questions to watched NotebookLM notebooks via 50-3 scorer + 50-4 disambiguator; 30s budget). |
