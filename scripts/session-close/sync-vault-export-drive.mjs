@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { sanitizeFanoutErrorText } from "./lib/classify-source-add-error.mjs";
 import { readNotebooklmDriveDocId } from "./lib/load-session-close-env.mjs";
 import { matchDriveSourceByDocId } from "./lib/match-drive-source.mjs";
 import { resolveNlmCommand } from "./lib/nlm-auth-watchdog.mjs";
@@ -132,6 +131,26 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
 
 /**
  * @param {string} reportPath
+ * @param {string} driveDocId
+ * @param {unknown[]} targets
+ * @param {string} message
+ */
+async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message) {
+  const updates = targets
+    .filter((row) => isObject(row) && typeof row.notebook_id === "string")
+    .map((row) => ({
+      notebook_id: /** @type {string} */ (row.notebook_id),
+      status: /** @type {'failed'} */ ("failed"),
+      stderr: message,
+      error_class: "drive_write_error",
+      drive_doc_id: driveDocId,
+    }));
+  await mergeFanoutUpdatesAtPath(reportPath, updates);
+  return { ok: false, reason: "drive-write-failed", merged: updates.length };
+}
+
+/**
+ * @param {string} reportPath
  * @param {{
  *   driveDocId?: string;
  *   runNlm?: (cmd: string, args: string[]) => Promise<{ stdout: string }>;
@@ -175,29 +194,13 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     legacy_fanout_deprecation: false,
   });
 
-  if (driveWrite?.status === "failed") {
+  if (driveWrite?.status !== "ok") {
     const message =
-      typeof driveWrite.message === "string"
+      driveWrite?.status === "failed" && typeof driveWrite.message === "string"
         ? driveWrite.message
-        : "drive doc overwrite failed";
-    const updates = targets
-      .filter((row) => isObject(row) && typeof row.notebook_id === "string")
-      .map((row) => ({
-        notebook_id: /** @type {string} */ (row.notebook_id),
-        status: /** @type {'failed'} */ ("failed"),
-        stderr: message,
-        error_class: "drive_write_error",
-      }));
-    await mergeFanoutUpdatesAtPath(reportPath, updates);
-    const patched = JSON.parse(await readFile(reportPath, "utf8"));
-    const patchedTargets = Array.isArray(patched.notebooklm_targets) ? patched.notebooklm_targets : [];
-    for (const row of patchedTargets) {
-      if (isObject(row)) {
-        row.drive_doc_id = driveDocId;
-      }
-    }
-    await writeFile(reportPath, `${JSON.stringify(patched, null, 2)}\n`, "utf8");
-    return { ok: false, reason: "drive-write-failed", merged: updates.length };
+        : "drive doc overwrite not completed (steps.drive_write missing or not ok)";
+    process.stderr.write(`session-close: sync-vault-export-drive skipped (${message})\n`);
+    return mergeDriveWriteFailure(reportPath, driveDocId, targets, message);
   }
 
   /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate[]} */
@@ -208,39 +211,19 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     }
     const notebookId = target.notebook_id;
     const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm);
-    target.drive_doc_id = driveDocId;
-    if (result.driveSourceId) {
-      target.drive_source_id = result.driveSourceId;
-    }
     updates.push({
       notebook_id: notebookId,
       status: result.status,
       stderr: result.stderr,
+      drive_doc_id: driveDocId,
+      ...(result.driveSourceId ? { drive_source_id: result.driveSourceId } : {}),
       ...(result.status === "failed" && result.stderr.includes("NOTEBOOKLM_DRIVE_DOC_ID")
-        ? {}
+        ? { error_class: "unknown" }
         : {}),
     });
   }
 
   await mergeFanoutUpdatesAtPath(reportPath, updates);
-
-  const reportAfter = JSON.parse(await readFile(reportPath, "utf8"));
-  const rows = Array.isArray(reportAfter.notebooklm_targets) ? reportAfter.notebooklm_targets : [];
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const update = updates.find((u) => isObject(row) && row.notebook_id === u.notebook_id);
-    if (!isObject(row) || !update || update.status !== "failed") {
-      continue;
-    }
-    if (update.stderr.includes("NOTEBOOKLM_DRIVE_DOC_ID")) {
-      row.error_class = "unknown";
-      const snippet = sanitizeFanoutErrorText(update.stderr);
-      if (snippet) {
-        row.error_snippet = snippet;
-      }
-    }
-  }
-  await writeFile(reportPath, `${JSON.stringify(reportAfter, null, 2)}\n`, "utf8");
 
   return { ok: true, synced: updates.filter((u) => u.status === "ok").length };
 }

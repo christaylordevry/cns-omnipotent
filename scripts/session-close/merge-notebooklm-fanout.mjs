@@ -10,7 +10,14 @@ import {
 } from "./lib/classify-source-add-error.mjs";
 
 /**
- * @typedef {{ notebook_id: string; status: 'ok' | 'failed'; stderr?: string; error_class?: string }} FanoutUpdate
+ * @typedef {{
+ *   notebook_id: string;
+ *   status: 'ok' | 'failed';
+ *   stderr?: string;
+ *   error_class?: string;
+ *   drive_doc_id?: string;
+ *   drive_source_id?: string;
+ * }} FanoutUpdate
  */
 
 /**
@@ -93,6 +100,12 @@ export async function mergeFanoutIntoCloseReport(report, update) {
   const exportPath = typeof row.export_path === "string" ? row.export_path : "";
   const exportBytes = await resolveExportBytes(report, exportPath);
   applyFanoutFields(row, update.status, update.stderr, exportBytes, update.error_class);
+  if (typeof update.drive_doc_id === "string" && update.drive_doc_id.trim()) {
+    row.drive_doc_id = update.drive_doc_id.trim();
+  }
+  if (typeof update.drive_source_id === "string" && update.drive_source_id.trim()) {
+    row.drive_source_id = update.drive_source_id.trim();
+  }
   return { merged: true, report };
 }
 
@@ -157,6 +170,9 @@ function parseBatch(raw) {
       status,
       stderr: typeof item.stderr === "string" ? item.stderr : "",
       error_class: typeof item.error_class === "string" ? item.error_class : undefined,
+      drive_doc_id: typeof item.drive_doc_id === "string" ? item.drive_doc_id : undefined,
+      drive_source_id:
+        typeof item.drive_source_id === "string" ? item.drive_source_id : undefined,
     });
   }
   return updates;

@@ -11,7 +11,7 @@ deferred_work: deferred-work.md (session-close replace vault export source)
 
 # Story 58.1: Migrate vault export sync to Drive-backed Doc — eliminate destructive source churn
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -193,6 +193,14 @@ feat(session-close): migrate vault export to Drive-backed Doc sync (58-1)
   - [x] `bash scripts/install-hermes-skill-session-close.sh` after SKILL changes
   - [x] Operator migration checklist in completion notes (not Operator Guide unless operator asks)
 
+### Review Findings
+
+- [x] [Review][Patch] `drive_source_id` never persisted on successful sync [scripts/session-close/sync-vault-export-drive.mjs:211-225] — Fixed via `drive_source_id` / `drive_doc_id` on `FanoutUpdate` merge.
+- [x] [Review][Patch] No-op conditional spread in sync updates [scripts/session-close/sync-vault-export-drive.mjs:219-221] — Replaced with `error_class: "unknown"` for migration-miss stderr; removed redundant post-merge pass.
+- [x] [Review][Patch] Sync can run without successful Drive write [scripts/session-close/sync-vault-export-drive.mjs:157-210] — Guard requires `steps.drive_write.status === "ok"` before sync loop.
+- [x] [Review][Patch] Missing integration test for drive-write-failed fan-out [tests/vault-export-drive-sync.test.mjs] — Added `runSyncVaultExportDrive` tests for failed/missing drive write and successful `drive_source_id` persistence.
+- [x] [Review][Defer] No unit tests for `google-drive-doc-write.mjs` / `runWriteVaultExportToDrive` [scripts/session-close/lib/google-drive-doc-write.mjs] — deferred, pre-existing test-gap pattern; REST path is thin but untested beyond manual operator migration.
+
 ## Dev Notes
 
 ### Current code state (READ BEFORE EDIT)
@@ -362,4 +370,5 @@ Composer (Cursor)
 
 ## Change Log
 
+- 2026-06-03: Code review patches — persist `drive_source_id` via merge, guard sync on `steps.drive_write`, integration tests
 - 2026-06-03: Implemented Drive-backed vault export sync (REST write + nlm sync); legacy source_add fallback; tests + skill v1.0.11
