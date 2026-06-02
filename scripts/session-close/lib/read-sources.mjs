@@ -3,6 +3,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import {
+  readNotebooklmDriveDocId,
+  readSessionCloseEnvVar,
+} from "./load-session-close-env.mjs";
+import {
   DEFAULT_REGISTRY_PATH,
   readRegistry,
 } from "../sync-notebooks.mjs";
@@ -314,36 +318,25 @@ function routingNotebooksFromTargets(targets) {
  * @param {{ registryPath?: string, contextPack?: unknown }} [options]
  * @returns {Promise<{ targets: unknown[], routing: NotebookRoutingMeta }>}
  */
-export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, options = {}) {
-  /** @type {string} */
-  let notebookIds = typeof process.env.NOTEBOOKLM_NOTEBOOK_IDS === "string" ? process.env.NOTEBOOKLM_NOTEBOOK_IDS : "";
-  if (!notebookIds.trim()) {
-    const envPath = join(homedir(), ".hermes", "session-close.env");
-    try {
-      const rawEnvFile = await readFile(envPath, "utf8");
-      for (const line of rawEnvFile.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) {
-          continue;
-        }
-        const match = trimmed.match(/^(?:export\s+)?NOTEBOOKLM_NOTEBOOK_IDS\s*=\s*(.*)$/);
-        if (!match) {
-          continue;
-        }
-        let value = (match[1] ?? "").trim();
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1).trim();
-        }
-        notebookIds = value;
-        break;
-      }
-    } catch (err) {
-      console.error("[notebooklm-router] session-close.env read failed:", err.message);
-    }
+/**
+ * @param {unknown[]} targets
+ * @param {string | undefined} driveDocId
+ */
+function withDriveDocIdHint(targets, driveDocId) {
+  if (!driveDocId) {
+    return targets;
   }
+  return targets.map((row) => {
+    if (row && typeof row === "object" && !Array.isArray(row)) {
+      return { ...row, drive_doc_id: driveDocId };
+    }
+    return row;
+  });
+}
+
+export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, options = {}) {
+  const notebookIds = await readSessionCloseEnvVar("NOTEBOOKLM_NOTEBOOK_IDS");
+  const driveDocId = await readNotebooklmDriveDocId();
 
   if (notebookIds.trim()) {
     const ids = notebookIds
@@ -351,12 +344,15 @@ export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, optio
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
     if (ids.length > 0) {
-      const targets = ids.map((notebook_id) => ({
-        notebook_id,
-        source_name: "CNS Vault Export",
-        source_type: "file",
-        file_path: exportPath,
-      }));
+      const targets = withDriveDocIdHint(
+        ids.map((notebook_id) => ({
+          notebook_id,
+          source_name: "CNS Vault Export",
+          source_type: "file",
+          file_path: exportPath,
+        })),
+        driveDocId || undefined,
+      );
       return {
         targets,
         routing: {
@@ -374,7 +370,7 @@ export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, optio
     const fromRegistry = notebookTargetsFromWatchRegistry(registry, exportPath);
     if (fromRegistry) {
       return {
-        targets: fromRegistry,
+        targets: withDriveDocIdHint(fromRegistry, driveDocId || undefined),
         routing: {
           method: "watch-flag",
           notebooks: routingNotebooksFromTargets(fromRegistry),
@@ -391,7 +387,7 @@ export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, optio
     const sr = smartRoute(registry, exportPath, options.contextPack);
     if (sr) {
       return {
-        targets: sr.targets,
+        targets: withDriveDocIdHint(sr.targets, driveDocId || undefined),
         routing: {
           method: "smart-route",
           notebooks: routingNotebooksFromTargets(sr.targets),
@@ -430,7 +426,7 @@ export async function readNotebookLmTargetsWithMeta(vaultRoot, exportPath, optio
     }
     if (targets.length > 0) {
       return {
-        targets,
+        targets: withDriveDocIdHint(targets, driveDocId || undefined),
         routing: {
           method: "project-map",
           notebooks: routingNotebooksFromTargets(targets),

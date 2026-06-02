@@ -1,6 +1,8 @@
 # NotebookLM fan-out diagnostics (Phase C)
 
-Normative contract for `/session-close` Phase C `source_add` fan-out. Merge results into `.session-close/close-report.json` without re-deriving targets from the vault.
+Normative contract for `/session-close` Phase C **legacy** `source_add` fan-out. When `NOTEBOOKLM_DRIVE_DOC_ID` and Google OAuth are configured, use `drive-export-sync.md` instead (no `source_add`).
+
+Merge results into `.session-close/close-report.json` without re-deriving targets from the vault.
 
 ## Flow
 
@@ -62,6 +64,7 @@ Rows merge **in place** on `notebook_id` (no duplicates). Never write export fil
 | `duplicate_source` | `duplicate`, `already exists`, `already added` |
 | `api_error` | `HTTP 5xx`, `502`, `503`, `504`, `internal server`, `service unavailable` |
 | `unknown` | default (e.g. bare `Could not add file source.`) |
+| `drive_write_error` | Drive Doc overwrite failed (drive-sync path only; set via merge `--error-class` or sync script) |
 
 ## HTTP status parsing
 

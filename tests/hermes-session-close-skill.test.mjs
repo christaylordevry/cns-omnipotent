@@ -13,6 +13,7 @@ const taskPromptLegacyPath = join(skillDir, "references/task-prompt.legacy.md");
 const triggerPatternPath = join(skillDir, "references/trigger-pattern.md");
 const dailyRhythmStaticPath = join(skillDir, "references/daily-rhythm-static-rows.md");
 const fanoutDiagnosticsPath = join(skillDir, "references/fanout-diagnostics.md");
+const driveExportSyncPath = join(skillDir, "references/drive-export-sync.md");
 const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md");
 
 
@@ -43,7 +44,10 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("close-report.json"));
     assert.ok(body.includes("title: \"My Knowledge Base\""));
     assert.ok(body.includes("Real close only"));
-    assert.ok(body.includes("Dry-run must not call `source_add`"));
+    assert.ok(
+      body.includes("Dry-run must not call") && body.includes("source_add"),
+      "dry-run must skip source_add and drive fan-out",
+    );
     assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
 
     const installScript = readFileSync(join(root, "scripts/install-hermes-skill-session-close.sh"), "utf8");
@@ -105,12 +109,19 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
 
   it("documents fan-out diagnostics before nlm auth watchdog", () => {
     assert.ok(existsSync(fanoutDiagnosticsPath));
+    assert.ok(existsSync(driveExportSyncPath));
     const body = readFileSync(skillPath, "utf8");
     const fanoutMerge = body.indexOf("merge-notebooklm-fanout");
     const fanoutRef = body.indexOf("fanout-diagnostics.md");
+    const driveSyncRef = body.indexOf("drive-export-sync.md");
+    const driveWrite = body.indexOf("hermes-run-write-vault-export-to-drive");
     const watchdog = body.indexOf("nlm auth watchdog");
     assert.ok(fanoutMerge >= 0, "SKILL must reference merge-notebooklm-fanout");
     assert.ok(fanoutRef >= 0, "SKILL must link fanout-diagnostics.md");
+    assert.ok(driveSyncRef >= 0, "SKILL must link drive-export-sync.md");
+    assert.ok(driveWrite >= 0, "SKILL must reference drive write wrapper");
+    assert.ok(body.includes("drive-sync"));
+    assert.ok(body.includes("Do **not** call `source_add` in drive-sync mode"));
     assert.ok(body.includes("error_class"));
     assert.ok(fanoutMerge < watchdog, "fan-out merge must be ordered before nlm auth watchdog");
 
@@ -118,9 +129,17 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(diagnostics.includes("merge-notebooklm-fanout"));
     assert.ok(diagnostics.includes("error_class"));
     assert.ok(diagnostics.includes("size_limit"));
+    assert.ok(diagnostics.includes("drive_write_error"));
+    assert.ok(diagnostics.includes("drive-export-sync.md"));
+
+    const driveSync = readFileSync(driveExportSyncPath, "utf8");
+    assert.ok(driveSync.includes("NOTEBOOKLM_DRIVE_DOC_ID"));
+    assert.ok(driveSync.includes("drive_doc_id"));
+    assert.ok(driveSync.includes("nlm source sync"));
 
     const template = readFileSync(discordReplyTemplatePath, "utf8");
     assert.ok(template.includes("error_class"));
+    assert.ok(template.includes("notebooklm_fanout_mode"));
   });
 
   it("operator guide documents session-close and version history", () => {

@@ -15,7 +15,7 @@ Notes:
 - **agents_sync:** {{agents_sync}} (derive from steps.section8 / steps.apply_section8 if present)
 - **section8_version:** {{section8_version}} (derive from steps.section8 output if present)
 - **export:** {{export}} (derive from steps.export status + path/bytes if present)
-- **notebooklm:** {{notebooklm}} (derive from `notebooklm_targets`: e.g. `2 ok, 1 failed (size_limit)` when `fanout_status` / `error_class` present; else steps.notebooklm)
+- **notebooklm:** {{notebooklm}} (derive from `notebooklm_targets`: e.g. `2 ok, 1 failed (size_limit)` when `fanout_status` / `error_class` present; else steps.notebooklm; prefix with `drive-sync` or `legacy (deprecated)` from `notebooklm_fanout_mode` when set)
 - **vault_fast_scan:** {{vault_fast_scan}} (derive from steps.fast_scan if present)
 - **daily_rhythm:** {{daily_rhythm}} (derive from steps.daily_rhythm if present)
 - **nlm_auth:** {{nlm_auth}} (derive from nlm_auth.status + nlm_auth.reason; dry-run says `skipped in dry-run`)

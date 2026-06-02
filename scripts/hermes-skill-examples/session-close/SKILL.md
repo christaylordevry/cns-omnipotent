@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.10
+version: 1.0.11
 author: CNS Operator
 license: MIT
 metadata:
@@ -60,11 +60,28 @@ Real close only, apply the draft:
 
 ## NotebookLM fan-out and reply
 
-Real close only: read `notebooklm_targets` from `.session-close/close-report.json` only (no re-derive from vault). For each row, call `mcp__notebooklm__source_add` with `title: "My Knowledge Base"`, `source_type: "file"`, `file_path` from row `export_path`, `wait: false`. Dry-run must not call `source_add` and must not write fan-out result fields; render NotebookLM as `skipped in dry-run`.
+Real close only: read `notebooklm_targets` from `.session-close/close-report.json` only (no re-derive from vault). Dry-run must not call Drive write, sync, or `source_add`, and must not write fan-out result fields; render NotebookLM as `skipped in dry-run`.
 
-Field shapes, stderr→`error_class` rules, and merge CLI: `references/fanout-diagnostics.md`.
+Drive-backed sync (primary when configured): `references/drive-export-sync.md`. Legacy file `source_add` (fallback): `references/fanout-diagnostics.md`.
 
-Treat NotebookLM fan-out as best-effort. After **each** `source_add` (success or failure), merge per-target diagnostics into the close report (do not fire-and-forget):
+**Step 1 — record mode** (real close):
+
+```bash
+"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh"
+```
+
+Read stdout JSON: `mode` is `drive-sync` or `legacy-source-add`. If `oauthSetupRequired`, stderr warns `GOOGLE_OAUTH_SETUP_REQUIRED` and mode is legacy.
+
+**Step 2a — drive-sync** when `mode` is `drive-sync` (requires `NOTEBOOKLM_DRIVE_DOC_ID` + Google OAuth in `~/.hermes/session-close.env`):
+
+```bash
+"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-write-vault-export-to-drive.sh"
+"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-sync-vault-export-drive.sh"
+```
+
+Do **not** call `source_add` in drive-sync mode. `sync-vault-export-drive.mjs` merges `fanout_status` per target. On Drive write failure, rows get `error_class: drive_write_error` (non-blocking).
+
+**Step 2b — legacy** when `mode` is `legacy-source-add`: for each row, call `mcp__notebooklm__source_add` with `title: "My Knowledge Base"`, `source_type: "file"`, `file_path` from row `export_path`, `wait: false`. After **each** call, merge:
 
 ```bash
 "${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-merge-notebooklm-fanout.sh" \
@@ -73,7 +90,7 @@ Treat NotebookLM fan-out as best-effort. After **each** `source_add` (success or
   --stderr "<error message plus stderr, for classifier>"
 ```
 
-Pass combined tool error message and stderr into `--stderr`. Rows gain `fanout_status`, `error_class` (failures), `export_bytes`, `error_snippet`, and `http_status` per the reference. Attempt every report-provided target and always continue to the auth watchdog after the loop, including when target results are partial or failed.
+Treat NotebookLM fan-out as best-effort. Attempt every report-provided target and always continue to the auth watchdog after fan-out, including when results are partial or failed.
 
 After the NotebookLM `source_add` loop or dry-run skip is complete, run the non-blocking nlm auth watchdog:
 

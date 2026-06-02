@@ -10,7 +10,7 @@ import {
 } from "./lib/classify-source-add-error.mjs";
 
 /**
- * @typedef {{ notebook_id: string; status: 'ok' | 'failed'; stderr?: string }} FanoutUpdate
+ * @typedef {{ notebook_id: string; status: 'ok' | 'failed'; stderr?: string; error_class?: string }} FanoutUpdate
  */
 
 /**
@@ -46,8 +46,9 @@ async function resolveExportBytes(report, exportPath) {
  * @param {'ok' | 'failed'} status
  * @param {string | undefined} stderr
  * @param {number | null} exportBytes
+ * @param {string | undefined} explicitErrorClass
  */
-function applyFanoutFields(row, status, stderr, exportBytes) {
+function applyFanoutFields(row, status, stderr, exportBytes, explicitErrorClass) {
   row.fanout_status = status;
   if (exportBytes !== null) {
     row.export_bytes = exportBytes;
@@ -61,7 +62,10 @@ function applyFanoutFields(row, status, stderr, exportBytes) {
   }
 
   const combined = stderr ?? "";
-  row.error_class = classifySourceAddError(combined);
+  row.error_class =
+    explicitErrorClass && explicitErrorClass.trim()
+      ? explicitErrorClass.trim()
+      : classifySourceAddError(combined);
   const httpStatus = parseHttpStatus(combined);
   row.http_status = httpStatus;
   const snippet = sanitizeFanoutErrorText(combined);
@@ -88,7 +92,7 @@ export async function mergeFanoutIntoCloseReport(report, update) {
   const row = /** @type {Record<string, unknown>} */ (targets[index]);
   const exportPath = typeof row.export_path === "string" ? row.export_path : "";
   const exportBytes = await resolveExportBytes(report, exportPath);
-  applyFanoutFields(row, update.status, update.stderr, exportBytes);
+  applyFanoutFields(row, update.status, update.stderr, exportBytes, update.error_class);
   return { merged: true, report };
 }
 
@@ -118,6 +122,7 @@ function parseArgv(argv) {
   const notebookIndex = argv.indexOf("--notebook-id");
   const statusIndex = argv.indexOf("--status");
   const stderrIndex = argv.indexOf("--stderr");
+  const errorClassIndex = argv.indexOf("--error-class");
   const batch = argv.includes("--batch");
 
   return {
@@ -129,6 +134,7 @@ function parseArgv(argv) {
     notebookId: notebookIndex >= 0 ? argv[notebookIndex + 1] : undefined,
     status: statusIndex >= 0 ? argv[statusIndex + 1] : undefined,
     stderr: stderrIndex >= 0 ? argv[stderrIndex + 1] : "",
+    errorClass: errorClassIndex >= 0 ? argv[errorClassIndex + 1] : undefined,
   };
 }
 
@@ -150,6 +156,7 @@ function parseBatch(raw) {
       notebook_id: item.notebook_id,
       status,
       stderr: typeof item.stderr === "string" ? item.stderr : "",
+      error_class: typeof item.error_class === "string" ? item.error_class : undefined,
     });
   }
   return updates;
@@ -193,6 +200,7 @@ async function main() {
         notebook_id: opts.notebookId,
         status: opts.status,
         stderr: opts.stderr,
+        error_class: opts.errorClass,
       },
     ];
   } else {
