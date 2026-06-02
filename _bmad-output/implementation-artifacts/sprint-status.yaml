@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-02T13:52:00+10:00"
+last_updated: "2026-06-02T15:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -393,3 +393,7 @@ development_status:
   56-3-session-close-fan-out-error-class-dashboard-widget: done
   56-4-morning-digest-signal-scoring-improvements: done
   56-5-notebook-queries-convex-table-dedupe: done
+
+  # Epic 57 — Hermes MEMORY.md CNS State freshness (operator brief 2026-06-02)
+  epic-57: in-progress
+  57-2-session-close-memory-md-auto-update: done

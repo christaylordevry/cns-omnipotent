@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import { parseApplySection8Argv, runApplySection8 } from "./apply-section8.mjs";
 import { evaluatePhaseBDraftTokens, recordPhaseBTokenCheck } from "./lib/phase-b-token-gate.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { runMemoryUpdate } from "./lib/update-memory-cns-state.mjs";
 import { ensurePhaseAComplete } from "./run-deterministic.mjs";
 import { SECTION8_DRAFT_TOKEN_LIMIT } from "./lib/token-estimate.mjs";
 
@@ -36,6 +37,8 @@ export function resolveGateDraftPath(draftPath, repoRoot) {
  *   contextPackPath?: string;
  *   contextPack?: Record<string, unknown> | null;
  *   dateStr?: string;
+ *   env?: NodeJS.ProcessEnv;
+ *   memoryMdPath?: string;
  * }} opts
  */
 export async function runGateApplySection8(opts) {
@@ -83,10 +86,23 @@ export async function runGateApplySection8(opts) {
     dateStr: opts.dateStr,
   });
 
+  let memoryUpdate = null;
+  if (!applyResult.dryRun) {
+    memoryUpdate = await runMemoryUpdate({
+      dryRun: false,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+      closeReportPath,
+      env: opts.env,
+      memoryMdPath: opts.memoryMdPath,
+    });
+  }
+
   return {
     check,
     applied: true,
     applyResult,
+    memoryUpdate,
   };
 }
 

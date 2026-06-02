@@ -23,6 +23,7 @@ import {
   recordPhaseAGateFailure,
 } from "./lib/phase-a-completion-gate.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { formatPriorFanoutSummary } from "./lib/update-memory-cns-state.mjs";
 import { runWriteMemory } from "./write-memory.mjs";
 
 export { evaluatePhaseACompletion, PHASE_A_REQUIRED_PACK_KEYS } from "./lib/phase-a-completion-gate.mjs";
@@ -591,6 +592,9 @@ export async function runDeterministicPipeline(opts = {}) {
     }
   };
 
+  const priorFanoutLoaded = await loadFanoutTargetsFromCloseReport(paths.closeReportPath);
+  const priorFanoutSummary = formatPriorFanoutSummary(priorFanoutLoaded.fanoutTargets);
+
   try {
     await runPrepareContextStep(paths.repoRoot, env, dryRun);
     steps.prepare_context = { status: "ok", message: "prepare-context complete" };
@@ -791,6 +795,7 @@ export async function runDeterministicPipeline(opts = {}) {
   }
 
   const reportTargets = enrichNotebooklmTargets(pack);
+  pack.deterministic.prior_fanout_summary = priorFanoutSummary;
   const report = buildCloseReport({
     mode: dryRun ? "dry-run" : "real",
     repoRoot: paths.repoRoot,

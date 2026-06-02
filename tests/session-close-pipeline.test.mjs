@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath, URL } from "node:url";
 import { promisify } from "node:util";
@@ -46,7 +46,16 @@ import {
   buildSprintNarrative,
 } from "../scripts/session-close/lib/rhythm-markers.mjs";
 import { buildMemoryMarkdown } from "../scripts/session-close/lib/write-memory-body.mjs";
+import {
+  buildCnsStateBlock,
+  enforceMemoryFileCharLimit,
+  formatPriorFanoutSummary,
+  MEMORY_FILE_CHAR_LIMIT,
+  replaceCnsStateInMemory,
+  runMemoryUpdate,
+} from "../scripts/session-close/lib/update-memory-cns-state.mjs";
 import { runWriteMemory } from "../scripts/session-close/write-memory.mjs";
+import { runGateApplySection8 } from "../scripts/session-close/gate-apply-section8.mjs";
 import {
   buildActiveEpics,
   excerptStoryBullet,
@@ -1889,5 +1898,291 @@ describe("session-close prepare-context integration", () => {
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }
+  });
+});
+
+describe("session-close 57-2 memory_update CNS State", () => {
+  it("replaceCnsStateInMemory prepends block when ## CNS State heading is absent", () => {
+    const original = `## Environment
+- Gateway: test
+
+## Next Session
+do work
+`;
+    const newBlock = `## CNS State (auto — /session-close)
+Closed: 2026-06-02T00:00:00.000Z | AGENTS v1.0.0 | failure_class: none
+Epics: none in-progress | Tests: 1 passing
+Vault: 1/1 clean — ERRORS: 0, WARNINGS: 0
+Fan-out (prev): unknown
+`;
+    const next = replaceCnsStateInMemory(original, newBlock);
+    assert.ok(next.startsWith("## CNS State (auto — /session-close)"));
+    assert.ok(next.includes("## Environment"));
+    assert.ok(next.includes("## Next Session"));
+  });
+
+  it("replaceCnsStateInMemory splices block and preserves ## Environment tail", () => {
+    const original = `## CNS State (auto — /session-close)
+stale telemetry
+
+## Environment
+- Gateway: test
+
+## Next Session
+do work
+`;
+    const newBlock = `## CNS State (auto — /session-close)
+Closed: 2026-06-02T00:00:00.000Z | AGENTS v9.9.10 | failure_class: none
+Epics: 48 in-progress | Tests: 100 passing
+Vault: 1/1 clean — ERRORS: 0, WARNINGS: 0
+Fan-out (prev): 2/2 ok
+`;
+    const next = replaceCnsStateInMemory(original, newBlock);
+    assert.ok(next.includes("## Environment"));
+    assert.ok(next.includes("- Gateway: test"));
+    assert.ok(next.includes("## Next Session"));
+    assert.ok(next.includes("AGENTS v9.9.10"));
+    assert.ok(!next.includes("stale telemetry"));
+  });
+
+  it("runMemoryUpdate skips cleanly when MEMORY.md missing", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-mem-update-skip-"));
+    const memoryDir = join(fixtureRoot, "hermes-mem");
+    const memoryPath = join(memoryDir, "MEMORY.md");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    const agentsPath = join(fixtureRoot, "AGENTS.md");
+    const sprintPath = join(fixtureRoot, "sprint-status.yaml");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(agentsPath, SAMPLE_AGENTS, "utf8");
+    await writeFile(sprintPath, SAMPLE_SPRINT, "utf8");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        generated_at: "2026-06-02T12:00:00.000Z",
+        steps: { tests: { status: "ok", message: "50 passing" } },
+        deterministic: { prior_fanout_summary: "1/1 ok" },
+      })}\n`,
+      "utf8",
+    );
+
+    try {
+      const result = await runMemoryUpdate({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: fixtureRoot,
+        closeReportPath: reportPath,
+        memoryMdPath: memoryPath,
+        agentsPath,
+        sprintPath,
+      });
+      assert.equal(result.status, "skipped");
+      assert.equal(result.message, "memory_update: skipped");
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.steps.memory_update.status, "skipped");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("enforceMemoryFileCharLimit preserves trailing sections when ## CNS State is absent", () => {
+    const padding = "y".repeat(3000);
+    const huge = `${padding}
+
+## Environment
+- ok
+`;
+    const capped = enforceMemoryFileCharLimit(huge, MEMORY_FILE_CHAR_LIMIT);
+    assert.ok(Buffer.byteLength(capped, "utf8") <= MEMORY_FILE_CHAR_LIMIT);
+    assert.ok(capped.includes("## Environment"));
+    assert.ok(capped.includes("- ok"));
+  });
+
+  it("enforceMemoryFileCharLimit keeps file at or under 2200 bytes", () => {
+    const padding = "x".repeat(3000);
+    const huge = `## CNS State (auto — /session-close)
+${padding}
+
+## Environment
+- ok
+`;
+    const capped = enforceMemoryFileCharLimit(huge, MEMORY_FILE_CHAR_LIMIT);
+    assert.ok(Buffer.byteLength(capped, "utf8") <= MEMORY_FILE_CHAR_LIMIT);
+    assert.ok(capped.includes("## Environment"));
+    assert.ok(capped.includes("[truncated]"));
+  });
+
+  it("formatPriorFanoutSummary summarizes ok and failed targets", () => {
+    assert.equal(formatPriorFanoutSummary([]), "unknown");
+    const summary = formatPriorFanoutSummary([
+      { fanout_status: "ok", title: "A" },
+      { fanout_status: "ok", title: "B" },
+      { fanout_status: "failed", error_class: "size_limit", title: "AI Factory Blueprint" },
+    ]);
+    assert.match(summary, /2\/3 ok/);
+    assert.match(summary, /1 failed/);
+    assert.match(summary, /size_limit: AI Factory Blueprint/);
+  });
+
+  it("runMemoryUpdate records failed when dependency read throws", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-mem-update-fail-"));
+    const memoryPath = join(fixtureRoot, "MEMORY.md");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(
+      memoryPath,
+      `## CNS State (auto — /session-close)
+old
+
+## Environment
+- ok
+`,
+      "utf8",
+    );
+    await writeFile(reportPath, `${JSON.stringify({ generated_at: "2026-06-02T12:00:00.000Z" })}\n`, "utf8");
+
+    try {
+      const result = await runMemoryUpdate({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: fixtureRoot,
+        closeReportPath: reportPath,
+        memoryMdPath: memoryPath,
+        agentsPath: join(fixtureRoot, "missing-agents.md"),
+        sprintPath: join(fixtureRoot, "missing-sprint.yaml"),
+      });
+      assert.equal(result.status, "failed");
+      assert.match(result.message, /memory_update: failed/);
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.steps.memory_update.status, "failed");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runDeterministicPipeline stashes prior_fanout_summary on close-report", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-prior-fanout-"));
+    const vault = join(fixtureRoot, "vault");
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        generated_at: "2026-06-01T00:00:00.000Z",
+        notebooklm_targets: [
+          { fanout_status: "ok", title: "N1" },
+          { fanout_status: "failed", error_class: "auth_error", title: "N2" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    try {
+      await runDeterministicPipeline({
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+      });
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.match(report.deterministic.prior_fanout_summary, /1\/2 ok/);
+      assert.match(report.deterministic.prior_fanout_summary, /1 failed/);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runGateApplySection8 updates temp MEMORY.md and records memory_update", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-gate-mem-update-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
+    const memoryPath = join(fixtureRoot, "hermes", "MEMORY.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await mkdir(dirname(memoryPath), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+    await writeFile(
+      memoryPath,
+      `## CNS State (auto — /session-close)
+old
+
+## Environment
+- fixture
+
+`,
+      "utf8",
+    );
+
+    await runDeterministicPipeline({
+      dryRun: true,
+      repoRoot: fixtureRoot,
+      vaultRoot: vault,
+    });
+
+    try {
+      const result = await runGateApplySection8({
+        draftPath,
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        closeReportPath: reportPath,
+        dateStr: "2026-06-02",
+        env: { ...process.env, MEMORY_MD_PATH: memoryPath },
+      });
+      assert.equal(result.check.status, "PASSED");
+      assert.equal(result.memoryUpdate?.status, "ok");
+      assert.match(result.memoryUpdate?.message ?? "", /memory_update: ok/);
+
+      const memory = await readFile(memoryPath, "utf8");
+      assert.ok(memory.includes("## Environment"));
+      assert.ok(memory.includes("- fixture"));
+      assert.ok(!memory.includes("old"));
+      assert.ok(Buffer.byteLength(memory, "utf8") <= MEMORY_FILE_CHAR_LIMIT);
+
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      assert.equal(report.steps.memory_update.status, "ok");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("buildCnsStateBlock is deterministic for fixed inputs", () => {
+    const block = buildCnsStateBlock({
+      closedAt: "2026-06-02T04:00:00.000Z",
+      agentsVersion: "2.1.25",
+      failureClass: null,
+      epicNumbers: ["54", "56"],
+      testsLine: "612 passing",
+      vaultHealth: "115/115 clean — ERRORS: 0, WARNINGS: 0",
+      priorFanoutSummary: "4/4 ok",
+    });
+    assert.equal(
+      block,
+      `## CNS State (auto — /session-close)
+Closed: 2026-06-02T04:00:00.000Z | AGENTS v2.1.25 | failure_class: none
+Epics: 54, 56 in-progress | Tests: 612 passing
+Vault: 115/115 clean — ERRORS: 0, WARNINGS: 0
+Fan-out (prev): 4/4 ok
+`,
+    );
+  });
+
+  it("buildCnsStateBlock renders unknown prior fan-out without double prefix", () => {
+    const block = buildCnsStateBlock({
+      closedAt: "2026-06-02T04:00:00.000Z",
+      agentsVersion: "2.1.25",
+      failureClass: null,
+      epicNumbers: [],
+      testsLine: "612 passing",
+      vaultHealth: "115/115 clean — ERRORS: 0, WARNINGS: 0",
+      priorFanoutSummary: "",
+    });
+    assert.ok(block.includes("Fan-out (prev): unknown"));
+    assert.ok(!block.includes("fanout: unknown"));
   });
 });

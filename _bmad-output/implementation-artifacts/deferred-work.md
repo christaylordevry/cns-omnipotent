@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 57-2-session-close-memory-md-auto-update (2026-06-02)
+
+- Gate stdout does not echo `memory_update` result — operator must read close-report; matches existing gate logging pattern for other steps.
+- Cap enforced on UTF-8 byte length not Unicode code-point count — AC wording says "characters"; MEMORY telemetry is ASCII-only in practice.
+
 ## Deferred from: code review of 56-5-notebook-queries-convex-table-dedupe (2026-06-02)
 
 - Concurrent duplicate mutation race in `logNotebookQuery` — two parallel HTTP mutations may both pass read-check before either inserts; story Dev Notes mark out of scope; database-level unique constraint deferred.
