@@ -15,10 +15,10 @@ function isObject(value) {
 
 /**
  * @param {string} reportPath
- * @param {{ env?: NodeJS.ProcessEnv }} [opts]
+ * @param {{ env?: NodeJS.ProcessEnv; envPath?: string }} [opts]
  */
 export async function recordNotebooklmFanoutMode(reportPath, opts = {}) {
-  const resolved = await resolveVaultExportFanoutMode({ env: opts.env });
+  const resolved = await resolveVaultExportFanoutMode({ env: opts.env, envPath: opts.envPath });
   let report;
   try {
     report = JSON.parse(await readFile(reportPath, "utf8"));

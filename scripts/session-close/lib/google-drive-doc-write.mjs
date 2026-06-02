@@ -12,6 +12,9 @@ import { readFile } from "node:fs/promises";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DOCS_API = "https://docs.googleapis.com/v1/documents";
 
+/** Refresh token must be issued with full Drive scope (not drive.file). */
+export const GOOGLE_OAUTH_SCOPE = "https://www.googleapis.com/auth/drive";
+
 /**
  * @param {{ clientId: string; clientSecret: string; refreshToken: string; fetchFn?: typeof fetch }} input
  */
@@ -98,12 +101,14 @@ export async function overwriteGoogleDocContent(input) {
   const endIndex = await getDocumentEndIndex(accessToken, input.documentId, fetchFn);
   /** @type {Record<string, unknown>[]} */
   const requests = [];
-  if (endIndex > 1) {
+  // Empty/new Docs still have a structural paragraph (endIndex 2); delete [1,1] is invalid.
+  const deleteEndIndex = endIndex - 1;
+  if (deleteEndIndex > 1) {
     requests.push({
       deleteContentRange: {
         range: {
           startIndex: 1,
-          endIndex: endIndex - 1,
+          endIndex: deleteEndIndex,
         },
       },
     });

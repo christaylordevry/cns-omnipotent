@@ -9,7 +9,7 @@ Primary Phase C path when `NOTEBOOKLM_DRIVE_DOC_ID` and Google OAuth credentials
 | `NOTEBOOKLM_DRIVE_DOC_ID` | Existing Google **Doc** file ID (overwrite only — do not auto-create) |
 | `GOOGLE_CLIENT_ID` | OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-| `GOOGLE_REFRESH_TOKEN` | OAuth refresh token with Docs API scope |
+| `GOOGLE_REFRESH_TOKEN` | OAuth refresh token with `https://www.googleapis.com/auth/drive` scope |
 
 `@googleapis/mcp-server-drive` is **not** required. Hermes uses the repo script `write-vault-export-to-drive.mjs` (Google Docs REST API via OAuth refresh).
 

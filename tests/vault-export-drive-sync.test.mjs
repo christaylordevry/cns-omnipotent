@@ -44,9 +44,12 @@ const DRIVE_SOURCE_LIST_FIXTURE = [
 
 /**
  * @param {Record<string, string | undefined>} overrides
- * @param {() => Promise<void>} fn
+ * @param {(opts: { env: NodeJS.ProcessEnv; envPath: string }) => Promise<void>} fn
  */
 async function withIsolatedEnv(overrides, fn) {
+  const dir = await mkdtemp(join(tmpdir(), "session-close-env-"));
+  const envPath = join(dir, "session-close.env");
+  const sessionCloseOpts = { env: process.env, envPath };
   const prior = {};
   for (const key of [
     "NOTEBOOKLM_DRIVE_DOC_ID",
@@ -63,7 +66,7 @@ async function withIsolatedEnv(overrides, fn) {
     }
   }
   try {
-    await fn();
+    await fn(sessionCloseOpts);
   } finally {
     for (const key of Object.keys(prior)) {
       if (prior[key] === undefined) {
@@ -106,8 +109,8 @@ GOOGLE_CLIENT_ID=abc
         GOOGLE_CLIENT_SECRET: "secret",
         GOOGLE_REFRESH_TOKEN: "refresh",
       },
-      async () => {
-        const resolved = await resolveVaultExportFanoutMode();
+      async (opts) => {
+        const resolved = await resolveVaultExportFanoutMode(opts);
         assert.equal(resolved.mode, "drive-sync");
         assert.equal(resolved.oauthSetupRequired, false);
       },
@@ -122,8 +125,8 @@ GOOGLE_CLIENT_ID=abc
         GOOGLE_CLIENT_SECRET: "secret",
         GOOGLE_REFRESH_TOKEN: "refresh",
       },
-      async () => {
-        const resolved = await resolveVaultExportFanoutMode();
+      async (opts) => {
+        const resolved = await resolveVaultExportFanoutMode(opts);
         assert.equal(resolved.mode, "legacy-source-add");
       },
     );
@@ -137,12 +140,12 @@ GOOGLE_CLIENT_ID=abc
         GOOGLE_CLIENT_SECRET: undefined,
         GOOGLE_REFRESH_TOKEN: undefined,
       },
-      async () => {
-        const resolved = await resolveVaultExportFanoutMode();
+      async (opts) => {
+        const resolved = await resolveVaultExportFanoutMode(opts);
         assert.equal(resolved.mode, "legacy-source-add");
         assert.equal(resolved.oauthSetupRequired, true);
-        assert.equal(await hasGoogleOAuthCredentials(), false);
-        assert.equal(await readNotebooklmDriveDocId(), FIXTURE_DRIVE_DOC);
+        assert.equal(await hasGoogleOAuthCredentials(opts), false);
+        assert.equal(await readNotebooklmDriveDocId(opts), FIXTURE_DRIVE_DOC);
       },
     );
   });
@@ -297,8 +300,8 @@ describe("record-notebooklm-fanout-mode (58-1)", () => {
       })}\n`,
       "utf8",
     );
-    await withIsolatedEnv({ NOTEBOOKLM_DRIVE_DOC_ID: undefined }, async () => {
-      const resolved = await recordNotebooklmFanoutMode(reportPath);
+    await withIsolatedEnv({ NOTEBOOKLM_DRIVE_DOC_ID: undefined }, async (opts) => {
+      const resolved = await recordNotebooklmFanoutMode(reportPath, opts);
       assert.equal(resolved.mode, "legacy-source-add");
       const saved = JSON.parse(await readFile(reportPath, "utf8"));
       assert.equal(saved.notebooklm_fanout_mode, "legacy-source-add");
