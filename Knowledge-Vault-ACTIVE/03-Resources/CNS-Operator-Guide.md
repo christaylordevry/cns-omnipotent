@@ -933,7 +933,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 | Item | Value |
 |------|--------|
-| Manual trigger | Post `morning-digest` in `#hermes` (case-insensitive, single line) |
+| Manual trigger | Post single-line `morning-digest` or `morning-digest cron:<label>` in `#hermes` (case-sensitive; see skill `references/trigger-pattern.md`) |
 | Default schedule | **08:00 machine-local** (`0 8 * * *`) — uses WSL system TZ / `process.env.TZ`, not hardcoded `Australia/Sydney` |
 | Schedule override | `MORNING_DIGEST_CRON` env or `morning_digest.cron` in `~/.hermes/config.yaml` |
 | Repo mirror | `scripts/hermes-skill-examples/morning-digest/` |
@@ -946,7 +946,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 1. `bash scripts/install-hermes-skill-morning-digest.sh`
 2. Add **`morning-digest`** to `#hermes` `discord.channel_skill_bindings` (see `references/config-snippet.md`).
-3. Ensure Hermes gateway is running; post **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Vault context / Recommended focus).
+3. Add the **`channel_prompts`** line for `morning-digest` from `references/config-snippet.md` (Story 55-1). Ensure Hermes gateway is running; post single-line **`morning-digest`** in `#hermes` and confirm the contract (Trending Now / Headlines / Deep Signal / Vault context / Recommended focus).
 4. Optional cron: `MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 8 * * *}" hermes cron create "$MORNING_DIGEST_CRON" ... --skill morning-digest --name morning-digest --deliver discord` (see skill `references/cron-snippet.md`; recreate the Hermes cron job after schedule changes).
 5. **Migration:** comment out §15.2 WSL crontab line; do **not** delete `scripts/hermes-morning-digest.sh` or related 26-7 files.
 

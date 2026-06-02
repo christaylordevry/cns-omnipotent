@@ -30,7 +30,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.2"));
+    assert.ok(body.includes("version: 1.2.3"));
     assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
@@ -62,8 +62,44 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const body = readFileSync(triggerPatternPath, "utf8");
 
     assert.ok(body.includes("morning-digest"));
-    assert.ok(body.includes("case-insensitive"));
     assert.ok(body.includes("cron:morning-digest"));
+    assert.ok(body.includes("case-sensitive"));
+  });
+
+  it("trigger pattern is strict and unambiguous (Story 55-1)", () => {
+    const triggerBody = readFileSync(triggerPatternPath, "utf8");
+    const skillBody = readFileSync(skillPath, "utf8");
+
+    assert.ok(
+      triggerBody.includes("Canonical manual trigger grammar") ||
+        triggerBody.includes("first non-empty line"),
+    );
+    assert.ok(
+      triggerBody.includes("must begin") ||
+        triggerBody.includes("first non-empty line") ||
+        triggerBody.includes("trigger line"),
+    );
+    assert.ok(triggerBody.includes("case-sensitive"));
+    assert.ok(triggerBody.includes("cron:<label>"));
+    assert.ok(triggerBody.includes("morning-digest cron:manual"));
+    assert.ok(
+      !triggerBody.includes("entire message** must match (case-insensitive)") &&
+        !triggerBody.includes("entire message** must match"),
+      "must not use whole-message equality as the only rule",
+    );
+    assert.ok(triggerBody.includes("substring"));
+    assert.ok(
+      triggerBody.includes("Negative") || triggerBody.includes("must not run digest"),
+    );
+    assert.ok(
+      triggerBody.includes("Morning-Digest") || triggerBody.includes("Case mismatch"),
+    );
+    assert.ok(skillBody.includes('skill_view("morning-digest", "references/task-prompt.md")'));
+    assert.ok(skillBody.includes("morning-digest cron:<label>"));
+    assert.ok(
+      skillBody.includes("Before any source collection") ||
+        skillBody.includes("skill_view"),
+    );
   });
 
   it("task-prompt defines output contract, all three sources, and machine-local date", () => {
@@ -161,6 +197,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     assert.ok(body.includes("morning_digest"));
     assert.ok(body.includes("channel_skill_bindings"));
+    assert.ok(body.includes("channel_prompts"));
+    assert.ok(body.includes('skill_view("morning-digest", "references/task-prompt.md")'));
+    assert.ok(body.includes("morning-digest cron:<label>"));
     assert.ok(body.includes("<hermes-channel-id>"));
     assert.ok(body.includes("do not wipe") || body.includes("do **not** replace"));
     assert.ok(!body.includes("1500733488897462382"));
@@ -218,9 +257,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("fire-and-forget"));
   });
 
-  it("SKILL.md v1.2.2 documents awaited Vault context Convex log (Story 52-2, 54-2)", () => {
+  it("SKILL.md v1.2.3 documents awaited Vault context Convex log (Story 52-2, 54-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.2"));
+    assert.ok(body.includes("version: 1.2.3"));
     assert.ok(body.includes("log-notebook-query.mjs"));
     assert.ok(body.includes("No trend Convex push"));
     assert.ok(body.includes("Vault context Convex log"));

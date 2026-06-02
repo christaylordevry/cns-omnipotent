@@ -7,8 +7,8 @@
 
 For documentation purposes only (do not re-evaluate at runtime):
 
-- Manual trigger: single line `morning-digest` (case-insensitive after trim).
-- Cron: operator schedule per `references/cron-snippet.md` / `references/trigger-pattern.md`.
+- Manual trigger: first non-empty line equals `morning-digest` or begins with `morning-digest ` (case-sensitive; single-line message). See `references/trigger-pattern.md`.
+- Cron: operator schedule per `references/cron-snippet.md` / `references/trigger-pattern.md` (`--skill morning-digest`; not the Discord line-1 grammar).
 
 ## Hard constraints (must follow)
 

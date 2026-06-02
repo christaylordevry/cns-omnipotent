@@ -53,6 +53,19 @@ describe("Story 54-4 Hermes trigger-contract (REFERENCE ONLY)", () => {
     });
   }
 
+  it("morning-digest trigger-pattern forbids whole-message equality as sole rule (Story 55-1)", () => {
+    const body = readFileSync(
+      join(skillDir("morning-digest"), "references/trigger-pattern.md"),
+      "utf8",
+    );
+    assert.match(body, /first non-empty line|Canonical manual trigger grammar/i);
+    assert.doesNotMatch(
+      body,
+      /entire message\*\* must match \(case-insensitive\)/i,
+    );
+    assert.match(body, /case-sensitive/i);
+  });
+
   it("notebook-query task-prompt §0 remains canonical (regression anchor)", () => {
     const body = readFileSync(
       join(skillDir("notebook-query"), "references/task-prompt.md"),

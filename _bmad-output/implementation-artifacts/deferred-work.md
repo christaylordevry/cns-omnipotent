@@ -648,7 +648,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 ## Deferred from: Story 49-6 morning-digest (2026-05-29)
 
-- **49-6:** morning-digest task-prompt never injected (journalctl confirms zero hits). Hermes skill-loading for free-text triggers may require slash-command registration or a different config key — investigate skill loader source. Compare **investigate-trend** (works) vs **morning-digest** (doesn't): both bound identically; difference likely in `trigger-pattern.md` format — compare cold next session.
+- ~~**49-6:** morning-digest task-prompt never injected~~ — **Resolved Story 55-1 (2026-06-02):** strict line-1 trigger grammar, `channel_prompts` routing line in config-snippet, mandatory `skill_view` discipline; operator applies prompt in `~/.hermes/config.yaml`.
 
 ## Deferred from: code review of 49-6-morning-digest-upgrade (2026-05-30)
 

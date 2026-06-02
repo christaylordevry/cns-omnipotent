@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.2
+version: 1.2.3
 author: CNS Operator
 license: MIT
 metadata:
@@ -16,7 +16,7 @@ metadata:
 
 Daily operator briefing in Discord **`#hermes`**: trending keywords, CNS-relevant headlines, a short Perplexity sweep on the top trend, and optional **Vault context** from NotebookLM (CLI query after signal scoring).
 
-- **Manual trigger**: single line `morning-digest` (case-insensitive; see `references/trigger-pattern.md`)
+- **Manual trigger**: single-line `morning-digest` or `morning-digest cron:<label>` (case-sensitive; see `references/trigger-pattern.md`)
 - **Cron trigger**: default **08:00 machine-local** (see `references/cron-snippet.md`)
 - **Tools**: explicit `terminal(...)` calls for trends, NewsAPI, `pick-signal-notebook.mjs`, and `query-notebook.mjs`; `mcp__perplexity__search` for deep signal only (no NotebookLM MCP)
 - **Date line**: civil date from machine timezone (`process.env.TZ` if set, else OS default)
@@ -28,11 +28,11 @@ Daily operator briefing in Discord **`#hermes`**: trending keywords, CNS-relevan
 
 When the incoming message is the manual trigger or the cron pseudo-trigger, **execute the digest immediately**. Do not summarize this skill, do not ask whether to proceed, and do not substitute old NotebookLM or legacy 26-7 scripts.
 
-First load the full task contract with:
+**Before any source collection**, load the full task contract (mandatory — do not rely on SKILL.md alone):
 
 `skill_view("morning-digest", "references/task-prompt.md")`
 
-Then follow that file as the source of truth. The required tool pattern is:
+If the reference is not loaded, call `skill_view` first, then follow `references/task-prompt.md` as the source of truth. The required tool pattern is:
 
 1. Call `terminal(command="node -e ...", workdir=resolved_repo_root, timeout=10)` for the machine-local date.
 2. Call `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", workdir=resolved_repo_root, timeout=60)` for Google Trends.
@@ -46,7 +46,7 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 
 ## Inline task contract
 
-Use this inline contract if the reference file is not loaded before execution.
+**Fallback only** after `skill_view("morning-digest", "references/task-prompt.md")` fails or times out — not a substitute for loading the reference.
 
 1. Resolve `resolved_repo_root`: `OMNIPOTENT_REPO` if it is a non-empty absolute path, otherwise `/home/christ/ai-factory/projects/Omnipotent.md`.
 2. Date: call `terminal(command="node -e \"const d=new Date(); const p=n=>String(n).padStart(2,'0'); console.log(d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()))\"", workdir=resolved_repo_root, timeout=10)`.
@@ -97,12 +97,12 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 
 ## When to use
 
-- Operator posts `morning-digest` in `#hermes`, or
+- Operator posts `morning-digest` or `morning-digest cron:<label>` as a single-line message in `#hermes` (case-sensitive; see `references/trigger-pattern.md`), or
 - Hermes cron fires per operator schedule (`MORNING_DIGEST_CRON` / `morning_digest.cron` in config).
 
 ## When not to use
 
-- Message is not exactly the manual trigger (after trim) and not a documented cron pseudo-trigger.
+- Message trigger line is neither `morning-digest` nor `morning-digest cron:<label>` (case-sensitive) per `references/trigger-pattern.md`, and invocation is not a documented cron pseudo-trigger.
 - Operator wants Mode B inbox constitution briefing — use legacy Story **26-7** scripts manually (§15.2 Operator Guide).
 
 ## Policy
