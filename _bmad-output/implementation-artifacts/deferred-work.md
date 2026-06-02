@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 56-5-notebook-queries-convex-table-dedupe (2026-06-02)
+
+- Concurrent duplicate mutation race in `logNotebookQuery` — two parallel HTTP mutations may both pass read-check before either inserts; story Dev Notes mark out of scope; database-level unique constraint deferred.
+
 ## Deferred from: code review of 56-4-morning-digest-signal-scoring-improvements (2026-06-02)
 
 - Malformed `DIGEST_SOURCES_JSON` / `SIGNALS_JSON` parse errors yield silent `[]` → `NO_ROUTE` — parity with pre-56-4 behavior; optional stderr warning in a future ops-hardening story.
