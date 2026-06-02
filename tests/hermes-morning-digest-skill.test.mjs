@@ -179,23 +179,30 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(newsapiWrapper.includes("NEWSAPI_API_KEY"));
   });
 
-  it("cron-snippet documents 0 8 schedule, MORNING_DIGEST_CRON, and 26-7 migration", () => {
+  it("cron-snippet documents 07:00 Sydney schedule, install script, and 26-7 migration (Story 55-3)", () => {
     assert.ok(existsSync(cronSnippetPath));
     const body = readFileSync(cronSnippetPath, "utf8");
 
-    assert.ok(body.includes("0 8"));
+    assert.ok(body.includes("0 7"));
     assert.ok(body.includes("MORNING_DIGEST_CRON"));
     assert.ok(body.includes("morning_digest.cron") || body.includes("morning_digest:"));
     assert.ok(body.includes("--skill morning-digest"));
+    assert.ok(body.includes("install-morning-digest-cron.sh"));
+    assert.ok(body.includes("run-morning-digest-cron.sh"));
+    assert.ok(body.includes("cns-morning-digest-skill"));
+    assert.ok(body.includes("CRON_TZ=Australia/Sydney"));
     assert.ok(body.includes("hermes-morning-digest.sh"));
-    assert.ok(!body.includes("CRON_TZ=Australia/Sydney"));
+    assert.ok(!body.includes("0 8 * * *"));
   });
 
-  it("config-snippet documents morning_digest.cron without hardcoded timezone", () => {
+  it("config-snippet documents morning_digest.cron with Sydney default (Story 55-3)", () => {
     assert.ok(existsSync(configSnippetPath));
     const body = readFileSync(configSnippetPath, "utf8");
 
     assert.ok(body.includes("morning_digest"));
+    assert.ok(body.includes("0 7"));
+    assert.ok(body.includes("Australia/Sydney"));
+    assert.ok(body.includes("install-morning-digest-cron.sh"));
     assert.ok(body.includes("channel_skill_bindings"));
     assert.ok(body.includes("channel_prompts"));
     assert.ok(body.includes('skill_view("morning-digest", "references/task-prompt.md")'));
@@ -203,7 +210,38 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("<hermes-channel-id>"));
     assert.ok(body.includes("do not wipe") || body.includes("do **not** replace"));
     assert.ok(!body.includes("1500733488897462382"));
-    assert.ok(!body.includes("Australia/Sydney"));
+  });
+
+  it("cron install + runner scripts exist with contract defaults (Story 55-3)", () => {
+    const installPath = join(root, "scripts/install-morning-digest-cron.sh");
+    const runPath = join(root, "scripts/run-morning-digest-cron.sh");
+    assert.ok(existsSync(installPath));
+    assert.ok(existsSync(runPath));
+    assert.ok((statSync(installPath).mode & 0o111) !== 0);
+    assert.ok((statSync(runPath).mode & 0o111) !== 0);
+
+    const installBody = readFileSync(installPath, "utf8");
+    const runBody = readFileSync(runPath, "utf8");
+
+    assert.ok(installBody.includes("cns-morning-digest-skill"));
+    assert.ok(installBody.includes('grep -v "$CRON_TAG"'));
+    assert.ok(installBody.includes("0 7 * * *"));
+    assert.ok(installBody.includes("CRON_TZ=Australia/Sydney"));
+    assert.ok(installBody.includes("MORNING_DIGEST_CRON"));
+    assert.ok(installBody.includes("--skill morning-digest"));
+    assert.ok(installBody.includes("--name"));
+    assert.ok(installBody.includes("--deliver discord"));
+    assert.ok(installBody.includes("0 0 1 1 *"));
+    assert.ok(installBody.includes(".env.live-chain"));
+    assert.ok(installBody.includes("morning-digest-skill-cron-job-id"));
+    assert.ok(installBody.includes("install_wsl_crontab_line"));
+    assert.ok(installBody.includes("chmod +x"));
+
+    assert.ok(runBody.includes("gateway is running"));
+    assert.ok(runBody.includes("hermes cron run"));
+    assert.ok(runBody.includes("hermes cron tick"));
+    assert.ok(runBody.includes("morning-digest-skill-cron-job-id"));
+    assert.ok(!runBody.includes("hermes-morning-digest-"));
   });
 
   it("SKILL.md forbids aborting digest on single-source failure", () => {

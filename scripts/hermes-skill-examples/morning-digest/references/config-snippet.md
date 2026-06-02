@@ -6,6 +6,12 @@ Copy skill to `~/.hermes/skills/cns/morning-digest/` via:
 bash scripts/install-hermes-skill-morning-digest.sh
 ```
 
+Automated daily run (Story 55-3):
+
+```bash
+bash scripts/install-morning-digest-cron.sh
+```
+
 ## `#hermes` skill binding
 
 In `~/.hermes/config.yaml`, add or extend `discord.channel_skill_bindings` for the `#hermes` channel ID (see Operator Guide §15.1).
@@ -50,18 +56,20 @@ Merge with your existing `channel_prompts` block; do **not** replace the whole p
 
 ## Optional schedule keys
 
-Cron expression only — **no timezone key** (machine local via WSL/Linux system TZ and optional `process.env.TZ`):
+Reference cron expression for `install-morning-digest-cron.sh` — **WSL line uses `CRON_TZ=Australia/Sydney`**:
 
 ```yaml
 morning_digest:
-  cron: "0 8 * * *"
+  cron: "0 7 * * *"
 ```
 
-Environment override (same 5-field cron):
+Environment override (same 5-field cron; takes precedence over YAML when install runs):
 
 ```bash
-export MORNING_DIGEST_CRON="0 8 * * *"
+export MORNING_DIGEST_CRON="0 7 * * *"
 ```
+
+Changing YAML or env alone does **not** reschedule the Hermes job until you re-run `bash scripts/install-morning-digest-cron.sh`.
 
 ## Credentials (not in this repo)
 
@@ -70,8 +78,9 @@ export MORNING_DIGEST_CRON="0 8 * * *"
 | `~/.hermes/trend-ingest.env` | `NEWSAPI_API_KEY` |
 | `~/.hermes/trend-watchlist.yaml` | Google Trends watchlist |
 | `OMNIPOTENT_REPO` | Optional; defaults to clone path in task-prompt |
+| `.env.live-chain` | `HERMES_DISCORD_TOKEN` for cron tick delivery |
 
 ## Coexistence
 
 - **investigate-trend**: bound to same channel with different trigger prefix — OK.
-- **Legacy 26-7**: comment out WSL crontab line in Operator Guide §15.2 when this skill is active.
+- **Legacy 26-7**: comment out WSL crontab line in Operator Guide §15.2 when this skill cron is active.

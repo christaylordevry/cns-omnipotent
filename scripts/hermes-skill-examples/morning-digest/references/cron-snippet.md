@@ -1,59 +1,63 @@
-# Cron: `morning-digest` (Story 49-6)
+# Cron: `morning-digest` (Story 49-6, 55-3)
+
+## One-command install (Story 55-3)
+
+```bash
+bash scripts/install-morning-digest-cron.sh
+```
+
+Installs:
+- WSL crontab line tagged **`cns-morning-digest-skill`** (real schedule, default **07:00 Sydney**)
+- Hermes cron job **`morning-digest`** with `--skill morning-digest --deliver discord` and **dummy** Hermes schedule (`0 0 1 1 *`) — WSL is the sole trigger (26-7 pattern)
+- Job id file: `~/.hermes/morning-digest-skill-cron-job-id`
+
+Log: `~/.hermes/logs/morning-digest-skill-cron.log`
 
 ## Schedule default
 
-- **08:00 machine-local** — `0 8 * * *` (five-field cron).
-- Uses WSL/Linux **system timezone** and optional `process.env.TZ`. **Do not** set `CRON_TZ` to a fixed region in repo docs for this skill.
+- **07:00 Australia/Sydney** — `0 7 * * *` with `CRON_TZ=Australia/Sydney` on the WSL crontab line.
+- Handles AEDT/AEST automatically via `CRON_TZ`; normative civil time is Sydney, not machine-local.
+- UTC equivalent (standard time only): **21:00 UTC previous calendar day** — do not hard-code UTC offset alone (DST).
 
-Overrides:
+Overrides (re-run install after changing):
 
 - Env: `MORNING_DIGEST_CRON` (5-field expression).
 - Config: `morning_digest.cron` in `~/.hermes/config.yaml` (see `references/config-snippet.md`).
 
-## Hermes cron job (preferred)
+## Hermes cron job
 
-Gateway must be running (same posture as Story 26-7 launcher).
+Gateway must be running (same posture as Story 26-7 / 55-3 runner).
+
+Manual create (install script preferred):
 
 ```bash
-MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 8 * * *}"
-hermes cron create "$MORNING_DIGEST_CRON" \
+# WSL civil-time schedule (operator reference):
+MORNING_DIGEST_CRON="${MORNING_DIGEST_CRON:-0 7 * * *}"
+
+# Hermes job: dummy schedule — WSL calls run-morning-digest-cron.sh at MORNING_DIGEST_CRON
+hermes cron create "0 0 1 1 *" \
   "Run morning-digest skill: collect Google Trends, NewsAPI, Perplexity; post Morning Digest contract to Discord." \
   --skill morning-digest \
   --name morning-digest \
   --deliver discord
 ```
 
-If you use `morning_digest.cron` in `~/.hermes/config.yaml`, copy that value into `MORNING_DIGEST_CRON` before creating or recreating the Hermes cron job. Hermes stores the schedule on the cron job; changing the env var or YAML later requires removing and recreating the job.
+`morning_digest.cron` in `~/.hermes/config.yaml` is an **operator reference** for the WSL crontab expression used by `install-morning-digest-cron.sh`. Changing YAML or env alone does **not** reschedule until you re-run `bash scripts/install-morning-digest-cron.sh` (or remove + recreate manually).
 
-Record job id (optional operator file):
-
-```bash
-hermes cron list | grep morning-digest
-# echo "<id>" > ~/.hermes/morning-digest-skill-cron-job-id
-```
-
-Remove / recreate after schedule changes:
-
-```bash
-hermes cron remove <id>
-```
-
-## WSL crontab alternative
-
-If you mirror the 26-7 pattern (external tick + `hermes cron run`), use **machine-local** time only:
+## WSL crontab (installed by `install-morning-digest-cron.sh`)
 
 ```cron
-# 0 8 * * * /usr/bin/env bash -lc 'hermes gateway status | grep -qi "gateway is running" && hermes cron run <job-id> && hermes cron tick'
+0 7 * * * CRON_TZ=Australia/Sydney /bin/bash "<repo>/scripts/run-morning-digest-cron.sh" >>"$HOME/.hermes/logs/morning-digest-skill-cron.log" 2>&1 # cns-morning-digest-skill
 ```
 
-Adjust `<job-id>` from `hermes cron list`. Log to `~/.hermes/logs/morning-digest-skill-cron.log` if desired.
+`run-morning-digest-cron.sh` checks `hermes gateway status`, then runs `hermes cron run <job-id>` and `hermes cron tick`. It does **not** post Discord text `morning-digest` (skill cron path per Story 55-1).
 
 ## Migration from Story 26-7
 
 - **Disable** the legacy **07:00** line calling `scripts/hermes-morning-digest.sh` (comment out in `crontab -e`) — see Operator Guide §15.2.
 - **Keep** 26-7 scripts in the repo for manual fallback.
-- Optional: `hermes cron remove <id>` for job in `~/.hermes/morning-digest-cron-job-id` when fully retired.
+- Do not confuse `~/.hermes/morning-digest-cron-job-id` (26-7) with **`~/.hermes/morning-digest-skill-cron-job-id`** (this skill).
 
 ## Gateway failure
 
-If `hermes gateway status` does not show a running gateway, do not claim Discord delivery. Exit non-zero from any wrapper script; retry on next schedule.
+If `hermes gateway status` does not show a running gateway, do not claim Discord delivery. Exit non-zero from `run-morning-digest-cron.sh`; retry on next schedule.

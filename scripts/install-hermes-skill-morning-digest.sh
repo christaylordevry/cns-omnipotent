@@ -23,6 +23,6 @@ fi
 
 echo "Installed Hermes skill to: $DEST_DIR"
 echo "Next: bind morning-digest in #hermes via ~/.hermes/config.yaml (see $DEST_DIR/references/config-snippet.md)."
-echo "Cron: see $DEST_DIR/references/cron-snippet.md (default 08:00 machine-local)."
+echo "Cron: bash scripts/install-morning-digest-cron.sh (default 07:00 Australia/Sydney; see $DEST_DIR/references/cron-snippet.md)."
 echo "Migration: comment out legacy 26-7 WSL crontab line in Operator Guide §15.2 — keep scripts as fallback."
 echo "NotebookLM: Vault context requires notebook-query scripts in repo (51-1) and nlm on PATH."

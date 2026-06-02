@@ -1,5 +1,14 @@
 # Deferred work
 
+## Deferred from: code review of 55-3-morning-digest-cron-automation (2026-06-02)
+
+- SKILL.md still documents 08:00 machine-local default — out of 55-3 scope; track as doc follow-up.
+- Gateway status grep substring brittleness — matches existing 26-7 launcher pattern.
+- E2E `#hermes` digest smoke deferred in dev record — operational gate when gateway restarts.
+- Concurrent install race without flock — not in sibling cron installers.
+- Log rotation / failure alerting absent — pre-existing cron pattern across CNS installers.
+- Optional env overrides (`MORNING_DIGEST_SKILL_CRON_*`) undocumented in Operator Guide — minor.
+
 ## Deferred from: code review of 55-2-google-trends-normalized-value-fix (2026-06-02)
 
 - Sub-0.5 mean rounds to zero indistinguishable from true all-zero window — watchlist not affected; optional future metadata for pre-round mean.
