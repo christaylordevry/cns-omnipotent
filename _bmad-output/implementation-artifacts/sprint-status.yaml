@@ -390,4 +390,4 @@ development_status:
   epic-56: in-progress
   56-1-notebooklm-routing-threshold-tuning: done
   56-2-vault-lint-remediation: done
-  56-3-session-close-fan-out-error-class-dashboard-widget: in-progress
+  56-3-session-close-fan-out-error-class-dashboard-widget: done

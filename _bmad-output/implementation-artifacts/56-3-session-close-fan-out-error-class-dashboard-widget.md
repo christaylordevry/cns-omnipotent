@@ -2,7 +2,7 @@
 story_id: 56-3
 epic: 56
 title: session-close-fan-out-error-class-dashboard-widget
-status: in-progress
+status: done
 baseline_commit: a87396d700eb9fff5d30cbd9aefb6fcb1442b9c9
 predecessors: 54-3, 56-1, 56-2
 repos: Omnipotent.md (Part A), cns-dashboard (Part B)
