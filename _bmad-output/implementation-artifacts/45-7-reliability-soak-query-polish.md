@@ -8,7 +8,7 @@ output_repo: cns-dashboard
 
 # Story 45-7: Reliability soak and query polish
 
-Status: review
+Status: done
 
 ## Acceptance Criteria
 

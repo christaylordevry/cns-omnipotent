@@ -8,7 +8,7 @@ output_repo: cns-dashboard
 
 # Story 45-4: Analytics action — wire and schedule
 
-Status: review
+Status: done
 
 ## Acceptance Criteria
 

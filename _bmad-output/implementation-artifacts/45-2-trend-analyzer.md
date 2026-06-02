@@ -8,7 +8,7 @@ output_repo: cns-dashboard
 
 # Story 45-2: TrendAnalyzer — lifecycle and investment scoring
 
-Status: review
+Status: done
 
 ## Story
 

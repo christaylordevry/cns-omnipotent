@@ -325,13 +325,13 @@ development_status:
 
   epic-45: done
   45-1-schema-and-query-layer: done
-  45-2-trend-analyzer: review
+  45-2-trend-analyzer: done
   45-3-trend-analysis-service: done
   45-4-analytics-action-wire-schedule: done
   45-5-anomaly-detection: done
   45-6-arima-forecasting: done
-  45-7-reliability-soak-query-polish: review
-  45-7-soak: review
+  45-7-reliability-soak-query-polish: done
+  45-7-soak: done
 
   # Epic 48 — session-close FR-17..19; strict order SC-1 → SC-6 (architecture-session-close-fr17-19.md)
   epic-48: done
