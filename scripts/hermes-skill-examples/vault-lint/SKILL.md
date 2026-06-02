@@ -1,7 +1,7 @@
 ---
 name: vault-lint
 description: "Hermes CNS vault lint for /vault-lint in #hermes. Read-only four-rule scan (vault-lint.md) via Vault IO MCP; Discord summary per spec; full report via direct FS write to _meta/reports/vault-lint-YYYY-MM-DD.md only."
-version: 1.0.1
+version: 1.0.2
 author: CNS Operator
 license: MIT
 metadata:
@@ -40,6 +40,7 @@ Normative rules, severities, Discord layout, on-disk report, and JSON machine bl
 1. Resolve **`CNS_VAULT_ROOT`** per `references/task-prompt.md`.
 2. Execute **`references/task-prompt.md`** in order (inventory, MCP reads, rule evaluation, Discord text, report file, JSON findings).
 3. Reply in Discord with **only** the spec template body (no extra preamble).
+4. After Discord + report write, run **`references/task-prompt.md` §14** — `scripts/patch-memory-vault-line.mjs` updates the `Vault:` line in Hermes `MEMORY.md` (best-effort; do not fail the skill on skip).
 
 ## Tools
 

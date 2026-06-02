@@ -98,15 +98,12 @@ export function formatPriorFanoutSummary(targets) {
 
 /**
  * @param {string} memoryText
- * @param {string} newBlock includes ## CNS State heading
- * @returns {string}
+ * @returns {{ start: number, regionEnd: number } | null}
  */
-export function replaceCnsStateInMemory(memoryText, newBlock) {
-  const block = newBlock.endsWith("\n") ? newBlock : `${newBlock}\n`;
+export function findCnsStateRegion(memoryText) {
   const start = memoryText.indexOf(CNS_STATE_HEADING);
   if (start === -1) {
-    const prefix = memoryText.length > 0 && !memoryText.endsWith("\n") ? "\n" : "";
-    return memoryText.length === 0 ? block : `${block}${prefix}${memoryText}`;
+    return null;
   }
 
   let regionEnd = memoryText.length;
@@ -117,6 +114,117 @@ export function replaceCnsStateInMemory(memoryText, newBlock) {
     regionEnd = nextHeading + 1;
   }
 
+  return { start, regionEnd };
+}
+
+/**
+ * @param {{ notes: number, errors: number, lintDate: string }} input
+ * @returns {string}
+ */
+export function formatVaultLintMemoryLine({ notes, errors, lintDate }) {
+  return `Vault: ${notes} notes, ERRORS: ${errors}, last lint: ${lintDate}`;
+}
+
+/**
+ * @param {string} memoryText
+ * @param {string} vaultLine formatted Vault: line (no trailing newline)
+ * @returns {string}
+ */
+export function patchVaultLineInMemory(memoryText, vaultLine) {
+  const region = findCnsStateRegion(memoryText);
+  if (!region) {
+    return memoryText;
+  }
+
+  const { start, regionEnd } = region;
+  const regionText = memoryText.slice(start, regionEnd);
+  const vaultLineRe = /^Vault:.*$/m;
+
+  let newRegionText;
+  if (vaultLineRe.test(regionText)) {
+    newRegionText = regionText.replace(vaultLineRe, vaultLine);
+  } else {
+    const afterHeading = regionText.indexOf("\n");
+    if (afterHeading === -1) {
+      newRegionText = `${regionText}\n${vaultLine}\n`;
+    } else {
+      const headingLine = regionText.slice(0, afterHeading + 1);
+      const rest = regionText.slice(afterHeading + 1);
+      newRegionText = `${headingLine}${vaultLine}\n${rest}`;
+    }
+  }
+
+  return memoryText.slice(0, start) + newRegionText + memoryText.slice(regionEnd);
+}
+
+/**
+ * @param {{
+ *   notes: number;
+ *   errors: number;
+ *   lintDate: string;
+ *   memoryMdPath?: string;
+ *   env?: NodeJS.ProcessEnv;
+ * }} opts
+ */
+export async function runVaultLintMemoryUpdate(opts) {
+  const env = opts.env ?? process.env;
+  const memoryPath = opts.memoryMdPath ?? resolveMemoryMdPath(env);
+
+  if (!memoryPath.trim()) {
+    return { status: "skipped", message: "vault_lint_memory: skipped" };
+  }
+
+  let parentExists = true;
+  try {
+    await access(dirname(memoryPath));
+  } catch {
+    parentExists = false;
+  }
+  if (!parentExists) {
+    return { status: "skipped", message: "vault_lint_memory: skipped" };
+  }
+
+  let memoryText;
+  try {
+    memoryText = await readFile(memoryPath, "utf8");
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+      return { status: "skipped", message: "vault_lint_memory: skipped" };
+    }
+    throw err;
+  }
+
+  if (!findCnsStateRegion(memoryText)) {
+    return { status: "skipped", message: "vault_lint_memory: skipped" };
+  }
+
+  const vaultLine = formatVaultLintMemoryLine({
+    notes: opts.notes,
+    errors: opts.errors,
+    lintDate: opts.lintDate,
+  });
+  let merged = patchVaultLineInMemory(memoryText, vaultLine);
+  merged = enforceMemoryFileCharLimit(merged);
+
+  const charCount = Buffer.byteLength(merged, "utf8");
+  await writeFile(memoryPath, merged, "utf8");
+  return { status: "ok", message: `vault_lint_memory: ok (${charCount} chars)` };
+}
+
+/**
+ * @param {string} memoryText
+ * @param {string} newBlock includes ## CNS State heading
+ * @returns {string}
+ */
+export function replaceCnsStateInMemory(memoryText, newBlock) {
+  const block = newBlock.endsWith("\n") ? newBlock : `${newBlock}\n`;
+  const region = findCnsStateRegion(memoryText);
+  if (!region) {
+    const prefix = memoryText.length > 0 && !memoryText.endsWith("\n") ? "\n" : "";
+    return memoryText.length === 0 ? block : `${block}${prefix}${memoryText}`;
+  }
+
+  const { start, regionEnd } = region;
   const before = memoryText.slice(0, start);
   const after = memoryText.slice(regionEnd);
   return `${before}${block}${after}`;
@@ -132,8 +240,8 @@ export function enforceMemoryFileCharLimit(memoryText, limit = MEMORY_FILE_CHAR_
     return memoryText;
   }
 
-  const start = memoryText.indexOf(CNS_STATE_HEADING);
-  if (start === -1) {
+  const region = findCnsStateRegion(memoryText);
+  if (!region) {
     const firstH2 = memoryText.indexOf("\n## ");
     if (firstH2 === -1) {
       return truncateUtf8ToByteLimit(memoryText, limit);
@@ -147,14 +255,7 @@ export function enforceMemoryFileCharLimit(memoryText, limit = MEMORY_FILE_CHAR_
     return truncateUtf8ToByteLimit(head, limit - tailBytes) + tail;
   }
 
-  let regionEnd = memoryText.length;
-  const afterHeading = memoryText.indexOf("\n", start);
-  const searchFrom = afterHeading === -1 ? start + CNS_STATE_HEADING.length : afterHeading + 1;
-  const nextHeading = memoryText.indexOf("\n## ", searchFrom);
-  if (nextHeading !== -1) {
-    regionEnd = nextHeading + 1;
-  }
-
+  const { start, regionEnd } = region;
   const before = memoryText.slice(0, start);
   const after = memoryText.slice(regionEnd);
   const suffix = "[truncated]";

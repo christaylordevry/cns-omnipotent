@@ -225,4 +225,23 @@ Set `counts.errors` / `counts.warnings` / `counts.infos` to match the `findings`
 
 - Batch `vault_read` for Rule 2 in groups (sequential or parallel tool calls) to stay within turn limits; if you cannot finish, reply `vault-lint: incomplete` and **do not** claim full scan (operator should retry with smaller vault or session split — avoid this by working in batches across turns if Hermes allows).
 - Never call mutator MCP tools.
-- After Discord reply and report write, **stop**.
+- After Discord reply and report write, proceed to **§14** (MEMORY patch). Do **not** stop before §14 on a successful full scan.
+
+## 14) Hermes MEMORY.md vault line (best-effort)
+
+After Discord reply and on-disk report write succeed (full scan — not `bad-trigger`, `no-vault-root`, or `incomplete`):
+
+1. Invoke the thin CLI with live scan counts and **`today`** (UTC run date):
+
+   ```bash
+   VAULT_LINT_NOTES=<scanned> VAULT_LINT_ERRORS=<counts.errors> VAULT_LINT_DATE=<today> \
+     node "$SKILL_DIR/scripts/patch-memory-vault-line.mjs"
+   ```
+
+   Set `SKILL_DIR` to this skill package root (installed copy under `~/.hermes/skills/cns/vault-lint/` or repo mirror `scripts/hermes-skill-examples/vault-lint/`). Optional: `OMNIPOTENT_REPO` and `MEMORY_MD_PATH` env overrides per session-close (57-2).
+
+2. Do **not** fail the skill if the script prints `vault_lint_memory: skipped` or exits 0 after skip — memory patch is best-effort.
+
+3. Do **not** include memory patch status in the Discord reply (operator-visible lint output unchanged).
+
+4. Then **stop**.

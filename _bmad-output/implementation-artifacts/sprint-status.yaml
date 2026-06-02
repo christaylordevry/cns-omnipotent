@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-02T15:00:00+10:00"
+last_updated: "2026-06-02T16:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -397,3 +397,4 @@ development_status:
   # Epic 57 — Hermes MEMORY.md CNS State freshness (operator brief 2026-06-02)
   epic-57: in-progress
   57-2-session-close-memory-md-auto-update: done
+  57-3-vault-lint-result-auto-memory: review
