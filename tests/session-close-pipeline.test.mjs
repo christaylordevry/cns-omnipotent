@@ -26,6 +26,7 @@ import {
   enrichNotebooklmTargets,
   ensurePhaseAComplete,
   evaluatePhaseACompletion,
+  mapFanoutTargetToHealthFields,
   parseKeyValueEnv,
   parseVitestTestsSummary,
   pushNotebookHealthSnapshot,
@@ -657,6 +658,9 @@ describe("session-close run-deterministic", () => {
         domain: "cns-brain",
         watch: true,
         lastUpdated: "2026-05-28T15:52:05Z",
+        lastFanoutStatus: "unknown",
+        lastErrorClass: null,
+        lastFanoutAt: null,
       },
       {
         notebookId: "routed-1",
@@ -664,8 +668,97 @@ describe("session-close run-deterministic", () => {
         domain: "unknown",
         watch: false,
         lastUpdated: null,
+        lastFanoutStatus: "unknown",
+        lastErrorClass: null,
+        lastFanoutAt: null,
       },
     ]);
+  });
+
+  it("mapFanoutTargetToHealthFields maps close-report fanout_status values", () => {
+    const generatedAt = "2026-06-01T12:00:00.000Z";
+    const at = Date.parse(generatedAt);
+    assert.deepEqual(mapFanoutTargetToHealthFields({ fanout_status: "ok" }, generatedAt), {
+      lastFanoutStatus: "success",
+      lastErrorClass: null,
+      lastFanoutAt: at,
+    });
+    assert.deepEqual(
+      mapFanoutTargetToHealthFields(
+        { fanout_status: "failed", error_class: "size_limit" },
+        generatedAt,
+      ),
+      {
+        lastFanoutStatus: "error",
+        lastErrorClass: "size_limit",
+        lastFanoutAt: at,
+      },
+    );
+    assert.deepEqual(mapFanoutTargetToHealthFields(undefined, generatedAt), {
+      lastFanoutStatus: "unknown",
+      lastErrorClass: null,
+      lastFanoutAt: null,
+    });
+  });
+
+  it("buildNotebookHealthRows merges fan-out targets by notebook_id", () => {
+    const generatedAt = "2026-06-01T12:00:00.000Z";
+    const at = Date.parse(generatedAt);
+    const rows = buildNotebookHealthRows(
+      [
+        {
+          id: "nb-ok",
+          title: "OK Notebook",
+          watch: true,
+          domain: "cns-brain",
+          last_updated: null,
+        },
+        {
+          id: "nb-fail",
+          title: "Failed Notebook",
+          watch: true,
+          domain: "learning",
+          last_updated: null,
+        },
+        {
+          id: "nb-none",
+          title: "No Fanout",
+          watch: true,
+          domain: "learning",
+          last_updated: null,
+        },
+      ],
+      [],
+      [
+        { notebook_id: "nb-ok", fanout_status: "ok" },
+        { notebook_id: "nb-fail", fanout_status: "failed", error_class: "auth_error" },
+      ],
+      generatedAt,
+    );
+
+    assert.deepEqual(rows[0], {
+      notebookId: "nb-ok",
+      title: "OK Notebook",
+      domain: "cns-brain",
+      watch: true,
+      lastUpdated: null,
+      lastFanoutStatus: "success",
+      lastErrorClass: null,
+      lastFanoutAt: at,
+    });
+    assert.deepEqual(rows[1], {
+      notebookId: "nb-fail",
+      title: "Failed Notebook",
+      domain: "learning",
+      watch: true,
+      lastUpdated: null,
+      lastFanoutStatus: "error",
+      lastErrorClass: "auth_error",
+      lastFanoutAt: at,
+    });
+    assert.equal(rows[2].lastFanoutStatus, "unknown");
+    assert.equal(rows[2].lastErrorClass, null);
+    assert.equal(rows[2].lastFanoutAt, null);
   });
 
   it("pushNotebookHealthSnapshot posts Convex mutation payload when configured", async () => {
@@ -728,6 +821,9 @@ describe("session-close run-deterministic", () => {
               domain: "cns-brain",
               watch: true,
               lastUpdated: "2026-05-28T15:52:05Z",
+              lastFanoutStatus: "unknown",
+              lastErrorClass: null,
+              lastFanoutAt: null,
             },
             {
               notebookId: "routed-1",
@@ -735,10 +831,83 @@ describe("session-close run-deterministic", () => {
               domain: "unknown",
               watch: false,
               lastUpdated: null,
+              lastFanoutStatus: "unknown",
+              lastErrorClass: null,
+              lastFanoutAt: null,
             },
           ],
         },
         format: "json",
+      });
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("pushNotebookHealthSnapshot includes fan-out fields from prior close-report", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "notebook-health-fanout-"));
+    const registryPath = join(fixtureRoot, "notebook-registry.json");
+    const closeReportPath = join(fixtureRoot, "close-report.json");
+    const generatedAt = "2026-06-01T18:30:00.000Z";
+    const fanoutAt = Date.parse(generatedAt);
+    const calls = [];
+
+    await writeFile(
+      registryPath,
+      `${JSON.stringify([
+        {
+          id: "watched-1",
+          title: "Watched Notebook",
+          watch: true,
+          domain: "cns-brain",
+          last_updated: null,
+        },
+      ])}\n`,
+      "utf8",
+    );
+    await writeFile(
+      closeReportPath,
+      `${JSON.stringify({
+        generated_at: generatedAt,
+        notebooklm_targets: [
+          { notebook_id: "watched-1", fanout_status: "failed", error_class: "size_limit" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    try {
+      const result = await pushNotebookHealthSnapshot({
+        dryRun: false,
+        registryPath,
+        closeReportPath,
+        pack: {},
+        env: {
+          CONVEX_URL: "https://example.convex.cloud",
+          CONVEX_DEPLOY_KEY: "deploy-key-secret",
+        },
+        fetchFn: async (url, init) => {
+          calls.push({ url, init });
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ status: "success" }),
+          };
+        },
+      });
+
+      assert.deepEqual(result, { status: "ok", rows: 1, reason: "pushed" });
+      const body = JSON.parse(calls[0].init.body);
+      assert.deepEqual(body.args.rows[0], {
+        notebookId: "watched-1",
+        title: "Watched Notebook",
+        domain: "cns-brain",
+        watch: true,
+        lastUpdated: null,
+        lastFanoutStatus: "error",
+        lastErrorClass: "size_limit",
+        lastFanoutAt: fanoutAt,
       });
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });

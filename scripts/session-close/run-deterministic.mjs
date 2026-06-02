@@ -86,11 +86,113 @@ function parseRoutingNotebook(row) {
 }
 
 /**
+ * @typedef {'success' | 'error' | 'unknown'} NotebookFanoutHealthStatus
+ */
+
+/**
+ * @typedef {{
+ *   lastFanoutStatus: NotebookFanoutHealthStatus;
+ *   lastErrorClass: string | null;
+ *   lastFanoutAt: number | null;
+ * }} NotebookFanoutHealthFields
+ */
+
+/**
+ * @param {unknown} target
+ * @param {string | null | undefined} reportGeneratedAt
+ * @returns {NotebookFanoutHealthFields}
+ */
+export function mapFanoutTargetToHealthFields(target, reportGeneratedAt) {
+  const record =
+    target && typeof target === "object" && !Array.isArray(target)
+      ? /** @type {{ fanout_status?: unknown; error_class?: unknown }} */ (target)
+      : null;
+  const status = record?.fanout_status;
+  let lastFanoutStatus = /** @type {NotebookFanoutHealthStatus} */ ("unknown");
+  if (status === "ok") {
+    lastFanoutStatus = "success";
+  } else if (status === "failed") {
+    lastFanoutStatus = "error";
+  }
+  const lastErrorClass =
+    lastFanoutStatus === "error" && typeof record?.error_class === "string"
+      ? record.error_class
+      : null;
+  let lastFanoutAt = null;
+  if (lastFanoutStatus !== "unknown" && typeof reportGeneratedAt === "string") {
+    const parsed = Date.parse(reportGeneratedAt);
+    if (!Number.isNaN(parsed)) {
+      lastFanoutAt = parsed;
+    }
+  }
+  return { lastFanoutStatus, lastErrorClass, lastFanoutAt };
+}
+
+/**
+ * @param {unknown[]} fanoutTargets
+ * @returns {Map<string, unknown>}
+ */
+function indexFanoutTargetsByNotebookId(fanoutTargets) {
+  const byId = new Map();
+  for (const target of fanoutTargets) {
+    if (!target || typeof target !== "object" || Array.isArray(target)) {
+      continue;
+    }
+    const notebookId = /** @type {{ notebook_id?: unknown }} */ (target).notebook_id;
+    if (typeof notebookId === "string" && notebookId) {
+      byId.set(notebookId, target);
+    }
+  }
+  return byId;
+}
+
+/**
+ * @param {string} closeReportPath
+ * @returns {Promise<{ fanoutTargets: unknown[]; reportGeneratedAt: string | null }>}
+ */
+export async function loadFanoutTargetsFromCloseReport(closeReportPath) {
+  try {
+    const parsed = JSON.parse(await readFile(closeReportPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { fanoutTargets: [], reportGeneratedAt: null };
+    }
+    const report = /** @type {{ notebooklm_targets?: unknown; generated_at?: unknown }} */ (parsed);
+    const fanoutTargets = Array.isArray(report.notebooklm_targets) ? report.notebooklm_targets : [];
+    const reportGeneratedAt =
+      typeof report.generated_at === "string" ? report.generated_at : null;
+    return { fanoutTargets, reportGeneratedAt };
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+      return { fanoutTargets: [], reportGeneratedAt: null };
+    }
+    return { fanoutTargets: [], reportGeneratedAt: null };
+  }
+}
+
+/**
  * @param {import('./lib/sync-notebook-registry.mjs').NotebookRegistryEntry[]} registry
  * @param {unknown[]} routingNotebooks
- * @returns {{ notebookId: string; title: string; domain: string; watch: boolean; lastUpdated: string | null }[]}
+ * @param {unknown[]} [fanoutTargets]
+ * @param {string | null} [reportGeneratedAt]
+ * @returns {{
+ *   notebookId: string;
+ *   title: string;
+ *   domain: string;
+ *   watch: boolean;
+ *   lastUpdated: string | null;
+ *   lastFanoutStatus: NotebookFanoutHealthStatus;
+ *   lastErrorClass: string | null;
+ *   lastFanoutAt: number | null;
+ * }[]}
  */
-export function buildNotebookHealthRows(registry, routingNotebooks = []) {
+export function buildNotebookHealthRows(
+  registry,
+  routingNotebooks = [],
+  fanoutTargets = [],
+  reportGeneratedAt = null,
+) {
+  const fanoutById = indexFanoutTargetsByNotebookId(fanoutTargets);
+
   const rows = registry
     .filter((notebook) => notebook.watch)
     .map((notebook) => ({
@@ -117,7 +219,10 @@ export function buildNotebookHealthRows(registry, routingNotebooks = []) {
     seen.add(parsed.id);
   }
 
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    ...mapFanoutTargetToHealthFields(fanoutById.get(row.notebookId), reportGeneratedAt),
+  }));
 }
 
 /**
@@ -212,6 +317,10 @@ async function resolveConvexPushEnv(env) {
  *   env?: Record<string, string | undefined>;
  *   fetchFn?: typeof fetch;
  *   registryPath?: string;
+ *   closeReportPath?: string;
+ *   repoRoot?: string;
+ *   fanoutTargets?: unknown[];
+ *   reportGeneratedAt?: string | null;
  * }} opts
  */
 export async function pushNotebookHealthSnapshot(opts) {
@@ -233,7 +342,24 @@ export async function pushNotebookHealthSnapshot(opts) {
       ? /** @type {{ notebooks?: unknown }} */ (opts.pack.notebooklm_routing).notebooks
       : [];
   const routingNotebooks = Array.isArray(routing) ? routing : [];
-  const rows = buildNotebookHealthRows(registry, routingNotebooks);
+
+  let fanoutTargets = opts.fanoutTargets;
+  let reportGeneratedAt = opts.reportGeneratedAt ?? null;
+  if (fanoutTargets === undefined) {
+    const closeReportPath =
+      opts.closeReportPath ??
+      resolvePaths({ repoRoot: opts.repoRoot }).closeReportPath;
+    const loaded = await loadFanoutTargetsFromCloseReport(closeReportPath);
+    fanoutTargets = loaded.fanoutTargets;
+    reportGeneratedAt = loaded.reportGeneratedAt;
+  }
+
+  const rows = buildNotebookHealthRows(
+    registry,
+    routingNotebooks,
+    fanoutTargets,
+    reportGeneratedAt,
+  );
   if (rows.length === 0) {
     return { status: "skipped", rows: 0, reason: "no-notebook-health-rows" };
   }
@@ -655,6 +781,8 @@ export async function runDeterministicPipeline(opts = {}) {
       env: process.env,
       fetchFn: globalThis.fetch,
       registryPath: DEFAULT_REGISTRY_PATH,
+      closeReportPath: paths.closeReportPath,
+      repoRoot: paths.repoRoot,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

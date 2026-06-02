@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 56-3-session-close-fan-out-error-class-dashboard-widget (2026-06-02)
+
+- Part B Knowledge Pulse badge overlay (AC 6) — separate Cursor session per story split; T7/T8.
+- `lastFanoutAt` uses report `generated_at` from Phase A write, not Phase C fan-out completion — accepted next-close visibility model in story Dev Notes.
+
 ## Deferred from: code review of 56-1-notebooklm-routing-threshold-tuning (2026-06-02)
 
 - `read-sources.mjs` `smartRoute` still uses hard-only `scoreNotebooks` + `disambiguateRoute` — morning digest and `/notebook-query` now soft-route; session-close fan-out parity is a follow-up outside 56-1 file list.
