@@ -398,3 +398,4 @@ development_status:
   epic-57: in-progress
   57-2-session-close-memory-md-auto-update: done
   57-3-vault-lint-result-auto-memory: done
+  57-4-external-memory-provider-eval: done
