@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 55-2-google-trends-normalized-value-fix (2026-06-02)
+
+- Sub-0.5 mean rounds to zero indistinguishable from true all-zero window — watchlist not affected; optional future metadata for pre-round mean.
+- Fetch tests omit `isPartial` row filtering — mocks lack `.index`/`.loc`; production filter at L744–745 unchanged.
+- Missing `isPartial` column includes incomplete hour in mean — pytrends frame-shape dependency; no fallback today.
+- NaN/non-numeric series values raise unhandled exceptions in aggregation — corrupt-frame gap predates 55-2.
+
 ## Deferred from: code review of 54-4-trigger-contract-audit (2026-06-02)
 
 - Contract test scans only first 120 lines of SKILL.md for REFERENCE ONLY — AC 6 sketch; full-file scan is follow-up hardening.

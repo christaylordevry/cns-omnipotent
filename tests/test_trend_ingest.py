@@ -593,6 +593,10 @@ class GoogleTrendsCollectorTests(unittest.TestCase):
             event["metadata"]["normalisationMethod"],
             "trends_interest_over_100",
         )
+        self.assertEqual(
+            event["metadata"]["interestAggregation"],
+            "mean_non_partial_window",
+        )
         self.assertEqual(event["ingestRunId"], "550e8400-e29b-41d4-a716-446655440000")
 
     def test_collect_emits_events_for_each_keyword(self) -> None:
@@ -702,16 +706,18 @@ class GoogleTrendsCollectorTests(unittest.TestCase):
             )
         )
 
-    def test_fetch_google_trends_interest_returns_latest_interest(self) -> None:
+    def test_aggregate_trends_interest_mean_non_partial_window(self) -> None:
+        self.assertEqual(trend_ingest._aggregate_trends_interest([40, 72]), 56)
+        self.assertEqual(trend_ingest._aggregate_trends_interest([100, 50, 0]), 50)
+
+    def test_aggregate_trends_interest_trailing_zero_regression(self) -> None:
+        """iloc[-1] would be 0; mean over window must be non-zero."""
+        interest = trend_ingest._aggregate_trends_interest([100, 0])
+        self.assertGreater(interest, 0)
+
+    def test_fetch_google_trends_interest_mean_non_partial_window(self) -> None:
         WatchlistEntry = trend_ingest.WatchlistEntry
         entry = WatchlistEntry("ai-agents", "AI agents", "global", 1)
-
-        class _Iloc:
-            def __init__(self, values: list[int]) -> None:
-                self._values = values
-
-            def __getitem__(self, idx: int) -> int:
-                return self._values[idx]
 
         class FakeSeries:
             def __init__(self, values: list[int]) -> None:
@@ -724,9 +730,8 @@ class GoogleTrendsCollectorTests(unittest.TestCase):
             def dropna(self) -> "FakeSeries":
                 return self
 
-            @property
-            def iloc(self) -> _Iloc:
-                return _Iloc(self._values)
+            def tolist(self) -> list[int]:
+                return list(self._values)
 
         class FakeFrame:
             empty = False
@@ -754,8 +759,49 @@ class GoogleTrendsCollectorTests(unittest.TestCase):
         interest = trend_ingest.fetch_google_trends_interest(
             entry, trend_client=client
         )
-        self.assertEqual(interest, 72)
+        self.assertEqual(interest, 56)
         self.assertEqual(FakeTrendClient.last_geo, "")
+
+    def test_fetch_google_trends_interest_trailing_zero_series(self) -> None:
+        WatchlistEntry = trend_ingest.WatchlistEntry
+        entry = WatchlistEntry("sveltekit", "SvelteKit", "global", 1)
+
+        class FakeSeries:
+            def __init__(self, values: list[int]) -> None:
+                self._values = values
+
+            @property
+            def empty(self) -> bool:
+                return not self._values
+
+            def dropna(self) -> "FakeSeries":
+                return self
+
+            def tolist(self) -> list[int]:
+                return list(self._values)
+
+        class FakeFrame:
+            empty = False
+            columns = ["SvelteKit", "isPartial"]
+
+            def drop(self, columns: list[str] | None = None) -> "FakeFrame":
+                return self
+
+            def __getitem__(self, key: str) -> FakeSeries:
+                return FakeSeries([100, 50, 0])
+
+        class FakeTrendClient:
+            def build_payload(self, *_a: object, **_k: object) -> None:
+                return None
+
+            def interest_over_time(self) -> FakeFrame:
+                return FakeFrame()
+
+        interest = trend_ingest.fetch_google_trends_interest(
+            entry, trend_client=FakeTrendClient()
+        )
+        self.assertEqual(interest, 50)
+        self.assertGreater(interest, 0)
 
     def test_fetch_google_trends_interest_empty_frame_raises(self) -> None:
         WatchlistEntry = trend_ingest.WatchlistEntry

@@ -72,6 +72,7 @@ TRENDS_SIGNAL_TYPE = "search_volume"
 REDDIT_SIGNAL_TYPE = "mention_count"
 NEWS_SIGNAL_TYPE = "article_count"
 TRENDS_NORM_METHOD = "trends_interest_over_100"
+TRENDS_INTEREST_AGGREGATION = "mean_non_partial_window"
 REDDIT_NORM_METHOD = "reddit_7d_minmax"
 NEWS_NORM_METHOD = "news_7d_minmax"
 REDDIT_SEARCH_LIMIT = 100
@@ -667,7 +668,10 @@ def build_google_trends_event(
             window_hours=window_hours,
         ),
         "ingestRunId": ingest_run_id,
-        "metadata": {"normalisationMethod": TRENDS_NORM_METHOD},
+        "metadata": {
+            "normalisationMethod": TRENDS_NORM_METHOD,
+            "interestAggregation": TRENDS_INTEREST_AGGREGATION,
+        },
     }
 
 
@@ -683,6 +687,21 @@ def _trends_geo_for_entry(entry: WatchlistEntry) -> str:
     if entry.region == "global":
         return ""
     return entry.region.upper()
+
+
+def _aggregate_trends_interest(series: Any) -> int:
+    """Mean of non-partial hourly values — avoids trailing-hour zeros (Story 55-2)."""
+    try:
+        values = series.tolist()
+    except AttributeError:
+        values = list(series)
+    if not values:
+        raise TrendsEmptyResponseError("no interest values")
+    mean_val = sum(values) / len(values)
+    interest = int(round(mean_val))
+    if interest < 0 or interest > 100:
+        raise TrendsEmptyResponseError("interest out of range")
+    return interest
 
 
 def fetch_google_trends_interest(
@@ -727,9 +746,7 @@ def fetch_google_trends_interest(
     if series.empty:
         raise TrendsEmptyResponseError("no interest values")
 
-    interest = int(series.iloc[-1])
-    if interest < 0 or interest > 100:
-        raise TrendsEmptyResponseError("interest out of range")
+    interest = _aggregate_trends_interest(series)
     return interest
 
 
