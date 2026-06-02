@@ -36,8 +36,9 @@ describe("classifySourceAddError", () => {
     assert.equal(classifySourceAddError("HTTP 503 service unavailable"), "api_error");
   });
 
-  it("defaults to unknown for generic message", () => {
-    assert.equal(classifySourceAddError("Could not add file source."), "unknown");
+  it("classifies nlm_source_rejected for generic NLM add failure", () => {
+    assert.equal(classifySourceAddError("Could not add file source."), "nlm_source_rejected");
+    assert.equal(classifySourceAddError("Could not add source."), "nlm_source_rejected");
   });
 });
 
@@ -133,7 +134,7 @@ describe("mergeFanoutIntoCloseReport", () => {
 
     const row = report.notebooklm_targets[0];
     assert.equal(row.export_bytes, Buffer.byteLength(body, "utf8"));
-    assert.equal(row.error_class, "unknown");
+    assert.equal(row.error_class, "nlm_source_rejected");
   });
 });
 

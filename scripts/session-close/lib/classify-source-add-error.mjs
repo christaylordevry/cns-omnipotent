@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { sanitizeNlmAuthText } from "./nlm-auth-watchdog.mjs";
 
-/** @typedef {'size_limit' | 'auth_error' | 'duplicate_source' | 'api_error' | 'unknown'} SourceAddErrorClass */
+/** @typedef {'size_limit' | 'auth_error' | 'duplicate_source' | 'api_error' | 'nlm_source_rejected' | 'unknown'} SourceAddErrorClass */
 
 const CLASS_RULES = [
   {
@@ -42,6 +42,13 @@ const CLASS_RULES = [
       /\b504\b/,
       /\binternal server\b/i,
       /\bservice unavailable\b/i,
+    ],
+  },
+  {
+    error_class: /** @type {SourceAddErrorClass} */ ("nlm_source_rejected"),
+    patterns: [
+      /\bcould not add file source\b/i,
+      /\bcould not add source\b/i,
     ],
   },
 ];
