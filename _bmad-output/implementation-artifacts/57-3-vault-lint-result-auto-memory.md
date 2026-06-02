@@ -2,7 +2,7 @@
 story_id: 57-3
 epic: 57
 title: vault-lint-result-auto-memory
-status: review
+status: done
 baseline_commit: b8d0605
 predecessors: 57-2, 29-5, 29-2
 repos: Omnipotent.md
@@ -10,7 +10,7 @@ repos: Omnipotent.md
 
 # Story 57.3: Vault-lint result auto-memory
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -306,4 +306,11 @@ Composer (Cursor)
 ## Change Log
 
 - 2026-06-02: Story 57-3 created — vault-lint post-scan MEMORY.md `Vault:` line auto-update via 57-2 helpers.
-- 2026-06-02: Implemented vault-lint MEMORY `Vault:` line patch (lib + CLI + skill Step 14 + tests); verify.sh green.
+- 2026-06-02: Code review patches — CLI validates finite notes + YYYY-MM-DD lint date; 2 CLI guard tests added.
+
+### Review Findings
+
+- [x] [Review][Patch] CLI accepts NaN notes when env/argv missing [`scripts/hermes-skill-examples/vault-lint/scripts/patch-memory-vault-line.mjs:44-54`] — fixed: reject non-finite notes
+- [x] [Review][Patch] lintDate not validated — arbitrary string can corrupt MEMORY line [`scripts/hermes-skill-examples/vault-lint/scripts/patch-memory-vault-line.mjs:31-54`] — fixed: require YYYY-MM-DD
+- [x] [Review][Defer] No CLI subprocess integration test — AC 7 only requires script presence [`tests/vault-lint-memory-patch.test.mjs:156`] — deferred, pre-existing test-gap pattern
+- [x] [Review][Defer] `findCnsStateRegion` uses prefix `indexOf("## CNS State")` — could match unintended headings [`scripts/session-close/lib/update-memory-cns-state.mjs:104`] — deferred, pre-existing 57-2 pattern

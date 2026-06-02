@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +16,11 @@ import {
 } from "../scripts/session-close/lib/update-memory-cns-state.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
+const patchCliPath = join(
+  root,
+  "scripts/hermes-skill-examples/vault-lint/scripts/patch-memory-vault-line.mjs",
+);
 
 const FIXTURE_MEMORY = `## CNS State (auto — /session-close)
 Closed: 2026-06-01T00:00:00.000Z | AGENTS v2.1.25 | failure_class: none
@@ -154,10 +161,30 @@ Fan-out (prev): unknown
   });
 
   it("patch-memory-vault-line.mjs exists in vault-lint skill package", () => {
-    const scriptPath = join(
-      root,
-      "scripts/hermes-skill-examples/vault-lint/scripts/patch-memory-vault-line.mjs",
+    return access(patchCliPath);
+  });
+
+  it("patch-memory-vault-line.mjs exits 1 when notes env is missing", async () => {
+    await assert.rejects(
+      () =>
+        execFileAsync(process.execPath, [patchCliPath], {
+          env: { ...process.env, VAULT_LINT_NOTES: "", VAULT_LINT_DATE: "2026-06-02" },
+        }),
+      (err) => err.code === 1,
     );
-    return access(scriptPath);
+  });
+
+  it("patch-memory-vault-line.mjs exits 1 when lint date is invalid", async () => {
+    await assert.rejects(
+      () =>
+        execFileAsync(process.execPath, [patchCliPath], {
+          env: {
+            ...process.env,
+            VAULT_LINT_NOTES: "10",
+            VAULT_LINT_DATE: "2026-06-02\ninjected",
+          },
+        }),
+      (err) => err.code === 1,
+    );
   });
 });

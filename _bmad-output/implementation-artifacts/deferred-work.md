@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 57-3-vault-lint-result-auto-memory (2026-06-02)
+
+- No CLI subprocess integration test — AC 7 table only requires script presence; lib paths covered in `vault-lint-memory-patch.test.mjs`.
+- `findCnsStateRegion` prefix `indexOf("## CNS State")` could match unintended headings — inherited from 57-2; MEMORY schema uses canonical heading.
+
 ## Deferred from: code review of 57-2-session-close-memory-md-auto-update (2026-06-02)
 
 - Gate stdout does not echo `memory_update` result — operator must read close-report; matches existing gate logging pattern for other steps.

@@ -14,6 +14,8 @@ const { runVaultLintMemoryUpdate } = await import(
   join(repoRoot, "scripts/session-close/lib/update-memory-cns-state.mjs")
 );
 
+const LINT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function parseCount(name, fallback) {
   const raw = process.env[name]?.trim();
   if (raw !== undefined && raw !== "") {
@@ -23,9 +25,16 @@ function parseCount(name, fallback) {
     }
   }
   if (fallback !== undefined) {
-    return fallback;
+    if (Number.isFinite(fallback) && fallback >= 0) {
+      return Math.trunc(fallback);
+    }
+    return null;
   }
   return null;
+}
+
+function isValidLintDate(value) {
+  return typeof value === "string" && LINT_DATE_RE.test(value);
 }
 
 function parseLintDate() {
@@ -49,8 +58,8 @@ function parseInputs() {
 
 try {
   const { notes, errors, lintDate } = parseInputs();
-  if (notes === null || !lintDate) {
-    process.stderr.write("patch-memory-vault-line: missing notes or lint date\n");
+  if (!Number.isFinite(notes) || !isValidLintDate(lintDate)) {
+    process.stderr.write("patch-memory-vault-line: missing or invalid notes or lint date\n");
     process.exit(1);
   }
 
