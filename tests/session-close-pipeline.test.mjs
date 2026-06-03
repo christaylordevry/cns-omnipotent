@@ -30,7 +30,9 @@ import {
   parseKeyValueEnv,
   parseVitestTestsSummary,
   pushNotebookHealthSnapshot,
+  isHermesProfileHome,
   resolveNpmTestEnv,
+  resolveOperatorHome,
   runDeterministicPipeline,
   stripAnsi,
 } from "../scripts/session-close/run-deterministic.mjs";
@@ -563,6 +565,23 @@ describe("session-close run-deterministic", () => {
     assert.equal(out.failureClass, null);
   });
 
+  it("isHermesProfileHome detects Hermes subprocess HOME", () => {
+    assert.equal(
+      isHermesProfileHome("/home/christ/.hermes/home", "/home/christ/.hermes"),
+      true,
+    );
+    assert.equal(isHermesProfileHome("/home/christ", "/home/christ/.hermes"), false);
+  });
+
+  it("resolveOperatorHome maps Hermes profile HOME to passwd home", async () => {
+    const home = await resolveOperatorHome({
+      HOME: "/home/christ/.hermes/home",
+      HERMES_HOME: "/home/christ/.hermes",
+      USER: "christ",
+    });
+    assert.equal(home, "/home/christ");
+  });
+
   it("resolveNpmTestEnv prepends nvm node under minimal PATH", async () => {
     const resolved = await resolveNpmTestEnv({
       HOME: process.env.HOME ?? "/home/christ",
@@ -570,6 +589,19 @@ describe("session-close run-deterministic", () => {
     });
     assert.ok(resolved.PATH?.includes(".nvm/versions/node"));
     assert.ok(resolved.PATH?.includes("/node"));
+  });
+
+  it("resolveNpmTestEnv uses operator nvm when HOME is Hermes profile", async () => {
+    const resolved = await resolveNpmTestEnv({
+      HOME: "/home/christ/.hermes/home",
+      HERMES_HOME: "/home/christ/.hermes",
+      USER: "christ",
+      PATH: "/usr/bin:/bin",
+    });
+    assert.equal(resolved.HOME, "/home/christ");
+    assert.equal(resolved.OPERATOR_HOME, "/home/christ");
+    assert.ok(resolved.PATH?.startsWith("/home/christ/.nvm/versions/node/"));
+    assert.ok(!resolved.PATH?.includes("/.hermes/home/.nvm/"));
   });
 
   it("marks tests failed on non-zero exit or missing regex", () => {
