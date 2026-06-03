@@ -6,7 +6,15 @@
 # nvm and project node_modules live under the operator's real home — resolve that
 # before prepending Node to PATH (Story 59-2).
 _operator_home="${OPERATOR_HOME:-$HOME}"
-if [[ -n "${HERMES_HOME:-}" && "$HOME" == "${HERMES_HOME}/home"* ]]; then
+# Story 59-3 follow-up: Hermes terminal sandbox does not always inject
+# HERMES_HOME, but profile-isolated HOME always matches *.hermes/home* —
+# use that as the trigger so the remap fires even when only HOME is set.
+_hermes_home="${HERMES_HOME:-}"
+if [[ -z "$_hermes_home" && "$HOME" == */.hermes/home* ]]; then
+  _hermes_home="${HOME%/home}"
+  export HERMES_HOME="$_hermes_home"
+fi
+if [[ -n "$_hermes_home" && "$HOME" == "${_hermes_home}/home"* ]]; then
   _passwd_home="$(getent passwd "${USER:-$(whoami 2>/dev/null)}" 2>/dev/null | cut -d: -f6)"
   if [[ -n "${_passwd_home}" ]]; then
     _operator_home="${_passwd_home}"

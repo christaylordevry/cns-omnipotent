@@ -23,6 +23,20 @@ export function isHermesProfileHome(home, hermesHome) {
 }
 
 /**
+ * Infer HERMES_HOME from a HOME that matches the Hermes profile-isolation
+ * pattern (.hermes/home or .hermes/home/...). Returns null if HOME does
+ * not look isolated.
+ *
+ * @param {string} home
+ * @returns {string | null}
+ */
+export function inferHermesHomeFromHome(home) {
+  if (!home) return null;
+  const m = home.match(/^(.*\/\.hermes)\/home(\/.*)?$/);
+  return m ? m[1] : null;
+}
+
+/**
  * Return the operator's real HOME, even when Hermes has profile-isolated
  * the process under {HERMES_HOME}/home. Falls back to the input HOME if
  * getent is unavailable or returns nothing.
@@ -32,7 +46,10 @@ export function isHermesProfileHome(home, hermesHome) {
  */
 export async function resolveOperatorHome(env = process.env) {
   const home = (env.HOME || homedir()).trim();
-  const hermesHome = (env.HERMES_HOME || "").trim();
+  let hermesHome = (env.HERMES_HOME || "").trim();
+  if (!hermesHome) {
+    hermesHome = inferHermesHomeFromHome(home) || "";
+  }
   if (!isHermesProfileHome(home, hermesHome)) {
     return home || homedir();
   }

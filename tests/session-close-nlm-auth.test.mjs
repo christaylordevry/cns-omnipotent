@@ -35,19 +35,42 @@ describe("nlm-auth-watchdog · Hermes HOME remap (Story 59-3)", () => {
     assert.equal(seen?.OPERATOR_HOME, OPERATOR_HOME);
   });
 
-  it("does not remap when HERMES_HOME is missing", async () => {
+  it("does not remap when HERMES_HOME is missing and HOME is not Hermes-isolated", async () => {
     /** @type {NodeJS.ProcessEnv | Record<string, string | undefined> | null} */
     let seen = null;
-    const partialEnv = { ...hermesEnv, HERMES_HOME: undefined };
+    const operatorOnlyEnv = {
+      HOME: OPERATOR_HOME,
+      USER: "christ",
+      PATH: "/home/christ/.local/bin:/usr/bin",
+    };
     await runNlmAuthWatchdog({
-      env: partialEnv,
+      env: operatorOnlyEnv,
       resolveCommand: async () => "/home/christ/.local/bin/nlm",
       runCommand: async (_cmd, _args, opts) => {
         seen = opts.env;
         return { stdout: "Authentication valid!", stderr: "" };
       },
     });
-    assert.equal(seen?.HOME, HERMES_PROFILE_HOME);
+    assert.equal(seen?.HOME, OPERATOR_HOME);
+  });
+
+  it("infers Hermes isolation from HOME pattern when HERMES_HOME is missing", async () => {
+    /** @type {NodeJS.ProcessEnv | Record<string, string | undefined> | null} */
+    let seen = null;
+    const noHermesHomeEnv = {
+      HOME: HERMES_PROFILE_HOME,
+      USER: "christ",
+      PATH: "/usr/bin:/bin",
+    };
+    await runNlmAuthWatchdog({
+      env: noHermesHomeEnv,
+      resolveCommand: async () => "/home/christ/.local/bin/nlm",
+      runCommand: async (_cmd, _args, opts) => {
+        seen = opts.env;
+        return { stdout: "Authentication valid!", stderr: "" };
+      },
+    });
+    assert.equal(seen?.HOME, OPERATOR_HOME);
   });
 
   it("is a no-op remap when env is already operator HOME", async () => {
