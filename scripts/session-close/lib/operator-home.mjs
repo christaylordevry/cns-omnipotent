@@ -37,6 +37,18 @@ export function inferHermesHomeFromHome(home) {
 }
 
 /**
+ * Infer the operator's real HOME directly from Hermes profile-isolated HOME.
+ *
+ * @param {string} home
+ * @returns {string | null}
+ */
+export function inferOperatorHomeFromHome(home) {
+  if (!home) return null;
+  const m = home.match(/^(.*?)\/\.hermes\/home(\/.*)?$/);
+  return m?.[1] ? m[1] : null;
+}
+
+/**
  * Return the operator's real HOME, even when Hermes has profile-isolated
  * the process under {HERMES_HOME}/home. Falls back to the input HOME if
  * getent is unavailable or returns nothing.
@@ -46,6 +58,10 @@ export function inferHermesHomeFromHome(home) {
  */
 export async function resolveOperatorHome(env = process.env) {
   const home = (env.HOME || homedir()).trim();
+  const directInference = inferOperatorHomeFromHome(home);
+  if (directInference) {
+    return directInference;
+  }
   let hermesHome = (env.HERMES_HOME || "").trim();
   if (!hermesHome) {
     hermesHome = inferHermesHomeFromHome(home) || "";

@@ -5,6 +5,7 @@ import {
   resolveNlmEnv,
   runNlmAuthWatchdog,
 } from "../scripts/session-close/lib/nlm-auth-watchdog.mjs";
+import { inferOperatorHomeFromHome } from "../scripts/session-close/lib/operator-home.mjs";
 
 const HERMES_HOME = "/home/christ/.hermes";
 const HERMES_PROFILE_HOME = `${HERMES_HOME}/home`;
@@ -18,6 +19,13 @@ const hermesEnv = {
 };
 
 describe("nlm-auth-watchdog · Hermes HOME remap (Story 59-3)", () => {
+  it("infers operator HOME directly from Hermes profile HOME", () => {
+    assert.equal(inferOperatorHomeFromHome("/home/christ/.hermes/home"), OPERATOR_HOME);
+    assert.equal(inferOperatorHomeFromHome("/home/christ/.hermes/home/subdir"), OPERATOR_HOME);
+    assert.equal(inferOperatorHomeFromHome(OPERATOR_HOME), null);
+    assert.equal(inferOperatorHomeFromHome(""), null);
+  });
+
   it("remaps HOME to operator home before spawning nlm", async () => {
     /** @type {NodeJS.ProcessEnv | Record<string, string | undefined> | null} */
     let seen = null;
