@@ -12,4 +12,6 @@ fi
 echo "[hermes-run-session-close] Using node: $(which node) ($(node --version))" >&2
 
 OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
+HERMES_HOME="${HERMES_HOME:-/home/christ/.hermes}"
+export HERMES_HOME
 exec node "$OMNIPOTENT_REPO/scripts/session-close/run-deterministic.mjs" "$@"
