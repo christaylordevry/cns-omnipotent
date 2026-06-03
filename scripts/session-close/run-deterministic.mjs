@@ -407,16 +407,55 @@ export async function pushNotebookHealthSnapshot(opts) {
   return { status: "ok", rows: rows.length, reason: "pushed" };
 }
 
+const ESC = String.fromCharCode(0x1b);
+const ANSI_RE = new RegExp(`${ESC}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g");
+const VITEST_TESTS_PASSED_RE = /Tests\s+(\d+)\s+passed/g;
+
+/**
+ * @param {string} text
+ */
+export function stripAnsi(text) {
+  return text.replace(ANSI_RE, "");
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<Record<string, string>>}
+ */
+export async function resolveNpmTestEnv(env = process.env) {
+  const merged = {
+    ...env,
+    HOME: env.HOME || homedir(),
+  };
+  try {
+    const { stdout } = await execFileAsync(
+      "bash",
+      ["-c", `source "${NPM_ENV_SH}" && printf '%s' "$PATH"`],
+      { env: merged },
+    );
+    const path = stdout.trim();
+    if (path) {
+      return { ...merged, PATH: path };
+    }
+  } catch {
+    // npm-env.sh is best-effort; bash -c source below still applies the prelude.
+  }
+  return merged;
+}
+
 /**
  * @param {string} stdout
  * @param {string} stderr
  * @param {number} exitCode
  */
 export function parseVitestTestsSummary(stdout, stderr, exitCode) {
-  const combined = `${stdout}\n${stderr}`;
-  const match = /Tests\s+(\d+)\s+passed/.exec(combined);
-  if (exitCode === 0 && match) {
-    return { tests: `${match[1]} passing`, failureClass: null };
+  const combined = stripAnsi(`${stdout}\n${stderr}`);
+  let lastMatch = null;
+  for (const match of combined.matchAll(VITEST_TESTS_PASSED_RE)) {
+    lastMatch = match;
+  }
+  if (exitCode === 0 && lastMatch) {
+    return { tests: `${lastMatch[1]} passing`, failureClass: null };
   }
   return { tests: "FAILED (see session-close log)", failureClass: "tests" };
 }
@@ -541,11 +580,12 @@ async function runFastScan(repoRoot, vaultRoot, env) {
  * @param {Record<string, string>} env
  */
 async function runNpmTest(repoRoot, env) {
+  const testEnv = await resolveNpmTestEnv(env);
   const cmd = `source "${NPM_ENV_SH}" && npm test`;
   try {
     const { stdout, stderr } = await execFileAsync("bash", ["-c", cmd], {
       cwd: OMNIPOTENT_INSTALL_ROOT,
-      env,
+      env: testEnv,
       maxBuffer: 16 * 1024 * 1024,
     });
     return parseVitestTestsSummary(stdout, stderr, 0);

@@ -30,7 +30,9 @@ import {
   parseKeyValueEnv,
   parseVitestTestsSummary,
   pushNotebookHealthSnapshot,
+  resolveNpmTestEnv,
   runDeterministicPipeline,
+  stripAnsi,
 } from "../scripts/session-close/run-deterministic.mjs";
 import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
 import {
@@ -522,6 +524,52 @@ describe("session-close run-deterministic", () => {
     const out = parseVitestTestsSummary("Tests 609 passed (609)\n", "", 0);
     assert.equal(out.tests, "609 passing");
     assert.equal(out.failureClass, null);
+  });
+
+  it("parses vitest summary with 642 count and double-space padding", () => {
+    const out = parseVitestTestsSummary("      Tests  642 passed (642)\n", "", 0);
+    assert.equal(out.tests, "642 passing");
+    assert.equal(out.failureClass, null);
+  });
+
+  it("stripAnsi removes codes between Tests and the passed count", () => {
+    const raw = "Tests\x1b[1m  642 passed (642)\n";
+    assert.equal(stripAnsi(raw), "Tests  642 passed (642)\n");
+    const out = parseVitestTestsSummary(raw, "", 0);
+    assert.equal(out.tests, "642 passing");
+    assert.equal(out.failureClass, null);
+  });
+
+  it("uses the last Tests N passed match when multiple summaries appear", () => {
+    const combined = [
+      "Tests  609 passed (609)\n",
+      "… middle output …\n",
+      " Test Files  50 passed (50)\n",
+      "      Tests  642 passed (642)\n",
+    ].join("");
+    const out = parseVitestTestsSummary(combined, "", 0);
+    assert.equal(out.tests, "642 passing");
+    assert.equal(out.failureClass, null);
+  });
+
+  it("parses committed npm test capture fixture from execFileAsync tail", async () => {
+    const fixturePath = join(
+      import.meta.dirname,
+      "fixtures/session-close/npm-test-capture-vitest-642.txt",
+    );
+    const capture = await readFile(fixturePath, "utf8");
+    const out = parseVitestTestsSummary(capture, "", 0);
+    assert.equal(out.tests, "642 passing");
+    assert.equal(out.failureClass, null);
+  });
+
+  it("resolveNpmTestEnv prepends nvm node under minimal PATH", async () => {
+    const resolved = await resolveNpmTestEnv({
+      HOME: process.env.HOME ?? "/home/christ",
+      PATH: "/usr/bin:/bin",
+    });
+    assert.ok(resolved.PATH?.includes(".nvm/versions/node"));
+    assert.ok(resolved.PATH?.includes("/node"));
   });
 
   it("marks tests failed on non-zero exit or missing regex", () => {
