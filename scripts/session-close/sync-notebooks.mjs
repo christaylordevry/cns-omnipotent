@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { alertStaleNotebooks } from "./lib/notebook-stale-alert.mjs";
+import { resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
 import { mergeNotebookRegistry } from "./lib/sync-notebook-registry.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,7 +25,9 @@ const NLM_HINT =
 export function createRunNlm(execFileFn = execFile) {
   const run = promisify(execFileFn);
   return async function runNlm() {
+    const nlmEnv = await resolveNlmEnv();
     const { stdout } = await run("nlm", ["list", "notebooks", "--json"], {
+      env: nlmEnv,
       encoding: "utf8",
       maxBuffer: 16 * 1024 * 1024,
     });

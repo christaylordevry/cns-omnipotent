@@ -22,9 +22,15 @@ import {
   formatPhaseAGateError,
   recordPhaseAGateFailure,
 } from "./lib/phase-a-completion-gate.mjs";
+import {
+  isHermesProfileHome,
+  resolveOperatorHome,
+} from "./lib/operator-home.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
 import { formatPriorFanoutSummary } from "./lib/update-memory-cns-state.mjs";
 import { runWriteMemory } from "./write-memory.mjs";
+
+export { isHermesProfileHome, resolveOperatorHome };
 
 export { evaluatePhaseACompletion, PHASE_A_REQUIRED_PACK_KEYS } from "./lib/phase-a-completion-gate.mjs";
 
@@ -416,52 +422,6 @@ const VITEST_TESTS_PASSED_RE = /Tests\s+(\d+)\s+passed/g;
  */
 export function stripAnsi(text) {
   return text.replace(ANSI_RE, "");
-}
-
-/**
- * True when HOME is Hermes per-profile isolation ({HERMES_HOME}/home).
- *
- * @param {string} home
- * @param {string} hermesHome
- */
-export function isHermesProfileHome(home, hermesHome) {
-  if (!home || !hermesHome) {
-    return false;
-  }
-  const profileRoot = join(hermesHome, "home");
-  return home === profileRoot || home.startsWith(`${profileRoot}/`);
-}
-
-/**
- * Real operator home for nvm/npm — not Hermes subprocess profile HOME.
- *
- * @param {Record<string, string | undefined>} env
- * @returns {Promise<string>}
- */
-export async function resolveOperatorHome(env = process.env) {
-  const home = (env.HOME || homedir()).trim();
-  const hermesHome = (env.HERMES_HOME || "").trim();
-  if (!isHermesProfileHome(home, hermesHome)) {
-    return home || homedir();
-  }
-  const user = (env.USER || env.LOGNAME || "").trim();
-  if (!user) {
-    return home || homedir();
-  }
-  try {
-    const { stdout } = await execFileAsync("getent", ["passwd", user], {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024,
-    });
-    const line = stdout.trim().split("\n")[0] ?? "";
-    const passwdHome = line.split(":")[5]?.trim();
-    if (passwdHome) {
-      return passwdHome;
-    }
-  } catch {
-    // getent unavailable — fall through to profile HOME.
-  }
-  return home || homedir();
 }
 
 /**

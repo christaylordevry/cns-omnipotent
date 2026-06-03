@@ -12,5 +12,7 @@ if [[ -n "${HERMES_HOME:-}" && "$HOME" == "${HERMES_HOME}/home"* ]]; then
     _operator_home="${_passwd_home}"
   fi
 fi
+export HOME="${_operator_home}"
+export OPERATOR_HOME="${_operator_home}"
 NODE_BIN="$(ls -d "${_operator_home}/.nvm/versions/node/"*/bin 2>/dev/null | sort -V | tail -1)"
 export PATH="${NODE_BIN:-${_operator_home}/.nvm/versions/node/v24.14.0/bin}:${PATH}"

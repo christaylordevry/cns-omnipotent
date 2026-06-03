@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { resolveOperatorHome } from "./operator-home.mjs";
+
 const execFileAsync = promisify(execFile);
 const DEFAULT_LOCAL_NLM = "/home/christ/.local/bin/nlm";
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -94,6 +96,23 @@ export async function resolveNlmCommand(opts = {}) {
 }
 
 /**
+ * Build the env passed to nlm subprocesses, remapping HOME out of the
+ * Hermes profile-isolated path when both HOME and HERMES_HOME indicate
+ * isolation. See Story 59-3.
+ *
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ * @returns {Promise<Record<string, string | undefined>>}
+ */
+export async function resolveNlmEnv(env = process.env) {
+  const operatorHome = await resolveOperatorHome(env);
+  return {
+    ...env,
+    HOME: operatorHome,
+    OPERATOR_HOME: operatorHome,
+  };
+}
+
+/**
  * @param {unknown} err
  */
 function errorOutput(err) {
@@ -137,7 +156,8 @@ export async function runNlmAuthWatchdog(opts = {}) {
   }
 
   const env = opts.env ?? process.env;
-  const resolveCommand = opts.resolveCommand ?? (() => resolveNlmCommand({ env }));
+  const nlmEnv = await resolveNlmEnv(env);
+  const resolveCommand = opts.resolveCommand ?? (() => resolveNlmCommand({ env: nlmEnv }));
   const command = await resolveCommand();
   if (!command) {
     return { status: "unknown", reason: "missing-cli", message: "nlm CLI not found" };
@@ -154,7 +174,7 @@ export async function runNlmAuthWatchdog(opts = {}) {
 
   try {
     const { stdout, stderr } = await runCommand(command, ["login", "--check"], {
-      env,
+      env: nlmEnv,
       timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     });
     const output = `${stdout}\n${stderr}`;

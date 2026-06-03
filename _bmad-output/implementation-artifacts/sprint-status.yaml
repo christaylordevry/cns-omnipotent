@@ -408,3 +408,4 @@ development_status:
   epic-59: in-progress
   59-1-session-close-context-reduction: review
   59-2-fix-session-close-tests-failure: review
+  59-3-fix-nlm-auth-hermes-home-isolation: in-progress

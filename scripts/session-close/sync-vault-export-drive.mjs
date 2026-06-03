@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 import { readNotebooklmDriveDocId } from "./lib/load-session-close-env.mjs";
 import { matchDriveSourceByDocId } from "./lib/match-drive-source.mjs";
-import { resolveNlmCommand } from "./lib/nlm-auth-watchdog.mjs";
+import { resolveNlmCommand, resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
 import { mergeFanoutUpdatesAtPath } from "./merge-notebooklm-fanout.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -52,7 +52,8 @@ export function parseNlmDriveSourceList(stdout) {
  * @param {(cmd: string, args: string[]) => Promise<{ stdout: string }>} [runNlm]
  */
 export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
-  const nlm = await resolveNlmCommand();
+  const nlmEnv = await resolveNlmEnv();
+  const nlm = await resolveNlmCommand({ env: nlmEnv });
   if (!nlm) {
     return {
       status: /** @type {'failed'} */ ("failed"),
@@ -65,6 +66,7 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     runNlm ??
     (async (cmd, args) => {
       const { stdout } = await execFileAsync(cmd, args, {
+        env: nlmEnv,
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
       });
