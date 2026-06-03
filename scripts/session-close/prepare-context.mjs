@@ -12,6 +12,7 @@ import {
   readVaultLintSummary,
   selectRecentStories,
 } from "./lib/read-sources.mjs";
+import { buildSection8Input, writeSection8Input } from "./prepare-section8-input.mjs";
 import { enforceTokenBudget, PACK_TOKEN_LIMIT } from "./lib/token-estimate.mjs";
 
 /**
@@ -80,6 +81,8 @@ export async function writeContextPack(pack, outputPath, opts = {}) {
   }
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(pack, null, 2)}\n`, "utf8");
+  const section8InputPath = join(dirname(outputPath), "section8-input.json");
+  await writeSection8Input(buildSection8Input(pack), section8InputPath);
   return pack;
 }
 
@@ -92,9 +95,15 @@ async function main() {
     const pack = await buildContextPack({ dryRun });
     await writeContextPack(pack, paths.contextPackPath, { dryRun });
     const dest = dryRun ? "(dry-run, not written)" : paths.contextPackPath;
+    const input = buildSection8Input(pack);
     process.stdout.write(
       `session-close: context pack ready (${pack.token_budget.pack_tokens}/${pack.token_budget.pack_limit} tokens) → ${dest}\n`,
     );
+    if (!dryRun) {
+      process.stdout.write(
+        `session-close: section8-input ready (${input.token_budget.input_tokens}/${input.token_budget.input_limit} tokens) → ${paths.section8InputPath}\n`,
+      );
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(`session-close: prepare-context failed: ${message}\n`);

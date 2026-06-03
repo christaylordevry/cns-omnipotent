@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-06-03T12:00:00.000Z",
+  "mode": "real",
+  "sprint": {
+    "active_epics": [
+      {
+        "epic": "59",
+        "status": "in-progress",
+        "stories": [
+          "59-1-session-close-context-reduction",
+          "59-2-follow-up-example"
+        ]
+      },
+      {
+        "epic": "48",
+        "status": "done",
+        "stories": ["48-6-session-close-operator-guide-and-hermes-smoke"]
+      }
+    ],
+    "project_status_line": "Session-close runtime token reduction (Epic 59) is the active operator priority."
+  },
+  "recent_stories": [
+    {
+      "key": "59-1-session-close-context-reduction",
+      "bullet": "Emit section8-input.json and slim Hermes SKILL router."
+    },
+    {
+      "key": "58-1-migrate-vault-export-drive-doc-sync",
+      "bullet": "Drive-backed vault export sync for NotebookLM fan-out."
+    },
+    {
+      "key": "57-2-session-close-memory-auto-update",
+      "bullet": "MEMORY CNS State block auto-update in Phase A."
+    }
+  ],
+  "agents": {
+    "version": "1.37.0",
+    "section8_excerpt": "### Project Status\n- Epic 59: session-close context reduction\n\n### Current Priorities\n1. Slim synthesis input\n2. Deterministic Discord render\n3. Operator smoke on Gemini Flash",
+    "changelog_anchor_row": "| 2026-06-02 | 1.37.0 | Morning digest cron automation | 55-3-morning-digest-cron-automation |"
+  },
+  "token_budget": {
+    "input_tokens": 0,
+    "input_limit": 1200
+  }
+}

@@ -439,6 +439,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-28 | 1.35.0 | Session close §15.4 updated: two-phase pipeline, env file, dry-run behavior, token cap, no git commit | 48-6-session-close-operator-guide-and-hermes-smoke |
 | 2026-05-29 | 1.36.0 | **Morning digest skill (49-6):** §15.11 trend briefing (Google Trends + NewsAPI + Perplexity, no vault writes, 08:00 machine-local cron); §15.2 legacy 26-7 WSL cron line **disabled (commented)** — scripts retained as fallback | 49-6-morning-digest-upgrade |
 | 2026-06-02 | 1.37.0 | **Morning digest cron automation (55-3):** §15.11 one-command install via `install-morning-digest-cron.sh`, default **07:00 Australia/Sydney**, log + schedule overrides; §15.2 legacy line stays commented | 55-3-morning-digest-cron-automation |
+| 2026-06-03 | 1.38.0 | Session close **Story 59-1:** total Hermes session input target **<20k**; LLM reads `section8-input.json` only; deterministic Discord reply via `hermes-run-render-discord-reply.sh`; bump skill `version`, reinstall, restart gateway after deploy | 59-1-session-close-context-reduction |
 
 ---
 
@@ -695,14 +696,15 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. For **manual
 
 **Two-phase pipeline (Epic 48, FR-17..19):**
 
-- **Phase A (deterministic, mandatory first step):** runs `scripts/session-close/run-deterministic.mjs` to generate a bounded `.session-close/context-pack.json` and `.session-close/close-report.json`. This is the required first step on both real close and dry-run.
-- **Phase B (LLM, bounded):** the LLM reads only the context pack, then drafts replacement content for **AGENTS.md Section 8**. On real close, the pipeline applies that draft via `scripts/session-close/apply-section8.mjs` to update and sync both AGENTS copies.
-- **Phase C (optional, MCP):** NotebookLM fan-out using `source_add` based on notebook IDs listed in the close report.
+- **Phase A (deterministic, mandatory first step):** runs `scripts/session-close/run-deterministic.mjs` to generate `.session-close/context-pack.json`, `.session-close/section8-input.json`, and `.session-close/close-report.json`. This is the required first step on both real close and dry-run.
+- **Phase B (LLM, bounded):** the LLM reads **only** `.session-close/section8-input.json` (not the full context pack), then drafts replacement content for **AGENTS.md Section 8**. On real close, the pipeline applies that draft via `scripts/session-close/gate-apply-section8.mjs` to update and sync both AGENTS copies.
+- **Phase C (optional, MCP):** NotebookLM fan-out via script wrappers (`hermes-run-record-notebooklm-fanout-mode.sh`, drive-sync or legacy merge scripts) based on notebook IDs listed in the close report.
 
-**Token budget (FR-19):**
+**Token budget (FR-19, Story 59-1):**
 
-- Target: ≤5000 input tokens typical after Phase A completes
-- Hard ceiling: **≤6000** input tokens
+- **Total Hermes session input target:** **< 20,000 tokens** on Gemini 2.5 Flash (typical ≤ 10k after Phase A + slim skill router)
+- **LLM-path artifacts only:** `SKILL.md` + `section8-synthesis.md` + `section8-input.json` + `section8-draft.md` — keep the scripted subset ≤ 5k estimated tokens
+- Full `.session-close/context-pack.json` remains for scripts and close-report consumers; Hermes must **not** load it into the LLM context during Section 8 synthesis
 
 **Environment variables:**
 

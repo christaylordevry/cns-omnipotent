@@ -1,10 +1,10 @@
-# Section 8 synthesis (pack-only, bounded)
+# Section 8 synthesis (section8-input only, bounded)
 
 ## Inputs (read only)
 
-- `.session-close/context-pack.json`
+- `.session-close/section8-input.json`
 
-Do not read sprint YAML, story artifacts, `AGENTS.md`, or the vault export directly. The pack is the only allowed content input.
+Do not read sprint YAML, story artifacts, `AGENTS.md`, the vault export, or `.session-close/context-pack.json`. The section8 input artifact is the only allowed content input.
 
 ## Output (write only)
 
@@ -17,7 +17,7 @@ Token budget: **≤ 1,500** tokens (estimate via `ceil(chars/4)`).
 ```markdown
 ### Project Status
 
-- <bullet lines from pack.sprint.active_epics>
+- <bullet lines from input.sprint.active_epics>
 
 ### Current Priorities
 
@@ -34,6 +34,6 @@ Token budget: **≤ 1,500** tokens (estimate via `ceil(chars/4)`).
 
 ## Rules
 
-- Use only facts present in `context-pack.json`.
-- Do not invent epics, stories, or statuses that are not in `pack.sprint.active_epics` or `pack.recent_stories`.
+- Use only facts present in `section8-input.json`.
+- Do not invent epics, stories, or statuses that are not in `input.sprint.active_epics` or `input.recent_stories`.
 - Keep each bullet short. Prefer concrete next actions and story keys.

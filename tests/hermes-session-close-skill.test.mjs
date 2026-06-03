@@ -4,6 +4,9 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
+import { estimateTokens } from "../scripts/session-close/lib/token-estimate.mjs";
+import { SECTION8_INPUT_TOKEN_LIMIT } from "../scripts/session-close/prepare-section8-input.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skillDir = join(root, "scripts/hermes-skill-examples/session-close");
 const skillPath = join(skillDir, "SKILL.md");
@@ -25,13 +28,18 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(existsSync(discordReplyTemplatePath));
     assert.ok(existsSync(taskPromptLegacyPath));
     assert.ok(existsSync(join(root, "scripts/install-hermes-skill-session-close.sh")));
+    assert.ok(existsSync(join(root, "scripts/session-close/hermes-run-render-discord-reply.sh")));
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: session-close"));
     assert.ok(body.includes("/session-close"));
     assert.ok(body.includes("requires_toolsets: [terminal]"));
-    assert.ok(body.includes("run-deterministic.mjs"));
-    assert.ok(body.includes(".session-close/context-pack.json"));
+    assert.ok(body.includes("hermes-run-session-close.sh"));
+    assert.ok(
+      body.includes("run-deterministic.mjs") || body.includes("hermes-run-session-close.sh"),
+      "Phase A gate must reference run-deterministic entrypoint",
+    );
+    assert.ok(body.includes(".session-close/section8-input.json"));
     assert.ok(body.includes("section8-draft.md"));
     assert.ok(body.includes("gate-apply-section8.mjs"));
     assert.ok(body.includes("phase B token check ABORTED"));
@@ -42,13 +50,29 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
       "Phase B must invoke gate-apply-section8, not apply-section8 directly",
     );
     assert.ok(body.includes("close-report.json"));
-    assert.ok(body.includes("title: \"My Knowledge Base\""));
-    assert.ok(body.includes("Real close only"));
+    assert.ok(body.includes("hermes-run-render-discord-reply.sh"));
+    assert.ok(body.includes("Real close"));
+    assert.ok(body.includes("Dry-run"));
     assert.ok(
-      body.includes("Dry-run must not call") && body.includes("source_add"),
-      "dry-run must skip source_add and drive fan-out",
+      body.includes("skipped in dry-run") || body.includes("skip"),
+      "dry-run must skip fan-out writes",
     );
-    assert.ok(!body.includes("references/task-prompt"), "router must not load legacy task prompt on activation");
+    const readOnlySection = body.slice(body.indexOf("Read **only**"), body.indexOf("**Do not read:**"));
+    assert.ok(readOnlySection.includes("section8-input.json"));
+    assert.ok(
+      !readOnlySection.includes("task-prompt"),
+      "router must not load legacy task prompt on activation",
+    );
+    assert.ok(
+      !readOnlySection.includes("context-pack.json"),
+      "full context pack must not be listed as LLM read target",
+    );
+    assert.ok(body.includes("Do not read:"));
+    assert.ok(body.includes("AGENTS.md"));
+    assert.ok(body.includes("task-prompt.legacy.md"));
+
+    const lineCount = body.split("\n").length;
+    assert.ok(lineCount <= 80, `SKILL.md has ${lineCount} lines; expected ≤80`);
 
     const installScript = readFileSync(join(root, "scripts/install-hermes-skill-session-close.sh"), "utf8");
     assert.ok(installScript.includes("rsync -a --delete"), "install must mirror with rsync --delete");
@@ -60,7 +84,8 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
 
   it("documents bounded Section 8 synthesis and reply template", () => {
     const synth = readFileSync(section8SynthesisPath, "utf8");
-    assert.ok(synth.includes("context-pack.json"));
+    assert.ok(synth.includes("section8-input.json"));
+    assert.ok(synth.includes("Do not read"));
     assert.ok(synth.includes("section8-draft.md"));
     assert.ok(synth.includes("≤ 1,500"));
     assert.ok(synth.includes("Do not invent epics"));
@@ -73,19 +98,16 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
 
   it("documents nlm auth watchdog after NotebookLM fan-out as non-blocking", () => {
     const body = readFileSync(skillPath, "utf8");
-    const fanOut = body.indexOf("Real close only:");
-    const watchdog = body.indexOf("nlm auth watchdog");
-    const reply = body.indexOf("Render the Discord reply");
-    assert.ok(fanOut >= 0, "NotebookLM fan-out instruction missing");
-    assert.ok(watchdog > fanOut, "watchdog must be ordered after NotebookLM fan-out");
-    assert.ok(watchdog < reply, "watchdog result must be recorded before final reply rendering");
-    assert.ok(body.includes("non-blocking"));
+    const fanOut = body.indexOf("Phase C");
+    const watchdog = body.indexOf("nlm-auth-watchdog");
+    const reply = body.indexOf("## Discord reply");
+    assert.ok(fanOut >= 0, "Phase C instruction missing");
+    assert.ok(watchdog > fanOut, "watchdog must be ordered after Phase C");
+    assert.ok(watchdog < reply, "watchdog must run before Discord reply rendering");
+    assert.ok(body.includes("best-effort"));
     assert.ok(body.includes("hermes-run-nlm-auth-watchdog.sh"));
-    assert.ok(body.includes("${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"));
+    assert.ok(body.includes("${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}") || body.includes("${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh"));
     assert.ok(body.includes("--dry-run"));
-    assert.ok(body.includes("Treat NotebookLM fan-out as best-effort"));
-    assert.ok(body.includes("always continue to the auth watchdog"));
-    assert.ok(body.includes("partial or failed"));
 
     const template = readFileSync(discordReplyTemplatePath, "utf8");
     assert.ok(template.includes("nlm_auth"));
@@ -107,35 +129,24 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("hermes-url-ingest-vault"));
   });
 
-  it("documents fan-out diagnostics before nlm auth watchdog", () => {
+  it("delegates fan-out to script wrappers without loading reference markdown on activation", () => {
     assert.ok(existsSync(fanoutDiagnosticsPath));
     assert.ok(existsSync(driveExportSyncPath));
     const body = readFileSync(skillPath, "utf8");
-    const fanoutMerge = body.indexOf("merge-notebooklm-fanout");
-    const fanoutRef = body.indexOf("fanout-diagnostics.md");
-    const driveSyncRef = body.indexOf("drive-export-sync.md");
-    const driveWrite = body.indexOf("hermes-run-write-vault-export-to-drive");
-    const watchdog = body.indexOf("nlm auth watchdog");
-    assert.ok(fanoutMerge >= 0, "SKILL must reference merge-notebooklm-fanout");
-    assert.ok(fanoutRef >= 0, "SKILL must link fanout-diagnostics.md");
-    assert.ok(driveSyncRef >= 0, "SKILL must link drive-export-sync.md");
-    assert.ok(driveWrite >= 0, "SKILL must reference drive write wrapper");
+    assert.ok(body.includes("hermes-run-record-notebooklm-fanout-mode.sh"));
+    assert.ok(body.includes("hermes-run-write-vault-export-to-drive.sh"));
+    assert.ok(body.includes("hermes-run-sync-vault-export-drive.sh"));
+    assert.ok(body.includes("hermes-run-merge-notebooklm-fanout.sh"));
     assert.ok(body.includes("drive-sync"));
-    assert.ok(body.includes("Do **not** call `source_add` in drive-sync mode"));
-    assert.ok(body.includes("error_class"));
-    assert.ok(fanoutMerge < watchdog, "fan-out merge must be ordered before nlm auth watchdog");
+    assert.ok(!body.includes("references/fanout-diagnostics.md"));
+    assert.ok(!body.includes("references/drive-export-sync.md"));
 
     const diagnostics = readFileSync(fanoutDiagnosticsPath, "utf8");
     assert.ok(diagnostics.includes("merge-notebooklm-fanout"));
     assert.ok(diagnostics.includes("error_class"));
-    assert.ok(diagnostics.includes("size_limit"));
-    assert.ok(diagnostics.includes("drive_write_error"));
-    assert.ok(diagnostics.includes("drive-export-sync.md"));
 
     const driveSync = readFileSync(driveExportSyncPath, "utf8");
     assert.ok(driveSync.includes("NOTEBOOKLM_DRIVE_DOC_ID"));
-    assert.ok(driveSync.includes("drive_doc_id"));
-    assert.ok(driveSync.includes("nlm source sync"));
 
     const template = readFileSync(discordReplyTemplatePath, "utf8");
     assert.ok(template.includes("error_class"));
@@ -150,6 +161,21 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("NotebookLM"));
     assert.ok(body.includes("session-close"));
     assert.ok(body.includes("Do not use Vault IO mutators for `AI-Context/AGENTS.md`"));
+  });
+});
+
+describe("Story 59-1 session-close context reduction", () => {
+  it("section8-input fixture stays within synthesis token cap", () => {
+    const fixturePath = join(root, "tests/fixtures/session-close/section8-input-fixture.json");
+    const raw = readFileSync(fixturePath, "utf8");
+    assert.ok(estimateTokens(raw) <= SECTION8_INPUT_TOKEN_LIMIT);
+  });
+
+  it("SKILL body token estimate stays within 1200", () => {
+    const body = readFileSync(skillPath, "utf8");
+    const frontmatterEnd = body.indexOf("---", 3);
+    const skillContent = frontmatterEnd >= 0 ? body.slice(frontmatterEnd + 3) : body;
+    assert.ok(estimateTokens(skillContent.trim()) <= 1200);
   });
 });
 

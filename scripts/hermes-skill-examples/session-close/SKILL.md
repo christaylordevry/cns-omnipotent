@@ -1,7 +1,7 @@
 ---
 name: session-close
-description: "Hermes CNS /session-close router. Runs deterministic Phase A, then bounded Section 8 synthesis using only the context pack, applies Section 8, and renders a Discord reply from the close report."
-version: 1.0.11
+description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
+version: 1.0.12
 author: CNS Operator
 license: MIT
 metadata:
@@ -15,97 +15,62 @@ metadata:
 
 ## Trigger
 
-> **REFERENCE ONLY — invocation already confirmed.** Hermes `channel_skill_bindings` already selected this skill. Do not re-check whether the message should have routed here.
+> **REFERENCE ONLY — invocation already confirmed.** Accept only `/session-close` or `/session-close --dry-run`. Reject unsupported flags or trailing arguments without running tools.
 
-Follow `references/trigger-pattern.md` for operator documentation only. After invocation, only accept:
+## Hard gate (Phase A, mandatory first action)
 
-- `/session-close`
-- `/session-close --dry-run`
-
-Reject unsupported **flags or trailing arguments** (extra flags, trailing text, multi-line input) — not a Hermes binding mismatch. Do not run any tools when the subcommand shape is invalid.
-
-## Hard gate (Phase A, deterministic)
-
-Use terminal toolset only. First action is always:
+Terminal only. **First action is always:**
 
 ```bash
 OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
-# wrapper required: systemd service environment does not inherit nvm PATH
-# wrapper executes run-deterministic.mjs
 "${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-session-close.sh" [--dry-run]
 ```
 
-If Phase A fails, stop and report from `close-report.json` (`failure_class`, `steps.*`).
+If Phase A fails, stop and report from `.session-close/close-report.json` (`failure_class`, `steps.*`).
 
-## Bounded LLM pass (Section 8 only)
+## Section 8 (bounded LLM pass)
 
-Read only:
+Read **only**:
 
-- `.session-close/context-pack.json`
+- `.session-close/section8-input.json`
 - `references/section8-synthesis.md`
 
-Write `.session-close/section8-draft.md` within 1,500 tokens.
+**Do not read:** `AGENTS.md`, `sprint-status.yaml`, `_bmad-output/` story files, vault export bodies, `.session-close/context-pack.json`, `references/task-prompt.legacy.md`, or other reference files unless a render/fan-out script fails.
 
-Real close only, apply the draft:
+Write `.session-close/section8-draft.md` (≤1,500 tokens).
+
+Real close — apply via gate (not `apply-section8.mjs` directly):
 
 ```bash
 /home/christ/.nvm/versions/node/v24.14.0/bin/node "${OMNIPOTENT_REPO}/scripts/session-close/gate-apply-section8.mjs" --draft ".session-close/section8-draft.md"
 ```
 
-`--draft` is relative to `OMNIPOTENT_REPO`, not the shell cwd.
+`--draft` is relative to `OMNIPOTENT_REPO`. If the gate exits **1** with `phase B token check ABORTED`, treat as controlled skip: read `phase_b_token_check` from `close-report.json`, still render Discord reply, surface ABORT in reply.
 
-**Phase A gate (inside `gate-apply-section8.mjs`):** Before token check or apply, the gate may **re-run Phase A once** when `context-pack.json` / `close-report.json` are missing or incomplete. If Phase A still cannot proceed, the gate exits **1** with stderr mentioning `Phase A incomplete` or `Phase A failed`; read `phase_a_gate` and `failure_class` from `.session-close/close-report.json`. Do not call `apply-section8.mjs` directly.
+## Phase C (NotebookLM, real close only)
 
-**Phase B token ABORT:** If the gate exits **1** with stderr containing `phase B token check ABORTED`, treat it as a **controlled skip** (§8 not applied): read `phase_b_token_check` from `.session-close/close-report.json`, still render the Discord reply, and surface the ABORT in the reply. Do not fail the whole session close for token ABORT alone.
+Dry-run: skip Drive write, sync, and `source_add`; NotebookLM = `skipped in dry-run`.
 
-## NotebookLM fan-out and reply
+Run in order (scripts only — do not load fan-out reference markdown):
 
-Real close only: read `notebooklm_targets` from `.session-close/close-report.json` only (no re-derive from vault). Dry-run must not call Drive write, sync, or `source_add`, and must not write fan-out result fields; render NotebookLM as `skipped in dry-run`.
+1. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh"` — read stdout JSON `mode` (`drive-sync` or `legacy-source-add`)
+2. If `drive-sync`: `hermes-run-write-vault-export-to-drive.sh` then `hermes-run-sync-vault-export-drive.sh` (no `source_add`)
+3. If `legacy-source-add`: MCP `source_add` per `close-report.json` target + `hermes-run-merge-notebooklm-fanout.sh` after each call
+4. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh" [--dry-run]`
 
-Drive-backed sync (primary when configured): `references/drive-export-sync.md`. Legacy file `source_add` (fallback): `references/fanout-diagnostics.md`.
+Fan-out is best-effort; always continue to the watchdog. Never paste tokens, emails, or raw MCP stderr into Discord.
 
-**Step 1 — record mode** (real close):
+## Discord reply (deterministic)
 
-```bash
-"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh"
-```
-
-Read stdout JSON: `mode` is `drive-sync` or `legacy-source-add`. If `oauthSetupRequired`, stderr warns `GOOGLE_OAUTH_SETUP_REQUIRED` and mode is legacy.
-
-**Step 2a — drive-sync** when `mode` is `drive-sync` (requires `NOTEBOOKLM_DRIVE_DOC_ID` + Google OAuth in `~/.hermes/session-close.env`):
+Prefer script output over template load:
 
 ```bash
-"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-write-vault-export-to-drive.sh"
-"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-sync-vault-export-drive.sh"
+"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-render-discord-reply.sh"
 ```
 
-Do **not** call `source_add` in drive-sync mode. `sync-vault-export-drive.mjs` merges `fanout_status` per target. On Drive write failure, rows get `error_class: drive_write_error` (non-blocking).
+Post stdout as the reply. Fallback only if render fails: `references/discord-reply-template.md`.
 
-**Step 2b — legacy** when `mode` is `legacy-source-add`: for each row, call `mcp__notebooklm__source_add` with `title: "My Knowledge Base"`, `source_type: "file"`, `file_path` from row `export_path`, `wait: false`. After **each** call, merge:
+## Pitfalls
 
-```bash
-"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-merge-notebooklm-fanout.sh" \
-  --notebook-id "<uuid>" \
-  --status ok|failed \
-  --stderr "<error message plus stderr, for classifier>"
-```
-
-Treat NotebookLM fan-out as best-effort. Attempt every report-provided target and always continue to the auth watchdog after fan-out, including when results are partial or failed.
-
-After the NotebookLM `source_add` loop or dry-run skip is complete, run the non-blocking nlm auth watchdog:
-
-```bash
-"${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh" [--dry-run]
-```
-
-Use `--dry-run` only for `/session-close --dry-run`. The watchdog records `nlm_auth` in `.session-close/close-report.json`; it must not change `failure_class` or mask export, Section 8, MEMORY, fast-scan, daily rhythm, Convex health push, or NotebookLM fan-out results. If `nlm_auth.warning` is present, post it to `#hermes` as the auth warning. Do not include raw CLI output, emails, cookies, tokens, or raw env values.
-
-Render the Discord reply from `.session-close/close-report.json` using `references/discord-reply-template.md`.
-
-## Pitfalls (keep this short)
-
-- `AI-Context/**` is WriteGate-protected; do not use Vault IO mutators for AGENTS.
-- `MEMORY.md` symlink cross-device rename can fail (ERRNO 18), scripts write canonical vault path.
-- NotebookLM `source_add` success returns `ready: false` (async), do not retry.
-- Keep inputs bounded. Do not paste export bodies, sprint YAML, or AGENTS full text into prompts.
-- Skill cache. Bump `version` and reinstall after changes.
+- WriteGate protects `AI-Context/**`; do not use Vault IO mutators for AGENTS.
+- Bump `version`, run `bash scripts/install-hermes-skill-session-close.sh`, restart gateway after skill changes.
