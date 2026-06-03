@@ -23,7 +23,7 @@ Terminal only. **First action is always:**
 
 ```bash
 OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
-"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-session-close.sh" [--dry-run]
+"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-session-close.sh"
 ```
 
 If Phase A fails, stop and report from `.session-close/close-report.json` (`failure_class`, `steps.*`).
