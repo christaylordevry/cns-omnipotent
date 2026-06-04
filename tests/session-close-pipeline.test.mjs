@@ -76,6 +76,7 @@ import {
   SECTION8_EXCERPT_LIMIT,
   truncateToTokens,
 } from "../scripts/session-close/lib/token-estimate.mjs";
+import { withSessionCloseEnvIsolation } from "./helpers/hermes-env-isolation.mjs";
 
 const execFileAsync = promisify(execFile);
 const TEST_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -284,232 +285,169 @@ describe("session-close read-sources", () => {
   });
 
   it("reads NotebookLM env file targets with upload file metadata", async () => {
-    const oldHome = process.env.HOME;
-    const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
-    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
-    const oldHermesHome = process.env.HERMES_HOME;
-    const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
+    await withSessionCloseEnvIsolation(
+      {
+        saveKeys: ["NOTEBOOKLM_NOTEBOOK_IDS", "NOTEBOOKLM_DRIVE_DOC_ID"],
+        apply: {
+          NOTEBOOKLM_NOTEBOOK_IDS: null,
+          NOTEBOOKLM_DRIVE_DOC_ID: null,
+        },
+        tmpdir: { prefix: "session-close-home-" },
+      },
+      async () => {
+        const home = process.env.HOME;
+        await mkdir(join(home, ".hermes"), { recursive: true });
+        await writeFile(
+          join(home, ".hermes", "session-close.env"),
+          [
+            "NOTEBOOKLM_NOTEBOOK_IDS=981466f0-de1c-4551-93a9-f3bc2a24b184,dc6abf1a-99d2-428d-af63-107591ff2c2e,f037c741-f7e1-4a90-880f-d2d38986767b",
+            "",
+          ].join("\n"),
+          "utf8",
+        );
 
-    try {
-      delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      delete process.env.HERMES_HOME;
-      process.env.HOME = home;
-      await mkdir(join(home, ".hermes"), { recursive: true });
-      await writeFile(
-        join(home, ".hermes", "session-close.env"),
-        [
-          "NOTEBOOKLM_NOTEBOOK_IDS=981466f0-de1c-4551-93a9-f3bc2a24b184,dc6abf1a-99d2-428d-af63-107591ff2c2e,f037c741-f7e1-4a90-880f-d2d38986767b",
-          "",
-        ].join("\n"),
-        "utf8",
-      );
-
-      const targets = await readNotebookLmTargets("/fake/vault", "/fake/export.md");
-      assert.deepEqual(targets, [
-        {
-          notebook_id: "981466f0-de1c-4551-93a9-f3bc2a24b184",
-          source_name: "CNS Vault Export",
-          source_type: "file",
-          file_path: "/fake/export.md",
-        },
-        {
-          notebook_id: "dc6abf1a-99d2-428d-af63-107591ff2c2e",
-          source_name: "CNS Vault Export",
-          source_type: "file",
-          file_path: "/fake/export.md",
-        },
-        {
-          notebook_id: "f037c741-f7e1-4a90-880f-d2d38986767b",
-          source_name: "CNS Vault Export",
-          source_type: "file",
-          file_path: "/fake/export.md",
-        },
-      ]);
-    } finally {
-      if (oldHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = oldHome;
-      }
-      if (oldIds === undefined) {
-        delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      } else {
-        process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
-      }
-      if (oldDriveDocId === undefined) {
-        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      } else {
-        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
-      }
-      if (oldHermesHome === undefined) {
-        delete process.env.HERMES_HOME;
-      } else {
-        process.env.HERMES_HOME = oldHermesHome;
-      }
-      await rm(home, { recursive: true, force: true });
-    }
+        const targets = await readNotebookLmTargets("/fake/vault", "/fake/export.md");
+        assert.deepEqual(targets, [
+          {
+            notebook_id: "981466f0-de1c-4551-93a9-f3bc2a24b184",
+            source_name: "CNS Vault Export",
+            source_type: "file",
+            file_path: "/fake/export.md",
+          },
+          {
+            notebook_id: "dc6abf1a-99d2-428d-af63-107591ff2c2e",
+            source_name: "CNS Vault Export",
+            source_type: "file",
+            file_path: "/fake/export.md",
+          },
+          {
+            notebook_id: "f037c741-f7e1-4a90-880f-d2d38986767b",
+            source_name: "CNS Vault Export",
+            source_type: "file",
+            file_path: "/fake/export.md",
+          },
+        ]);
+      },
+    );
   });
 
   it("uses watch:true registry entries when env IDs are unset", async () => {
-    const oldHome = process.env.HOME;
-    const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
-    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
-    const oldHermesHome = process.env.HERMES_HOME;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
-    const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const registryPath = join(dir, "notebook-registry.json");
     const watchedId = "981466f0-de1c-4551-93a9-f3bc2a24b184";
     const unwatchedId = "dc6abf1a-99d2-428d-af63-107591ff2c2e";
 
     try {
-      delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      delete process.env.HERMES_HOME;
-      process.env.HOME = home;
-      await writeFile(
-        registryPath,
-        `${JSON.stringify(
-          [
-            {
-              id: watchedId,
-              title: "CNS Vault Architecture",
-              watch: true,
-              domain: "cns-brain",
-              last_updated: null,
-            },
-            {
-              id: unwatchedId,
-              title: "Other notebook",
-              watch: false,
-              domain: "general",
-              last_updated: null,
-            },
-          ],
-          null,
-          2,
-        )}\n`,
-        "utf8",
-      );
-
-      const targets = await readNotebookLmTargets("/fake/vault", "/fake/export.md", {
-        registryPath,
-      });
-
-      assert.deepEqual(targets, [
+      await withSessionCloseEnvIsolation(
         {
-          notebook_id: watchedId,
-          title: "CNS Vault Architecture",
-          source_name: "CNS Vault Export",
-          source_type: "file",
-          file_path: "/fake/export.md",
+          saveKeys: ["NOTEBOOKLM_NOTEBOOK_IDS", "NOTEBOOKLM_DRIVE_DOC_ID"],
+          apply: {
+            NOTEBOOKLM_NOTEBOOK_IDS: null,
+            NOTEBOOKLM_DRIVE_DOC_ID: null,
+          },
+          tmpdir: { prefix: "session-close-home-" },
         },
-      ]);
+        async () => {
+          await writeFile(
+            registryPath,
+            `${JSON.stringify(
+              [
+                {
+                  id: watchedId,
+                  title: "CNS Vault Architecture",
+                  watch: true,
+                  domain: "cns-brain",
+                  last_updated: null,
+                },
+                {
+                  id: unwatchedId,
+                  title: "Other notebook",
+                  watch: false,
+                  domain: "general",
+                  last_updated: null,
+                },
+              ],
+              null,
+              2,
+            )}\n`,
+            "utf8",
+          );
+
+          const targets = await readNotebookLmTargets("/fake/vault", "/fake/export.md", {
+            registryPath,
+          });
+
+          assert.deepEqual(targets, [
+            {
+              notebook_id: watchedId,
+              title: "CNS Vault Architecture",
+              source_name: "CNS Vault Export",
+              source_type: "file",
+              file_path: "/fake/export.md",
+            },
+          ]);
+        },
+      );
     } finally {
-      if (oldHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = oldHome;
-      }
-      if (oldIds === undefined) {
-        delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      } else {
-        process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
-      }
-      if (oldDriveDocId === undefined) {
-        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      } else {
-        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
-      }
-      if (oldHermesHome === undefined) {
-        delete process.env.HERMES_HOME;
-      } else {
-        process.env.HERMES_HOME = oldHermesHome;
-      }
       await rm(dir, { recursive: true, force: true });
-      await rm(home, { recursive: true, force: true });
     }
   });
 
   it("falls back to project map when registry has no watch:true rows", async () => {
-    const oldHome = process.env.HOME;
-    const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
-    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
-    const oldHermesHome = process.env.HERMES_HOME;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
-    const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const vault = join(dir, "vault");
     const registryPath = join(dir, "notebook-registry.json");
     const mapId = "f037c741-f7e1-4a90-880f-d2d38986767b";
 
     try {
-      delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      delete process.env.HERMES_HOME;
-      process.env.HOME = home;
-      await mkdir(join(vault, "03-Resources"), { recursive: true });
-      await writeFile(
-        join(vault, "03-Resources/NotebookLM-Project-Map.md"),
-        [
-          "| Project | Notebook |",
-          "| --- | --- |",
-          `| CNS | CNS Vault ${mapId} |`,
-          "",
-        ].join("\n"),
-        "utf8",
-      );
-      await writeFile(
-        registryPath,
-        `${JSON.stringify([
-          {
-            id: "981466f0-de1c-4551-93a9-f3bc2a24b184",
-            title: "Unwatched",
-            watch: false,
-            domain: "general",
-            last_updated: null,
+      await withSessionCloseEnvIsolation(
+        {
+          saveKeys: ["NOTEBOOKLM_NOTEBOOK_IDS", "NOTEBOOKLM_DRIVE_DOC_ID"],
+          apply: {
+            NOTEBOOKLM_NOTEBOOK_IDS: null,
+            NOTEBOOKLM_DRIVE_DOC_ID: null,
           },
-        ])}\n`,
-        "utf8",
-      );
+          tmpdir: { prefix: "session-close-home-" },
+        },
+        async () => {
+          await mkdir(join(vault, "03-Resources"), { recursive: true });
+          await writeFile(
+            join(vault, "03-Resources/NotebookLM-Project-Map.md"),
+            [
+              "| Project | Notebook |",
+              "| --- | --- |",
+              `| CNS | CNS Vault ${mapId} |`,
+              "",
+            ].join("\n"),
+            "utf8",
+          );
+          await writeFile(
+            registryPath,
+            `${JSON.stringify([
+              {
+                id: "981466f0-de1c-4551-93a9-f3bc2a24b184",
+                title: "Unwatched",
+                watch: false,
+                domain: "general",
+                last_updated: null,
+              },
+            ])}\n`,
+            "utf8",
+          );
 
-      const targets = await readNotebookLmTargets(vault, "/fake/export.md", {
-        registryPath,
-      });
+          const targets = await readNotebookLmTargets(vault, "/fake/export.md", {
+            registryPath,
+          });
 
-      assert.equal(targets.length, 1);
-      assert.equal(
-        /** @type {{ notebook_id?: string }} */ (targets[0]).notebook_id,
-        mapId,
+          assert.equal(targets.length, 1);
+          assert.equal(
+            /** @type {{ notebook_id?: string }} */ (targets[0]).notebook_id,
+            mapId,
+          );
+        },
       );
     } finally {
-      if (oldHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = oldHome;
-      }
-      if (oldIds === undefined) {
-        delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-      } else {
-        process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
-      }
-      if (oldDriveDocId === undefined) {
-        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
-      } else {
-        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
-      }
-      if (oldHermesHome === undefined) {
-        delete process.env.HERMES_HOME;
-      } else {
-        process.env.HERMES_HOME = oldHermesHome;
-      }
       await rm(dir, { recursive: true, force: true });
-      await rm(home, { recursive: true, force: true });
     }
   });
 

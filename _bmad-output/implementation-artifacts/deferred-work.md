@@ -706,4 +706,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 ## Deferred from: session-close test HERMES_HOME isolation fix (2026-06-04)
 
-- Three test files (`tests/notebook-routing-report.test.mjs`, `tests/smart-routing.test.mjs`, `tests/session-close-pipeline.test.mjs`) each hand-roll the same `HOME`/`HERMES_HOME`/`NOTEBOOKLM_*` save-delete-restore isolation pattern. This duplication is what produced the original `HERMES_HOME` omission. Extract a shared `withSessionCloseEnvIsolation(overrides, fn)` helper in a future pass so new tests can't forget a var.
+- ~~Three test files hand-roll HOME/HERMES_HOME isolation~~ **Resolved (Story 60-2, 2026-06-04):** shared helper `tests/helpers/hermes-env-isolation.mjs` exports `withSessionCloseEnvIsolation` and `withSmartRoutingIsolatedEnv`; migrated `tests/notebook-routing-report.test.mjs`, `tests/smart-routing.test.mjs`, `tests/session-close-pipeline.test.mjs`.
+
+## Deferred from: code review of 60-2-dry-refactor-shared-withsessioncloseenv-isolation-helper (2026-06-04)
+
+- Optional direct unit tests for `tests/helpers/hermes-env-isolation.mjs` (save/restore ordering, nested-call safety); integration coverage via three migrated suites is sufficient for now.

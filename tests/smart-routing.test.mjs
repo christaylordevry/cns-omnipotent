@@ -5,15 +5,10 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { readNotebookLmTargets } from "../scripts/session-close/lib/read-sources.mjs";
-
-/** Restore env var to its prior state. */
-function restoreEnv(key, prior) {
-  if (prior === undefined) {
-    delete process.env[key];
-  } else {
-    process.env[key] = prior;
-  }
-}
+import {
+  withSessionCloseEnvIsolation,
+  withSmartRoutingIsolatedEnv,
+} from "./helpers/hermes-env-isolation.mjs";
 
 /** Create a temp directory under system tmpdir. */
 async function mktmp(prefix) {
@@ -37,41 +32,6 @@ async function createVaultWithMap(dir, mapId) {
     "utf8",
   );
   return vaultRoot;
-}
-
-/**
- * Run `fn` with isolated HOME, NOTEBOOKLM_NOTEBOOK_IDS, and NOTEBOOK_SMART_ROUTING.
- * Restores all three after fn completes (or throws).
- * @param {string} smartRoutingValue  value to set for NOTEBOOK_SMART_ROUTING (or null to delete)
- * @param {() => Promise<void>} fn
- */
-async function withIsolatedEnv(smartRoutingValue, fn) {
-  const priorHome = process.env.HOME;
-  // HERMES_HOME takes precedence over HOME when resolving the session-close env
-  // file (see load-session-close-env.mjs). The Hermes gateway subprocess sets it
-  // to the real ~/.hermes, so it must be neutralized here or these tests read the
-  // operator's real session-close.env instead of the isolated fixture.
-  const priorHermesHome = process.env.HERMES_HOME;
-  const priorIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-  const priorFlag = process.env.NOTEBOOK_SMART_ROUTING;
-  const fakeHome = await mktmp("sr-home-");
-  try {
-    process.env.HOME = fakeHome;
-    delete process.env.HERMES_HOME;
-    delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    if (smartRoutingValue === null) {
-      delete process.env.NOTEBOOK_SMART_ROUTING;
-    } else {
-      process.env.NOTEBOOK_SMART_ROUTING = smartRoutingValue;
-    }
-    await fn();
-  } finally {
-    restoreEnv("HOME", priorHome);
-    restoreEnv("HERMES_HOME", priorHermesHome);
-    restoreEnv("NOTEBOOKLM_NOTEBOOK_IDS", priorIds);
-    restoreEnv("NOTEBOOK_SMART_ROUTING", priorFlag);
-    await rm(fakeHome, { recursive: true, force: true });
-  }
 }
 
 /** A registry entry with domain cns-brain (no watch flag). */
@@ -126,7 +86,7 @@ describe("smart routing — NOTEBOOK_SMART_ROUTING flag", () => {
   it("skips smart routing when flag is unset → project-map wins", async () => {
     const dir = await mktmp("notebook-sr-unset-");
     try {
-      await withIsolatedEnv(null, async () => {
+      await withSmartRoutingIsolatedEnv(null, async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -146,7 +106,7 @@ describe("smart routing — NOTEBOOK_SMART_ROUTING flag", () => {
   it("skips smart routing when flag is '0'", async () => {
     const dir = await mktmp("notebook-sr-zero-");
     try {
-      await withIsolatedEnv("0", async () => {
+      await withSmartRoutingIsolatedEnv("0", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -166,7 +126,7 @@ describe("smart routing — NOTEBOOK_SMART_ROUTING flag", () => {
   it("skips smart routing when flag is '' (empty string)", async () => {
     const dir = await mktmp("notebook-sr-empty-");
     try {
-      await withIsolatedEnv("", async () => {
+      await withSmartRoutingIsolatedEnv("", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -186,7 +146,7 @@ describe("smart routing — NOTEBOOK_SMART_ROUTING flag", () => {
   it("skips smart routing when flag is 'false'", async () => {
     const dir = await mktmp("notebook-sr-false-");
     try {
-      await withIsolatedEnv("false", async () => {
+      await withSmartRoutingIsolatedEnv("false", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -210,7 +170,7 @@ describe("smart routing — ROUTED path", () => {
   it("returns single ROUTED target when scorer matches and flag is '1'", async () => {
     const dir = await mktmp("notebook-sr-routed-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
 
         const targets = await readNotebookLmTargets("/fake/vault", EXPORT_PATH, {
@@ -234,7 +194,7 @@ describe("smart routing — ROUTED path", () => {
   it("ROUTED target has all required shape fields", async () => {
     const dir = await mktmp("notebook-sr-fields-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
 
         const targets = await readNotebookLmTargets("/fake/vault", EXPORT_PATH, {
@@ -257,7 +217,7 @@ describe("smart routing — ROUTED path", () => {
   it("ROUTED using sprint.active_epics (epic id tokens match domain)", async () => {
     const dir = await mktmp("notebook-sr-epics-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
 
         // P1: extractScoringTopic joins epic IDs → "epic-cns-vault-brain"
@@ -289,7 +249,7 @@ describe("smart routing — NO_ROUTE fall-through", () => {
   it("falls through to project-map when scorer returns NO_ROUTE", async () => {
     const dir = await mktmp("notebook-sr-noroute-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         // Health domain won't match "widget wizard" topic
         const registryPath = await writeRegistry(dir, [HEALTH_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
@@ -310,7 +270,7 @@ describe("smart routing — NO_ROUTE fall-through", () => {
   it("falls through when contextPack is undefined (empty topic → NO_ROUTE)", async () => {
     const dir = await mktmp("notebook-sr-noctx-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -328,7 +288,7 @@ describe("smart routing — NO_ROUTE fall-through", () => {
   it("falls through when contextPack is null", async () => {
     const dir = await mktmp("notebook-sr-null-ctx-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -352,7 +312,7 @@ describe("smart routing — precedence", () => {
   it("watch-list wins over smart routing", async () => {
     const dir = await mktmp("notebook-sr-watch-wins-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         // WATCHED_ENTRY has watch:true → returned before smart routing step
         const registryPath = await writeRegistry(dir, [WATCHED_ENTRY, CNS_ENTRY]);
 
@@ -371,33 +331,30 @@ describe("smart routing — precedence", () => {
 
   it("env IDs win over smart routing", async () => {
     const envId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
-    const priorHome = process.env.HOME;
-    const priorHermesHome = process.env.HERMES_HOME;
-    const priorIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    const priorFlag = process.env.NOTEBOOK_SMART_ROUTING;
-    const fakeHome = await mktmp("sr-env-home-");
     const dir = await mktmp("notebook-sr-env-wins-");
     try {
-      process.env.HOME = fakeHome;
-      delete process.env.HERMES_HOME;
-      process.env.NOTEBOOK_SMART_ROUTING = "1";
-      process.env.NOTEBOOKLM_NOTEBOOK_IDS = envId; // env override must win
+      await withSessionCloseEnvIsolation(
+        {
+          saveKeys: ["NOTEBOOKLM_NOTEBOOK_IDS", "NOTEBOOK_SMART_ROUTING"],
+          apply: {
+            NOTEBOOK_SMART_ROUTING: "1",
+            NOTEBOOKLM_NOTEBOOK_IDS: envId,
+          },
+          tmpdir: { prefix: "sr-env-home-" },
+        },
+        async () => {
+          const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
 
-      const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
+          const targets = await readNotebookLmTargets("/fake/vault", EXPORT_PATH, {
+            registryPath,
+            contextPack: CNS_CONTEXT_PACK,
+          });
 
-      const targets = await readNotebookLmTargets("/fake/vault", EXPORT_PATH, {
-        registryPath,
-        contextPack: CNS_CONTEXT_PACK,
-      });
-
-      assert.equal(targets.length, 1);
-      assert.equal(/** @type {any} */ (targets[0]).notebook_id, envId);
+          assert.equal(targets.length, 1);
+          assert.equal(/** @type {any} */ (targets[0]).notebook_id, envId);
+        },
+      );
     } finally {
-      restoreEnv("HOME", priorHome);
-      restoreEnv("HERMES_HOME", priorHermesHome);
-      restoreEnv("NOTEBOOKLM_NOTEBOOK_IDS", priorIds);
-      restoreEnv("NOTEBOOK_SMART_ROUTING", priorFlag);
-      await rm(fakeHome, { recursive: true, force: true });
       await rm(dir, { recursive: true, force: true });
     }
   });
@@ -409,7 +366,7 @@ describe("smart routing — error resilience", () => {
   it("falls through gracefully when scorer throws (no crash)", async () => {
     const dir = await mktmp("notebook-sr-throws-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         // Write a registry file with invalid JSON so readRegistry throws,
         // leaving registry = [] for the smartRoute call — but that hits scorer NO_ROUTE.
         // To exercise the scorer-throw path we write a valid registry with a corrupted
@@ -440,7 +397,7 @@ describe("smart routing — error resilience", () => {
   it("falls through when registry is empty (scorer NO_ROUTE, no entries)", async () => {
     const dir = await mktmp("notebook-sr-empty-reg-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withSmartRoutingIsolatedEnv("1", async () => {
         const registryPath = await writeRegistry(dir, []);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 

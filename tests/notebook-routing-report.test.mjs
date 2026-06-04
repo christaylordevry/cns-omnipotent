@@ -10,14 +10,10 @@ import {
 } from "../scripts/session-close/lib/read-sources.mjs";
 import { enforceTokenBudget } from "../scripts/session-close/lib/token-estimate.mjs";
 import { buildCloseReport } from "../scripts/session-close/run-deterministic.mjs";
+import { withSmartRoutingIsolatedEnv } from "./helpers/hermes-env-isolation.mjs";
 
-function restoreEnv(key, prior) {
-  if (prior === undefined) {
-    delete process.env[key];
-  } else {
-    process.env[key] = prior;
-  }
-}
+const withRoutingReportEnv = (smartRoutingValue, fn) =>
+  withSmartRoutingIsolatedEnv(smartRoutingValue, fn, { prefix: "routing-report-home-" });
 
 async function mktmp(prefix) {
   return mkdtemp(join(tmpdir(), prefix));
@@ -38,35 +34,6 @@ async function createVaultWithMap(dir, mapId) {
     "utf8",
   );
   return vaultRoot;
-}
-
-async function withIsolatedEnv(smartRoutingValue, fn) {
-  const priorHome = process.env.HOME;
-  // HERMES_HOME takes precedence over HOME when resolving the session-close env
-  // file (see load-session-close-env.mjs). The Hermes gateway subprocess sets it
-  // to the real ~/.hermes, so it must be neutralized here or these tests read the
-  // operator's real session-close.env instead of the isolated fixture.
-  const priorHermesHome = process.env.HERMES_HOME;
-  const priorIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-  const priorFlag = process.env.NOTEBOOK_SMART_ROUTING;
-  const fakeHome = await mktmp("routing-report-home-");
-  try {
-    process.env.HOME = fakeHome;
-    delete process.env.HERMES_HOME;
-    delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
-    if (smartRoutingValue === null) {
-      delete process.env.NOTEBOOK_SMART_ROUTING;
-    } else {
-      process.env.NOTEBOOK_SMART_ROUTING = smartRoutingValue;
-    }
-    await fn();
-  } finally {
-    restoreEnv("HOME", priorHome);
-    restoreEnv("HERMES_HOME", priorHermesHome);
-    restoreEnv("NOTEBOOKLM_NOTEBOOK_IDS", priorIds);
-    restoreEnv("NOTEBOOK_SMART_ROUTING", priorFlag);
-    await rm(fakeHome, { recursive: true, force: true });
-  }
 }
 
 const CNS_ENTRY = {
@@ -106,7 +73,7 @@ const EXPORT_PATH = "/fake/export.md";
 
 describe("notebook routing report metadata", () => {
   it("captures env-override routing metadata without reason", async () => {
-    await withIsolatedEnv("1", async () => {
+    await withRoutingReportEnv("1", async () => {
       process.env.NOTEBOOKLM_NOTEBOOK_IDS = "abc-123";
 
       const { targets, routing } = await readNotebookLmTargetsWithMeta("/fake/vault", EXPORT_PATH);
@@ -121,7 +88,7 @@ describe("notebook routing report metadata", () => {
   it("captures watch-flag routing metadata from registry entries", async () => {
     const dir = await mktmp("routing-report-watch-");
     try {
-      await withIsolatedEnv(null, async () => {
+      await withRoutingReportEnv(null, async () => {
         const registryPath = await writeRegistry(dir, [WATCHED_ENTRY]);
 
         const { targets, routing } = await readNotebookLmTargetsWithMeta("/fake/vault", EXPORT_PATH, {
@@ -140,7 +107,7 @@ describe("notebook routing report metadata", () => {
   it("captures smart-route metadata including disambiguator reason", async () => {
     const dir = await mktmp("routing-report-smart-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withRoutingReportEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [CNS_ENTRY]);
 
         const { targets, routing } = await readNotebookLmTargetsWithMeta("/fake/vault", EXPORT_PATH, {
@@ -161,7 +128,7 @@ describe("notebook routing report metadata", () => {
   it("falls through from smart-route NO_ROUTE to project-map metadata", async () => {
     const dir = await mktmp("routing-report-smart-fallback-");
     try {
-      await withIsolatedEnv("1", async () => {
+      await withRoutingReportEnv("1", async () => {
         const registryPath = await writeRegistry(dir, [HEALTH_ENTRY]);
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
@@ -181,7 +148,7 @@ describe("notebook routing report metadata", () => {
   it("captures project-map routing metadata when no prior method wins", async () => {
     const dir = await mktmp("routing-report-map-");
     try {
-      await withIsolatedEnv(null, async () => {
+      await withRoutingReportEnv(null, async () => {
         const vaultRoot = await createVaultWithMap(dir, MAP_ID);
 
         const { targets, routing } = await readNotebookLmTargetsWithMeta(vaultRoot, EXPORT_PATH, {
@@ -200,7 +167,7 @@ describe("notebook routing report metadata", () => {
   it("captures empty routing metadata when no targets resolve", async () => {
     const dir = await mktmp("routing-report-empty-");
     try {
-      await withIsolatedEnv(null, async () => {
+      await withRoutingReportEnv(null, async () => {
         const registryPath = await writeRegistry(dir, []);
 
         const { targets, routing } = await readNotebookLmTargetsWithMeta(dir, EXPORT_PATH, {
@@ -216,7 +183,7 @@ describe("notebook routing report metadata", () => {
   });
 
   it("keeps readNotebookLmTargets backward compatible as a plain array", async () => {
-    await withIsolatedEnv("1", async () => {
+    await withRoutingReportEnv("1", async () => {
       process.env.NOTEBOOKLM_NOTEBOOK_IDS = "plain-array-id";
 
       const targets = await readNotebookLmTargets("/fake/vault", EXPORT_PATH);
