@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.27 | Last updated: 2026-06-03
+> Version: 2.1.32 | Last updated: 2026-06-04
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -270,14 +270,14 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 ### Current Priorities
 
 1. Story 58.1: Migrate vault export sync to Drive-backed Doc — complete review and close
-2. Investigate tests failure in session-close deterministic phase — FAILED status blocks clean close
-3. Advance Epic 57 Memory Track — implement chosen external memory provider or close spike (57.4 eval done, 57.3 auto-memory done)
+2. Story 59.2: Fix session-close tests always reporting FAILED — ready-for-dev
+3. Story 59.1: Session-close context reduction (runtime token fix) — review
 
 ### Recent Session Context
 
-- Story 58.1: Migrate vault export sync to Drive-backed Doc — status: review
-- Story 57.4: External memory provider evaluation (Mem0 vs Honcho) — done
-- Story 57.3: Vault-lint result auto-memory — done
+- Story 59.2: Fix session-close tests always reporting FAILED — ready-for-dev
+- Story 59.1: Session-close context reduction (runtime token fix) — review
+- Story 58.1: Migrate vault export sync to Drive-backed Doc — review
 
 ## 9. Agent Behavior Guidelines
 
@@ -360,6 +360,11 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-04 | 2.1.32 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-06-04 | 2.1.31 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-06-04 | 2.1.30 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-06-04 | 2.1.29 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
+| 2026-06-04 | 2.1.28 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-03 | 2.1.27 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-03 | 2.1.26 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-02 | 2.1.25 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |

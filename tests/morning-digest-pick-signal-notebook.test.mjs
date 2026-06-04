@@ -263,6 +263,7 @@ describe('pick-signal-notebook.mjs CLI', () => {
       CNS_REPO_ROOT: repoRoot,
       ...env,
     };
+    const debugLogPath = '/tmp/debug-pick-signal-test-env.log';
     if (digestSources !== undefined) {
       baseEnv.DIGEST_SOURCES_JSON = JSON.stringify(digestSources);
       delete baseEnv.SIGNALS_JSON;
@@ -320,11 +321,12 @@ describe('pick-signal-notebook.mjs CLI', () => {
     delete baseEnv.SIGNALS_JSON;
     const { stdout } = await execFileAsync(
       'node',
-      [pickScript, JSON.stringify(['CNS vault architecture']), registryPath],
+      [pickScript, JSON.stringify(['CNS vault architecture'])],
       {
         env: {
           ...baseEnv,
           CNS_REPO_ROOT: repoRoot,
+          CNS_NOTEBOOK_REGISTRY_PATH: registryPath, // Added for debug
         },
       },
     );
