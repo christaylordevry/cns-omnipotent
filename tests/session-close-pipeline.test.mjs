@@ -286,10 +286,12 @@ describe("session-close read-sources", () => {
   it("reads NotebookLM env file targets with upload file metadata", async () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
 
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
       process.env.HOME = home;
       await mkdir(join(home, ".hermes"), { recursive: true });
       await writeFile(
@@ -333,6 +335,11 @@ describe("session-close read-sources", () => {
       } else {
         process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
       }
+      if (oldDriveDocId === undefined) {
+        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      } else {
+        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
+      }
       await rm(home, { recursive: true, force: true });
     }
   });
@@ -340,6 +347,7 @@ describe("session-close read-sources", () => {
   it("uses watch:true registry entries when env IDs are unset", async () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const registryPath = join(dir, "notebook-registry.json");
@@ -348,6 +356,7 @@ describe("session-close read-sources", () => {
 
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
       process.env.HOME = home;
       await writeFile(
         registryPath,
@@ -398,6 +407,11 @@ describe("session-close read-sources", () => {
       } else {
         process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
       }
+      if (oldDriveDocId === undefined) {
+        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      } else {
+        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
+      }
       await rm(dir, { recursive: true, force: true });
       await rm(home, { recursive: true, force: true });
     }
@@ -406,6 +420,7 @@ describe("session-close read-sources", () => {
   it("falls back to project map when registry has no watch:true rows", async () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+    const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const vault = join(dir, "vault");
@@ -414,6 +429,7 @@ describe("session-close read-sources", () => {
 
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
+      delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
       process.env.HOME = home;
       await mkdir(join(vault, "03-Resources"), { recursive: true });
       await writeFile(
@@ -459,6 +475,11 @@ describe("session-close read-sources", () => {
         delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
       } else {
         process.env.NOTEBOOKLM_NOTEBOOK_IDS = oldIds;
+      }
+      if (oldDriveDocId === undefined) {
+        delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      } else {
+        process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
       }
       await rm(dir, { recursive: true, force: true });
       await rm(home, { recursive: true, force: true });
