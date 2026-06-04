@@ -395,17 +395,17 @@ development_status:
   56-5-notebook-queries-convex-table-dedupe: done
 
   # Epic 57 — Hermes MEMORY.md CNS State freshness (operator brief 2026-06-02)
-  epic-57: in-progress
+  epic-57: done
   57-2-session-close-memory-md-auto-update: done
   57-3-vault-lint-result-auto-memory: done
   57-4-external-memory-provider-eval: done
 
   # Epic 58 — NotebookLM vault export Drive sync (operator brief 2026-06-03)
-  epic-58: in-progress
+  epic-58: done
   58-1-migrate-vault-export-drive-doc-sync: done
 
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
-  epic-59: in-progress
-  59-1-session-close-context-reduction: review
+  epic-59: done
+  59-1-session-close-context-reduction: done
   59-2-fix-session-close-tests-failure: done
   59-3-fix-nlm-auth-hermes-home-isolation: done
