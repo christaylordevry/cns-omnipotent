@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  defaultSessionCloseEnvPath,
   hasGoogleOAuthCredentials,
   parseSessionCloseEnvFile,
   readNotebooklmDriveDocId,
@@ -108,6 +109,35 @@ GOOGLE_CLIENT_ID=abc
         assert.equal(await readSessionCloseEnvVar("NOTEBOOKLM_DRIVE_DOC_ID", { envPath }), "from-file");
       });
     });
+  });
+
+  it("readSessionCloseEnvVar reads HERMES_HOME session-close.env under profile HOME", async () => {
+    const hermesHome = await mkdtemp(join(tmpdir(), "session-close-hermes-home-"));
+    await writeFile(join(hermesHome, "session-close.env"), "NOTEBOOKLM_DRIVE_DOC_ID=from-hermes-home\n", "utf8");
+    const env = {
+      HOME: join(hermesHome, "home"),
+      HERMES_HOME: hermesHome,
+    };
+    assert.equal(defaultSessionCloseEnvPath(env), join(hermesHome, "session-close.env"));
+    assert.equal(
+      await readNotebooklmDriveDocId({ env }),
+      "from-hermes-home",
+    );
+  });
+
+  it("readSessionCloseEnvVar infers Hermes home from profile HOME when HERMES_HOME is absent", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "session-close-hermes-profile-"));
+    const hermesHome = join(dir, ".hermes");
+    await mkdir(hermesHome, { recursive: true });
+    await writeFile(join(hermesHome, "session-close.env"), "NOTEBOOKLM_DRIVE_DOC_ID=from-profile-home\n", "utf8");
+    const env = {
+      HOME: join(hermesHome, "home"),
+    };
+    assert.equal(defaultSessionCloseEnvPath(env), join(hermesHome, "session-close.env"));
+    assert.equal(
+      await readNotebooklmDriveDocId({ env }),
+      "from-profile-home",
+    );
   });
 
   it("resolveVaultExportFanoutMode selects drive-sync when doc id and oauth present", async () => {

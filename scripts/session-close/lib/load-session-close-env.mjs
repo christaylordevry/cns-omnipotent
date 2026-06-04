@@ -2,8 +2,32 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-/** Resolve at call time so tests can isolate via HOME. */
-export function defaultSessionCloseEnvPath() {
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+function resolveHermesHome(env) {
+  const explicit = env.HERMES_HOME;
+  if (typeof explicit === "string" && explicit.trim()) {
+    return explicit.trim();
+  }
+
+  const home = env.HOME;
+  if (typeof home === "string") {
+    const match = home.match(/^(.*\/\.hermes)\/home(?:\/.*)?$/);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+/** Resolve at call time so tests can isolate via HOME and HERMES_HOME. */
+export function defaultSessionCloseEnvPath(env = process.env) {
+  const hermesHome = resolveHermesHome(env);
+  if (hermesHome) {
+    return join(hermesHome, "session-close.env");
+  }
   return join(homedir(), ".hermes", "session-close.env");
 }
 
@@ -54,7 +78,7 @@ export async function readSessionCloseEnvVar(key, opts = {}) {
     return fromProcess.trim();
   }
 
-  const envPath = opts.envPath ?? defaultSessionCloseEnvPath();
+  const envPath = opts.envPath ?? defaultSessionCloseEnvPath(env);
   try {
     const raw = await readFile(envPath, "utf8");
     const parsed = parseSessionCloseEnvFile(raw);
