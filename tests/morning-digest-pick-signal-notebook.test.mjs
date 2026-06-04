@@ -14,6 +14,7 @@ import {
 import {
   buildDigestSignals,
   dedupeSignals,
+  extractArxivSignals,
   extractPerplexitySignals,
   pickSignalNotebook,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs';
@@ -103,6 +104,47 @@ describe('buildDigestSignals', () => {
       buildDigestSignals({ trends: [{ keyword: '' }], headlines: null, perplexityText: '   ' }),
       [],
     );
+    assert.deepEqual(buildDigestSignals({ arxiv: [] }), []);
+  });
+
+  it('places arxiv titles after perplexity-derived signals', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
+      perplexityText: 'Perplexity sentence one. Perplexity sentence two.',
+      arxiv: [{ title: 'Arxiv Paper Alpha' }, { title: 'Arxiv Paper Beta' }],
+    });
+    const arxivIdx = signals.indexOf('Arxiv Paper Alpha');
+    const perplexityIdx = signals.findIndex((s) => s.includes('Perplexity'));
+    assert.ok(perplexityIdx >= 0 && arxivIdx > perplexityIdx);
+  });
+
+  it('dedupes arxiv title when headline wins first', () => {
+    const signals = buildDigestSignals({
+      headlines: [{ title: 'Shared Paper Title' }],
+      arxiv: [{ title: 'shared paper title' }],
+    });
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0], 'Shared Paper Title');
+  });
+
+  it('caps combined output at 10 with arxiv included', () => {
+    const signals = buildDigestSignals({
+      trends: Array.from({ length: 6 }, (_, i) => ({
+        keyword: `trend-${i}`,
+        normalizedValue: 1 - i * 0.01,
+      })),
+      headlines: Array.from({ length: 6 }, (_, i) => ({ title: `headline-${i}` })),
+      perplexityText: 'One. Two. Three. Four. Five.',
+      arxiv: Array.from({ length: 5 }, (_, i) => ({ title: `arxiv-${i}` })),
+    });
+    assert.equal(signals.length, 10);
+  });
+
+  it('extractArxivSignals caps at three titles', () => {
+    const titles = extractArxivSignals(
+      Array.from({ length: 5 }, (_, i) => ({ title: `paper-${i}` })),
+    );
+    assert.equal(titles.length, 3);
   });
 });
 

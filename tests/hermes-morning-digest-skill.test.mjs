@@ -13,6 +13,8 @@ const cronSnippetPath = join(skillDir, "references/cron-snippet.md");
 const configSnippetPath = join(skillDir, "references/config-snippet.md");
 const trendIngestWrapperPath = join(root, "scripts/session-close/hermes-run-trend-ingest.sh");
 const newsapiWrapperPath = join(root, "scripts/session-close/hermes-run-newsapi.sh");
+const arxivWrapperPath = join(root, "scripts/session-close/hermes-run-arxiv.sh");
+const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const pickSignalScriptPath = join(
   skillDir,
   "scripts/pick-signal-notebook.mjs",
@@ -30,7 +32,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.4"));
+    assert.ok(body.includes("version: 1.2.5"));
+    assert.ok(body.includes("**arXiv Preprints**"));
+    assert.ok(body.includes("hermes-run-arxiv.sh"));
     assert.ok(body.includes("## Pitfalls"));
     assert.ok(body.includes("pick-signal-routing.md"));
     assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
@@ -127,6 +131,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("**Trending Now**"));
     assert.ok(body.includes("**Headlines**"));
     assert.ok(body.includes("**Deep Signal**"));
+    assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**Recommended focus:**"));
     assert.ok(body.includes("**Vault context**"));
     assert.ok(body.includes("pick-signal-notebook.mjs"));
@@ -161,6 +166,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
         'terminal(command="bash scripts/session-close/hermes-run-newsapi.sh"',
       ),
     );
+    assert.ok(
+      body.includes(
+        'terminal(command="bash scripts/session-close/hermes-run-arxiv.sh"',
+      ),
+    );
     assert.ok(body.includes("Call `terminal` exactly once for NewsAPI"));
     assert.ok(body.includes("Call `mcp__perplexity__search` exactly once"));
     assert.ok(
@@ -173,16 +183,21 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
   it("wrapper scripts exist and are executable", () => {
     assert.ok(existsSync(trendIngestWrapperPath));
     assert.ok(existsSync(newsapiWrapperPath));
+    assert.ok(existsSync(arxivWrapperPath));
+    assert.ok(existsSync(fetchArxivScriptPath));
 
     assert.ok((statSync(trendIngestWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(newsapiWrapperPath).mode & 0o111) !== 0);
+    assert.ok((statSync(arxivWrapperPath).mode & 0o111) !== 0);
 
     const trendIngestWrapper = readFileSync(trendIngestWrapperPath, "utf8");
     const newsapiWrapper = readFileSync(newsapiWrapperPath, "utf8");
+    const arxivWrapper = readFileSync(arxivWrapperPath, "utf8");
     assert.ok(trendIngestWrapper.includes("--dry-run"));
     assert.ok(trendIngestWrapper.includes("--sources google_trends"));
     assert.ok(newsapiWrapper.includes("$HOME/.hermes/trend-ingest.env"));
     assert.ok(newsapiWrapper.includes("NEWSAPI_API_KEY"));
+    assert.ok(arxivWrapper.includes("fetch-arxiv-rss.mjs"));
   });
 
   it("cron-snippet documents 07:00 Sydney schedule, install script, and 26-7 migration (Story 55-3)", () => {
@@ -279,19 +294,35 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
   });
 
-  it("task-prompt Source 4 uses DIGEST_SOURCES_JSON builder for three sources (Story 56-4)", () => {
+  it("task-prompt Source 4 arXiv terminal and Source 5 five-source scoring (Story 61-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const source4 = taskBody.slice(taskBody.indexOf("## Source 4"));
-    assert.ok(source4.includes("DIGEST_SOURCES_JSON=<shellQuote"));
-    assert.ok(source4.includes("buildDigestSignals"));
-    assert.ok(source4.includes("perplexityText"));
-    assert.ok(source4.includes('"trends"'));
-    assert.ok(source4.includes('"headlines"'));
+    const source4End = taskBody.indexOf("## Source 5");
+    const source4 = taskBody.slice(taskBody.indexOf("## Source 4"), source4End);
+    assert.ok(source4.includes("hermes-run-arxiv.sh"));
+    assert.ok(source4.includes("fetch-arxiv-rss.mjs") || source4.includes("papers[]"));
+    assert.ok(source4.includes("**arXiv Preprints**"));
+
+    const source5 = taskBody.slice(source4End);
+    assert.ok(source5.includes("DIGEST_SOURCES_JSON=<shellQuote"));
+    assert.ok(source5.includes("buildDigestSignals"));
+    assert.ok(source5.includes("perplexityText"));
+    assert.ok(source5.includes('"arxiv"'));
+    assert.ok(source5.includes('"trends"'));
+    assert.ok(source5.includes('"headlines"'));
+    assert.ok(source5.includes("arXiv titles (up to 3)"));
     assert.ok(
-      source4.includes("Do **not** hand-build a `SIGNALS_JSON` array"),
+      source5.includes("Do **not** hand-build a `SIGNALS_JSON` array"),
     );
     const skillBody = readFileSync(skillPath, "utf8");
     assert.ok(skillBody.includes("DIGEST_SOURCES_JSON"));
+    assert.ok(skillBody.includes("arxiv"));
+  });
+
+  it("config-snippet documents arXiv env keys (Story 61-1)", () => {
+    const body = readFileSync(configSnippetPath, "utf8");
+    assert.ok(body.includes("MORNING_DIGEST_ARXIV_CATEGORIES"));
+    assert.ok(body.includes("MORNING_DIGEST_ARXIV_MAX_PER_CATEGORY"));
+    assert.ok(body.includes("cs.AI,cs.LG,stat.ML"));
   });
 
   it("task-prompt documents post-post Convex log for successful Vault context (Story 52-2, 54-2)", () => {
@@ -320,9 +351,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("fire-and-forget"));
   });
 
-  it("SKILL.md v1.2.4 documents awaited Vault context Convex log (Story 52-2, 54-2)", () => {
+  it("SKILL.md v1.2.5 documents five sources and awaited Vault context Convex log (Story 61-1, 52-2, 54-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.4"));
+    assert.ok(body.includes("version: 1.2.5"));
+    assert.ok(body.includes("**arXiv Preprints**"));
+    assert.ok(body.includes("hermes-run-arxiv.sh"));
     assert.ok(body.includes("## Pitfalls"));
     assert.ok(body.includes("pick-signal-routing.md"));
     assert.ok(body.includes("log-notebook-query.mjs"));

@@ -75,10 +75,33 @@ Changing YAML or env alone does **not** reschedule the Hermes job until you re-r
 
 | Secret / file | Purpose |
 |---------------|---------|
-| `~/.hermes/trend-ingest.env` | `NEWSAPI_API_KEY` |
+| `~/.hermes/trend-ingest.env` | `NEWSAPI_API_KEY`; optional `MORNING_DIGEST_ARXIV_*` keys |
 | `~/.hermes/trend-watchlist.yaml` | Google Trends watchlist |
 | `OMNIPOTENT_REPO` | Optional; defaults to clone path in task-prompt |
 | `.env.live-chain` | `HERMES_DISCORD_TOKEN` for cron tick delivery |
+
+## arXiv preprints (Story 61-1)
+
+Public RSS — no API key. Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as NewsAPI is fine).
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `MORNING_DIGEST_ARXIV_CATEGORIES` | Comma-separated arXiv category codes | `cs.AI,cs.LG,stat.ML` |
+| `MORNING_DIGEST_ARXIV_MAX_PER_CATEGORY` | Max papers per feed (newest first) | `3` |
+| `MORNING_DIGEST_ARXIV_ENABLED` | Set `0` or `false` to disable without unsetting categories | `1` |
+
+Only the **first three** valid category codes are fetched (45s Hermes `terminal` timeout; 15s per feed).
+
+Example operator setup (not baked into code — categories must be set explicitly):
+
+```bash
+# In ~/.hermes/trend-ingest.env
+MORNING_DIGEST_ARXIV_CATEGORIES=cs.AI,cs.LG,stat.ML
+MORNING_DIGEST_ARXIV_MAX_PER_CATEGORY=3
+MORNING_DIGEST_ARXIV_ENABLED=1
+```
+
+When categories are unset or empty, the fetch script returns `{"papers":[]}` or `{"error":"arxiv disabled"}` when disabled.
 
 ## Coexistence
 

@@ -16,6 +16,7 @@ const MAX_SIGNALS = 10;
 const MAX_TREND_KEYWORDS = 5;
 const MAX_HEADLINE_TITLES = 5;
 const MAX_PERPLEXITY_SIGNALS = 3;
+const MAX_ARXIV_SIGNALS = 3;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
 const CNS_REPO_ROOT =
@@ -123,10 +124,30 @@ export function extractPerplexitySignals(perplexityText) {
 }
 
 /**
+ * @param {Array<{ title?: string }>} arxivList
+ * @returns {string[]}
+ */
+export function extractArxivSignals(arxivList) {
+  if (!Array.isArray(arxivList)) {
+    return [];
+  }
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of arxivList.slice(0, MAX_ARXIV_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {{
  *   trends?: Array<{ keyword?: string, normalizedValue?: number }>,
  *   headlines?: Array<{ title?: string } | string>,
  *   perplexityText?: string,
+ *   arxiv?: Array<{ title?: string }>,
  * }} sources
  * @returns {string[]}
  */
@@ -157,6 +178,7 @@ export function buildDigestSignals(sources = {}) {
   }
 
   ordered.push(...extractPerplexitySignals(sources.perplexityText).slice(0, MAX_PERPLEXITY_SIGNALS));
+  ordered.push(...extractArxivSignals(sources.arxiv));
 
   return dedupeSignals(ordered);
 }
@@ -260,7 +282,10 @@ function signalsFromParsedInput(parsed) {
     parsed &&
     typeof parsed === 'object' &&
     !Array.isArray(parsed) &&
-    ('trends' in parsed || 'headlines' in parsed || 'perplexityText' in parsed)
+    ('trends' in parsed ||
+      'headlines' in parsed ||
+      'perplexityText' in parsed ||
+      'arxiv' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

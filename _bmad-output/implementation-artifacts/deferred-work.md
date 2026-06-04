@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 61-1-morning-digest-arxiv-source (2026-06-04)
+
+- Partial per-category RSS failure returns papers from successful categories without `error` — acceptable when at least one feed succeeds; operator may not see which category failed.
+
 ## Deferred from: code review of 57-3-vault-lint-result-auto-memory (2026-06-02)
 
 - No CLI subprocess integration test — AC 7 table only requires script presence; lib paths covered in `vault-lint-memory-patch.test.mjs`.

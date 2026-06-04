@@ -1,7 +1,7 @@
 ---
 name: morning-digest
-description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.4
+description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
+version: 1.2.5
 author: CNS Operator
 license: MIT
 metadata:
@@ -14,11 +14,11 @@ metadata:
 
 ## Overview
 
-Daily operator briefing in Discord **`#hermes`**: trending keywords, CNS-relevant headlines, a short Perplexity sweep on the top trend, and optional **Vault context** from NotebookLM (CLI query after signal scoring).
+Daily operator briefing in Discord **`#hermes`**: trending keywords, CNS-relevant headlines, a short Perplexity sweep on the top trend, recent **arXiv** preprints from configured categories, and optional **Vault context** from NotebookLM (CLI query after signal scoring).
 
 - **Manual trigger**: single-line `morning-digest` or `morning-digest cron:<label>` (case-sensitive; see `references/trigger-pattern.md`)
 - **Cron trigger**: default **08:00 machine-local** (see `references/cron-snippet.md`)
-- **Tools**: explicit `terminal(...)` calls for trends, NewsAPI, `pick-signal-notebook.mjs`, and `query-notebook.mjs`; `mcp__perplexity__search` for deep signal only (no NotebookLM MCP)
+- **Tools**: explicit `terminal(...)` calls for trends, NewsAPI, arXiv RSS, `pick-signal-notebook.mjs`, and `query-notebook.mjs`; `mcp__perplexity__search` for deep signal only (no NotebookLM MCP)
 - **Date line**: civil date from machine timezone (`process.env.TZ` if set, else OS default)
 - **Safety**: **No vault writes**, **No dashboard relay**, no digest archive files
 
@@ -38,11 +38,12 @@ If the reference is not loaded, call `skill_view` first, then follow `references
 2. Call `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", workdir=resolved_repo_root, timeout=60)` for Google Trends.
 3. Call `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=resolved_repo_root, timeout=45)` for NewsAPI headlines, loading `NEWSAPI_API_KEY` only from `$HOME/.hermes/trend-ingest.env`.
 4. Call `mcp__perplexity__search` once for the Deep Signal.
-5. Build trend/headline signals; run `pick-signal-notebook.mjs`; on ROUTED, run `query-notebook.mjs` from `notebook-query/scripts/` (see task-prompt Source 4).
-6. Post the final `🌅 **Morning Digest**` contract even when one source fails.
-7. After posting, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (telemetry + optional warning; see task-prompt post-post).
+5. Call `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)` for arXiv preprints.
+6. Build trend/headline/arxiv signals; run `pick-signal-notebook.mjs`; on ROUTED, run `query-notebook.mjs` from `notebook-query/scripts/` (see task-prompt Source 5).
+7. Post the final `🌅 **Morning Digest**` contract even when one source fails.
+8. After posting, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (telemetry + optional warning; see task-prompt post-post).
 
-The final reply must use the task-prompt headings exactly: `🌅 **Morning Digest**`, `**Trending Now**`, `**Headlines**`, `**Deep Signal**`, `**Vault context**`, and `**Recommended focus:**`. Never invent trends or headlines when a tool fails.
+The final reply must use the task-prompt headings exactly: `🌅 **Morning Digest**`, `**Trending Now**`, `**Headlines**`, `**Deep Signal**`, `**arXiv Preprints**`, `**Vault context**`, and `**Recommended focus:**`. Never invent trends or headlines when a tool fails.
 
 ## Inline task contract
 
@@ -53,8 +54,9 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 3. Google Trends: call `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", workdir=resolved_repo_root, timeout=60)`. Parse stdout JSON only. Use `events[]`, sort by `normalizedValue` descending, take top 5, and display `round(normalizedValue * 100)` or integer `value`. If stdout is not valid JSON, show only `- (source unavailable: <short reason>)`.
 4. NewsAPI: call `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=resolved_repo_root, timeout=45)`. It reads `NEWSAPI_API_KEY` only from `$HOME/.hermes/trend-ingest.env` and prints JSON. If it fails, show only `- (source unavailable: <short reason>)`.
 5. Deep Signal: call `mcp__perplexity__search` once using the top parsed Google Trends keyword. If no top trend exists, do not invent a fallback keyword; write `- (source unavailable: no top trend keyword)`. If Perplexity fails or times out, write `- (source unavailable: perplexity timeout)`.
-6. Vault context: record `digest_start_ms` at task start; after Source 3, run `pick-signal-notebook.mjs` with shell-quoted `DIGEST_SOURCES_JSON` (trends + headlines + Perplexity Deep Signal text), then `query-notebook.mjs` when routed (same-command `QUERY_SCRIPT` plus shell-quoted env values; remaining_s cap per task-prompt). Partial failure → unavailable bullet only in Vault context.
-7. After posting the digest, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (emit `notebook_query_log`; warning on `failed`|`timeout` only; does not alter the digest).
+6. arXiv: call `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)`. Parse `papers[]` or show `- (source unavailable: <short reason>)` under **arXiv Preprints**.
+7. Vault context: record `digest_start_ms` at task start; after Source 4, run `pick-signal-notebook.mjs` with shell-quoted `DIGEST_SOURCES_JSON` (trends + headlines + Perplexity Deep Signal text + arxiv), then `query-notebook.mjs` when routed (same-command `QUERY_SCRIPT` plus shell-quoted env values; remaining_s cap per task-prompt). Partial failure → unavailable bullet only in Vault context.
+8. After posting the digest, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (emit `notebook_query_log`; warning on `failed`|`timeout` only; does not alter the digest).
 
 Output exactly:
 
@@ -69,6 +71,9 @@ Output exactly:
 
 **Deep Signal** (Perplexity — top trend: "<keyword>")
 <2-3 sentence sweep summary or - (source unavailable: <short reason>)>
+
+**arXiv Preprints** (<categories>)
+- <title> — <snippet>
 
 **Vault context** (NotebookLM — <title or omit>)
 <answer text, max 500 chars; if longer truncate with … suffix>

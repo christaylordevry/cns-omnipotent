@@ -18,8 +18,8 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`).
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
-7. **Cross-source failures**: run Sources 1–4 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
-8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 4 `NOTEBOOK_REMAINING_S` (see Source 4).
+7. **Cross-source failures**: run Sources 1–5 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 5 `NOTEBOOK_REMAINING_S` (see Source 5).
 
 ## Tool-call rule
 
@@ -88,35 +88,54 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 - Soft cap **45s** — on timeout, write `- (source unavailable: perplexity timeout)`.
 - Missing top trend keyword: write `- (source unavailable: no top trend keyword)`.
 
-## Source 4 — Vault context (NotebookLM)
+## Source 4 — arXiv preprints
 
-Run **after** Source 3 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Call `terminal` exactly once for arXiv RSS (no API key). The script reads `MORNING_DIGEST_ARXIV_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present. It prints JSON with either `{"papers":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+Parse stdout JSON:
+
+- `papers[]` with `category`, `title`, `link`, `snippet`, `pubDate`.
+- Emit up to **N** papers per configured category (newest first in RSS order).
+
+For Discord **arXiv Preprints**, list each paper as `- <title> — <snippet>` (single line). Parenthetical after the heading: configured category codes (e.g. `cs.AI, cs.LG`) or `(configured categories)` when unknown.
+
+On failure (`error` key, empty `papers`, or invalid stdout): section header **arXiv Preprints** + `- (source unavailable: <short reason>)` and **continue** to Source 5.
+
+## Source 5 — Vault context (NotebookLM)
+
+Run **after** Source 4 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–3 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–4 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
   "trends": [{ "keyword": "<string>", "normalizedValue": <number> }],
   "headlines": [{ "title": "<string>" }],
-  "perplexityText": "<Deep Signal body text only — not the Perplexity query string>"
+  "perplexityText": "<Deep Signal body text only — not the Perplexity query string>",
+  "arxiv": [{ "title": "<string>", "snippet": "<string>" }]
 }
 ```
 
 - **trends:** up to **5** keywords from Source 1 (`events[]`), sorted by `normalizedValue` descending (same sort/top-5 as Trending Now).
 - **headlines:** up to **5** headline **titles** from Source 2.
 - **perplexityText:** the **2–3 sentence Deep Signal** answer from Source 3 when Perplexity succeeded; omit or `""` when Deep Signal is unavailable.
+- **arxiv:** paper **titles** and **snippets** from Source 4 when available; omit or `[]` when arXiv is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
-Before building any Source 4 terminal command, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
+Before building the Source 5 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
 ```text
 shellQuote(value) = "'" + String(value).replaceAll("'", "'\\''") + "'"
 ```
 
-Use `shellQuote(...)` for `DIGEST_SOURCES_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT` (Source 4), and for `LOG_SCRIPT`, `NOTEBOOK_ANSWER`, `NOTEBOOK_TITLE`, and `NOTEBOOK_DOMAIN` (post-post log). Do not pass raw headline text, matched signals, or NotebookLM queries unquoted.
+Use `shellQuote(...)` for `DIGEST_SOURCES_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`, `NOTEBOOK_REMAINING_S`, and `QUERY_SCRIPT` (Source 5), and for `LOG_SCRIPT`, `NOTEBOOK_ANSWER`, `NOTEBOOK_TITLE`, and `NOTEBOOK_DOMAIN` (post-post log). Do not pass raw headline text, matched signals, or NotebookLM queries unquoted.
 
 ### Pick notebook
 
@@ -187,6 +206,11 @@ Vault context failure does **not** abort the digest.
 **Deep Signal** (Perplexity — top trend: "<keyword>")
 <2–3 sentence sweep summary or - (source unavailable: <short reason>)>
 
+**arXiv Preprints** (<category list or configured categories>)
+- <title> — <snippet>
+- ...
+(or - (source unavailable: <short reason>) when Source 4 failed)
+
 **Vault context** (NotebookLM — <route.title>)
 <answer text, max 500 chars; if longer truncate with … suffix>
 _Matched signal:_ <winning_signal>
@@ -212,7 +236,7 @@ _Matched signal:_ <winning_signal>
 
 ## Post-post — Log Vault context to Convex (ROUTED + query success only)
 
-Run **only** when Source 4 finished with `route.status === 'ROUTED'` and `query-notebook.mjs` returned valid stdout JSON `{ answer, elapsed_ms }` where **`answer` is non-empty after trim** (Vault context section is **not** `(source unavailable: …)`).
+Run **only** when Source 5 finished with `route.status === 'ROUTED'` and `query-notebook.mjs` returned valid stdout JSON `{ answer, elapsed_ms }` where **`answer` is non-empty after trim** (Vault context section is **not** `(source unavailable: …)`).
 
 **After** posting the full digest to `#hermes`, call `terminal` once. **Await** completion (15s cap) before ending the task turn. Do not edit or retract the Discord digest regardless of log outcome.
 
@@ -233,9 +257,9 @@ log_script = resolved_repo_root + "/scripts/hermes-skill-examples/notebook-query
 Fallback if repo path missing: `$HOME/.hermes/skills/cns/notebook-query/scripts/log-notebook-query.mjs`
 
 - `NOTEBOOK_QUERY` = `winning_signal` (matched trend keyword or headline — **not** the templated NotebookLM prompt).
-- `NOTEBOOK_ANSWER` = `answer_full` from Source 4 (**full** `query-notebook.mjs` stdout `answer`, saved before Discord 500-char truncation).
+- `NOTEBOOK_ANSWER` = `answer_full` from Source 5 (**full** `query-notebook.mjs` stdout `answer`, saved before Discord 500-char truncation).
 - `NOTEBOOK_DOMAIN` = `route.domain` when present; otherwise `'general'`.
-- Use the same `shellQuote(value)` transform as Source 4 for all dynamic env values.
+- Use the same `shellQuote(value)` transform as Source 5 for all dynamic env values.
 
 **Do not run** for `NO_ROUTE`, query failure/timeout/invalid JSON, empty/whitespace-only `answer`, or when Vault context shows `(source unavailable: …)`.
 
@@ -276,7 +300,7 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only) |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 
