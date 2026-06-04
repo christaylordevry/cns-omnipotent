@@ -698,3 +698,7 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 49-6-morning-digest-upgrade (2026-05-30)
 
 - Sprint-status diff bundles unrelated Epic 38 and Epic 50 state changes into the 49-6 review scope. Deferred by operator decision: Epic 38 and Epic 50 sprint-status changes are legitimate completed work, not something to revert; handle sprint-status ownership / commit-splitting separately.
+
+## Deferred from: session-close test HERMES_HOME isolation fix (2026-06-04)
+
+- Three test files (`tests/notebook-routing-report.test.mjs`, `tests/smart-routing.test.mjs`, `tests/session-close-pipeline.test.mjs`) each hand-roll the same `HOME`/`HERMES_HOME`/`NOTEBOOKLM_*` save-delete-restore isolation pattern. This duplication is what produced the original `HERMES_HOME` omission. Extract a shared `withSessionCloseEnvIsolation(overrides, fn)` helper in a future pass so new tests can't forget a var.

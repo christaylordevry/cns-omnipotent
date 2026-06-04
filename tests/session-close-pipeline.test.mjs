@@ -287,11 +287,15 @@ describe("session-close read-sources", () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
     const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
+    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
+    const oldHermesHome = process.env.HERMES_HOME;
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
 
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
       delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      delete process.env.HERMES_HOME;
       process.env.HOME = home;
       await mkdir(join(home, ".hermes"), { recursive: true });
       await writeFile(
@@ -340,6 +344,11 @@ describe("session-close read-sources", () => {
       } else {
         process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
       }
+      if (oldHermesHome === undefined) {
+        delete process.env.HERMES_HOME;
+      } else {
+        process.env.HERMES_HOME = oldHermesHome;
+      }
       await rm(home, { recursive: true, force: true });
     }
   });
@@ -348,6 +357,9 @@ describe("session-close read-sources", () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
     const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
+    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
+    const oldHermesHome = process.env.HERMES_HOME;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const registryPath = join(dir, "notebook-registry.json");
@@ -357,6 +369,7 @@ describe("session-close read-sources", () => {
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
       delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      delete process.env.HERMES_HOME;
       process.env.HOME = home;
       await writeFile(
         registryPath,
@@ -412,6 +425,11 @@ describe("session-close read-sources", () => {
       } else {
         process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
       }
+      if (oldHermesHome === undefined) {
+        delete process.env.HERMES_HOME;
+      } else {
+        process.env.HERMES_HOME = oldHermesHome;
+      }
       await rm(dir, { recursive: true, force: true });
       await rm(home, { recursive: true, force: true });
     }
@@ -421,6 +439,9 @@ describe("session-close read-sources", () => {
     const oldHome = process.env.HOME;
     const oldIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
     const oldDriveDocId = process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+    // HERMES_HOME outranks HOME in defaultSessionCloseEnvPath; neutralize it so
+    // the Hermes gateway subprocess does not redirect reads to the real ~/.hermes.
+    const oldHermesHome = process.env.HERMES_HOME;
     const dir = await mkdtemp(join(tmpdir(), "notebook-registry-fanout-"));
     const home = await mkdtemp(join(tmpdir(), "session-close-home-"));
     const vault = join(dir, "vault");
@@ -430,6 +451,7 @@ describe("session-close read-sources", () => {
     try {
       delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
       delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
+      delete process.env.HERMES_HOME;
       process.env.HOME = home;
       await mkdir(join(vault, "03-Resources"), { recursive: true });
       await writeFile(
@@ -480,6 +502,11 @@ describe("session-close read-sources", () => {
         delete process.env.NOTEBOOKLM_DRIVE_DOC_ID;
       } else {
         process.env.NOTEBOOKLM_DRIVE_DOC_ID = oldDriveDocId;
+      }
+      if (oldHermesHome === undefined) {
+        delete process.env.HERMES_HOME;
+      } else {
+        process.env.HERMES_HOME = oldHermesHome;
       }
       await rm(dir, { recursive: true, force: true });
       await rm(home, { recursive: true, force: true });

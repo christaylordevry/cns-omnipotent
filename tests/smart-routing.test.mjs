@@ -47,11 +47,17 @@ async function createVaultWithMap(dir, mapId) {
  */
 async function withIsolatedEnv(smartRoutingValue, fn) {
   const priorHome = process.env.HOME;
+  // HERMES_HOME takes precedence over HOME when resolving the session-close env
+  // file (see load-session-close-env.mjs). The Hermes gateway subprocess sets it
+  // to the real ~/.hermes, so it must be neutralized here or these tests read the
+  // operator's real session-close.env instead of the isolated fixture.
+  const priorHermesHome = process.env.HERMES_HOME;
   const priorIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
   const priorFlag = process.env.NOTEBOOK_SMART_ROUTING;
   const fakeHome = await mktmp("sr-home-");
   try {
     process.env.HOME = fakeHome;
+    delete process.env.HERMES_HOME;
     delete process.env.NOTEBOOKLM_NOTEBOOK_IDS;
     if (smartRoutingValue === null) {
       delete process.env.NOTEBOOK_SMART_ROUTING;
@@ -61,6 +67,7 @@ async function withIsolatedEnv(smartRoutingValue, fn) {
     await fn();
   } finally {
     restoreEnv("HOME", priorHome);
+    restoreEnv("HERMES_HOME", priorHermesHome);
     restoreEnv("NOTEBOOKLM_NOTEBOOK_IDS", priorIds);
     restoreEnv("NOTEBOOK_SMART_ROUTING", priorFlag);
     await rm(fakeHome, { recursive: true, force: true });
@@ -365,12 +372,14 @@ describe("smart routing — precedence", () => {
   it("env IDs win over smart routing", async () => {
     const envId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     const priorHome = process.env.HOME;
+    const priorHermesHome = process.env.HERMES_HOME;
     const priorIds = process.env.NOTEBOOKLM_NOTEBOOK_IDS;
     const priorFlag = process.env.NOTEBOOK_SMART_ROUTING;
     const fakeHome = await mktmp("sr-env-home-");
     const dir = await mktmp("notebook-sr-env-wins-");
     try {
       process.env.HOME = fakeHome;
+      delete process.env.HERMES_HOME;
       process.env.NOTEBOOK_SMART_ROUTING = "1";
       process.env.NOTEBOOKLM_NOTEBOOK_IDS = envId; // env override must win
 
@@ -385,6 +394,7 @@ describe("smart routing — precedence", () => {
       assert.equal(/** @type {any} */ (targets[0]).notebook_id, envId);
     } finally {
       restoreEnv("HOME", priorHome);
+      restoreEnv("HERMES_HOME", priorHermesHome);
       restoreEnv("NOTEBOOKLM_NOTEBOOK_IDS", priorIds);
       restoreEnv("NOTEBOOK_SMART_ROUTING", priorFlag);
       await rm(fakeHome, { recursive: true, force: true });

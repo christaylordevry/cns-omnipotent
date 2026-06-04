@@ -8,6 +8,30 @@ import { applyGeminiCliAdapter } from "../../src/routing/adapters/gemini-cli.js"
 import { resolveAlias } from "../../src/routing/adapters/resolve-alias.js";
 import type { AliasRegistry, DecisionRecord, FallbackResult, RoutingPolicy } from "../../src/routing/types.js";
 
+// ── Test helpers ───────────────────────────────────────────────
+
+// Audit writes are fire-and-forget: the adapter invokes the auditing callback
+// but does NOT await the underlying appendFile (routing must not block on audit
+// IO — see createAuditingCallback in src/routing/audit-log.ts). Reading the log
+// once immediately after the adapter returns therefore races that write. Poll
+// (bounded) until the expected entry lands; if it never does, the caller's
+// assertion still fails legitimately.
+const AUDIT_POLL_ATTEMPTS = 100;
+const AUDIT_POLL_INTERVAL_MS = 10;
+async function waitForAuditEntry(auditPath: string, expected: string): Promise<string> {
+  let content = "";
+  for (let attempt = 0; attempt < AUDIT_POLL_ATTEMPTS; attempt++) {
+    try {
+      content = await readFile(auditPath, "utf8");
+      if (content.includes(expected)) return content;
+    } catch {
+      // File not present yet — treat as "no entry" and retry.
+    }
+    await new Promise((resolve) => setTimeout(resolve, AUDIT_POLL_INTERVAL_MS));
+  }
+  return content;
+}
+
 // ── Shared fixtures ────────────────────────────────────────────
 
 const REGISTRY: AliasRegistry = {
@@ -530,8 +554,9 @@ describe("applyCursorAdapter fallback integration", () => {
     );
 
     expect(result.ok).toBe(false);
-    const logContent = await readFile(auditPath, "utf8");
-    expect(logContent).toContain("ROUTING silent FALLBACK_USED cursor/coding");
+    const expectedEntry = "ROUTING silent FALLBACK_USED cursor/coding";
+    const logContent = await waitForAuditEntry(auditPath, expectedEntry);
+    expect(logContent).toContain(expectedEntry);
   });
 });
 
@@ -588,8 +613,9 @@ describe("applyClaudeCodeAdapter fallback integration", () => {
     );
 
     expect(result.ok).toBe(false);
-    const logContent = await readFile(auditPath, "utf8");
-    expect(logContent).toContain("ROUTING silent FALLBACK_USED claude-code/coding");
+    const expectedEntry = "ROUTING silent FALLBACK_USED claude-code/coding";
+    const logContent = await waitForAuditEntry(auditPath, expectedEntry);
+    expect(logContent).toContain(expectedEntry);
   });
 });
 
@@ -648,7 +674,8 @@ describe("applyGeminiCliAdapter fallback integration", () => {
     );
 
     expect(result.ok).toBe(false);
-    const logContent = await readFile(auditPath, "utf8");
-    expect(logContent).toContain("ROUTING visible FALLBACK_CROSS_PROVIDER gemini-cli/coding");
+    const expectedEntry = "ROUTING visible FALLBACK_CROSS_PROVIDER gemini-cli/coding";
+    const logContent = await waitForAuditEntry(auditPath, expectedEntry);
+    expect(logContent).toContain(expectedEntry);
   });
 });
