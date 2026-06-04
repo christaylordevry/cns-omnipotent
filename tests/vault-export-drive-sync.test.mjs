@@ -42,6 +42,15 @@ const DRIVE_SOURCE_LIST_FIXTURE = [
   },
 ];
 
+const DRIVE_SOURCE_LIST_WITHOUT_DOC_ID_FIXTURE = [
+  {
+    id: "src-vault-google-doc",
+    title: "vault-export-for-notebooklm",
+    type: "google_docs",
+    can_sync: true,
+  },
+];
+
 /**
  * @param {Record<string, string | undefined>} overrides
  * @param {(opts: { env: NodeJS.ProcessEnv; envPath: string }) => Promise<void>} fn
@@ -188,6 +197,23 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.equal(result.driveSourceId, "src-vault");
     assert.ok(calls.some((c) => c.includes("source list")));
     assert.ok(calls.some((c) => c.includes("source sync") && c.includes("src-vault")));
+  });
+
+  it("syncNotebookDriveSource falls back to google_docs source when drive_doc_id is absent", async () => {
+    const calls = [];
+    const runNlm = async (_cmd, args) => {
+      calls.push(args.join(" "));
+      if (args.includes("list")) {
+        return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_WITHOUT_DOC_ID_FIXTURE) };
+      }
+      return { stdout: "{}" };
+    };
+    const result = await syncNotebookDriveSource(FIXTURE_NOTEBOOK, FIXTURE_DRIVE_DOC, runNlm);
+    assert.equal(result.status, "ok");
+    assert.equal(result.driveSourceId, "src-vault-google-doc");
+    assert.ok(
+      calls.some((c) => c.includes("source sync") && c.includes("src-vault-google-doc")),
+    );
   });
 
   it("runSyncVaultExportDrive marks targets drive_write_error when drive write failed", async () => {

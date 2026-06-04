@@ -47,6 +47,26 @@ export function parseNlmDriveSourceList(stdout) {
 }
 
 /**
+ * @param {unknown[]} sources
+ * @returns {{ sourceId: string; source: Record<string, unknown> } | null}
+ */
+function matchGoogleDocsSourceFallback(sources) {
+  if (!Array.isArray(sources)) {
+    return null;
+  }
+  for (const source of sources) {
+    if (!isObject(source) || source.type !== "google_docs" || typeof source.id !== "string") {
+      continue;
+    }
+    const sourceId = source.id.trim();
+    if (sourceId) {
+      return { sourceId, source };
+    }
+  }
+  return null;
+}
+
+/**
  * @param {string} notebookId
  * @param {string} driveDocId
  * @param {(cmd: string, args: string[]) => Promise<{ stdout: string }>} [runNlm]
@@ -101,12 +121,15 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     return { status: "failed", stderr: message, driveSourceId: null };
   }
 
-  const matched = matchDriveSourceByDocId(sources, driveDocId);
+  let matched = matchDriveSourceByDocId(sources, driveDocId);
+  if (!matched) {
+    matched = matchGoogleDocsSourceFallback(sources);
+  }
   if (!matched) {
     return {
       status: "failed",
       stderr:
-        `no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID ${driveDocId}; add the Doc as a Drive source in NotebookLM UI`,
+        `no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID ${driveDocId} and no google_docs fallback source was available; add the Doc as a Drive source in NotebookLM UI`,
       driveSourceId: null,
     };
   }
