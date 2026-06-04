@@ -407,5 +407,5 @@ development_status:
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
   epic-59: in-progress
   59-1-session-close-context-reduction: review
-  59-2-fix-session-close-tests-failure: review
-  59-3-fix-nlm-auth-hermes-home-isolation: in-progress
+  59-2-fix-session-close-tests-failure: done
+  59-3-fix-nlm-auth-hermes-home-isolation: done
