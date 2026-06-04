@@ -291,12 +291,18 @@ function parseSignalsInput() {
 }
 
 function parseRegistryPath() {
-  const fromArgv = hasEnvSignalInput() ? process.argv[2] : process.argv[3];
-  return (
-    fromArgv ??
-    (process.env.CNS_NOTEBOOK_REGISTRY_PATH ||
-      join(LIB_PATH, 'notebook-registry.json'))
-  );
+  const fromArgv = process.argv[3];
+  const fromEnv = process.env.CNS_NOTEBOOK_REGISTRY_PATH;
+  if (fromArgv && String(fromArgv).trim()) {
+    return fromArgv;
+  }
+  if (fromEnv && String(fromEnv).trim()) {
+    return fromEnv;
+  }
+  if (hasEnvSignalInput()) {
+    return process.argv[2];
+  }
+  return join(LIB_PATH, 'notebook-registry.json');
 }
 
 function isMainModule() {

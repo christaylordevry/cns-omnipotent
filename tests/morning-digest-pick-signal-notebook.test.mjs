@@ -263,12 +263,12 @@ describe('pick-signal-notebook.mjs CLI', () => {
       CNS_REPO_ROOT: repoRoot,
       ...env,
     };
-    const debugLogPath = '/tmp/debug-pick-signal-test-env.log';
     if (digestSources !== undefined) {
       baseEnv.DIGEST_SOURCES_JSON = JSON.stringify(digestSources);
       delete baseEnv.SIGNALS_JSON;
     } else {
       baseEnv.SIGNALS_JSON = JSON.stringify(signals);
+      delete baseEnv.DIGEST_SOURCES_JSON;
     }
     return execFileAsync('node', [pickScript, registryPath], { env: baseEnv });
   }
