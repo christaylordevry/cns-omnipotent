@@ -926,7 +926,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 
 ### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1 + 52-2 + 55-3)
 
-**Skill version:** **1.2.3** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no trend Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+**Skill version:** **1.2.4** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no trend Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
 
 **Vault context (Story 52-1):** After Sources 1–3, the skill builds up to five trend keywords plus five headline titles (deduped), runs `scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs` against watched notebooks in `scripts/session-close/lib/notebook-registry.json`, and on a match invokes `scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs` (same `nlm` / `uvx` prerequisite as §15.x notebook-query — not the NotebookLM MCP). Answers appear under **`Vault context`** in Discord (max 500 characters). Failed routing or query shows `- (source unavailable: …)` without aborting the digest.
 
@@ -966,7 +966,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 `bash scripts/verify.sh` runs **`scripts/assert-hermes-skill-install-gate.mjs`** after Node tests. On a workstation with Hermes installed it enforces:
 
 1. **Binding existence** — every skill listed under `discord.channel_skill_bindings` in `~/.hermes/config.yaml` has `~/.hermes/skills/cns/<skill>/SKILL.md`.
-2. **NotebookLM parity trio** — `notebook-query`, `morning-digest`, and `session-close` match the repo mirrors under `scripts/hermes-skill-examples/<skill>/` (`diff -rq` must be clean).
+2. **NotebookLM parity trio** — `notebook-query`, `morning-digest`, and `session-close` match the repo mirrors under `scripts/hermes-skill-examples/<skill>/` (`diff -rq` must be clean). **`morning-digest`** and **`session-close`** install helpers use **`rsync -a --delete`** so stale files cannot linger under `~/.hermes/skills/cns/`.
 
 **When verify fails**
 

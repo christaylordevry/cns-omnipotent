@@ -30,7 +30,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.3"));
+    assert.ok(body.includes("version: 1.2.4"));
+    assert.ok(body.includes("## Pitfalls"));
+    assert.ok(body.includes("pick-signal-routing.md"));
     assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
@@ -263,7 +265,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("install script source dir exists", () => {
     assert.ok(existsSync(skillDir));
-    assert.ok(existsSync(join(root, "scripts/install-hermes-skill-morning-digest.sh")));
+    const installPath = join(root, "scripts/install-hermes-skill-morning-digest.sh");
+    assert.ok(existsSync(installPath));
+    const installBody = readFileSync(installPath, "utf8");
+    assert.ok(installBody.includes("rsync -a --delete"), "install must mirror with rsync --delete");
+    assert.ok(existsSync(join(skillDir, "references/pick-signal-routing.md")));
   });
 
   it("pick-signal script exists and query-notebook path is referenced (Story 52-1)", () => {
@@ -314,9 +320,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("fire-and-forget"));
   });
 
-  it("SKILL.md v1.2.3 documents awaited Vault context Convex log (Story 52-2, 54-2)", () => {
+  it("SKILL.md v1.2.4 documents awaited Vault context Convex log (Story 52-2, 54-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.3"));
+    assert.ok(body.includes("version: 1.2.4"));
+    assert.ok(body.includes("## Pitfalls"));
+    assert.ok(body.includes("pick-signal-routing.md"));
     assert.ok(body.includes("log-notebook-query.mjs"));
     assert.ok(body.includes("No trend Convex push"));
     assert.ok(body.includes("Vault context Convex log"));

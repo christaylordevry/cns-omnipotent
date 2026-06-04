@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-03T12:57:00+00:00
+# last_updated: 2026-06-04T17:10:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-03T12:00:00+10:00"
+last_updated: "2026-06-04T17:10:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -409,3 +409,7 @@ development_status:
   59-1-session-close-context-reduction: done
   59-2-fix-session-close-tests-failure: done
   59-3-fix-nlm-auth-hermes-home-isolation: done
+
+  # Epic 60 — Hermes skill mirror hygiene (operator brief 2026-06-04)
+  epic-60: in-progress
+  60-1-fix-verify-sh-hermes-skill-parity-gate: done

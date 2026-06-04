@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.3
+version: 1.2.4
 author: CNS Operator
 license: MIT
 metadata:
@@ -119,9 +119,16 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 - **`investigate-trend`**: trigger `investigate-trend keyword:` — different prefix, no collision.
 - **Legacy 26-7 digest**: separate WSL cron at 07:00 — **disable** that crontab line when using this skill (Operator Guide §15.2 / §15.11).
 
+## Pitfalls
+
+- When reproducing or testing `pick-signal-notebook.mjs`, use an absolute registry path. Relative `CNS_NOTEBOOK_REGISTRY_PATH` values can resolve against the repo root unexpectedly.
+- Isolated routing tests should clear inherited digest payload env such as `DIGEST_SOURCES_JSON`; otherwise the scorer can behave like it is being run in a full digest pipeline.
+- The notebook registry lookup precedence is argv path first, then `CNS_NOTEBOOK_REGISTRY_PATH`, then the default registry file; wrappers and test harnesses should preserve that order.
+
 ## References
 
 - Task prompt (sources, parsing, output contract): `references/task-prompt.md`
+- Pick-signal routing notes and NO_ROUTE debugging recipe: `references/pick-signal-routing.md`
 - Triggers: `references/trigger-pattern.md`
 - Config / bindings: `references/config-snippet.md`
 - Cron install: `references/cron-snippet.md`

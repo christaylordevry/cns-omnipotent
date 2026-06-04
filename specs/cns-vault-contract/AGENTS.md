@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.32 | Last updated: 2026-06-04
+> Version: 2.1.33 | Last updated: 2026-06-04
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -360,6 +360,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-04 | 2.1.33 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-04 | 2.1.32 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-04 | 2.1.31 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-04 | 2.1.30 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |

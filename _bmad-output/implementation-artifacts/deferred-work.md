@@ -60,10 +60,15 @@
 - 15s log `terminal` timeout vs slow Convex HTTP — operator brief explicitly requires 15s cap (AC 1/2).
 - Large `NOTEBOOK_ANSWER` shell env / ARG_MAX — inherited 52-2 `shellQuote` pattern; not introduced by 54-2.
 
+## Deferred from: code review of 60-1-fix-verify-sh-hermes-skill-parity-gate (2026-06-04)
+
+- Duplicate Behavioral Integrity changelog rows in `specs/cns-vault-contract/AGENTS.md` — pre-existing version-churn pattern; not introduced by 60-1.
+- morning-digest install `cp` fallback lacks session-close's explicit stale-file `rm` — rsync path is primary on operator workstations; non-rsync edge rare.
+
 ## Deferred from: code review of 54-1-skill-install-gate (2026-06-01)
 
 - `vault-fast-scan-index.md` date bump alongside Operator Guide §15.12 — incidental index maintenance, not story File List.
-- notebook-query / morning-digest install scripts still use `cp` without `--delete`; parity gate catches trio drift; rsync-on-all-install deferred beyond 54-1 scope.
+- ~~notebook-query / morning-digest install scripts still use `cp` without `--delete`~~ — **Resolved Story 60-1 (2026-06-04):** `install-hermes-skill-morning-digest.sh` now uses `rsync -a --delete` (session-close already had rsync). notebook-query install still `cp` without `--delete` if unchanged.
 
 ## Deferred from: code review of 53-3-add-reason-field-to-no-route-responses (2026-06-01)
 

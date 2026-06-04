@@ -13,12 +13,17 @@ fi
 
 mkdir -p "$DEST_DIR"
 
-# Copy skill payload (no secrets).
-if cp -a "$SRC_DIR/." "$DEST_DIR/" 2>/dev/null; then
-  :
+# Mirror repo tree exactly; prune stale files (parity with session-close install).
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete "$SRC_DIR/" "$DEST_DIR/"
 else
-  # macOS/BSD cp does not support -a
-  cp -R "$SRC_DIR/." "$DEST_DIR/"
+  rm -rf "$DEST_DIR"
+  mkdir -p "$DEST_DIR"
+  if cp -a "$SRC_DIR/." "$DEST_DIR/" 2>/dev/null; then
+    :
+  else
+    cp -R "$SRC_DIR/." "$DEST_DIR/"
+  fi
 fi
 
 echo "Installed Hermes skill to: $DEST_DIR"
