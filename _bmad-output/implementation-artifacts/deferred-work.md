@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 62-1-keyword-candidates-from-digest-signals (2026-06-06)
+
+- `postMutation` duplicated from `push-digest-convex.mjs` — AC allows inline copy when under ~40 lines; shared `convex-http.mjs` extraction deferred unless duplication grows.
+- `.unique()` on `by_term` throws if duplicate rows exist — story marks duplicate-row index race as acceptable Phase 1 risk; first-match patch deferred.
+- No convexTest for server-side term normalization (whitespace collapse) — mutation implements normalize; happy-path term only tested.
+
 ## Deferred from: code review of 61-5-morning-digest-convex-push (2026-06-05)
 
 - Duplicate `digestRuns` per date — no unique constraint or idempotency guard; feed consumer should pick latest by `ranAt` in a future epic.

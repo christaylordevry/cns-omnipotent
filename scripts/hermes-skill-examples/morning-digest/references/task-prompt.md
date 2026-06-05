@@ -21,6 +21,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 7. **Cross-source failures**: run Sources 1–6 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion step — Convex digest push (non-negotiable)**: The post-post step *§ Push digest entities to Convex* (`push-digest-convex.mjs` invoked with `DIGEST_PUSH_JSON`) is a **mandatory completion step**, not optional telemetry. The skill is **NOT complete** until that `terminal(...)` call has been invoked after the Discord post. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize it. Treat it exactly like a session-close required step: the task is unfinished until the push terminal call has fired. ("fire-and-forget" describes only how its *result* is handled — exit 0, no Discord warning — it never means the call itself is skippable.)
+10. **Required completion step — keyword candidates push (non-negotiable)**: Immediately after the digest Convex push, invoke *§ Push keyword candidates to Convex* (`push-keyword-candidates.mjs` with the same `DIGEST_PUSH_JSON`). Same mandatory completion posture as digest push — fire-and-forget result only.
 
 ## Tool-call rule
 
@@ -431,11 +432,50 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 
 Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures. The graceful exit-0 / no-warning behavior governs only the *outcome* — it does **not** make the push optional. The skill is incomplete until this required terminal call has been invoked.
 
+## Post-post — Push keyword candidates to Convex (REQUIRED — all runs)
+
+> **REQUIRED — MUST run after digest Convex push before the task is complete.** Same completion posture as digest entity push: mandatory invocation on **every** run (success or partial failure), fire-and-forget **result** only (exit 0, no Discord warning).
+
+Run **immediately after** the digest Convex push terminal call (`push-digest-convex.mjs`). Reuse the **same** `digest_push_payload` — do not rebuild or query Convex.
+
+### Terminal invocation (REQUIRED — completion gate)
+
+```text
+terminal(
+  command="CANDIDATES_SCRIPT=<shellQuote(candidates_script)> DIGEST_PUSH_JSON=<shellQuote(JSON.stringify(digest_push_payload))> node \"$CANDIDATES_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=45
+)
+```
+
+Where:
+
+```text
+candidates_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/push-keyword-candidates.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/push-keyword-candidates.mjs`
+
+**After terminal returns**, emit optional stderr JSON for observability:
+
+```json
+{"keyword_candidates_push":{"status":"ok|skipped-env|invalid-input|failed","exit_code":0,"upserted":3,"reason":"..."}}
+```
+
+| status | When |
+|--------|------|
+| `ok` | Exit `0` and upserts completed |
+| `skipped-env` | Exit `0` and stderr indicates missing `CONVEX_URL` / deploy key skip |
+| `invalid-input` | Exit `0` and stderr indicates missing/invalid `DIGEST_PUSH_JSON` (`run.date` required) |
+| `failed` | Exit `0` but stderr contains `push-keyword-candidates: warning` |
+
+Always `exit_code: 0`. Do **not** post Discord warnings for keyword candidate push failures.
+
 ## Allowed tools
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `push-digest-convex.mjs` (post-post, all runs) |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 

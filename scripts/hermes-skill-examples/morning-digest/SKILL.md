@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, HackerNews top stories, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.9
+version: 1.3.0
 author: CNS Operator
 license: MIT
 metadata:
@@ -44,6 +44,7 @@ If the reference is not loaded, call `skill_view` first, then follow `references
 8. Post the final `🌅 **Morning Digest**` contract even when one source fails.
 9. After posting, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (telemetry + optional warning; see task-prompt post-post).
 10. After posting (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt digest Convex push).
+11. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same shell-quoted `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt keyword candidates push).
 
 The final reply must use the task-prompt headings exactly: `🌅 **Morning Digest**`, `**Trending Now**`, `**Headlines**`, `**Deep Signal**`, `**arXiv Preprints**`, `**HackerNews**`, `**Vault context**`, and `**Recommended focus:**`. Never invent trends or headlines when a tool fails.
 
@@ -61,6 +62,7 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 8. Vault context: record `digest_start_ms` at task start; after Source 5, run `pick-signal-notebook.mjs` with shell-quoted `DIGEST_SOURCES_JSON` (trends + headlines + Perplexity Deep Signal text + arxiv + hackernews), then `query-notebook.mjs` when routed (same-command `QUERY_SCRIPT` plus shell-quoted env values; remaining_s cap per task-prompt). Partial failure → unavailable bullet only in Vault context.
 9. After posting the digest, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (emit `notebook_query_log`; warning on `failed`|`timeout` only; does not alter the digest).
 10. After posting (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with shell-quoted `DIGEST_PUSH_JSON` (emit `digest_convex_push`; failures silent to operator).
+11. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same shell-quoted `DIGEST_PUSH_JSON` (emit `keyword_candidates_push`; failures silent to operator).
 
 Output exactly:
 
@@ -123,6 +125,7 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 - **No vault writes.** Do not call Vault IO mutators or write under `Knowledge-Vault-ACTIVE/`.
 - **No trend-ingest Convex push.** Always pass `--dry-run` to `trend-ingest.py` (no `signalEvents` ingest).
 - **Digest entity push (fire-and-forget):** After the Discord post, push `digestRuns` / `digestSignals` via `push-digest-convex.mjs` on every run. Failures are stderr-only; never post operator warnings; script always exits 0.
+- **Keyword candidates push (fire-and-forget):** After digest entity push, upsert `keywordCandidates` from digest signals via `push-keyword-candidates.mjs`. Failures are stderr-only; never post operator warnings; script always exits 0.
 - **Vault context Convex log (optional telemetry):** On ROUTED + successful `query-notebook.mjs` only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` after the Discord post. Emit `notebook_query_log` JSON; post the silent warning line only on `failed` or `timeout`. Do not alter or retract the digest on log errors.
 - **Partial failure:** keep section headers; one bullet `- (source unavailable: <reason>)` per failed source; never invent trends or headlines. **Never abort** the digest because one source failed — finish all sections, then post.
 - **Secrets:** never print `NEWSAPI_API_KEY` or other credentials in Discord.

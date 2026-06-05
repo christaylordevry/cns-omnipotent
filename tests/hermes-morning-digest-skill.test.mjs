@@ -34,7 +34,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.9"));
+    assert.ok(body.includes("version: 1.3.0"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -408,9 +408,23 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("Notebook history log failed"));
   });
 
-  it("SKILL.md v1.2.9 documents six sources, digest entity push, and awaited Vault context log (Story 61-5, 61-4, 52-2)", () => {
+  it("task-prompt documents post-post keyword candidates push after digest push (Story 62-1)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const digestIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");
+    const candidatesIdx = taskBody.indexOf("## Post-post — Push keyword candidates to Convex");
+    assert.ok(digestIdx >= 0);
+    assert.ok(candidatesIdx > digestIdx);
+    const candidatesSection = taskBody.slice(candidatesIdx);
+    assert.ok(candidatesSection.includes("push-keyword-candidates.mjs"));
+    assert.ok(candidatesSection.includes("DIGEST_PUSH_JSON"));
+    assert.ok(candidatesSection.includes("digest_push_payload"));
+    assert.ok(candidatesSection.includes("keyword_candidates_push"));
+    assert.ok(candidatesSection.includes("timeout=45"));
+  });
+
+  it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.9"));
+    assert.ok(body.includes("version: 1.3.0"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -421,6 +435,10 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("No trend-ingest Convex push"));
     assert.ok(body.includes("Digest entity push"));
     assert.ok(body.includes("push-digest-convex.mjs"));
+    assert.ok(body.includes("push-keyword-candidates.mjs"));
+    assert.ok(body.includes("keywordCandidates"));
+    assert.ok(body.includes("keyword_candidates_push"));
+    assert.ok(body.includes("Keyword candidates push"));
     assert.ok(body.includes("digestRuns"));
     assert.ok(body.includes("digestSignals"));
     assert.ok(body.includes("fire-and-forget"));
