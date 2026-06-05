@@ -20,8 +20,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
 7. **Cross-source failures**: run Sources 1–6 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
-9. **Required completion step — Convex digest push (non-negotiable)**: The post-post step *§ Push digest entities to Convex* (`push-digest-convex.mjs` invoked with `DIGEST_PUSH_JSON`) is a **mandatory completion step**, not optional telemetry. The skill is **NOT complete** until that `terminal(...)` call has been invoked after the Discord post. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize it. Treat it exactly like a session-close required step: the task is unfinished until the push terminal call has fired. ("fire-and-forget" describes only how its *result* is handled — exit 0, no Discord warning — it never means the call itself is skippable.)
-10. **Required completion step — keyword candidates push (non-negotiable)**: Immediately after the digest Convex push, invoke *§ Push keyword candidates to Convex* (`push-keyword-candidates.mjs` with the same `DIGEST_PUSH_JSON`). Same mandatory completion posture as digest push — fire-and-forget result only.
+9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.)
 
 ## Tool-call rule
 
@@ -324,9 +323,9 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 ## Post-post — Push digest entities to Convex (REQUIRED — all runs)
 
-> **REQUIRED §9 — MUST run before the task is complete.** This step is **non-negotiable even under context compression**. The skill is **not done** until this `terminal(...)` push call has been invoked. Do **not** treat it as optional post-post telemetry, and do **not** drop it if context is compressed — invoke it on **every** run (success or partial failure), exactly as session-close treats its required steps.
+> **REQUIRED §9 — part 1 of 2 of the completion gate.** This is **part 1 of 2** — do **not** end the task turn after this call; §10 must also fire. Non-negotiable even under context compression. Invoke on **every** run (success or partial failure), exactly as session-close treats its required steps.
 
-Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory**: it runs **after** the Discord post but **MUST complete (the terminal call must be invoked) before the skill is considered done**. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
+Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 
@@ -397,9 +396,9 @@ Every entry in `signals[]` MUST carry both `section` and `sourceType` (see the s
 
 Omit `workspaceId`. Push available signals even when some sources failed.
 
-### Terminal invocation (REQUIRED — completion gate)
+### Terminal invocation (REQUIRED — part 1 of 2 completion gate — do not end the task turn here)
 
-This `terminal(...)` call **MUST be invoked before you consider the skill complete**. It is the completion gate for the digest: do not end the task turn until it has fired, even if context was compressed mid-run.
+This `terminal(...)` call **MUST be invoked** as the first half of the two-part completion gate. Do **not** end the task turn after it fires — §10 must also run, even if context was compressed mid-run.
 
 ```text
 terminal(
@@ -430,15 +429,15 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 | `invalid-input` | Exit `0` and stderr indicates missing/invalid `DIGEST_PUSH_JSON` (`run.date` required) |
 | `failed` | Exit `0` but stderr contains `push-digest-convex: warning` |
 
-Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures. The graceful exit-0 / no-warning behavior governs only the *outcome* — it does **not** make the push optional. The skill is incomplete until this required terminal call has been invoked.
+Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures. The graceful exit-0 / no-warning behavior governs only the *outcome* — it does **not** make the push optional. The skill is still incomplete after this call — proceed immediately to §10.
 
 ## Post-post — Push keyword candidates to Convex (REQUIRED — all runs)
 
-> **REQUIRED — MUST run after digest Convex push before the task is complete.** Same completion posture as digest entity push: mandatory invocation on **every** run (success or partial failure), fire-and-forget **result** only (exit 0, no Discord warning).
+> **REQUIRED §10 — part 2 of 2 of the completion gate.** The skill is **complete only after this call fires.** Same mandatory posture as §9: invoke on **every** run (success or partial failure), fire-and-forget **result** only (exit 0, no Discord warning).
 
 Run **immediately after** the digest Convex push terminal call (`push-digest-convex.mjs`). Reuse the **same** `digest_push_payload` — do not rebuild or query Convex.
 
-### Terminal invocation (REQUIRED — completion gate)
+### Terminal invocation (REQUIRED — part 2 of 2 completion gate)
 
 ```text
 terminal(
