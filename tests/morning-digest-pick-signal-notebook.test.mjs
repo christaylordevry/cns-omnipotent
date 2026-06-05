@@ -12,10 +12,12 @@ import {
   tokenizeForScoring,
 } from '../scripts/session-close/lib/notebook-scorer.mjs';
 import {
+  applyNotebookTitleOverlay,
   buildDigestSignals,
   dedupeSignals,
   extractArxivSignals,
   extractPerplexitySignals,
+  parseNotebookTitleMap,
   pickSignalNotebook,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs';
 
@@ -47,6 +49,79 @@ const multiSourceFixture = {
   perplexityText:
     'AI agent orchestration platforms saw major releases for AI Factory Blueprint operators this week.',
 };
+
+describe('parseNotebookTitleMap', () => {
+  it('parses three production-style entries', () => {
+    const map = parseNotebookTitleMap(
+      '981466f0:CNS Vault Architecture,dc6abf1a:AI Factory Blueprint,f037c741:Nexus Discord Bridge',
+    );
+    assert.equal(map.size, 3);
+    assert.equal(map.get('981466f0'), 'CNS Vault Architecture');
+    assert.equal(map.get('dc6abf1a'), 'AI Factory Blueprint');
+    assert.equal(map.get('f037c741'), 'Nexus Discord Bridge');
+  });
+
+  it('splits on first colon only and skips malformed segments', () => {
+    const map = parseNotebookTitleMap('badsegment,981466f0:CNS Vault Architecture,:empty,abc:');
+    assert.equal(map.size, 1);
+    assert.equal(map.get('981466f0'), 'CNS Vault Architecture');
+  });
+
+  it('preserves colons after the first delimiter in title values', () => {
+    const map = parseNotebookTitleMap('981466f0:Title: with sub:section');
+    assert.equal(map.size, 1);
+    assert.equal(map.get('981466f0'), 'Title: with sub:section');
+  });
+
+  it('returns empty map for unset or empty env', () => {
+    assert.equal(parseNotebookTitleMap(undefined).size, 0);
+    assert.equal(parseNotebookTitleMap('').size, 0);
+    assert.equal(parseNotebookTitleMap('   ').size, 0);
+  });
+});
+
+describe('applyNotebookTitleOverlay', () => {
+  const uuidTitleRegistry = [
+    {
+      id: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+      title: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+      watch: true,
+      domain: 'cns-brain',
+      last_updated: null,
+    },
+  ];
+
+  it('overlays human title and enables ROUTED scoring', () => {
+    const map = parseNotebookTitleMap('981466f0:CNS Vault Architecture');
+    const overlaid = applyNotebookTitleOverlay(uuidTitleRegistry, map);
+    const result = pickSignalNotebook(['CNS vault architecture roadmap'], overlaid);
+    assert.equal(result.route.status, 'ROUTED');
+    assert.equal(result.route.id, '981466f0-de1c-4551-93a9-f3bc2a24b184');
+    assert.equal(result.route.title, 'CNS Vault Architecture');
+  });
+
+  it('keeps UUID title when prefix is unmapped', () => {
+    const unmappedRegistry = [
+      {
+        id: 'aaaaaaaa-de1c-4551-93a9-f3bc2a24b184',
+        title: 'aaaaaaaa-de1c-4551-93a9-f3bc2a24b184',
+        watch: true,
+        domain: 'other',
+        last_updated: null,
+      },
+    ];
+    const map = parseNotebookTitleMap('981466f0:CNS Vault Architecture');
+    const overlaid = applyNotebookTitleOverlay(unmappedRegistry, map);
+    assert.equal(overlaid[0].title, 'aaaaaaaa-de1c-4551-93a9-f3bc2a24b184');
+    const result = pickSignalNotebook(['CNS vault architecture'], overlaid);
+    assert.equal(result.route.status, 'NO_ROUTE');
+  });
+
+  it('returns rows unchanged when map is empty', () => {
+    const overlaid = applyNotebookTitleOverlay(uuidTitleRegistry, new Map());
+    assert.deepEqual(overlaid, uuidTitleRegistry);
+  });
+});
 
 describe('pick-signal-notebook.mjs helpers', () => {
   it('dedupes case-insensitively and keeps first occurrence', () => {
@@ -430,5 +505,30 @@ describe('pick-signal-notebook.mjs CLI', () => {
     assert.equal(payload.route.id, 'ai-watch-1');
     assert.ok(payload.winning_score >= 0.2);
     assert.ok(payload.winning_score < 0.75);
+  });
+
+  it('ROUTED via NOTEBOOKLM_NOTEBOOK_TITLES overlay on UUID-title registry', async () => {
+    const uuidRegistry = [
+      {
+        id: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+        title: '981466f0-de1c-4551-93a9-f3bc2a24b184',
+        watch: true,
+        domain: 'cns-brain',
+        last_updated: null,
+      },
+    ];
+    const registryPath = await writeRegistry(uuidRegistry);
+    const { stdout } = await runPick({
+      signals: ['CNS vault architecture'],
+      registryPath,
+      env: {
+        NOTEBOOKLM_NOTEBOOK_TITLES: '981466f0:CNS Vault Architecture',
+      },
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.route.id, '981466f0-de1c-4551-93a9-f3bc2a24b184');
+    assert.equal(payload.route.title, 'CNS Vault Architecture');
+    assert.equal(payload.route.domain, 'cns-brain');
   });
 });

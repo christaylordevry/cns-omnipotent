@@ -10,6 +10,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
+
 const EXIT_REGISTRY = 2;
 const EXIT_ROUTING = 1;
 const MAX_SIGNALS = 10;
@@ -214,6 +216,53 @@ function candidateBeatsIncumbent(candidate, incumbent) {
 }
 
 /**
+ * @param {string | undefined | null} raw
+ * @returns {Map<string, string>}
+ */
+export function parseNotebookTitleMap(raw) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (const segment of String(raw ?? '').split(',')) {
+    const idx = segment.indexOf(':');
+    if (idx <= 0) {
+      continue;
+    }
+    const prefix = segment.slice(0, idx).trim();
+    const title = segment.slice(idx + 1).trim();
+    if (prefix && title) {
+      map.set(prefix, title);
+    }
+  }
+  return map;
+}
+
+/**
+ * @param {unknown[]} rows
+ * @param {Map<string, string>} titleMap
+ * @returns {unknown[]}
+ */
+export function applyNotebookTitleOverlay(rows, titleMap) {
+  if (!titleMap.size) {
+    return rows;
+  }
+  return rows.map((row) => {
+    if (!row || typeof row !== 'object' || typeof row.id !== 'string') {
+      return row;
+    }
+    for (const [prefix, title] of titleMap) {
+      if (
+        row.id === prefix ||
+        row.id.startsWith(prefix + '-') ||
+        row.id.startsWith(prefix)
+      ) {
+        return { ...row, title };
+      }
+    }
+    return row;
+  });
+}
+
+/**
  * @param {string[]} signals
  * @param {unknown[]} watchedRegistry
  */
@@ -352,7 +401,10 @@ if (isMainModule()) {
     failRegistry();
   }
 
-  const watchedRegistry = raw.filter((e) => e && e.watch === true);
+  const mergedEnv = await mergeTrendIngestEnv(process.env);
+  const titleMap = parseNotebookTitleMap(mergedEnv.NOTEBOOKLM_NOTEBOOK_TITLES);
+  const registryWithTitles = applyNotebookTitleOverlay(raw, titleMap);
+  const watchedRegistry = registryWithTitles.filter((e) => e && e.watch === true);
   const signals = parseSignalsInput();
   const result = pickSignalNotebook(signals, watchedRegistry);
   const elapsed_ms = Date.now() - start;

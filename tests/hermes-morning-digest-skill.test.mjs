@@ -32,7 +32,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.5"));
+    assert.ok(body.includes("version: 1.2.6"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
     assert.ok(body.includes("## Pitfalls"));
@@ -351,9 +351,18 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("fire-and-forget"));
   });
 
-  it("SKILL.md v1.2.5 documents five sources and awaited Vault context Convex log (Story 61-1, 52-2, 54-2)", () => {
+  it("config-snippet documents NotebookLM title map (Story 61-2)", () => {
+    const body = readFileSync(configSnippetPath, "utf8");
+    assert.ok(body.includes("NOTEBOOKLM_NOTEBOOK_TITLES"));
+    assert.ok(body.includes("981466f0:CNS Vault Architecture"));
+    assert.ok(body.includes("dc6abf1a:AI Factory Blueprint"));
+    assert.ok(body.includes("f037c741:Nexus Discord Bridge"));
+    assert.ok(body.includes("trend-ingest.env"));
+  });
+
+  it("SKILL.md v1.2.6 documents five sources and awaited Vault context Convex log (Story 61-1, 52-2, 54-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.5"));
+    assert.ok(body.includes("version: 1.2.6"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
     assert.ok(body.includes("## Pitfalls"));
@@ -364,6 +373,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("notebook_query_log"));
     assert.ok(body.includes("timeout=15"));
     assert.ok(!body.includes("fire-and-forget"));
+    assert.ok(body.includes("NOTEBOOKLM_NOTEBOOK_TITLES"));
     assert.ok(body.includes("trend-ingest.py"));
   });
 });

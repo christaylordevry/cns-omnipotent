@@ -103,6 +103,25 @@ MORNING_DIGEST_ARXIV_ENABLED=1
 
 When categories are unset or empty, the fetch script returns `{"papers":[]}` or `{"error":"arxiv disabled"}` when disabled.
 
+## NotebookLM title map (Story 61-2)
+
+When `NOTEBOOKLM_NOTEBOOK_IDS` is set for session-close fan-out, registry rows may carry UUID-only titles. Morning digest signal scoring uses **human-readable** titles from this map so Vault context can ROUTED-match watched notebooks.
+
+| Variable | Purpose |
+|----------|---------|
+| `NOTEBOOKLM_NOTEBOOK_TITLES` | Comma-separated `prefix:Title` pairs; prefix is the first 8 hex chars of the notebook UUID |
+
+Load order: values from `$HOME/.hermes/trend-ingest.env` first, then process environment overrides (same merge as arXiv keys).
+
+Example (production prefixes):
+
+```bash
+# In ~/.hermes/trend-ingest.env
+NOTEBOOKLM_NOTEBOOK_TITLES=981466f0:CNS Vault Architecture,dc6abf1a:AI Factory Blueprint,f037c741:Nexus Discord Bridge
+```
+
+Unmapped notebook IDs keep their existing registry title (UUID if unset — safe degradation).
+
 ## Coexistence
 
 - **investigate-trend**: bound to same channel with different trigger prefix — OK.

@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.5
+version: 1.2.6
 author: CNS Operator
 license: MIT
 metadata:
@@ -127,6 +127,7 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 ## Pitfalls
 
 - When reproducing or testing `pick-signal-notebook.mjs`, use an absolute registry path. Relative `CNS_NOTEBOOK_REGISTRY_PATH` values can resolve against the repo root unexpectedly.
+- When registry rows have UUID-only titles (common with `NOTEBOOKLM_NOTEBOOK_IDS` fan-out), set `NOTEBOOKLM_NOTEBOOK_TITLES` in `~/.hermes/trend-ingest.env` so signal scoring can F1-match human titles.
 - Isolated routing tests should clear inherited digest payload env such as `DIGEST_SOURCES_JSON`; otherwise the scorer can behave like it is being run in a full digest pipeline.
 - The notebook registry lookup precedence is argv path first, then `CNS_NOTEBOOK_REGISTRY_PATH`, then the default registry file; wrappers and test harnesses should preserve that order.
 

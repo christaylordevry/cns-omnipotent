@@ -1,5 +1,16 @@
 # Deferred work
 
+## Deferred from: code review of 61-2-fix-vault-context-notebook-title-routing (2026-06-05)
+
+- Comma inside notebook title silently truncates title map — spec uses comma delimiter between entries; titles containing commas not supported without format change.
+- Duplicate prefix key in NOTEBOOKLM_NOTEBOOK_TITLES silently overwrites — operator config edge; production map uses unique 8-char prefixes.
+- Shorter prefix shadows longer prefix by Map insertion order — production uses non-overlapping hex prefixes only.
+- Two registry rows sharing same prefix receive identical overlay title — UUID prefix uniqueness in production registry prevents collision.
+- mergeTrendIngestEnv EPERM/parse errors swallowed — pre-existing 61-1 pattern; unreadable trend-ingest.env indistinguishable from absent file.
+- CNS_NOTEBOOK_REGISTRY_PATH in trend-ingest.env ignored by pick-signal-notebook CLI — parseRegistryPath runs before mergeTrendIngestEnv; pre-existing asymmetry outside 61-2 file list.
+- Unbalanced quotes in parseEnvFile produce prefix with leading quote — pre-existing fetch-arxiv-rss parser; overlay silently no-ops.
+- AC3 file-first CLI integration test absent — AC6 table marks file-load CLI path optional; mergeTrendIngestEnv unit-tested in 61-1.
+
 ## Deferred from: code review of 61-1-morning-digest-arxiv-source (2026-06-04)
 
 - Partial per-category RSS failure returns papers from successful categories without `error` — acceptable when at least one feed succeeds; operator may not see which category failed.
