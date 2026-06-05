@@ -16,7 +16,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 2. **No vault writes**: no Vault IO mutators, no files under `Knowledge-Vault-ACTIVE/`, no `00-Inbox/` captures.
 3. **No dashboard relay**, no digest archive JSONL. **NotebookLM:** read-only via `query-notebook.mjs` after signal scoring — no `source_add`, no session-close fan-out, no `mcp__notebooklm__notebook_query`.
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
-5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`).
+5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
 7. **Cross-source failures**: run Sources 1–5 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 5 `NOTEBOOK_REMAINING_S` (see Source 5).
@@ -60,7 +60,7 @@ Requires `~/.hermes/trend-watchlist.yaml` and `pytrends` (Operator Guide §16.5)
 
 ## Source 2 — NewsAPI headlines
 
-Call `terminal` exactly once for NewsAPI. This command reads credentials only from the absolute `$HOME/.hermes/trend-ingest.env` path and prints JSON with either `{"headlines":[...]}` or `{"error":"..."}`:
+Call `terminal` exactly once for NewsAPI. This command reads credentials only from the `$HOME/.hermes/trend-ingest.env` path — the wrapper remaps `$HOME` back to the operator home under Hermes isolation (Epic 59) — and prints JSON with either `{"headlines":[...]}` or `{"error":"..."}`:
 
 ```text
 terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=resolved_repo_root, timeout=45)
@@ -90,7 +90,7 @@ Call `mcp__perplexity__search` exactly once when Source 1 produced at least one 
 
 ## Source 4 — arXiv preprints
 
-Call `terminal` exactly once for arXiv RSS (no API key). The script reads `MORNING_DIGEST_ARXIV_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present. It prints JSON with either `{"papers":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+Call `terminal` exactly once for arXiv RSS (no API key). The script reads `MORNING_DIGEST_ARXIV_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"papers":[...]}` or `{"error":"..."}` and always exits **0** on failure:
 
 ```text
 terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)

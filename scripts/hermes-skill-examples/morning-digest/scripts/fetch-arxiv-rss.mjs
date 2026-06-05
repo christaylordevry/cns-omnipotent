@@ -2,10 +2,14 @@
 // Usage: node fetch-arxiv-rss.mjs
 // stdout: {"papers":[...]} or {"error":"..."}; always exit 0 on fetch/parse failure
 
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 const CATEGORY_RE = /^[a-zA-Z0-9._+-]+$/;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -162,11 +166,99 @@ export function loadArxivConfig(env = process.env) {
 }
 
 /**
+ * Infer the operator's real HOME directly from a Hermes profile-isolated HOME
+ * (e.g. /home/christ/.hermes/home → /home/christ). Returns null when HOME does
+ * not match the isolation pattern.
+ *
+ * @param {string} home
+ * @returns {string | null}
+ */
+export function inferOperatorHomeFromHome(home) {
+  if (!home) return null;
+  const m = home.match(/^(.*?)\/\.hermes\/home(\/.*)?$/);
+  return m?.[1] ? m[1] : null;
+}
+
+/**
+ * Infer HERMES_HOME from a HOME that matches the Hermes profile-isolation
+ * pattern (.hermes/home or .hermes/home/...). Returns null otherwise.
+ *
+ * @param {string} home
+ * @returns {string | null}
+ */
+export function inferHermesHomeFromHome(home) {
+  if (!home) return null;
+  const m = home.match(/^(.*\/\.hermes)\/home(\/.*)?$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * True when HOME is Hermes per-profile isolation ({HERMES_HOME}/home).
+ *
+ * @param {string} home
+ * @param {string} hermesHome
+ * @returns {boolean}
+ */
+export function isHermesProfileHome(home, hermesHome) {
+  if (!home || !hermesHome) {
+    return false;
+  }
+  const profileRoot = join(hermesHome, 'home');
+  return home === profileRoot || home.startsWith(`${profileRoot}/`);
+}
+
+/**
+ * Resolve the operator's real HOME even when Hermes has profile-isolated the
+ * process under {HERMES_HOME}/home (Epic 59). Falls back to the input HOME when
+ * the pattern does not match or getent yields nothing.
+ *
+ * Mirrors scripts/session-close/lib/operator-home.mjs. Inlined deliberately: the
+ * installed skill tree (~/.hermes/skills/cns/morning-digest) does not include the
+ * session-close package, so a cross-package import would break at runtime.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {Promise<string>}
+ */
+export async function resolveOperatorHome(env = process.env) {
+  const home = (env.HOME || homedir()).trim();
+  const directInference = inferOperatorHomeFromHome(home);
+  if (directInference) {
+    return directInference;
+  }
+  let hermesHome = (env.HERMES_HOME || '').trim();
+  if (!hermesHome) {
+    hermesHome = inferHermesHomeFromHome(home) || '';
+  }
+  if (!isHermesProfileHome(home, hermesHome)) {
+    return home || homedir();
+  }
+  const user = (env.USER || env.LOGNAME || '').trim();
+  if (!user) {
+    return home || homedir();
+  }
+  try {
+    const { stdout } = await execFileAsync('getent', ['passwd', user], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024,
+    });
+    const line = stdout.trim().split('\n')[0] ?? '';
+    const passwdHome = line.split(':')[5]?.trim();
+    if (passwdHome) {
+      return passwdHome;
+    }
+  } catch {
+    // getent unavailable — fall through to profile HOME.
+  }
+  return home || homedir();
+}
+
+/**
  * @param {Record<string, string | undefined>} baseEnv
  * @returns {Promise<Record<string, string | undefined>>}
  */
 export async function mergeTrendIngestEnv(baseEnv) {
-  const path = join(homedir(), '.hermes', 'trend-ingest.env');
+  const operatorHome = await resolveOperatorHome(baseEnv);
+  const path = join(operatorHome, '.hermes', 'trend-ingest.env');
   try {
     const content = await readFile(path, 'utf8');
     const fromFile = parseEnvFile(content);

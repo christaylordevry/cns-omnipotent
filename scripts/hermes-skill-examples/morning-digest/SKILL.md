@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.2.6
+version: 1.2.7
 author: CNS Operator
 license: MIT
 metadata:

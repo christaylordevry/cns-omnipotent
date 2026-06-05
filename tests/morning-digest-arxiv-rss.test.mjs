@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -7,9 +9,12 @@ import { describe, it } from 'node:test';
 
 import {
   extractSnippetFromDescription,
+  inferOperatorHomeFromHome,
   isValidArxivCategory,
   loadArxivConfig,
+  mergeTrendIngestEnv,
   parseArxivRss,
+  resolveOperatorHome,
   runArxivFetch,
   trimSnippet,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
@@ -119,6 +124,110 @@ describe('fetch-arxiv-rss.mjs runArxivFetch', () => {
     });
     const cli = JSON.parse(stdout.trim());
     assert.deepEqual(cli, { error: 'invalid category' });
+  });
+});
+
+describe('resolveOperatorHome (Hermes HOME isolation)', () => {
+  it('infers real operator home from Hermes profile HOME', () => {
+    assert.equal(
+      inferOperatorHomeFromHome('/home/christ/.hermes/home'),
+      '/home/christ',
+    );
+    assert.equal(
+      inferOperatorHomeFromHome('/home/christ/.hermes/home/sub/dir'),
+      '/home/christ',
+    );
+  });
+
+  it('returns null for a normal (non-isolated) HOME', () => {
+    assert.equal(inferOperatorHomeFromHome('/home/christ'), null);
+  });
+
+  it('remaps a Hermes-isolated HOME back to the operator home', async () => {
+    const resolved = await resolveOperatorHome({
+      HOME: '/home/christ/.hermes/home',
+      USER: 'christ',
+    });
+    assert.equal(resolved, '/home/christ');
+  });
+
+  it('leaves a normal HOME untouched', async () => {
+    const resolved = await resolveOperatorHome({ HOME: '/home/christ' });
+    assert.equal(resolved, '/home/christ');
+  });
+});
+
+describe('mergeTrendIngestEnv under simulated Hermes HOME isolation', () => {
+  it('reads the real trend-ingest.env when HOME is profile-isolated', async () => {
+    const tmpRoot = await mkdtemp(join(tmpdir(), 'cns-merge-env-'));
+    try {
+      // Real operator home: <tmpRoot>/.hermes/trend-ingest.env
+      await mkdir(join(tmpRoot, '.hermes'), { recursive: true });
+      await writeFile(
+        join(tmpRoot, '.hermes', 'trend-ingest.env'),
+        [
+          '# comment line',
+          'NEWSAPI_API_KEY=news-secret',
+          'PERPLEXITY_API_KEY="perp-secret"',
+          'NOTEBOOKLM_NOTEBOOK_TITLES=nb1:Title One,nb2:Title Two',
+          'GOOGLE_TRENDS_WATCHLIST=ai,llm',
+        ].join('\n'),
+        'utf8',
+      );
+
+      // Hermes isolates HOME under <tmpRoot>/.hermes/home — the broken path.
+      const merged = await mergeTrendIngestEnv({
+        HOME: join(tmpRoot, '.hermes', 'home'),
+        USER: 'christ',
+      });
+
+      assert.equal(merged.NEWSAPI_API_KEY, 'news-secret');
+      assert.equal(merged.PERPLEXITY_API_KEY, 'perp-secret');
+      assert.equal(
+        merged.NOTEBOOKLM_NOTEBOOK_TITLES,
+        'nb1:Title One,nb2:Title Two',
+      );
+      assert.equal(merged.GOOGLE_TRENDS_WATCHLIST, 'ai,llm');
+    } finally {
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('lets baseEnv override file values', async () => {
+    const tmpRoot = await mkdtemp(join(tmpdir(), 'cns-merge-env-'));
+    try {
+      await mkdir(join(tmpRoot, '.hermes'), { recursive: true });
+      await writeFile(
+        join(tmpRoot, '.hermes', 'trend-ingest.env'),
+        'NEWSAPI_API_KEY=from-file\n',
+        'utf8',
+      );
+
+      const merged = await mergeTrendIngestEnv({
+        HOME: join(tmpRoot, '.hermes', 'home'),
+        USER: 'christ',
+        NEWSAPI_API_KEY: 'from-process-env',
+      });
+
+      assert.equal(merged.NEWSAPI_API_KEY, 'from-process-env');
+    } finally {
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('returns baseEnv unchanged when no env file exists', async () => {
+    const tmpRoot = await mkdtemp(join(tmpdir(), 'cns-merge-env-'));
+    try {
+      const merged = await mergeTrendIngestEnv({
+        HOME: join(tmpRoot, '.hermes', 'home'),
+        USER: 'christ',
+        SOME_KEY: 'value',
+      });
+      assert.equal(merged.SOME_KEY, 'value');
+      assert.equal(merged.NEWSAPI_API_KEY, undefined);
+    } finally {
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
   });
 });
 
