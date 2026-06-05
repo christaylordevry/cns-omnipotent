@@ -103,6 +103,25 @@ MORNING_DIGEST_ARXIV_ENABLED=1
 
 When categories are unset or empty, the fetch script returns `{"papers":[]}` or `{"error":"arxiv disabled"}` when disabled.
 
+## HackerNews top stories (Story 61-4)
+
+Public RSS — no API key. Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as NewsAPI is fine).
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MORNING_DIGEST_HN_MAX_STORIES` | Max stories to return (after fetch) | `5` |
+| `MORNING_DIGEST_HN_ENABLED` | Set `0` or `false` to disable without code change | enabled |
+
+Example operator setup:
+
+```bash
+# In ~/.hermes/trend-ingest.env
+MORNING_DIGEST_HN_MAX_STORIES=5
+MORNING_DIGEST_HN_ENABLED=1
+```
+
+When disabled, the fetch script returns `{"error":"hackernews disabled"}`.
+
 ## NotebookLM title map (Story 61-2)
 
 When `NOTEBOOKLM_NOTEBOOK_IDS` is set for session-close fan-out, registry rows may carry UUID-only titles. Morning digest signal scoring uses **human-readable** titles from this map so Vault context can ROUTED-match watched notebooks.

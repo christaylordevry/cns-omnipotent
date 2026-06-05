@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 61-4-morning-digest-hackernews-source (2026-06-05)
+
+- Story completion notes cite "505 tests pass" but `npm test` reports 642 — documentation drift in Dev Agent Record only; no code impact.
+
 ## Deferred from: code review of 61-2-fix-vault-context-notebook-title-routing (2026-06-05)
 
 - Comma inside notebook title silently truncates title map — spec uses comma delimiter between entries; titles containing commas not supported without format change.

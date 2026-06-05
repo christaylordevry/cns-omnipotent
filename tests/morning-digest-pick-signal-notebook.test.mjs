@@ -16,6 +16,7 @@ import {
   buildDigestSignals,
   dedupeSignals,
   extractArxivSignals,
+  extractHnSignals,
   extractPerplexitySignals,
   parseNotebookTitleMap,
   pickSignalNotebook,
@@ -218,6 +219,51 @@ describe('buildDigestSignals', () => {
   it('extractArxivSignals caps at three titles', () => {
     const titles = extractArxivSignals(
       Array.from({ length: 5 }, (_, i) => ({ title: `paper-${i}` })),
+    );
+    assert.equal(titles.length, 3);
+  });
+
+  it('places HN titles after arXiv titles in order', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
+      arxiv: [{ title: 'Arxiv Paper Alpha' }],
+      hackernews: [{ title: 'HN Story One' }, { title: 'HN Story Two' }],
+    });
+    const arxivIdx = signals.indexOf('Arxiv Paper Alpha');
+    const hnIdx = signals.indexOf('HN Story One');
+    assert.ok(arxivIdx >= 0 && hnIdx > arxivIdx);
+  });
+
+  it('dedupes HN title when headline wins first', () => {
+    const signals = buildDigestSignals({
+      headlines: [{ title: 'Shared Title' }],
+      hackernews: [{ title: 'shared title' }],
+    });
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0], 'Shared Title');
+  });
+
+  it('caps combined output at 10 with hackernews included', () => {
+    const signals = buildDigestSignals({
+      trends: Array.from({ length: 6 }, (_, i) => ({
+        keyword: `trend-${i}`,
+        normalizedValue: 1 - i * 0.01,
+      })),
+      headlines: Array.from({ length: 6 }, (_, i) => ({ title: `headline-${i}` })),
+      perplexityText: 'One. Two. Three. Four. Five.',
+      arxiv: Array.from({ length: 3 }, (_, i) => ({ title: `arxiv-${i}` })),
+      hackernews: Array.from({ length: 5 }, (_, i) => ({ title: `hn-${i}` })),
+    });
+    assert.equal(signals.length, 10);
+  });
+
+  it('returns empty for empty hackernews array', () => {
+    assert.deepEqual(buildDigestSignals({ hackernews: [] }), []);
+  });
+
+  it('extractHnSignals caps at three titles', () => {
+    const titles = extractHnSignals(
+      Array.from({ length: 5 }, (_, i) => ({ title: `story-${i}` })),
     );
     assert.equal(titles.length, 3);
   });
