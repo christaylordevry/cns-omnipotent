@@ -20,6 +20,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
 7. **Cross-source failures**: run Sources 1–6 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
+9. **Required completion step — Convex digest push (non-negotiable)**: The post-post step *§ Push digest entities to Convex* (`push-digest-convex.mjs` invoked with `DIGEST_PUSH_JSON`) is a **mandatory completion step**, not optional telemetry. The skill is **NOT complete** until that `terminal(...)` call has been invoked after the Discord post. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize it. Treat it exactly like a session-close required step: the task is unfinished until the push terminal call has fired. ("fire-and-forget" describes only how its *result* is handled — exit 0, no Discord warning — it never means the call itself is skippable.)
 
 ## Tool-call rule
 
@@ -320,9 +321,11 @@ _(Notebook history log failed — /trends may be missing this query.)_
 
 Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log failure as skill failure. Missing `CONVEX_URL` / `CONVEX_DEPLOY_KEY` → script exits 0 (skip path → `skipped-env`). Malformed required env or Convex HTTP error → script exits 1 (`failed`).
 
-## Post-post — Push digest entities to Convex (all runs)
+## Post-post — Push digest entities to Convex (REQUIRED — all runs)
 
-Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. **fire-and-forget** — always exit **0** from the push script; never post a Discord warning on failure.
+> **REQUIRED §9 — MUST run before the task is complete.** This step is **non-negotiable even under context compression**. The skill is **not done** until this `terminal(...)` push call has been invoked. Do **not** treat it as optional post-post telemetry, and do **not** drop it if context is compressed — invoke it on **every** run (success or partial failure), exactly as session-close treats its required steps.
+
+Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory**: it runs **after** the Discord post but **MUST complete (the terminal call must be invoked) before the skill is considered done**. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 
@@ -337,9 +340,19 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 | `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
 
 - `rank`: 1-based index within each section in display order.
-- `sourceMetadata`: HN `comments`, arXiv `categories` from `category` when present.
+- `sourceMetadata`: HN `comments` (number), arXiv `categories` (array of strings from `category`) when present.
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
+
+#### Each signal object — required schema (Convex validators are strict)
+
+The `addDigestSignal` validator is a **strict** object: a missing required key **or** an unexpected/`null` value rejects the whole signal, and the push then finalizes the run as `failed` with **zero** signals stored. Build every signal object exactly to this contract:
+
+- **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
+- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal`.
+- **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
+- **Types:** `rank` and `score` are **numbers** (not strings); `sourceMetadata.comments` is a **number**; `sourceMetadata.categories` is an **array of strings**.
+- Do **not** add any key not listed in the table / this contract.
 
 ### `digest_push_payload` shape
 
@@ -354,15 +367,38 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
     "notebookId": "<route.id when ROUTED>",
     "vaultContextSummary": "<answer_full when ROUTED + query success>"
   },
-  "signals": [ "...mapped per table above..." ]
+  "signals": [
+    {
+      "section": "trends",
+      "sourceType": "google_trends",
+      "title": "<keyword>",
+      "score": 0.4,
+      "rank": 1,
+      "externalId": "<short hex>"
+    },
+    {
+      "section": "hackernews",
+      "sourceType": "hackernews",
+      "title": "<story title>",
+      "url": "https://news.ycombinator.com/item?id=...",
+      "score": 142,
+      "rank": 1,
+      "externalId": "<hn id>",
+      "sourceMetadata": { "comments": 12 }
+    }
+  ]
 }
 ```
+
+Every entry in `signals[]` MUST carry both `section` and `sourceType` (see the strict-schema contract above). Optional keys with no value are **omitted**, never `null`.
 
 `ranAt` must be the numeric `digest_start_ms` from task start (Unix ms) — never a string.
 
 Omit `workspaceId`. Push available signals even when some sources failed.
 
-### Terminal invocation
+### Terminal invocation (REQUIRED — completion gate)
+
+This `terminal(...)` call **MUST be invoked before you consider the skill complete**. It is the completion gate for the digest: do not end the task turn until it has fired, even if context was compressed mid-run.
 
 ```text
 terminal(
@@ -393,7 +429,7 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 | `invalid-input` | Exit `0` and stderr indicates missing/invalid `DIGEST_PUSH_JSON` (`run.date` required) |
 | `failed` | Exit `0` but stderr contains `push-digest-convex: warning` |
 
-Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures.
+Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures. The graceful exit-0 / no-warning behavior governs only the *outcome* — it does **not** make the push optional. The skill is incomplete until this required terminal call has been invoked.
 
 ## Allowed tools
 
