@@ -137,7 +137,7 @@ export async function pushDigestToConvex(opts = {}) {
 
   try {
     const createdId = await postMutation(fetchFn, convexEnv, CREATE_PATH, {
-      run: { ...payload.run, status: 'started' },
+      run: { ...payload.run, ranAt: payload.run.ranAt ?? Date.now(), status: 'started' },
     });
 
     if (typeof createdId !== 'string' || !createdId) {
