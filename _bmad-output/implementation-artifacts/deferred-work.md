@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 61-5-morning-digest-convex-push (2026-06-05)
+
+- Duplicate `digestRuns` per date — no unique constraint or idempotency guard; feed consumer should pick latest by `ranAt` in a future epic.
+- `shortSha256Hex` delimiter collision — `parts.join('')` matches spec's `sha256(keyword + date)` concatenation; delimiter fix requires spec change.
+- `section` / `sourceType` pairing not enforced at Convex — mapping is Hermes agent contract; server-side cross-validator deferred.
+
 ## Deferred from: code review of 61-4-morning-digest-hackernews-source (2026-06-05)
 
 - Story completion notes cite "505 tests pass" but `npm test` reports 642 — documentation drift in Dev Agent Record only; no code impact.

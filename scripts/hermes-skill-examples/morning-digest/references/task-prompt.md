@@ -320,11 +320,86 @@ _(Notebook history log failed — /trends may be missing this query.)_
 
 Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log failure as skill failure. Missing `CONVEX_URL` / `CONVEX_DEPLOY_KEY` → script exits 0 (skip path → `skipped-env`). Malformed required env or Convex HTTP error → script exits 1 (`failed`).
 
+## Post-post — Push digest entities to Convex (all runs)
+
+Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. **fire-and-forget** — always exit **0** from the push script; never post a Discord warning on failure.
+
+**Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
+
+### Signal mapping (`signals[]`)
+
+| Section | sourceType | Source data | title | summary | url | score | externalId |
+|---------|------------|-------------|-------|---------|-----|-------|------------|
+| `trends` | `google_trends` | Source 1 `events[]` | `keyword` | — | — | `normalizedValue` | `sha256(keyword + date)` short hex |
+| `headlines` | `newsapi` | Source 2 `headlines[]` | `title` | — | `url` if present | — | url hash or title+date hash |
+| `deep_signal` | `deep_signal` | Source 3 body | first 80 chars or `"Deep Signal"` | full text | — | — | `sha256(date + topTrend)` short hex |
+| `arxiv` | `arxiv` | Source 4 `papers[]` | `title` | `snippet` | `link` | — | arxiv id from link (`/\d+\.\d+`) or link hash |
+| `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
+
+- `rank`: 1-based index within each section in display order.
+- `sourceMetadata`: HN `comments`, arXiv `categories` from `category` when present.
+- Use Node `crypto.createHash('sha256')` for hashes (built-in only).
+- Empty sections → omit signals (no placeholder rows).
+
+### `digest_push_payload` shape
+
+```json
+{
+  "run": {
+    "date": "<YYYY-MM-DD>",
+    "ranAt": 1749091200000,
+    "topTrend": "<top keyword when available>",
+    "focusKeyword": "<recommended focus line>",
+    "deepSignalSummary": "<Source 3 body when available>",
+    "notebookId": "<route.id when ROUTED>",
+    "vaultContextSummary": "<answer_full when ROUTED + query success>"
+  },
+  "signals": [ "...mapped per table above..." ]
+}
+```
+
+`ranAt` must be the numeric `digest_start_ms` from task start (Unix ms) — never a string.
+
+Omit `workspaceId`. Push available signals even when some sources failed.
+
+### Terminal invocation
+
+```text
+terminal(
+  command="PUSH_SCRIPT=<shellQuote(push_script)> DIGEST_PUSH_JSON=<shellQuote(JSON.stringify(digest_push_payload))> node \"$PUSH_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=45
+)
+```
+
+Where:
+
+```text
+push_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/push-digest-convex.mjs`
+
+**After terminal returns**, emit optional stderr JSON for observability:
+
+```json
+{"digest_convex_push":{"status":"ok|skipped-env|invalid-input|failed","exit_code":0,"reason":"..."}}
+```
+
+| status | When |
+|--------|------|
+| `ok` | Exit `0` and push completed |
+| `skipped-env` | Exit `0` and stderr indicates missing `CONVEX_URL` / deploy key skip |
+| `invalid-input` | Exit `0` and stderr indicates missing/invalid `DIGEST_PUSH_JSON` (`run.date` required) |
+| `failed` | Exit `0` but stderr contains `push-digest-convex: warning` |
+
+Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures.
+
 ## Allowed tools
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only) |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `push-digest-convex.mjs` (post-post, all runs) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 

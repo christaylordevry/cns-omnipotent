@@ -1,0 +1,194 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, it } from 'node:test';
+
+import {
+	pushDigestToConvex,
+	readDigestPushPayload,
+	resolveConvexPushEnv,
+	shortSha256Hex,
+} from '../scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
+
+/** @type {string[]} */
+let tempDirs = [];
+
+afterEach(async () => {
+	await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+	tempDirs = [];
+});
+
+function basePayload() {
+	return {
+		run: {
+			date: '2026-06-05',
+			ranAt: 1_749_091_200_000,
+			topTrend: 'AI agents',
+			focusKeyword: 'AI agents',
+		},
+		signals: [
+			{
+				section: 'trends',
+				sourceType: 'google_trends',
+				title: 'AI agents',
+				score: 0.87,
+				rank: 1,
+				externalId: 'a1b2c3d4',
+			},
+			{
+				section: 'hackernews',
+				sourceType: 'hackernews',
+				title: 'Show HN: Example',
+				url: 'https://news.ycombinator.com/item?id=48408186',
+				score: 142,
+				rank: 1,
+				externalId: '48408186',
+				sourceMetadata: { comments: 12 },
+			},
+		],
+	};
+}
+
+function baseEnv(overrides = {}) {
+	return {
+		DIGEST_PUSH_JSON: JSON.stringify(basePayload()),
+		CONVEX_URL: 'https://test.convex.cloud',
+		CONVEX_DEPLOY_KEY: 'deploy-key-test',
+		...overrides,
+	};
+}
+
+function mockResponse(status, body = '{}') {
+	return {
+		ok: status >= 200 && status < 300,
+		status,
+		text: async () => body,
+	};
+}
+
+describe('push-digest-convex.mjs', () => {
+	it('readDigestPushPayload rejects missing run.date', () => {
+		assert.equal(readDigestPushPayload({ DIGEST_PUSH_JSON: '{}' }), null);
+		assert.equal(readDigestPushPayload({ DIGEST_PUSH_JSON: '{"run":{}}' }), null);
+		assert.equal(readDigestPushPayload({ DIGEST_PUSH_JSON: 'not-json' }), null);
+	});
+
+	it('shortSha256Hex is stable for same inputs', () => {
+		const first = shortSha256Hex('AI agents', '2026-06-05');
+		const second = shortSha256Hex('AI agents', '2026-06-05');
+		assert.equal(first, second);
+		assert.equal(first.length, 16);
+	});
+
+	it('posts create → add × N → finalize in order on happy path', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-1' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.status, 'ok');
+		assert.equal(calls.length, 4);
+		assert.equal(calls[0].path, 'digest:createDigestRun');
+		assert.equal(calls[0].args.run.status, 'started');
+		assert.equal(calls[1].path, 'digest:addDigestSignal');
+		assert.equal(calls[1].args.signal.digestRunId, 'run-id-1');
+		assert.equal(calls[2].path, 'digest:addDigestSignal');
+		assert.equal(calls[3].path, 'digest:finalizeDigestRun');
+		assert.deepEqual(calls[3].args, { id: 'run-id-1', status: 'published' });
+	});
+
+	it('skips without fetch when Convex env is missing', async () => {
+		let fetchCalled = false;
+		const result = await pushDigestToConvex({
+			env: baseEnv({
+				CONVEX_URL: '',
+				CONVEX_DEPLOY_KEY: '',
+				HOME: '/tmp/nonexistent-operator-home-push-digest',
+				CNS_TREND_INGEST_ENV_PATH: '/tmp/push-digest-missing-trend-ingest.env',
+			}),
+			fetchFn: async () => {
+				fetchCalled = true;
+				return mockResponse(200);
+			},
+		});
+
+		assert.equal(result.status, 'skipped');
+		assert.equal(fetchCalled, false);
+	});
+
+	it('returns failed with exit 0 when add mutation HTTP fails and finalizes run as failed', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-2' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(500, 'mutation failed');
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.status, 'failed');
+		assert.equal(result.exitCode, 0);
+		assert.equal(calls.length, 3);
+		assert.equal(calls[0].path, 'digest:createDigestRun');
+		assert.equal(calls[1].path, 'digest:addDigestSignal');
+		assert.equal(calls[2].path, 'digest:finalizeDigestRun');
+		assert.deepEqual(calls[2].args, { id: 'run-id-2', status: 'failed' });
+	});
+
+	it('returns failed with exit 0 when create mutation HTTP fails', async () => {
+		/** @type {string[]} */
+		const paths = [];
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				paths.push(body.path);
+				return mockResponse(500, 'create failed');
+			},
+		});
+
+		assert.equal(result.status, 'failed');
+		assert.equal(result.exitCode, 0);
+		assert.deepEqual(paths, ['digest:createDigestRun']);
+	});
+
+	it('resolveConvexPushEnv uses mergeTrendIngestEnv via operator home trend-ingest.env', async () => {
+		const dir = await mkdtemp(join(tmpdir(), 'morning-digest-push-convex-'));
+		tempDirs.push(dir);
+		const hermesDir = join(dir, '.hermes');
+		const { mkdir } = await import('node:fs/promises');
+		await mkdir(hermesDir, { recursive: true });
+		await writeFile(
+			join(hermesDir, 'trend-ingest.env'),
+			"CONVEX_URL=https://fallback.convex.cloud\nCONVEX_DEPLOY_KEY='key|123'\n",
+		);
+
+		const resolved = await resolveConvexPushEnv({
+			HOME: dir,
+		});
+		assert.deepEqual(resolved, {
+			convexUrl: 'https://fallback.convex.cloud',
+			convexDeployKey: 'key|123',
+		});
+	});
+});

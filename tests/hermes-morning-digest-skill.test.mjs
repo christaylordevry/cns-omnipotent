@@ -34,7 +34,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.2.8"));
+    assert.ok(body.includes("version: 1.2.9"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -352,9 +352,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("task-prompt documents post-post Convex log for successful Vault context (Story 52-2, 54-2)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const postPost = taskBody.slice(
-      taskBody.indexOf("## Post-post — Log Vault context to Convex"),
-    );
+    const logStart = taskBody.indexOf("## Post-post — Log Vault context to Convex");
+    const digestPushStart = taskBody.indexOf("## Post-post — Push digest entities to Convex");
+    const postPost = taskBody.slice(logStart, digestPushStart > logStart ? digestPushStart : undefined);
     assert.ok(postPost.includes("log-notebook-query.mjs"));
     assert.ok(postPost.includes("**After** posting"));
     assert.ok(postPost.includes("Do not edit or retract the Discord digest"));
@@ -392,9 +392,25 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("hackernews disabled"));
   });
 
-  it("SKILL.md v1.2.8 documents six sources and awaited Vault context Convex log (Story 61-4, 61-1, 52-2, 54-2)", () => {
+  it("task-prompt documents post-post digest Convex push (Story 61-5)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const postPost = taskBody.slice(
+      taskBody.indexOf("## Post-post — Push digest entities to Convex"),
+    );
+    assert.ok(postPost.includes("push-digest-convex.mjs"));
+    assert.ok(postPost.includes("DIGEST_PUSH_JSON"));
+    assert.ok(postPost.includes("digest_push_payload"));
+    assert.ok(postPost.includes("fire-and-forget"));
+    assert.ok(postPost.includes("timeout=45"));
+    assert.ok(postPost.includes("digest_convex_push"));
+    assert.ok(postPost.includes("google_trends"));
+    assert.ok(postPost.includes("hackernews"));
+    assert.ok(!postPost.includes("Notebook history log failed"));
+  });
+
+  it("SKILL.md v1.2.9 documents six sources, digest entity push, and awaited Vault context log (Story 61-5, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.2.8"));
+    assert.ok(body.includes("version: 1.2.9"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -402,11 +418,16 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("## Pitfalls"));
     assert.ok(body.includes("pick-signal-routing.md"));
     assert.ok(body.includes("log-notebook-query.mjs"));
-    assert.ok(body.includes("No trend Convex push"));
+    assert.ok(body.includes("No trend-ingest Convex push"));
+    assert.ok(body.includes("Digest entity push"));
+    assert.ok(body.includes("push-digest-convex.mjs"));
+    assert.ok(body.includes("digestRuns"));
+    assert.ok(body.includes("digestSignals"));
+    assert.ok(body.includes("fire-and-forget"));
     assert.ok(body.includes("Vault context Convex log"));
     assert.ok(body.includes("notebook_query_log"));
     assert.ok(body.includes("timeout=15"));
-    assert.ok(!body.includes("fire-and-forget"));
+    assert.ok(body.includes("digest_convex_push"));
     assert.ok(body.includes("NOTEBOOKLM_NOTEBOOK_TITLES"));
     assert.ok(body.includes("trend-ingest.py"));
   });
