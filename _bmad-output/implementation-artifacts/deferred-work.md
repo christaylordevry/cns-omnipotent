@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 64-7-arxiv-env-fix (2026-06-08)
+
+- Unreachable `{ papers: [] }` fallback in `runArxivFetch` after defaults populate categories in `loadArxivConfig` — harmless dead code at `fetch-arxiv-rss.mjs:333`.
+- 64-6 commit landed wrapper HOME assertions before `hermes-run-arxiv.sh` remap — HEAD red until 64-7 wrapper patch is committed.
+
 ## Deferred from: code review of 62-1-keyword-candidates-from-digest-signals (2026-06-06)
 
 - `postMutation` duplicated from `push-digest-convex.mjs` — AC allows inline copy when under ~40 lines; shared `convex-http.mjs` extraction deferred unless duplication grows.

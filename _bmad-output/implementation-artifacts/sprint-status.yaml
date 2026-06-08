@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-08T23:45:00+10:00"
+last_updated: "2026-06-08T23:50:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -444,7 +444,7 @@ development_status:
   # Stories: 64-1 schema → 64-2 scoring (5 dims incl. personalRelevance) → 64-3 disposition → 64-4 normalization → 64-5 ranked push
   # Parallel: 64-6 NewsAPI tightening, 64-7 arXiv env fix
   64-6-newsapi-query-tightening: done
-  64-7-arxiv-env-fix: review
+  64-7-arxiv-env-fix: done
 
   # Epic 65 — Native Source Adapter Expansion v1 (reference: last30days codebook only; Omnipotent.md)
   epic-65: backlog

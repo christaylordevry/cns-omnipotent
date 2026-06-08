@@ -1120,3 +1120,37 @@ FR-SC-17: Epic 48 — Stories 48.2, 48.3 (orchestrator + MEMORY/rhythm scripts)
 FR-SC-18: Epic 48 — Stories 48.1, 48.4, 48.5 (context pack, apply-section8, slim skill)
 FR-SC-19: Epic 48 — Stories 48.1, 48.5, 48.6 (token tests, skill contract, operator guide + smoke)
 ```
+
+### Epic 64: Intelligence Scoring Engine v1
+
+**Goal:** Every `digestSignal` receives five normalized dimension scores (0–100) — `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — plus cross-source engagement normalization, derived disposition, and ranked "What Matters Now" ordering in the morning digest pipeline. No new source adapters.
+
+**Repo:** Cross-repo — scoring compute in Omnipotent.md digest scripts; schema + persistence in cns-dashboard (`convex/validators.ts` via 64-1). Scoring does not run in Convex functions (ADR-E64-001).
+
+**Stories:** 64-1 (schema gate) → 64-2 (five named dimensions) → 64-3 (disposition) → 64-4 (engagement normalization) → 64-5 (ranked push); parallel: 64-6 (NewsAPI tightening), 64-7 (arXiv env fix)
+
+**Out of scope:** GitHub/Reddit/RSS adapters (Epic 65), dashboard UI feed rendering, vault-semantic personal relevance
+
+**Origin:** `sprint-change-proposal-2026-06-08.md` (approved 2026-06-08)
+
+### Epic 65: Native Source Adapter Expansion v1
+
+**Goal:** CNS-native Node/TypeScript adapters for GitHub, Reddit (public-JSON spike first), and curated RSS/Substack. Reference `last30days-skill` logic only — never install, import, or subprocess-call.
+
+**Repo:** Omnipotent.md
+
+**Stories:** 65-1 GitHub adapter, 65-2 Reddit spike, 65-3 Reddit adapter (or credential fallback), 65-4 RSS adapter, 65-5 HN scoring upgrade (optional)
+
+**Constraints:** `resolveOperatorHome()` everywhere; fixture-tested; `verify.sh` gate; config in `~/.hermes/trend-ingest.env`
+
+**Origin:** `sprint-change-proposal-2026-06-08.md` (approved 2026-06-08)
+
+### Epic 66: Nexus Agent Orchestration (deferred from Epic 63)
+
+**Goal:** Hermes wiring for Intelligence Inspector AI actions, Agent Orchestration Workspace (Screen 10), `investigationSessions` table.
+
+**Repo:** cns-dashboard (primary) + Omnipotent.md (Hermes skills)
+
+**Priority:** Backlog behind Epic 64/65. Epic 63 shipped 2026-06-08 — no open dependency on 63.
+
+**Origin:** Previously "Epic 64+" in `sprint-change-proposal-2026-06-06.md`; renumbered per `sprint-change-proposal-2026-06-08.md` (approved 2026-06-08)

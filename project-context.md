@@ -11,10 +11,17 @@ Lean implementation rules for AI agents. Normative specs live in `specs/cns-vaul
 - **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v2.1.5)
 - **cns-dashboard** — Layer 3 SvelteKit + Convex dashboard; sibling at `../cns-dashboard`
 
+## Nexus intelligence principle
+
+> `last30days` is a codebook, not a dependency. CNS owns every adapter it runs,
+> in Node, with every signal scored for personal relevance — not just market motion.
+
+Reference clone (read-only): `~/ai-factory/projects/last30days-skill-reference`. Never install, import, or subprocess-call in CNS builds.
+
 ## Phase status
 
-- Omnipotent.md: Phase 6 complete; Epics 1–37 done; Epics 38 + 43 in progress
-- cns-dashboard: Epics 1–45 done; Epic 46 (Trend Intelligence UI) in progress
+- Omnipotent.md: Phase 6 complete; Epics 1–63 done; Epic 64 (Intelligence Scoring Engine v1) backlog; Epic 65 (Native Source Adapters v1) backlog; Epic 66 (Agent Orchestration) backlog
+- cns-dashboard: Epics 1–48 done; Epic 63 (Nexus Intelligence Cockpit UI) done; Epic 64 schema extension (64-1) backlog
 
 ## Repo layout (this repo)
 
