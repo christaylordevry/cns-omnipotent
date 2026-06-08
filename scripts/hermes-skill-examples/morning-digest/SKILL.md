@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, HackerNews top stories, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.4.1
+version: 1.4.2
 author: CNS Operator
 license: MIT
 metadata:
@@ -43,8 +43,9 @@ If the reference is not loaded, call `skill_view` first, then follow `references
 7. Build trend/headline/arxiv/hackernews signals; run `pick-signal-notebook.mjs`; on ROUTED, run `query-notebook.mjs` from `notebook-query/scripts/` (see task-prompt Source 6).
 8. Post the final `🌅 **Morning Digest**` contract even when one source fails.
 9. After posting, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (telemetry + optional warning; see task-prompt post-post).
-10. After posting (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt digest Convex push).
-11. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same shell-quoted `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt keyword candidates push).
+10. After posting (all runs), invoke `terminal(..., timeout=30)` for `score-digest-signals.mjs`, capture stdout, parse `scored_signals = JSON.parse(stdout.trim())`, and assign `digest_push_payload.signals = scored_signals` when valid (see task-prompt §9).
+11. After scoring (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with post-scoring `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt digest Convex push).
+12. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same post-scoring shell-quoted `DIGEST_PUSH_JSON` (fire-and-forget; see task-prompt keyword candidates push).
 
 The final reply must use the task-prompt headings exactly: `🌅 **Morning Digest**`, `**Trending Now**`, `**Headlines**`, `**Deep Signal**`, `**arXiv Preprints**`, `**HackerNews**`, `**Vault context**`, and `**Recommended focus:**`. Never invent trends or headlines when a tool fails.
 
@@ -61,8 +62,9 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 7. HackerNews: call `terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)`. Parse `stories[]` or show `- (source unavailable: <short reason>)` under **HackerNews**.
 8. Vault context: record `digest_start_ms` at task start; after Source 5, run `pick-signal-notebook.mjs` with shell-quoted `DIGEST_SOURCES_JSON` (trends + headlines + Perplexity Deep Signal text + arxiv + hackernews), then `query-notebook.mjs` when routed (same-command `QUERY_SCRIPT` plus shell-quoted env values; remaining_s cap per task-prompt). Partial failure → unavailable bullet only in Vault context.
 9. After posting the digest, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (emit `notebook_query_log`; warning on `failed`|`timeout` only; does not alter the digest).
-10. After posting (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with shell-quoted `DIGEST_PUSH_JSON` (emit `digest_convex_push`; failures silent to operator).
-11. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same shell-quoted `DIGEST_PUSH_JSON` (emit `keyword_candidates_push`; failures silent to operator).
+10. After posting (all runs), invoke `terminal(..., timeout=30)` for `score-digest-signals.mjs`, capture stdout, and replace `digest_push_payload.signals` with parsed scored output before push (see task-prompt §9).
+11. After scoring (all runs), invoke `terminal(..., timeout=45)` for `push-digest-convex.mjs` with post-scoring shell-quoted `DIGEST_PUSH_JSON` (emit `digest_convex_push`; failures silent to operator).
+12. After digest Convex push (all runs), invoke `terminal(..., timeout=45)` for `push-keyword-candidates.mjs` with the same post-scoring shell-quoted `DIGEST_PUSH_JSON` (emit `keyword_candidates_push`; failures silent to operator).
 
 Output exactly:
 
@@ -137,6 +139,7 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 
 ## Pitfalls
 
+- **Scoring stdout threading (§9):** After `score-digest-signals.mjs` returns, you **must** capture stdout, parse `scored_signals = JSON.parse(stdout.trim())`, and assign `digest_push_payload.signals = scored_signals` before building `DIGEST_PUSH_JSON` for push or keyword-candidates. Do not pass pre-scoring signals when scoring stdout parsed successfully.
 - When reproducing or testing `pick-signal-notebook.mjs`, use an absolute registry path. Relative `CNS_NOTEBOOK_REGISTRY_PATH` values can resolve against the repo root unexpectedly.
 - When registry rows have UUID-only titles (common with `NOTEBOOKLM_NOTEBOOK_IDS` fan-out), set `NOTEBOOKLM_NOTEBOOK_TITLES` in `~/.hermes/trend-ingest.env` so signal scoring can F1-match human titles.
 - Isolated routing tests should clear inherited digest payload env such as `DIGEST_SOURCES_JSON`; otherwise the scorer can behave like it is being run in a full digest pipeline.

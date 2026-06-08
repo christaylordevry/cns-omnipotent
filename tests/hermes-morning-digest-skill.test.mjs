@@ -35,7 +35,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.1"));
+    assert.ok(body.includes("version: 1.4.2"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -451,6 +451,33 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(postPost.includes("timeout=30"));
   });
 
+  it("task-prompt documents imperative scoring stdout threading (Story 64-8)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const postPost = taskBody.slice(
+      taskBody.indexOf("## Post-post — Push digest entities to Convex"),
+    );
+    assert.ok(postPost.includes("scored_signals"));
+    assert.ok(postPost.includes("digest_push_payload.signals = scored_signals"));
+    assert.ok(postPost.includes("JSON.parse"));
+    assert.ok(postPost.includes("score_stdout"));
+    assert.ok(
+      postPost.includes(
+        "Do not pass pre-scoring `digest_push_payload.signals` to `push-digest-convex.mjs`",
+      ),
+    );
+    const scoringIdx = postPost.indexOf("Score signals before push");
+    const pushIdx = postPost.indexOf("push-digest-convex.mjs");
+    assert.ok(scoringIdx >= 0 && pushIdx > scoringIdx);
+    assert.ok(postPost.includes("keyword candidates terminal (same post-scoring payload)"));
+  });
+
+  it("SKILL.md documents scoring stdout threading guardrail (Story 64-8)", () => {
+    const body = readFileSync(skillPath, "utf8");
+    assert.ok(body.includes("Scoring stdout threading"));
+    assert.ok(body.includes("digest_push_payload.signals = scored_signals"));
+    assert.ok(body.includes("score-digest-signals.mjs"));
+  });
+
   it("task-prompt documents post-post keyword candidates push after digest push (Story 62-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const digestIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");
@@ -484,7 +511,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.1"));
+    assert.ok(body.includes("version: 1.4.2"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));

@@ -411,6 +411,8 @@ The `addDigestSignal` validator is a **strict** object: a missing required key *
 }
 ```
 
+> **Note:** `rank`, `rankScore`, `scores`, `disposition`, and `normalizedEngagement` appear on signals **after** the scoring step below — the example shows pre-scoring section-order `rank` only.
+
 Every entry in `signals[]` MUST carry both `section` and `sourceType` (see the strict-schema contract above). Optional keys with no value are **omitted**, never `null`.
 
 `ranAt` must be the numeric `digest_start_ms` from task start (Unix ms) — never a string.
@@ -447,10 +449,28 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 | `DIGEST_NOVELTY_HISTORY_JSON` | Prior digest titles for novelty scoring — prefer **`{ title, sourceType, seenAt? }[]`** when history is available, e.g. `[{"title":"Prior HN story","sourceType":"hackernews","seenAt":1749000000000}]`; legacy `string[]` still accepted |
 | `DIGEST_RUN_AT` | Same numeric `digest_start_ms` as `run.ranAt` |
 
-**After terminal returns:**
+**After the scoring terminal returns** (mandatory stdout threading — mirror Source 6 pick/query stdout patterns):
 
-1. Parse stdout as a JSON array. On valid parse → replace `digest_push_payload.signals` with the scored array (sorted by `rankScore` desc, `rank` 1..N).
-2. On scoring failure, empty stdout, or invalid JSON → **continue with unscored signals** (architecture §9 degraded mode); push still fires (fire-and-forget).
+1. Let `score_stdout` = scoring terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `scored_signals = JSON.parse(score_stdout)`.
+3. If `Array.isArray(scored_signals) && scored_signals.length > 0`:
+   - `digest_push_payload.signals = scored_signals` (replace the entire array; do not merge).
+4. Else (empty stdout, invalid JSON, or `[]`):
+   - keep existing unscored `digest_push_payload.signals` (architecture §9 degraded mode).
+5. Do **not** call `JSON.stringify(digest_push_payload)` for push until step 3 or 4 completes.
+6. **Anti-pattern:** Do not pass pre-scoring `digest_push_payload.signals` to `push-digest-convex.mjs` when step 3 assigned scored signals.
+
+**Pipeline order (fixed):**
+
+```text
+build digest_push_payload (unscored signals)
+  → scoring terminal
+  → capture stdout → digest_push_payload.signals = scored_signals
+  → push terminal (DIGEST_PUSH_JSON uses post-scoring payload)
+  → keyword candidates terminal (same post-scoring payload)
+```
+
+`DIGEST_PUSH_JSON` in the push command must reference `digest_push_payload` **after** signal replacement — not a stale copy from before scoring.
 
 The script always exits **0**. Stderr warnings use prefix `score-digest-signals:`.
 
@@ -493,7 +513,7 @@ Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push f
 
 > **REQUIRED §10 — part 2 of 2 of the completion gate.** The skill is **complete only after this call fires.** Same mandatory posture as §9: invoke on **every** run (success or partial failure), fire-and-forget **result** only (exit 0, no Discord warning).
 
-Run **immediately after** the digest Convex push terminal call (`push-digest-convex.mjs`). Reuse the **same** `digest_push_payload` — do not rebuild or query Convex.
+Run **immediately after** the digest Convex push terminal call (`push-digest-convex.mjs`). Reuse the **same** `digest_push_payload` from **after** scoring stdout replacement (§9) — do not rebuild or query Convex.
 
 ### Terminal invocation (REQUIRED — part 2 of 2 completion gate)
 
