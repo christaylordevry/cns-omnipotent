@@ -11,7 +11,7 @@ blocks: 64-2, 64-3, 64-4, 64-5
 
 # Story 64.1: digestSignals schema extension for per-signal scores
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -347,3 +347,8 @@ Composer (Cursor Agent)
 ### Change Log
 
 - 2026-06-09: Story 64-1 — digestSignals schema extension (scores, disposition, rankScore, sourceMetadata engagement); cross-repo validators + push contract docs.
+
+### Review Findings
+
+- [x] [Review][Patch] Tied `rankScore` sort fallback untested [`cns-dashboard/tests/convex/digest.test.ts`] — added tied-rankScore fixture; lower legacy `rank` sorts first per §3.3.
+- [x] [Review][Patch] Query mapper omits full scored-field assertion [`cns-dashboard/tests/convex/digest.test.ts`] — happy-path test now asserts all four scored fields via `getDigestSignalsForRun` query response.
