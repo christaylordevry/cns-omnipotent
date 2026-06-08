@@ -20,7 +20,39 @@ afterEach(async () => {
 	tempDirs = [];
 });
 
-function basePayload() {
+function basePayload({ scored = false } = {}) {
+	const hackernewsSignal = scored
+		? {
+				section: 'hackernews',
+				sourceType: 'hackernews',
+				title: 'Show HN: Agent framework',
+				url: 'https://news.ycombinator.com/item?id=48408186',
+				score: 142,
+				rank: 1,
+				externalId: '48408186',
+				sourceMetadata: { points: 142, commentCount: 38 },
+				scores: {
+					relevance: 72,
+					personalRelevance: 85,
+					novelty: 90,
+					momentum: 55,
+					urgency: 40,
+				},
+				disposition: 'priority',
+				normalizedEngagement: 61,
+				rankScore: 78,
+			}
+		: {
+				section: 'hackernews',
+				sourceType: 'hackernews',
+				title: 'Show HN: Example',
+				url: 'https://news.ycombinator.com/item?id=48408186',
+				score: 142,
+				rank: 1,
+				externalId: '48408186',
+				sourceMetadata: { comments: 12 },
+			};
+
 	return {
 		run: {
 			date: '2026-06-05',
@@ -37,16 +69,7 @@ function basePayload() {
 				rank: 1,
 				externalId: 'a1b2c3d4',
 			},
-			{
-				section: 'hackernews',
-				sourceType: 'hackernews',
-				title: 'Show HN: Example',
-				url: 'https://news.ycombinator.com/item?id=48408186',
-				score: 142,
-				rank: 1,
-				externalId: '48408186',
-				sourceMetadata: { comments: 12 },
-			},
+			hackernewsSignal,
 		],
 	};
 }
@@ -80,6 +103,42 @@ describe('push-digest-convex.mjs', () => {
 		const second = shortSha256Hex('AI agents', '2026-06-05');
 		assert.equal(first, second);
 		assert.equal(first.length, 16);
+	});
+
+	it('passes scored signal fields through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(basePayload({ scored: true })) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-scored' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.status, 'ok');
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
+		assert.ok(scoredSignal, 'expected scored HN signal in addDigestSignal calls');
+		assert.deepEqual(scoredSignal.args.signal.scores, {
+			relevance: 72,
+			personalRelevance: 85,
+			novelty: 90,
+			momentum: 55,
+			urgency: 40,
+		});
+		assert.equal(scoredSignal.args.signal.disposition, 'priority');
+		assert.equal(scoredSignal.args.signal.normalizedEngagement, 61);
+		assert.equal(scoredSignal.args.signal.rankScore, 78);
+		assert.deepEqual(scoredSignal.args.signal.sourceMetadata, {
+			points: 142,
+			commentCount: 38,
+		});
 	});
 
 	it('posts create → add × N → finalize in order on happy path', async () => {

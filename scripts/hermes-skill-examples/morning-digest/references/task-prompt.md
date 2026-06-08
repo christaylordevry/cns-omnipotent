@@ -356,8 +356,12 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 | `arxiv` | `arxiv` | Source 4 `papers[]` | `title` | `snippet` | `link` | — | arxiv id from link (`/\d+\.\d+`) or link hash |
 | `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
 
-- `rank`: 1-based index within each section in display order.
-- `sourceMetadata`: HN `comments` (number), arXiv `categories` (array of strings from `category`) when present.
+- `rank`: 1-based index within each section in display order (legacy ordering; Epic 64 scoring stories will assign `rank` from `rankScore` sort in 64-5).
+- `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
+  - HN: map RSS `score` → `points` (number); RSS `comments` → `commentCount` (number). Legacy `sourceMetadata.comments` remains accepted by validators but prefer `points` + `commentCount` for engagement normalization (64-4).
+  - arXiv: `categories` (array of strings from `category`) when present.
+  - GitHub/Reddit (future): `stars`, `forks`, `upvotes` when present.
+- **Scoring fields (optional until 64-5 populates them):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Morning digest v1 pushes **unscored** signals — omit these keys entirely until the scoring pipeline runs.
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
 
@@ -367,8 +371,8 @@ The `addDigestSignal` validator is a **strict** object: a missing required key *
 
 - **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
 - **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal`.
-- **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
-- **Types:** `rank` and `score` are **numbers** (not strings); `sourceMetadata.comments` is a **number**; `sourceMetadata.categories` is an **array of strings**.
+- **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`, `scores`, `disposition`, `normalizedEngagement`, `rankScore`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
+- **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
 - Do **not** add any key not listed in the table / this contract.
 
 ### `digest_push_payload` shape
@@ -401,7 +405,7 @@ The `addDigestSignal` validator is a **strict** object: a missing required key *
       "score": 142,
       "rank": 1,
       "externalId": "<hn id>",
-      "sourceMetadata": { "comments": 12 }
+      "sourceMetadata": { "points": 142, "commentCount": 12 }
     }
   ]
 }
