@@ -36,28 +36,7 @@ if [[ -z "${NEWSAPI_API_KEY:-}" ]]; then
   exit 0
 fi
 
-python3 - <<'PY'
-import json, os, urllib.parse, urllib.request
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-key = os.environ.get("NEWSAPI_API_KEY", "")
-params = urllib.parse.urlencode({
-    "q": "(\"artificial intelligence\" OR \"AI agents\" OR automation) AND NOT sports",
-    "sortBy": "publishedAt",
-    "pageSize": "5",
-    "language": "en",
-    "apiKey": key,
-})
-try:
-    with urllib.request.urlopen("https://newsapi.org/v2/everything?" + params, timeout=20) as r:
-        payload = json.loads(r.read().decode())
-except Exception as exc:
-    print(json.dumps({"error": type(exc).__name__}))
-    raise SystemExit(0)
-
-if payload.get("status") != "ok":
-    print(json.dumps({"error": payload.get("code") or "newsapi error"}))
-    raise SystemExit(0)
-
-headlines = [a.get("title","").strip() for a in payload.get("articles",[]) if a.get("title","").strip()]
-print(json.dumps({"headlines": headlines[:5]}))
-PY
+exec node "$REPO_ROOT/scripts/hermes-skill-examples/morning-digest/scripts/fetch-newsapi-headlines.mjs"

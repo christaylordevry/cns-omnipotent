@@ -17,6 +17,7 @@ const arxivWrapperPath = join(root, "scripts/session-close/hermes-run-arxiv.sh")
 const hnWrapperPath = join(root, "scripts/session-close/hermes-run-hn.sh");
 const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const fetchHnScriptPath = join(skillDir, "scripts/fetch-hn-rss.mjs");
+const fetchNewsapiScriptPath = join(skillDir, "scripts/fetch-newsapi-headlines.mjs");
 const pickSignalScriptPath = join(
   skillDir,
   "scripts/pick-signal-notebook.mjs",
@@ -34,7 +35,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.3.0"));
+    assert.ok(body.includes("version: 1.4.1"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -198,6 +199,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(existsSync(hnWrapperPath));
     assert.ok(existsSync(fetchArxivScriptPath));
     assert.ok(existsSync(fetchHnScriptPath));
+    assert.ok(existsSync(fetchNewsapiScriptPath));
 
     assert.ok((statSync(trendIngestWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(newsapiWrapperPath).mode & 0o111) !== 0);
@@ -212,7 +214,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(trendIngestWrapper.includes("--sources google_trends"));
     assert.ok(newsapiWrapper.includes("$HOME/.hermes/trend-ingest.env"));
     assert.ok(newsapiWrapper.includes("NEWSAPI_API_KEY"));
+    assert.ok(newsapiWrapper.includes("fetch-newsapi-headlines.mjs"));
+    assert.ok(!newsapiWrapper.includes("python3 - <<'PY'"));
     assert.ok(arxivWrapper.includes("fetch-arxiv-rss.mjs"));
+    assert.ok(arxivWrapper.includes(".hermes/home"));
+    assert.ok(arxivWrapper.includes('export HOME="$OPERATOR_HOME"'));
     assert.ok(hnWrapper.includes("fetch-hn-rss.mjs"));
   });
 
@@ -385,6 +391,29 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("trend-ingest.env"));
   });
 
+  it("task-prompt Source 2 NewsAPI tightening (Story 64-6)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source2End = taskBody.indexOf("## Source 3");
+    const source2 = taskBody.slice(taskBody.indexOf("## Source 2"), source2End);
+
+    assert.ok(source2.includes("fetch-newsapi-headlines.mjs"));
+    assert.ok(source2.includes("searchIn=title,description"));
+    assert.ok(source2.includes("MORNING_DIGEST_NEWSAPI_WINDOW_HOURS"));
+    assert.ok(source2.includes('"url"'));
+    assert.ok(source2.includes("isOnTopicHeadline"));
+    assert.ok(!source2.includes('automation) AND NOT sports'));
+  });
+
+  it("config-snippet documents NewsAPI env keys (Story 64-6)", () => {
+    const body = readFileSync(configSnippetPath, "utf8");
+    assert.ok(body.includes("MORNING_DIGEST_NEWSAPI_WINDOW_HOURS"));
+    assert.ok(body.includes("MORNING_DIGEST_NEWSAPI_MAX_HEADLINES"));
+    assert.ok(body.includes("MORNING_DIGEST_NEWSAPI_PAGE_SIZE"));
+    assert.ok(body.includes("MORNING_DIGEST_NEWSAPI_QUERY"));
+    assert.ok(body.includes("MORNING_DIGEST_NEWSAPI_ENABLED"));
+    assert.ok(body.includes("newsapi disabled"));
+  });
+
   it("config-snippet documents HN env keys (Story 61-4)", () => {
     const body = readFileSync(configSnippetPath, "utf8");
     assert.ok(body.includes("MORNING_DIGEST_HN_MAX_STORIES"));
@@ -422,9 +451,26 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(candidatesSection.includes("timeout=45"));
   });
 
+  it("trend-ingest.env.example documents arXiv env keys (Story 64-7)", () => {
+    const body = readFileSync(join(root, "scripts/trend-ingest.env.example"), "utf8");
+    assert.ok(body.includes("MORNING_DIGEST_ARXIV_CATEGORIES"));
+    assert.ok(body.includes("MORNING_DIGEST_ARXIV_MAX_PER_CATEGORY"));
+    assert.ok(body.includes("MORNING_DIGEST_ARXIV_ENABLED"));
+    assert.ok(body.includes("cs.AI,cs.LG,stat.ML"));
+  });
+
+  it("task-prompt Source 4 documents arXiv defaults and escape hatch (Story 64-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source4End = taskBody.indexOf("## Source 5");
+    const source4 = taskBody.slice(taskBody.indexOf("## Source 4"), source4End);
+    assert.ok(source4.includes("cs.AI,cs.LG,stat.ML"));
+    assert.ok(source4.includes("MORNING_DIGEST_ARXIV_USE_DEFAULTS=0"));
+    assert.ok(source4.includes("categories not configured"));
+  });
+
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.3.0"));
+    assert.ok(body.includes("version: 1.4.1"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));

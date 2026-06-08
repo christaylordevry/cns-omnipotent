@@ -69,13 +69,28 @@ terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=res
 
 Load `NEWSAPI_API_KEY` from that path only. **Do not** use repo-relative or cwd-relative env paths.
 
-Request (one call per digest):
+Request (one call per digest; implemented in `fetch-newsapi-headlines.mjs`):
 
 - Endpoint: `https://newsapi.org/v2/everything`
-- Query: `q=("artificial intelligence" OR "AI agents" OR automation) AND NOT sports`
-- Params: `sortBy=publishedAt`, `pageSize=5`, `language=en`
+- Query (`q`): CNS-focused OR group — `"artificial intelligence"`, `"AI agents"`, `"large language model"`, `LLM`, `"agentic AI"`, `MCP`, `"knowledge management"`, `"AI assistant"` — **without** bare `automation`; excludes `sports`, `celebrity`, `"reality TV"`, `"stock market"`, `cryptocurrency`, `bitcoin`, `ethereum`
+- Params: `searchIn=title,description`, `sortBy=publishedAt`, `language=en`, `from=<rolling window ISO 8601>`, `pageSize=20` (fetch pool before client-side filter)
+- Rolling window: `MORNING_DIGEST_NEWSAPI_WINDOW_HOURS` (default **48**)
+- Post-fetch: client-side `isOnTopicHeadline` filter; cap at `MORNING_DIGEST_NEWSAPI_MAX_HEADLINES` (default **5**)
+- Optional override: `MORNING_DIGEST_NEWSAPI_QUERY` replaces the built-in `q`; `MORNING_DIGEST_NEWSAPI_ENABLED=0` skips the network call
 
-Emit up to **5** headline titles (title field only) under **Headlines**.
+Stdout shape:
+
+```json
+{
+  "headlines": [
+    { "title": "OpenAI ships new agent framework for developers", "url": "https://example.com/article" }
+  ]
+}
+```
+
+`url` is included when NewsAPI provides it; omit the key when absent (never `null`).
+
+Emit up to **5** headline **titles** under **Headlines** (use `title` from each object; `url` is for Convex `digestSignals` push only).
 
 On failure (missing key, HTTP error, empty results): `- (source unavailable: <short reason>)` and **continue** to Source 3.
 
@@ -97,6 +112,8 @@ Call `terminal` exactly once for arXiv RSS (no API key). The script reads `MORNI
 terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
+When `MORNING_DIGEST_ARXIV_CATEGORIES` is unset or empty, the script applies documented defaults: **`cs.AI,cs.LG,stat.ML`**. Operators who want empty categories to fail instead of defaulting can set `MORNING_DIGEST_ARXIV_USE_DEFAULTS=0` (returns `{"error":"categories not configured"}`).
+
 Parse stdout JSON:
 
 - `papers[]` with `category`, `title`, `link`, `snippet`, `pubDate`.
@@ -104,7 +121,7 @@ Parse stdout JSON:
 
 For Discord **arXiv Preprints**, list each paper as `- <title> — <snippet>` (single line). Parenthetical after the heading: configured category codes (e.g. `cs.AI, cs.LG`) or `(configured categories)` when unknown.
 
-On failure (`error` key, empty `papers`, or invalid stdout): section header **arXiv Preprints** + `- (source unavailable: <short reason>)` and **continue** to Source 5.
+On failure (`error` key, empty `papers`, or invalid stdout): section header **arXiv Preprints** + `- (source unavailable: <short reason>)` and **continue** to Source 5. Map `error: categories not configured` → `- (source unavailable: categories not configured)`.
 
 ## Source 5 — HackerNews
 
@@ -134,7 +151,7 @@ After Sources 1–5 complete, assemble a JSON object from parsed tool outputs (s
 ```json
 {
   "trends": [{ "keyword": "<string>", "normalizedValue": <number> }],
-  "headlines": [{ "title": "<string>" }],
+  "headlines": [{ "title": "<string>", "url": "<optional url>" }],
   "perplexityText": "<Deep Signal body text only — not the Perplexity query string>",
   "arxiv": [{ "title": "<string>", "snippet": "<string>" }],
   "hackernews": [{ "title": "<string>" }]

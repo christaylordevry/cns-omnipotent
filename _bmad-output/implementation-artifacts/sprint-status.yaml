@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-06T12:00:00+10:00
+# last_updated: 2026-06-08T12:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-05T22:05:00+10:00"
+last_updated: "2026-06-08T23:45:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -424,5 +424,31 @@ development_status:
   61-5-morning-digest-convex-push: done
 
   # Epic 62 — Signal Seeds (Phase 1 — keyword candidates data layer)
-  epic-62: in-progress
+  epic-62: done
   62-1-keyword-candidates-from-digest-signals: done
+  epic-62-retrospective: optional
+
+  # Epic 63 — Nexus Intelligence Cockpit UI (cns-dashboard; sprint-change-proposal-2026-06-06)
+  epic-63: done
+  63-1-new-sveltekit-shell-foundation: done
+  63-2-p0-convex-mutations-seed-accept-dismiss: done
+  63-3-signal-seeds-chip-rail: done
+  63-4-hero-trajectory-chart-anomaly-feed: done
+  63-5-intelligence-inspector-drawer: done
+  63-6-polish-pass-digest-read-queries: done
+  63-7-visual-polish-pass-stitch-designs: done
+  epic-63-retrospective: optional
+
+  # Epic 64 — Intelligence Scoring Engine v1 (cross-repo: cns-dashboard schema + Omnipotent.md digest scoring)
+  epic-64: in-progress
+  # Stories: 64-1 schema → 64-2 scoring (5 dims incl. personalRelevance) → 64-3 disposition → 64-4 normalization → 64-5 ranked push
+  # Parallel: 64-6 NewsAPI tightening, 64-7 arXiv env fix
+  64-6-newsapi-query-tightening: done
+  64-7-arxiv-env-fix: review
+
+  # Epic 65 — Native Source Adapter Expansion v1 (reference: last30days codebook only; Omnipotent.md)
+  epic-65: backlog
+  # Stories: 65-1 GitHub → 65-2 Reddit spike → 65-3 Reddit adapter → 65-4 RSS → 65-5 HN optional
+
+  # Epic 66 — Nexus Agent Orchestration (renumbered from sprint-change-proposal-2026-06-06 Epic 64+)
+  epic-66: backlog
