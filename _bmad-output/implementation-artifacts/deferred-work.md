@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 64-2-scoring-engine-five-dimensions (2026-06-09)
+
+- Novelty rule 65 (same `sourceType` in history) unreachable when `DIGEST_NOVELTY_HISTORY_JSON` is normative `string[]` without `sourceType` — scores 90 instead of 65 until 64-5 orchestration enriches history entries; object[] path tested in 64-2.
+
 ## Deferred from: code review of 64-7-arxiv-env-fix (2026-06-08)
 
 - Unreachable `{ papers: [] }` fallback in `runArxivFetch` after defaults populate categories in `loadArxivConfig` — harmless dead code at `fetch-arxiv-rss.mjs:333`.
