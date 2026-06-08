@@ -10,11 +10,19 @@ import {
   deriveDisposition,
   extractSprintTokens,
   f1Score,
+  GH_FORKS_CAP,
+  GH_STARS_CAP,
+  HN_COMMENTS_CAP,
+  HN_POINTS_CAP,
   loadScoringContext,
+  logNorm,
+  normalizeEngagement,
   overlapRatio,
   parseDevelopmentStatus,
   parseNoveltyHistoryJson,
   parseWatchlistYaml,
+  RD_COMMENTS_CAP,
+  RD_UPVOTES_CAP,
   recencyScore,
   scoreMomentum,
   scoreNovelty,
@@ -297,6 +305,171 @@ describe('scoreUrgency', () => {
   });
 });
 
+describe('logNorm and cap constants', () => {
+  it('exports normative §6.1 cap constants', () => {
+    assert.equal(HN_POINTS_CAP, 500);
+    assert.equal(HN_COMMENTS_CAP, 200);
+    assert.equal(GH_STARS_CAP, 50000);
+    assert.equal(GH_FORKS_CAP, 5000);
+    assert.equal(RD_UPVOTES_CAP, 10000);
+    assert.equal(RD_COMMENTS_CAP, 2000);
+  });
+
+  it('logNorm returns 0 for zero value', () => {
+    assert.equal(logNorm(0, 500), 0);
+    assert.equal(logNorm(0, 50000), 0);
+  });
+
+  it('logNorm treats negative and non-finite values as 0', () => {
+    assert.equal(logNorm(-10, 500), 0);
+    assert.equal(logNorm(Number.NaN, 500), 0);
+    assert.equal(logNorm(Number.POSITIVE_INFINITY, 500), 0);
+  });
+
+  it('logNorm returns 100 at cap saturation', () => {
+    assert.equal(logNorm(500, 500), 100);
+    assert.equal(logNorm(50000, 50000), 100);
+    assert.equal(logNorm(10000, 10000), 100);
+  });
+});
+
+describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
+  it('hackernews at points/comments cap → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'HN cap story',
+        sourceType: 'hackernews',
+        sourceMetadata: { points: 500, commentCount: 200 },
+      }),
+      100,
+    );
+  });
+
+  it('github at stars/forks cap → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'GH cap repo',
+        sourceType: 'github',
+        sourceMetadata: { stars: 50000, forks: 5000 },
+      }),
+      100,
+    );
+  });
+
+  it('reddit at upvotes/comments cap → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'RD cap post',
+        sourceType: 'reddit',
+        sourceMetadata: { upvotes: 10000, commentCount: 2000 },
+      }),
+      100,
+    );
+  });
+
+  it('hackernews at zero engagement → 0', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'HN zero story',
+        sourceType: 'hackernews',
+        sourceMetadata: { points: 0, commentCount: 0 },
+      }),
+      0,
+    );
+  });
+});
+
+describe('normalizeEngagement §6.2 cross-source calibration', () => {
+  it('primary-only raw 500 yields hn=80 and gh=48 — not shared scale', () => {
+    const hn = normalizeEngagement({
+      title: 'HN cap story',
+      sourceType: 'hackernews',
+      sourceMetadata: { points: 500 },
+    });
+    const gh = normalizeEngagement({
+      title: 'GH repo',
+      sourceType: 'github',
+      sourceMetadata: { stars: 500 },
+    });
+
+    assert.notEqual(hn, gh);
+    assert.equal(hn, 80);
+    assert.equal(gh, 48);
+    assert.ok(hn >= 51 && hn <= 85);
+    assert.ok(gh < hn);
+  });
+});
+
+describe('normalizeEngagement omit-null sources', () => {
+  it('returns null for newsapi, arxiv, deep_signal, google_trends', () => {
+    assert.equal(
+      normalizeEngagement({ title: 'News', sourceType: 'newsapi' }),
+      null,
+    );
+    assert.equal(
+      normalizeEngagement({ title: 'Paper', sourceType: 'arxiv' }),
+      null,
+    );
+    assert.equal(
+      normalizeEngagement({ title: 'Deep', sourceType: 'deep_signal' }),
+      null,
+    );
+    assert.equal(
+      normalizeEngagement({
+        title: 'Trend',
+        sourceType: 'google_trends',
+        sourceMetadata: { normalizedValue: 0.9 },
+      }),
+      null,
+    );
+  });
+
+  it('returns null when primary engagement field is absent', () => {
+    assert.equal(
+      normalizeEngagement({ title: 'HN no points', sourceType: 'hackernews' }),
+      null,
+    );
+    assert.equal(
+      normalizeEngagement({ title: 'GH no stars', sourceType: 'github' }),
+      null,
+    );
+    assert.equal(
+      normalizeEngagement({ title: 'RD no upvotes', sourceType: 'reddit' }),
+      null,
+    );
+  });
+
+  it('uses 0 for missing secondary fields when primary is present', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'HN points only',
+        sourceType: 'hackernews',
+        sourceMetadata: { points: 500 },
+      }),
+      80,
+    );
+    assert.equal(
+      normalizeEngagement({
+        title: 'GH stars only',
+        sourceType: 'github',
+        sourceMetadata: { stars: 500 },
+      }),
+      48,
+    );
+  });
+
+  it('does not alias legacy comments field to commentCount', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'HN legacy comments',
+        sourceType: 'hackernews',
+        sourceMetadata: { points: 500, comments: 200 },
+      }),
+      80,
+    );
+  });
+});
+
 describe('scoreMomentum', () => {
   it('uses Path B static priors when normalizedEngagement is absent', () => {
     assert.equal(
@@ -339,6 +512,38 @@ describe('scoreMomentum', () => {
     );
     assert.equal(withRaw, withoutRaw);
     assert.equal(withRaw, clamp(Math.round(0.75 * 80 + 0.25 * trendProxyForSignal(signal)), 0, 100));
+  });
+
+  it('normalizeEngagement output drives Path A momentum (HN cap → 86)', () => {
+    const signal = {
+      title: 'HN cap story',
+      sourceType: 'hackernews',
+      sourceMetadata: { points: 500, commentCount: 200 },
+    };
+    const norm = normalizeEngagement(signal);
+    assert.equal(norm, 100);
+    assert.equal(scoreMomentum(signal, norm, baseCtx()), 86);
+  });
+
+  it('null normalizedEngagement preserves Path B for non-engagement sources', () => {
+    const newsapi = { title: 'News headline', sourceType: 'newsapi' };
+    const arxiv = { title: 'arXiv paper', sourceType: 'arxiv' };
+    const deep = { title: 'Deep signal', sourceType: 'deep_signal' };
+    const trends = {
+      title: 'Trend spike',
+      sourceType: 'google_trends',
+      sourceMetadata: { normalizedValue: 0.82 },
+    };
+
+    assert.equal(normalizeEngagement(newsapi), null);
+    assert.equal(normalizeEngagement(arxiv), null);
+    assert.equal(normalizeEngagement(deep), null);
+    assert.equal(normalizeEngagement(trends), null);
+
+    assert.equal(scoreMomentum(newsapi, normalizeEngagement(newsapi), baseCtx()), 35);
+    assert.equal(scoreMomentum(arxiv, normalizeEngagement(arxiv), baseCtx()), 25);
+    assert.equal(scoreMomentum(deep, normalizeEngagement(deep), baseCtx()), 50);
+    assert.equal(scoreMomentum(trends, normalizeEngagement(trends), baseCtx()), 82);
   });
 });
 

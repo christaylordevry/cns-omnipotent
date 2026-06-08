@@ -446,7 +446,7 @@ development_status:
   64-1-digest-signals-schema-extension: done
   64-2-scoring-engine-five-dimensions: done
   64-3-derived-disposition: done
-  64-4-engagement-normalization: backlog
+  64-4-engagement-normalization: done
   64-5-ranked-push-integration: backlog
   64-6-newsapi-query-tightening: done
   64-7-arxiv-env-fix: done

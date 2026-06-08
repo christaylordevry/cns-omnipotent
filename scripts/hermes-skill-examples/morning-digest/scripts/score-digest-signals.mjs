@@ -1,5 +1,5 @@
-// score-digest-signals.mjs — Epic 64 dimension scoring (Stories 64-2, 64-3)
-// Computes five independent 0–100 dimension scores and derived disposition for digest signals.
+// score-digest-signals.mjs — Epic 64 dimension scoring (Stories 64-2, 64-3, 64-4)
+// Computes five independent 0–100 dimension scores, engagement normalization, and derived disposition.
 
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -33,13 +33,21 @@ const TREND_PROXY_PRIOR = {
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit'} DigestSourceType */
 /**
- * @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal'} DigestSourceType
  * @typedef {{
  *   title: string,
  *   summary?: string,
  *   sourceType: DigestSourceType,
- *   sourceMetadata?: { publishedAt?: string, normalizedValue?: number },
+ *   sourceMetadata?: {
+ *     publishedAt?: string,
+ *     normalizedValue?: number,
+ *     points?: number,
+ *     commentCount?: number,
+ *     stars?: number,
+ *     forks?: number,
+ *     upvotes?: number,
+ *   },
  * }} DigestSignal
  * @typedef {{
  *   title: string,
@@ -71,6 +79,79 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  */
 export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+/** Architecture §6.1 engagement caps — normative constants (anti-drift surface). */
+export const HN_POINTS_CAP = 500;
+export const HN_COMMENTS_CAP = 200;
+export const GH_STARS_CAP = 50000;
+export const GH_FORKS_CAP = 5000;
+export const RD_UPVOTES_CAP = 10000;
+export const RD_COMMENTS_CAP = 2000;
+
+/**
+ * Log-scaled normalization to 0–100 per architecture §6.1.
+ *
+ * @param {number} value
+ * @param {number} cap
+ * @returns {number}
+ */
+export function logNorm(value, cap) {
+  const v = Number.isFinite(value) && value > 0 ? value : 0;
+  if (cap <= 0) {
+    return 0;
+  }
+  const scaled = (100 * Math.log10(1 + v)) / Math.log10(1 + cap);
+  return Math.round(clamp(scaled, 0, 100));
+}
+
+/**
+ * Map per-source raw engagement onto a common 0–100 scale (FR-11).
+ * Raw fields read only here — ADR-E64-003: scoreMomentum consumes normalizedEngagement only.
+ *
+ * @param {DigestSignal} signal
+ * @returns {number | null}
+ */
+export function normalizeEngagement(signal) {
+  const meta = signal.sourceMetadata ?? {};
+  const commentCount = meta.commentCount;
+
+  switch (signal.sourceType) {
+    case 'hackernews': {
+      if (!Number.isFinite(meta.points)) {
+        return null;
+      }
+      return Math.round(
+        0.8 * logNorm(meta.points, HN_POINTS_CAP) +
+          0.2 * logNorm(commentCount, HN_COMMENTS_CAP),
+      );
+    }
+    case 'github': {
+      if (!Number.isFinite(meta.stars)) {
+        return null;
+      }
+      return Math.round(
+        0.85 * logNorm(meta.stars, GH_STARS_CAP) +
+          0.15 * logNorm(meta.forks, GH_FORKS_CAP),
+      );
+    }
+    case 'reddit': {
+      if (!Number.isFinite(meta.upvotes)) {
+        return null;
+      }
+      return Math.round(
+        0.75 * logNorm(meta.upvotes, RD_UPVOTES_CAP) +
+          0.25 * logNorm(commentCount, RD_COMMENTS_CAP),
+      );
+    }
+    case 'newsapi':
+    case 'arxiv':
+    case 'deep_signal':
+    case 'google_trends':
+      return null;
+    default:
+      return null;
+  }
 }
 
 /**
