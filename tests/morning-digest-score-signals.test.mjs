@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import {
   breakingBonus,
   clamp,
+  deriveDisposition,
   extractSprintTokens,
   f1Score,
   loadScoringContext,
@@ -338,6 +339,128 @@ describe('scoreMomentum', () => {
     );
     assert.equal(withRaw, withoutRaw);
     assert.equal(withRaw, clamp(Math.round(0.75 * 80 + 0.25 * trendProxyForSignal(signal)), 0, 100));
+  });
+});
+
+/**
+ * @param {{
+ *   relevance: number,
+ *   personalRelevance: number,
+ *   novelty?: number,
+ *   momentum?: number,
+ *   urgency: number,
+ * }} fixture
+ */
+function scoresFixture({ relevance, personalRelevance, novelty = 30, momentum = 30, urgency }) {
+  return { relevance, personalRelevance, novelty, momentum, urgency };
+}
+
+describe('deriveDisposition', () => {
+  it('exports deriveDisposition with architecture §7.1 case A — escalate via relevance >= 75', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 80, personalRelevance: 30, urgency: 80 }), 55),
+      'escalate',
+    );
+  });
+
+  it('architecture §7.1 case B — escalate via personalRelevance >= 60', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 40, personalRelevance: 65, urgency: 80 }), 60),
+      'escalate',
+    );
+  });
+
+  it('architecture §7.1 case C — priority when urgency below escalate threshold', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 70, personalRelevance: 55, urgency: 40 }), 72),
+      'priority',
+    );
+  });
+
+  it('architecture §7.1 case D — ignore when rankScore < 40 and max dimension < 50', () => {
+    assert.equal(
+      deriveDisposition(
+        scoresFixture({
+          relevance: 30,
+          personalRelevance: 30,
+          novelty: 20,
+          momentum: 25,
+          urgency: 20,
+        }),
+        35,
+      ),
+      'ignore',
+    );
+  });
+
+  it('architecture §7.1 case E — watch default for remaining signals', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 55, personalRelevance: 40, urgency: 50 }), 55),
+      'watch',
+    );
+  });
+
+  it('escalate wins over priority when both rules match', () => {
+    assert.equal(
+      deriveDisposition(
+        scoresFixture({ relevance: 80, personalRelevance: 65, urgency: 80 }),
+        85,
+      ),
+      'escalate',
+    );
+  });
+
+  it('case C inputs do not escalate when urgency is below 75', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 70, personalRelevance: 55, urgency: 40 }), 72),
+      'priority',
+    );
+  });
+
+  it('case D inputs are ignore not watch', () => {
+    assert.equal(
+      deriveDisposition(
+        scoresFixture({
+          relevance: 30,
+          personalRelevance: 30,
+          novelty: 20,
+          momentum: 25,
+          urgency: 20,
+        }),
+        35,
+      ),
+      'ignore',
+    );
+  });
+
+  it('escalate with null rankScore — rule 1 does not require rankScore', () => {
+    assert.equal(
+      deriveDisposition(
+        scoresFixture({ relevance: 80, personalRelevance: 30, urgency: 80 }),
+        null,
+      ),
+      'escalate',
+    );
+  });
+
+  it('skips priority and ignore when rankScore is absent, falling through to watch', () => {
+    assert.equal(
+      deriveDisposition(scoresFixture({ relevance: 70, personalRelevance: 55, urgency: 40 }), null),
+      'watch',
+    );
+    assert.equal(
+      deriveDisposition(
+        scoresFixture({
+          relevance: 30,
+          personalRelevance: 30,
+          novelty: 20,
+          momentum: 25,
+          urgency: 20,
+        }),
+        undefined,
+      ),
+      'watch',
+    );
   });
 });
 

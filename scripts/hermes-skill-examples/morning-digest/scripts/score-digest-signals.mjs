@@ -1,5 +1,5 @@
-// score-digest-signals.mjs — Epic 64 dimension scoring (Story 64-2)
-// Computes five independent 0–100 dimension scores for digest signal candidates.
+// score-digest-signals.mjs — Epic 64 dimension scoring (Stories 64-2, 64-3)
+// Computes five independent 0–100 dimension scores and derived disposition for digest signals.
 
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -54,6 +54,13 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  *   runAt: number,
  *   watchlistMissing: boolean,
  * }} ScoringContext
+ * @typedef {{
+ *   relevance: number,
+ *   personalRelevance: number,
+ *   novelty: number,
+ *   momentum: number,
+ *   urgency: number,
+ * }} DimensionScores
  */
 
 /**
@@ -593,4 +600,34 @@ export function scoreMomentum(signal, normalizedEngagement, ctx) {
     0,
     100,
   );
+}
+
+/**
+ * Derive categorical disposition from dimension scores and optional rankScore.
+ * Architecture §7: first-match-wins threshold table. Rule 1 (escalate) ignores rankScore.
+ *
+ * @param {DimensionScores} scores
+ * @param {number | null | undefined} rankScore
+ * @returns {'priority' | 'watch' | 'ignore' | 'escalate'}
+ */
+export function deriveDisposition(scores, rankScore) {
+  const { relevance, personalRelevance, novelty, momentum, urgency } = scores;
+
+  if (urgency >= 75 && (personalRelevance >= 60 || relevance >= 75)) {
+    return 'escalate';
+  }
+
+  const rank = rankScore;
+  if (Number.isFinite(rank)) {
+    if (rank >= 70 && personalRelevance >= 50) {
+      return 'priority';
+    }
+
+    const dimMax = Math.max(relevance, personalRelevance, novelty, momentum, urgency);
+    if (rank < 40 && dimMax < 50) {
+      return 'ignore';
+    }
+  }
+
+  return 'watch';
 }
