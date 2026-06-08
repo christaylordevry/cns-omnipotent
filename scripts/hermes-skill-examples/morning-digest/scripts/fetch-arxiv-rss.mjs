@@ -17,6 +17,18 @@ const MAX_ARXIV_CATEGORIES = 3;
 const SNIPPET_MAX = 200;
 const ARXIV_RSS_BASE = 'https://rss.arxiv.org/rss/';
 
+/** Documented default categories when env unset (Story 64-7). */
+export const DEFAULT_ARXIV_CATEGORIES = 'cs.AI,cs.LG,stat.ML';
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {boolean}
+ */
+export function useArxivDefaults(env) {
+  const v = String(env.MORNING_DIGEST_ARXIV_USE_DEFAULTS ?? '').trim().toLowerCase();
+  return v !== '0' && v !== 'false' && v !== 'no' && v !== 'off';
+}
+
 /**
  * @param {string} value
  * @returns {boolean}
@@ -149,10 +161,14 @@ export function parseEnvFile(content) {
  */
 export function loadArxivConfig(env = process.env) {
   const enabled = isArxivEnabled(env.MORNING_DIGEST_ARXIV_ENABLED);
-  const rawCategories = String(env.MORNING_DIGEST_ARXIV_CATEGORIES ?? '')
+  let rawCategories = String(env.MORNING_DIGEST_ARXIV_CATEGORIES ?? '')
     .split(',')
     .map((c) => c.trim())
     .filter(Boolean);
+
+  if (rawCategories.length === 0 && enabled && useArxivDefaults(env)) {
+    rawCategories = DEFAULT_ARXIV_CATEGORIES.split(',').map((c) => c.trim());
+  }
 
   const invalidCategories = rawCategories.filter((c) => !isValidArxivCategory(c));
   const categories = rawCategories
@@ -310,6 +326,9 @@ export async function runArxivFetch(env, options = {}) {
   if (config.categories.length === 0) {
     if (config.invalidCategories.length > 0) {
       return { error: 'invalid category' };
+    }
+    if (config.enabled && !useArxivDefaults(env)) {
+      return { error: 'categories not configured' };
     }
     return { papers: [] };
   }

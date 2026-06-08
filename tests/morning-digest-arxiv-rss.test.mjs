@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { describe, it } from 'node:test';
 
 import {
+  DEFAULT_ARXIV_CATEGORIES,
   extractSnippetFromDescription,
   inferOperatorHomeFromHome,
   isValidArxivCategory,
@@ -84,9 +85,25 @@ describe('fetch-arxiv-rss.mjs runArxivFetch', () => {
     assert.equal(payload.papers.length, 2);
   });
 
-  it('returns empty papers when categories unset', async () => {
-    const payload = await runArxivFetch({});
-    assert.deepEqual(payload, { papers: [] });
+  it('applies DEFAULT_ARXIV_CATEGORIES when unset', async () => {
+    const payload = await runArxivFetch(
+      { MORNING_DIGEST_ARXIV_MAX_PER_CATEGORY: '1' },
+      { fixtureXml: FIXTURE_RSS },
+    );
+    assert.ok(Array.isArray(payload.papers));
+    assert.equal(payload.papers.length, 3);
+    assert.deepEqual(
+      payload.papers.map((p) => p.category),
+      ['cs.AI', 'cs.LG', 'stat.ML'],
+    );
+  });
+
+  it('returns categories not configured when defaults disabled', async () => {
+    const payload = await runArxivFetch({
+      MORNING_DIGEST_ARXIV_CATEGORIES: '',
+      MORNING_DIGEST_ARXIV_USE_DEFAULTS: '0',
+    });
+    assert.deepEqual(payload, { error: 'categories not configured' });
   });
 
   it('returns arxiv disabled when enabled flag is false', async () => {
@@ -169,6 +186,7 @@ describe('mergeTrendIngestEnv under simulated Hermes HOME isolation', () => {
           '# comment line',
           'NEWSAPI_API_KEY=news-secret',
           'PERPLEXITY_API_KEY="perp-secret"',
+          'MORNING_DIGEST_ARXIV_CATEGORIES=cs.AI,cs.LG',
           'NOTEBOOKLM_NOTEBOOK_TITLES=nb1:Title One,nb2:Title Two',
           'GOOGLE_TRENDS_WATCHLIST=ai,llm',
         ].join('\n'),
@@ -183,6 +201,7 @@ describe('mergeTrendIngestEnv under simulated Hermes HOME isolation', () => {
 
       assert.equal(merged.NEWSAPI_API_KEY, 'news-secret');
       assert.equal(merged.PERPLEXITY_API_KEY, 'perp-secret');
+      assert.equal(merged.MORNING_DIGEST_ARXIV_CATEGORIES, 'cs.AI,cs.LG');
       assert.equal(
         merged.NOTEBOOKLM_NOTEBOOK_TITLES,
         'nb1:Title One,nb2:Title Two',
@@ -232,8 +251,17 @@ describe('mergeTrendIngestEnv under simulated Hermes HOME isolation', () => {
 });
 
 describe('loadArxivConfig', () => {
-  it('does not embed default categories in code path', () => {
+  it('applies DEFAULT_ARXIV_CATEGORIES when unset', () => {
     const cfg = loadArxivConfig({});
+    assert.deepEqual(cfg.categories, ['cs.AI', 'cs.LG', 'stat.ML']);
+    assert.equal(DEFAULT_ARXIV_CATEGORIES, 'cs.AI,cs.LG,stat.ML');
+  });
+
+  it('returns empty categories when defaults disabled', () => {
+    const cfg = loadArxivConfig({
+      MORNING_DIGEST_ARXIV_CATEGORIES: '',
+      MORNING_DIGEST_ARXIV_USE_DEFAULTS: '0',
+    });
     assert.deepEqual(cfg.categories, []);
   });
 
