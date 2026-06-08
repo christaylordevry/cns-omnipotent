@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-09T16:00:00+00:00"
+last_updated: "2026-06-09T18:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -447,7 +447,7 @@ development_status:
   64-2-scoring-engine-five-dimensions: done
   64-3-derived-disposition: done
   64-4-engagement-normalization: done
-  64-5-ranked-push-integration: backlog
+  64-5-ranked-push-integration: done
   64-6-newsapi-query-tightening: done
   64-7-arxiv-env-fix: done
 

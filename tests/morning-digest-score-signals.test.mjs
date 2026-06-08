@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { promisify } from 'node:util';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   breakingBonus,
   clamp,
+  computeRankScore,
   deriveDisposition,
   extractSprintTokens,
   f1Score,
@@ -19,11 +23,22 @@ import {
   normalizeEngagement,
   overlapRatio,
   parseDevelopmentStatus,
+  parseDigestSignalsJson,
   parseNoveltyHistoryJson,
   parseWatchlistYaml,
+  RANK_WEIGHT_MOMENTUM,
+  RANK_WEIGHT_MOMENTUM_NO_ENGAGEMENT,
+  RANK_WEIGHT_NORMALIZED_ENGAGEMENT,
+  RANK_WEIGHT_NOVELTY,
+  RANK_WEIGHT_PERSONAL,
+  RANK_WEIGHT_RELEVANCE,
+  RANK_WEIGHT_URGENCY,
   RD_COMMENTS_CAP,
   RD_UPVOTES_CAP,
   recencyScore,
+  runScoreDigestSignalsCli,
+  scoreDigestSignals,
+  scoreDigestSignalsSafe,
   scoreMomentum,
   scoreNovelty,
   scorePersonalRelevance,
@@ -32,6 +47,12 @@ import {
   tokenizeSignalText,
   trendProxyForSignal,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
+
+const execFileAsync = promisify(execFile);
+const scoreScript = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs',
+);
 
 /** @returns {import('../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs').ScoringContext} */
 function baseCtx(overrides = {}) {
@@ -761,5 +782,283 @@ personal:
     assert.ok(ctx.noveltyHistoryEntries.some((entry) => entry.title === 'Recent headline'));
     assert.ok(ctx.noveltyHistoryEntries.some((entry) => entry.title === 'Undated headline'));
     assert.ok(!ctx.noveltyHistoryEntries.some((entry) => entry.title === 'Stale headline'));
+  });
+});
+
+describe('computeRankScore weight constants', () => {
+  it('exports architecture §8.1 anti-drift weight constants', () => {
+    assert.equal(RANK_WEIGHT_PERSONAL, 0.3);
+    assert.equal(RANK_WEIGHT_RELEVANCE, 0.2);
+    assert.equal(RANK_WEIGHT_MOMENTUM, 0.2);
+    assert.equal(RANK_WEIGHT_MOMENTUM_NO_ENGAGEMENT, 0.25);
+    assert.equal(RANK_WEIGHT_URGENCY, 0.15);
+    assert.equal(RANK_WEIGHT_NOVELTY, 0.1);
+    assert.equal(RANK_WEIGHT_NORMALIZED_ENGAGEMENT, 0.05);
+  });
+});
+
+describe('computeRankScore fixture rows (§8.2)', () => {
+  const baseScores = {
+    personalRelevance: 80,
+    relevance: 60,
+    momentum: 50,
+    urgency: 40,
+    novelty: 30,
+  };
+
+  it('row 1 — engagement present → rankScore 58', () => {
+    assert.equal(computeRankScore(baseScores, 60), 58);
+  });
+
+  it('row 2 — engagement absent redistributes 0.05 to momentum (0.25) → rankScore 58', () => {
+    assert.equal(computeRankScore(baseScores, null), 58);
+  });
+
+  it('row 3 — all zeros with null engagement → rankScore 0', () => {
+    assert.equal(
+      computeRankScore(
+        {
+          personalRelevance: 0,
+          relevance: 0,
+          momentum: 0,
+          urgency: 0,
+          novelty: 0,
+        },
+        null,
+      ),
+      0,
+    );
+  });
+
+  it('row 4 — all hundreds with engagement → rankScore 100', () => {
+    assert.equal(
+      computeRankScore(
+        {
+          personalRelevance: 100,
+          relevance: 100,
+          momentum: 100,
+          urgency: 100,
+          novelty: 100,
+        },
+        100,
+      ),
+      100,
+    );
+  });
+});
+
+describe('scoreDigestSignals orchestrator', () => {
+  it('FR-14 sort fixture — personalRelevance drives rankScore order (A before B)', () => {
+    const ctx = baseCtx({
+      watchlistMissing: true,
+      personalTokens: ['omnipotent', 'vault', 'scoring', 'digest'],
+    });
+    const signals = [
+      {
+        section: 'hackernews',
+        sourceType: 'hackernews',
+        title: 'Omnipotent vault scoring digest framework update',
+        rank: 2,
+        sourceMetadata: { points: 500, commentCount: 200 },
+      },
+      {
+        section: 'hackernews',
+        sourceType: 'hackernews',
+        title: 'Regional sports league championship recap',
+        rank: 1,
+        sourceMetadata: { points: 500, commentCount: 200 },
+      },
+    ];
+
+    const result = scoreDigestSignals(signals, ctx);
+
+    assert.equal(result.length, 2);
+    assert.ok(result[0].rankScore > result[1].rankScore);
+    assert.equal(result[0].rank, 1);
+    assert.equal(result[0].title, signals[0].title);
+    assert.equal(result[1].rank, 2);
+  });
+
+  it('stable tie-break preserves input order when rankScore ties', () => {
+    const ctx = baseCtx({ watchlistMissing: true });
+    const signals = [
+      {
+        section: 'headlines',
+        sourceType: 'newsapi',
+        title: 'Identical headline alpha',
+        rank: 5,
+      },
+      {
+        section: 'headlines',
+        sourceType: 'newsapi',
+        title: 'Identical headline alpha',
+        rank: 2,
+      },
+    ];
+
+    const result = scoreDigestSignals(signals, ctx);
+    assert.equal(result[0].rankScore, result[1].rankScore);
+    assert.equal(result[0].title, signals[0].title);
+    assert.equal(result[0].rank, 1);
+    assert.equal(result[1].rank, 2);
+  });
+
+  it('HN orchestrator integration — normalizedEngagement, Path A momentum, full scored shape', () => {
+    const signal = {
+      section: 'hackernews',
+      sourceType: 'hackernews',
+      title: 'HN cap story',
+      rank: 3,
+      sourceMetadata: { points: 500, commentCount: 200 },
+    };
+    const ctx = baseCtx({ watchlistMissing: true });
+    const [scored] = scoreDigestSignals([signal], ctx);
+
+    assert.equal(scored.normalizedEngagement, 100);
+    assert.equal(scored.scores.momentum, 86);
+    assert.equal(scored.scores.relevance, 25);
+    assert.ok(['priority', 'watch', 'ignore', 'escalate'].includes(scored.disposition));
+    assert.equal(typeof scored.rankScore, 'number');
+    assert.equal(scored.rank, 1);
+    assert.equal(scored.section, 'hackernews');
+  });
+
+  it('omits normalizedEngagement key when engagement is null', () => {
+    const [scored] = scoreDigestSignals(
+      [{ section: 'headlines', sourceType: 'newsapi', title: 'Plain headline', rank: 1 }],
+      baseCtx({ watchlistMissing: true }),
+    );
+    assert.ok(!Object.hasOwn(scored, 'normalizedEngagement'));
+  });
+
+  it('does not mutate the input array', () => {
+    const signals = [
+      { section: 'headlines', sourceType: 'newsapi', title: 'Headline A', rank: 1 },
+      { section: 'headlines', sourceType: 'newsapi', title: 'Headline B', rank: 2 },
+    ];
+    const snapshot = JSON.parse(JSON.stringify(signals));
+    scoreDigestSignals(signals, baseCtx({ watchlistMissing: true }));
+    assert.deepEqual(signals, snapshot);
+  });
+
+  it('wires disposition via deriveDisposition(scores, rankScore) after computeRankScore', () => {
+    const ctx = baseCtx({
+      watchlistMissing: true,
+      personalTokens: ['omnipotent', 'vault', 'scoring', 'digest'],
+    });
+    const [scored] = scoreDigestSignals(
+      [
+        {
+          section: 'headlines',
+          sourceType: 'newsapi',
+          title: 'Omnipotent vault scoring digest weekly update',
+          rank: 1,
+        },
+      ],
+      ctx,
+    );
+
+    const expectedRankScore = computeRankScore(
+      scored.scores,
+      Object.hasOwn(scored, 'normalizedEngagement') ? scored.normalizedEngagement : null,
+    );
+    assert.equal(scored.rankScore, expectedRankScore);
+    assert.equal(scored.disposition, deriveDisposition(scored.scores, scored.rankScore));
+  });
+});
+
+describe('parseDigestSignalsJson', () => {
+  it('returns null for missing or invalid JSON', () => {
+    assert.equal(parseDigestSignalsJson(undefined), null);
+    assert.equal(parseDigestSignalsJson('not-json'), null);
+    assert.equal(parseDigestSignalsJson('{"signals":[]}'), null);
+  });
+
+  it('returns object array for valid JSON array', () => {
+    assert.deepEqual(parseDigestSignalsJson('[{"title":"A"}]'), [{ title: 'A' }]);
+  });
+});
+
+describe('runScoreDigestSignalsCli', () => {
+  it('returns [] with stderr warning when DIGEST_SIGNALS_JSON is missing', async () => {
+    const stderrChunks = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    };
+    try {
+      const result = await runScoreDigestSignalsCli({});
+      assert.deepEqual(result, []);
+      assert.ok(stderrChunks.join('').includes('score-digest-signals: warning'));
+      assert.ok(stderrChunks.join('').includes('DIGEST_SIGNALS_JSON'));
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+
+  it('passthrough unscored signals on scoring failure', async () => {
+    const signals = [{ section: 'headlines', sourceType: 'newsapi', title: 'Fail path', rank: 1 }];
+    const badSignal = {};
+    Object.defineProperty(badSignal, 'sourceType', {
+      get() {
+        throw new Error('simulated scoring failure');
+      },
+    });
+    const stderrChunks = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    };
+    try {
+      const result = await scoreDigestSignalsSafe([badSignal, ...signals], {});
+      assert.deepEqual(result, [badSignal, ...signals]);
+      assert.ok(stderrChunks.join('').includes('score-digest-signals: warning'));
+      assert.ok(stderrChunks.join('').includes('simulated scoring failure'));
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+});
+
+describe('score-digest-signals CLI', () => {
+  it('writes scored JSON array to stdout on success', async () => {
+    const { stdout } = await execFileAsync('node', [scoreScript], {
+      env: {
+        ...process.env,
+        DIGEST_SIGNALS_JSON: JSON.stringify([
+          {
+            section: 'headlines',
+            sourceType: 'newsapi',
+            title: 'CLI scored headline',
+            rank: 1,
+          },
+        ]),
+        DIGEST_RUN_AT: String(Date.parse('2026-06-09T12:00:00Z')),
+        HOME: join(tmpdir(), 'score-cli-missing-operator'),
+        CNS_REPO_ROOT: join(tmpdir(), 'score-cli-missing-repo'),
+      },
+    });
+
+    const parsed = JSON.parse(stdout.trim());
+    assert.ok(Array.isArray(parsed));
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0].title, 'CLI scored headline');
+    assert.ok(parsed[0].scores);
+    assert.equal(typeof parsed[0].rankScore, 'number');
+    assert.equal(parsed[0].rank, 1);
+  });
+
+  it('exits 0 with [] stdout when DIGEST_SIGNALS_JSON is invalid', async () => {
+    const { stdout, stderr } = await execFileAsync('node', [scoreScript], {
+      env: {
+        ...process.env,
+        DIGEST_SIGNALS_JSON: 'not-json',
+      },
+    });
+
+    assert.equal(JSON.parse(stdout.trim()).length, 0);
+    assert.match(stderr, /score-digest-signals: warning/);
   });
 });

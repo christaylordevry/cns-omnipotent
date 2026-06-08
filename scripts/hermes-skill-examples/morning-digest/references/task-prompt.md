@@ -1,4 +1,4 @@
-# Task: `morning-digest` (Story 49-6 + 52-1 + 52-2)
+# Task: `morning-digest` (Story 49-6 + 52-1 + 52-2 + 64-5)
 
 ## 0) REFERENCE ONLY — invocation already confirmed
 
@@ -356,12 +356,12 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 | `arxiv` | `arxiv` | Source 4 `papers[]` | `title` | `snippet` | `link` | — | arxiv id from link (`/\d+\.\d+`) or link hash |
 | `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
 
-- `rank`: 1-based index within each section in display order (legacy ordering; Epic 64 scoring stories will assign `rank` from `rankScore` sort in 64-5).
+- `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
   - HN: map RSS `score` → `points` (number); RSS `comments` → `commentCount` (number). Legacy `sourceMetadata.comments` remains accepted by validators but prefer `points` + `commentCount` for engagement normalization (64-4).
   - arXiv: `categories` (array of strings from `category`) when present.
   - GitHub/Reddit (future): `stars`, `forks`, `upvotes` when present.
-- **Scoring fields (optional until 64-5 populates them):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Morning digest v1 pushes **unscored** signals — omit these keys entirely until the scoring pipeline runs.
+- **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
 
@@ -416,6 +416,43 @@ Every entry in `signals[]` MUST carry both `section` and `sourceType` (see the s
 `ranAt` must be the numeric `digest_start_ms` from task start (Unix ms) — never a string.
 
 Omit `workspaceId`. Push available signals even when some sources failed.
+
+### Score signals before push (REQUIRED — Epic 64-5)
+
+After building unscored `digest_push_payload.signals` from the mapping table above and **before** `JSON.stringify(digest_push_payload)` for Convex push, invoke the scoring terminal:
+
+```text
+terminal(
+  command="SCORE_SCRIPT=<shellQuote(score_script)> DIGEST_SIGNALS_JSON=<shellQuote(JSON.stringify(digest_push_payload.signals))> DIGEST_RUN_AT=<shellQuote(String(digest_start_ms))> node \"$SCORE_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Where:
+
+```text
+score_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/score-digest-signals.mjs`
+
+**Scoring context env** (passed through to `loadScoringContext` — set when available):
+
+| Env | Purpose |
+|-----|---------|
+| `CNS_REPO_ROOT` | Repo root for sprint-status watchlist (defaults to Omnipotent.md) |
+| `MORNING_DIGEST_PROJECT_ENTITIES` | Comma-separated project entity names for personal relevance |
+| `DIGEST_KEYWORD_CANDIDATES_JSON` | Personal keyword candidates from §10 upsert path |
+| `DIGEST_NOVELTY_HISTORY_JSON` | Prior digest titles for novelty scoring — prefer **`{ title, sourceType, seenAt? }[]`** when history is available, e.g. `[{"title":"Prior HN story","sourceType":"hackernews","seenAt":1749000000000}]`; legacy `string[]` still accepted |
+| `DIGEST_RUN_AT` | Same numeric `digest_start_ms` as `run.ranAt` |
+
+**After terminal returns:**
+
+1. Parse stdout as a JSON array. On valid parse → replace `digest_push_payload.signals` with the scored array (sorted by `rankScore` desc, `rank` 1..N).
+2. On scoring failure, empty stdout, or invalid JSON → **continue with unscored signals** (architecture §9 degraded mode); push still fires (fire-and-forget).
+
+The script always exits **0**. Stderr warnings use prefix `score-digest-signals:`.
 
 ### Terminal invocation (REQUIRED — part 1 of 2 completion gate — do not end the task turn here)
 
@@ -495,7 +532,7 @@ Always `exit_code: 0`. Do **not** post Discord warnings for keyword candidate pu
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `score-digest-signals.mjs` (post-post, before push); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 

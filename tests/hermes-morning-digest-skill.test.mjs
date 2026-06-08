@@ -437,6 +437,20 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(!postPost.includes("Notebook history log failed"));
   });
 
+  it("task-prompt documents post-post scoring before digest push (Story 64-5)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const postPost = taskBody.slice(
+      taskBody.indexOf("## Post-post — Push digest entities to Convex"),
+    );
+    assert.ok(postPost.includes("score-digest-signals.mjs"));
+    assert.ok(postPost.includes("DIGEST_SIGNALS_JSON"));
+    assert.ok(postPost.includes("DIGEST_RUN_AT"));
+    assert.ok(postPost.includes("Score signals before push"));
+    assert.ok(postPost.includes("DIGEST_NOVELTY_HISTORY_JSON"));
+    assert.ok(postPost.includes("rankScore"));
+    assert.ok(postPost.includes("timeout=30"));
+  });
+
   it("task-prompt documents post-post keyword candidates push after digest push (Story 62-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const digestIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");

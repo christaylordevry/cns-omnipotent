@@ -1,5 +1,5 @@
-// score-digest-signals.mjs — Epic 64 dimension scoring (Stories 64-2, 64-3, 64-4)
-// Computes five independent 0–100 dimension scores, engagement normalization, and derived disposition.
+// score-digest-signals.mjs — Epic 64 dimension scoring (Stories 64-2..64-5)
+// Computes five independent 0–100 dimension scores, engagement normalization, rankScore, and derived disposition.
 
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -88,6 +88,15 @@ export const GH_STARS_CAP = 50000;
 export const GH_FORKS_CAP = 5000;
 export const RD_UPVOTES_CAP = 10000;
 export const RD_COMMENTS_CAP = 2000;
+
+/** Architecture §8.1 rankScore weights — normative constants (anti-drift surface). */
+export const RANK_WEIGHT_PERSONAL = 0.3;
+export const RANK_WEIGHT_RELEVANCE = 0.2;
+export const RANK_WEIGHT_MOMENTUM = 0.2;
+export const RANK_WEIGHT_MOMENTUM_NO_ENGAGEMENT = 0.25;
+export const RANK_WEIGHT_URGENCY = 0.15;
+export const RANK_WEIGHT_NOVELTY = 0.1;
+export const RANK_WEIGHT_NORMALIZED_ENGAGEMENT = 0.05;
 
 /**
  * Log-scaled normalization to 0–100 per architecture §6.1.
@@ -711,4 +720,158 @@ export function deriveDisposition(scores, rankScore) {
   }
 
   return 'watch';
+}
+
+/**
+ * Composite rankScore from dimension scores and optional normalizedEngagement (FR-13).
+ * When engagement is absent, its 0.05 weight redistributes to momentum (0.25).
+ *
+ * @param {DimensionScores} scores
+ * @param {number | null | undefined} normalizedEngagement
+ * @returns {number}
+ */
+export function computeRankScore(scores, normalizedEngagement) {
+  const { personalRelevance, relevance, momentum, urgency, novelty } = scores;
+  const hasEngagement =
+    normalizedEngagement != null && Number.isFinite(normalizedEngagement);
+  const raw = hasEngagement
+    ? RANK_WEIGHT_PERSONAL * personalRelevance +
+      RANK_WEIGHT_RELEVANCE * relevance +
+      RANK_WEIGHT_MOMENTUM * momentum +
+      RANK_WEIGHT_URGENCY * urgency +
+      RANK_WEIGHT_NOVELTY * novelty +
+      RANK_WEIGHT_NORMALIZED_ENGAGEMENT * normalizedEngagement
+    : RANK_WEIGHT_PERSONAL * personalRelevance +
+      RANK_WEIGHT_RELEVANCE * relevance +
+      RANK_WEIGHT_MOMENTUM_NO_ENGAGEMENT * momentum +
+      RANK_WEIGHT_URGENCY * urgency +
+      RANK_WEIGHT_NOVELTY * novelty;
+  return clamp(Math.round(raw), 0, 100);
+}
+
+/**
+ * @param {Record<string, unknown>[]} signals
+ * @param {ScoringContext} ctx
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function scoreDigestSignals(signals, ctx) {
+  const enriched = signals.map((signal, originalIndex) => {
+    const normalizedEngagement = normalizeEngagement(/** @type {DigestSignal} */ (signal));
+    const scores = {
+      relevance: scoreRelevance(/** @type {DigestSignal} */ (signal), ctx),
+      personalRelevance: scorePersonalRelevance(/** @type {DigestSignal} */ (signal), ctx),
+      novelty: scoreNovelty(/** @type {DigestSignal} */ (signal), ctx),
+      urgency: scoreUrgency(/** @type {DigestSignal} */ (signal), ctx),
+      momentum: scoreMomentum(
+        /** @type {DigestSignal} */ (signal),
+        normalizedEngagement,
+        ctx,
+      ),
+    };
+    const rankScore = computeRankScore(scores, normalizedEngagement);
+    const disposition = deriveDisposition(scores, rankScore);
+    /** @type {Record<string, unknown>} */
+    const out = {
+      ...signal,
+      scores,
+      disposition,
+      rankScore,
+      _oi: originalIndex,
+    };
+    if (normalizedEngagement != null && Number.isFinite(normalizedEngagement)) {
+      out.normalizedEngagement = normalizedEngagement;
+    }
+    return out;
+  });
+
+  enriched.sort((a, b) => {
+    const rankDiff = /** @type {number} */ (b.rankScore) - /** @type {number} */ (a.rankScore);
+    if (rankDiff !== 0) {
+      return rankDiff;
+    }
+    return /** @type {number} */ (a._oi) - /** @type {number} */ (b._oi);
+  });
+
+  return enriched.map(({ _oi, ...signal }, index) => {
+    void _oi;
+    return {
+      ...signal,
+      rank: index + 1,
+    };
+  });
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {Record<string, unknown>[] | null}
+ */
+export function parseDigestSignalsJson(raw) {
+  if (!raw) {
+    return null;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed.filter((item) => item && typeof item === 'object');
+}
+
+/**
+ * @param {Record<string, unknown>[]} signals
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<Record<string, unknown>[]>}
+ */
+export async function scoreDigestSignalsSafe(signals, env = process.env) {
+  try {
+    const ctx = await loadScoringContext(env);
+    return scoreDigestSignals(signals, ctx);
+  } catch (err) {
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 200)
+        : 'unexpected error';
+    console.error(`score-digest-signals: warning — ${reason}`);
+    return signals;
+  }
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<Record<string, unknown>[]>}
+ */
+export async function runScoreDigestSignalsCli(env = process.env) {
+  const parsed = parseDigestSignalsJson(env.DIGEST_SIGNALS_JSON);
+  if (parsed == null) {
+    console.error('score-digest-signals: warning — missing or invalid DIGEST_SIGNALS_JSON');
+    return [];
+  }
+
+  return scoreDigestSignalsSafe(parsed, env);
+}
+
+async function main() {
+  const scored = await runScoreDigestSignalsCli();
+  process.stdout.write(`${JSON.stringify(scored)}\n`);
+  process.exit(0);
+}
+
+const isMain =
+  import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}` ||
+  process.argv[1]?.endsWith('score-digest-signals.mjs');
+
+if (isMain) {
+  main().catch((err) => {
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 200)
+        : 'unexpected error';
+    console.error(`score-digest-signals: warning — ${reason}`);
+    process.stdout.write('[]\n');
+    process.exit(0);
+  });
 }

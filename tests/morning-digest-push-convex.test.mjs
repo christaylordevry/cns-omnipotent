@@ -141,6 +141,72 @@ describe('push-digest-convex.mjs', () => {
 		});
 	});
 
+	it('preserves pre-sorted rankScore descending order in addDigestSignal mutation calls (FR-14)', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-05',
+				ranAt: 1_749_091_200_000,
+				topTrend: 'AI agents',
+				focusKeyword: 'AI agents',
+			},
+			signals: [
+				{
+					section: 'hackernews',
+					sourceType: 'hackernews',
+					title: 'Higher rankScore signal',
+					rank: 1,
+					rankScore: 90,
+					scores: {
+						relevance: 80,
+						personalRelevance: 85,
+						novelty: 90,
+						momentum: 70,
+						urgency: 60,
+					},
+					disposition: 'priority',
+				},
+				{
+					section: 'headlines',
+					sourceType: 'newsapi',
+					title: 'Lower rankScore signal',
+					rank: 2,
+					rankScore: 45,
+					scores: {
+						relevance: 40,
+						personalRelevance: 35,
+						novelty: 50,
+						momentum: 35,
+						urgency: 30,
+					},
+					disposition: 'watch',
+				},
+			],
+		};
+
+		await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-order' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		assert.equal(addCalls.length, 2);
+		assert.equal(addCalls[0].args.signal.title, 'Higher rankScore signal');
+		assert.equal(addCalls[1].args.signal.title, 'Lower rankScore signal');
+		assert.ok(
+			/** @type {number} */ (addCalls[0].args.signal.rankScore) >
+				/** @type {number} */ (addCalls[1].args.signal.rankScore),
+		);
+	});
+
 	it('posts create → add × N → finalize in order on happy path', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];
