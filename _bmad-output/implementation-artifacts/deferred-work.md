@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 65-2-reddit-public-json-spike (2026-06-09)
+
+- Network/timeout failures labeled `parse-error` — spec allows indicator; distinct `timeout`/`network-error` would aid ops but not required for gate script.
+- No upper bound on spike cycles or inter-cycle delay — mis-set env could run unbounded; operator config responsibility for gate script.
+
 ## Deferred from: code review of 64-2-scoring-engine-five-dimensions (2026-06-09)
 
 - Novelty rule 65 (same `sourceType` in history) unreachable when `DIGEST_NOVELTY_HISTORY_JSON` is normative `string[]` without `sourceType` — scores 90 instead of 65 until 64-5 orchestration enriches history entries; object[] path tested in 64-2.

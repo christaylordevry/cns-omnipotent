@@ -2,7 +2,7 @@
 story_id: 65-2
 epic: 65
 title: reddit-public-json-spike
-status: review
+status: done
 baseline_commit: 4a7fd2f
 operator_brief: 2026-06-09
 predecessors: 64-5, 64-8
@@ -12,7 +12,7 @@ parallel: 65-1
 
 # Story 65.2: Reddit public-JSON spike (risk gate)
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -184,6 +184,14 @@ GET https://www.reddit.com/r/{subreddit}/hot.json?limit=10&raw_json=1
   - [x] Document 65-3 branch instruction for next story author
 - [x] **T4** Verify gate (AC: 4)
   - [x] `bash scripts/verify.sh` green
+
+### Review Findings
+
+- [x] [Review][Patch] `captcha-marker` false positive on valid JSON listings — `detectBlockIndicator` scans raw body for `captcha`/`blocked` before checking `parsed.parseOk`, so legitimate post titles/selftext can force FAIL/PARTIAL [spike-reddit-public-json.mjs:88-90]
+- [x] [Review][Patch] No test asserts Reddit hot.json URL or User-Agent header — AC 1 fetch contract untested; add mock-fetch test for `buildRedditHotUrl` / `fetchRedditHotJson` [morning-digest-reddit-spike.test.mjs]
+- [x] [Review][Patch] `MORNING_DIGEST_REDDIT_SPIKE_CYCLES` accepts values below 3 — PRD FR-5 requires minimum three consecutive cycles; clamp with `Math.max(3, rawCycles)` [spike-reddit-public-json.mjs:33-36]
+- [x] [Review][Defer] Network/timeout failures labeled `parse-error` — spec allows indicator; distinct `timeout`/`network-error` would aid ops but not required [spike-reddit-public-json.mjs:254-262] — deferred, pre-existing spec ambiguity
+- [x] [Review][Defer] No upper bound on spike cycles or inter-cycle delay — mis-set env could run unbounded; operator config responsibility for gate script [spike-reddit-public-json.mjs:33-38] — deferred, pre-existing
 
 ## Dev Notes
 

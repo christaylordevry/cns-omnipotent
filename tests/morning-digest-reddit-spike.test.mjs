@@ -9,6 +9,7 @@ import {
   computeSpikeSummary,
   detectBlockIndicator,
   evaluateGoNoGo,
+  fetchRedditHotJson,
   loadSpikeConfig,
   parseRedditListing,
   parseSubreddits,
@@ -94,6 +95,13 @@ describe('detectBlockIndicator', () => {
   it('returns null on successful parse', () => {
     const parsed = parseRedditListing(redditListing(3));
     assert.equal(detectBlockIndicator(200, '{}', parsed), null);
+  });
+
+  it('does not flag captcha/blocked substrings inside valid listing JSON', () => {
+    const listing = redditListing(2, 'How I got blocked by captcha on Reddit');
+    const parsed = parseRedditListing(listing);
+    const body = JSON.stringify(listing);
+    assert.equal(detectBlockIndicator(200, body, parsed), null);
   });
 
   it('returns empty-listing and parse-error for bad JSON listings', () => {
@@ -272,6 +280,39 @@ describe('loadSpikeConfig', () => {
     assert.deepEqual(config.subreddits, ['MachineLearning']);
     assert.equal(config.cycles, 3);
     assert.equal(config.delayMs, 180_000);
+  });
+
+  it('clamps spike cycles to minimum of 3', () => {
+    const config = loadSpikeConfig({
+      MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning',
+      MORNING_DIGEST_REDDIT_SPIKE_CYCLES: '1',
+    });
+    assert.equal(config.cycles, 3);
+  });
+});
+
+describe('fetchRedditHotJson', () => {
+  it('requests hot.json URL with CNS User-Agent', async () => {
+    /** @type {string | undefined} */
+    let capturedUrl;
+    /** @type {RequestInit | undefined} */
+    let capturedInit;
+    await fetchRedditHotJson('MachineLearning', async (url, init) => {
+      capturedUrl = url;
+      capturedInit = init;
+      return {
+        status: 200,
+        text: async () => JSON.stringify(redditListing(2)),
+      };
+    });
+    assert.equal(
+      capturedUrl,
+      'https://www.reddit.com/r/MachineLearning/hot.json?limit=10&raw_json=1',
+    );
+    assert.equal(
+      /** @type {{ headers?: Record<string, string> }} */ (capturedInit).headers?.['User-Agent'],
+      'CNS-morning-digest/1.0',
+    );
   });
 });
 

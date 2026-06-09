@@ -33,7 +33,9 @@ export function loadSpikeConfig(env = process.env) {
   const rawCycles = parseInt(String(env.MORNING_DIGEST_REDDIT_SPIKE_CYCLES ?? ''), 10);
   const rawDelay = parseInt(String(env.MORNING_DIGEST_REDDIT_SPIKE_DELAY_MS ?? ''), 10);
   const cycles =
-    Number.isFinite(rawCycles) && rawCycles > 0 ? rawCycles : SPIKE_CYCLES_DEFAULT;
+    Number.isFinite(rawCycles) && rawCycles > 0
+      ? Math.max(SPIKE_CYCLES_DEFAULT, rawCycles)
+      : SPIKE_CYCLES_DEFAULT;
   const delayMs =
     Number.isFinite(rawDelay) && rawDelay >= 0 ? rawDelay : SPIKE_DELAY_MS_DEFAULT;
   return { subreddits, cycles, delayMs };
@@ -80,6 +82,9 @@ export function detectBlockIndicator(httpStatus, body, parsed, jsonParseFailed =
   }
   if (httpStatus === 403) {
     return 'http-403';
+  }
+  if (parsed?.parseOk) {
+    return null;
   }
   const trimmed = String(body ?? '').trimStart();
   if (/^<!DOCTYPE/i.test(trimmed) || /^<html/i.test(trimmed)) {
