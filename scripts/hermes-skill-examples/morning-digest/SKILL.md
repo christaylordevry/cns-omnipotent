@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, HackerNews top stories, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.4.4
+version: 1.4.5
 author: CNS Operator
 license: MIT
 metadata:
@@ -42,7 +42,7 @@ If the reference is not loaded, call `skill_view` first, then follow `references
 6. Call `terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)` for HackerNews top stories.
 7. Call `terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)` for GitHub repository search (Source 7).
 8. Call `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)` for Reddit hot listings (Source 8).
-9. Call `terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)` for curated Newsletters / RSS feeds (Source 9); parse stdout `entries[]`.
+9. Call `terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)` for curated Newsletters / RSS feeds (Source 9).
 10. Build trend/headline/arxiv/hackernews/github/reddit/rss signals; run `pick-signal-notebook.mjs`; on ROUTED, run `query-notebook.mjs` from `notebook-query/scripts/` (see task-prompt Source 6).
 11. Post the final `🌅 **Morning Digest**` contract even when one source fails.
 12. After posting, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (telemetry + optional warning; see task-prompt post-post).
@@ -63,9 +63,9 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 5. Deep Signal: call `mcp__perplexity__search` once using the top parsed Google Trends keyword. If no top trend exists, do not invent a fallback keyword; write `- (source unavailable: no top trend keyword)`. If Perplexity fails or times out, write `- (source unavailable: perplexity timeout)`.
 6. arXiv: call `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)`. Parse `papers[]` or show `- (source unavailable: <short reason>)` under **arXiv Preprints**.
 7. HackerNews: call `terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)`. Let `hn_stdout` = terminal stdout (trimmed); try `hn_json = JSON.parse(hn_stdout)` → read **`hn_json.stories`** only (not `repos[]`, `posts[]`, or `entries[]`); render Discord bullets or show `- (source unavailable: <short reason>)` under **HackerNews**; on failure **continue** to Source 7.
-8. GitHub (Source 7): call `terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)`. Parse `repos[]` or show unavailable under **GitHub** (see task-prompt).
-9. Reddit (Source 8): call `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)`. Parse `posts[]` or show unavailable under **Reddit** (see task-prompt).
-10. Newsletters / RSS (Source 9): call `terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)`. Parse `entries[]` or show unavailable under **Newsletters / RSS** (see task-prompt).
+8. GitHub (Source 7): call `terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)`. Let `gh_stdout` = terminal stdout (trimmed); try `gh_json = JSON.parse(gh_stdout)` → read **`gh_json.repos`** only (not `stories[]`, `posts[]`, or `entries[]`); render Discord bullets or show `- (source unavailable: <short reason>)` under **GitHub**; on failure **continue** to Source 8.
+9. Reddit (Source 8): call `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)`. Let `rd_stdout` = terminal stdout (trimmed); try `rd_json = JSON.parse(rd_stdout)` → read **`rd_json.posts`** only (not `stories[]`, `repos[]`, or `entries[]`); render Discord bullets or show `- (source unavailable: <short reason>)` under **Reddit**; on failure **continue** to Source 9.
+10. Newsletters / RSS (Source 9): call `terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)`. Let `rss_stdout` = terminal stdout (trimmed); try `rss_json = JSON.parse(rss_stdout)` → read **`rss_json.entries`** only (not `stories[]`, `repos[]`, or `posts[]`); render Discord bullets or show `- (source unavailable: <short reason>)` under **Newsletters / RSS**; on failure **continue** to Source 6.
 11. Vault context: record `digest_start_ms` at task start; after Sources 7–9, run `pick-signal-notebook.mjs` with shell-quoted `DIGEST_SOURCES_JSON` (trends + headlines + Perplexity Deep Signal text + arxiv + hackernews + github + reddit + rss), then `query-notebook.mjs` when routed (same-command `QUERY_SCRIPT` plus shell-quoted env values; remaining_s cap per task-prompt). Partial failure → unavailable bullet only in Vault context.
 12. After posting the digest, on ROUTED + successful query only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` (emit `notebook_query_log`; warning on `failed`|`timeout` only; does not alter the digest).
 13. After posting (all runs), invoke `terminal(..., timeout=30)` for `score-digest-signals.mjs`, capture stdout, and replace `digest_push_payload.signals` with parsed scored output before push (see task-prompt §9).
@@ -146,6 +146,9 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 ## Pitfalls
 
 - **HackerNews stdout threading (Source 5):** After `hermes-run-hn.sh` returns, let `hn_stdout` = terminal stdout (trimmed), try `hn_json = JSON.parse(hn_stdout)`, and read story rows from **`hn_json.stories`** only before Discord rendering or §9 mapping. Do not read `repos[]`, `posts[]`, or `entries[]` from HN stdout — those keys belong to Sources 7–9.
+- **GitHub stdout threading (Source 7):** After `hermes-run-github.sh` returns, let `gh_stdout` = terminal stdout (trimmed), try `gh_json = JSON.parse(gh_stdout)`, and read repo rows from **`gh_json.repos`** only. Do not read `stories[]`, `posts[]`, or `entries[]` from GitHub stdout — those keys belong to Sources 5, 8, and 9.
+- **Reddit stdout threading (Source 8):** After `hermes-run-reddit.sh` returns, let `rd_stdout` = terminal stdout (trimmed), try `rd_json = JSON.parse(rd_stdout)`, and read post rows from **`rd_json.posts`** only. Do not read `stories[]`, `repos[]`, or `entries[]` from Reddit stdout — those keys belong to Sources 5, 7, and 9.
+- **RSS stdout threading (Source 9):** After `hermes-run-rss.sh` returns, let `rss_stdout` = terminal stdout (trimmed), try `rss_json = JSON.parse(rss_stdout)`, and read entry rows from **`rss_json.entries`** only. Do not read `stories[]`, `repos[]`, or `posts[]` from RSS stdout — those keys belong to Sources 5, 7, and 8.
 - **Scoring stdout threading (§9):** After `score-digest-signals.mjs` returns, you **must** capture stdout, parse `scored_signals = JSON.parse(stdout.trim())`, and assign `digest_push_payload.signals = scored_signals` before building `DIGEST_PUSH_JSON` for push or keyword-candidates. Do not pass pre-scoring signals when scoring stdout parsed successfully.
 - When reproducing or testing `pick-signal-notebook.mjs`, use an absolute registry path. Relative `CNS_NOTEBOOK_REGISTRY_PATH` values can resolve against the repo root unexpectedly.
 - When registry rows have UUID-only titles (common with `NOTEBOOKLM_NOTEBOOK_IDS` fan-out), set `NOTEBOOKLM_NOTEBOOK_TITLES` in `~/.hermes/trend-ingest.env` so signal scoring can F1-match human titles.

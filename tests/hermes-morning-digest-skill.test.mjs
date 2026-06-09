@@ -39,7 +39,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.4"));
+    assert.ok(body.includes("version: 1.4.5"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -399,6 +399,57 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(skillBody.includes("hn_json.stories"));
   });
 
+  it("task-prompt documents imperative GitHub stdout parsing (Story 65-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source7End = taskBody.indexOf("## Source 8");
+    const source7 = taskBody.slice(taskBody.indexOf("## Source 7"), source7End);
+    assert.ok(source7.includes("repos[]"));
+    assert.ok(source7.includes("gh_json") || source7.includes("gh_stdout"));
+    assert.ok(source7.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*stories/i.test(source7),
+      "must anti-pattern stories/posts/entries for GitHub",
+    );
+    assert.ok(source7.includes("continue** to Source 8"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("GitHub stdout threading"));
+    assert.ok(skillBody.includes("gh_json.repos"));
+  });
+
+  it("task-prompt documents imperative Reddit stdout parsing (Story 65-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source8End = taskBody.indexOf("## Source 9");
+    const source8 = taskBody.slice(taskBody.indexOf("## Source 8"), source8End);
+    assert.ok(source8.includes("posts[]"));
+    assert.ok(source8.includes("rd_json") || source8.includes("rd_stdout"));
+    assert.ok(source8.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*repos/i.test(source8),
+      "must anti-pattern wrong keys for Reddit",
+    );
+    assert.ok(source8.includes("continue** to Source 9"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("Reddit stdout threading"));
+    assert.ok(skillBody.includes("rd_json.posts"));
+  });
+
+  it("task-prompt documents imperative RSS stdout parsing (Story 65-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source9End = taskBody.indexOf("## Source 6");
+    const source9 = taskBody.slice(taskBody.indexOf("## Source 9"), source9End);
+    assert.ok(source9.includes("entries[]"));
+    assert.ok(source9.includes("rss_json") || source9.includes("rss_stdout"));
+    assert.ok(source9.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*stories/i.test(source9),
+      "must anti-pattern wrong keys for RSS",
+    );
+    assert.ok(source9.includes("continue** to Source 6"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("RSS stdout threading"));
+    assert.ok(skillBody.includes("rss_json.entries"));
+  });
+
   it("config-snippet documents RSS env keys (Story 65-4)", () => {
     const body = readFileSync(configSnippetPath, "utf8");
     assert.ok(body.includes("MORNING_DIGEST_RSS_FEEDS"));
@@ -578,7 +629,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.4"));
+    assert.ok(body.includes("version: 1.4.5"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));

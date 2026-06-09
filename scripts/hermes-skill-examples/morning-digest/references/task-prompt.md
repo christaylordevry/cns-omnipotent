@@ -158,15 +158,25 @@ Call `terminal` exactly once for GitHub repository search. The script reads `MOR
 terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-Parse stdout JSON:
+Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
 
-- `repos[]` with `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
-- When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
-- Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
+```json
+{ "repos": [{ "title": "owner/repo", "url": "https://github.com/...", "stars": 1200, "forks": 45 }] }
+```
 
-For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks`.
+**After the GitHub terminal returns** (mandatory stdout threading — mirror Source 5 / §9 scoring):
 
-On failure (`error` key, empty `repos`, or invalid stdout): section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 8.
+1. Let `gh_stdout` = GitHub terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `gh_json = JSON.parse(gh_stdout)` inside try/catch or equivalent safe parse.
+3. If `gh_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(gh_json.repos) && gh_json.repos.length > 0`:
+   - Read **`gh_json.repos`** (`repos[]` stdout array key) only — each item uses `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
+   - When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
+   - Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
+   - For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks`.
+5. Else → failure (empty `repos`, invalid shape, or parse error).
+6. On failure: section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 8.
+7. **Anti-pattern:** Do not read `stories[]`, `posts[]`, or `entries[]` from GitHub stdout — those keys belong to Sources 5, 8, and 9 only.
 
 ## Source 8 — Reddit
 
@@ -176,15 +186,25 @@ Call `terminal` exactly once for Reddit hot listings via OAuth. The script reads
 terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-Parse stdout JSON:
+Stdout shape (Reddit only — do not confuse with Sources 5, 7, or 9 keys):
 
-- `posts[]` with `title`, `url`, `upvotes`, `commentCount` (numbers), optional `publishedAt` (ISO string).
-- When building §9 push signals, nest engagement under `sourceMetadata`: `posts[].upvotes` → `sourceMetadata.upvotes`, `posts[].commentCount` → `sourceMetadata.commentCount` (omit `commentCount` when absent), `posts[].publishedAt` → `sourceMetadata.publishedAt` when present.
-- Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names **without** `r/` prefix) and OAuth credentials when enabled.
+```json
+{ "posts": [{ "title": "...", "url": "https://reddit.com/...", "upvotes": 42, "commentCount": 7 }] }
+```
 
-For Discord **Reddit**, list each post as `- <title> — <upvotes> upvotes, <commentCount> comments`.
+**After the Reddit terminal returns** (mandatory stdout threading — mirror Source 5 / §9 scoring):
 
-On failure (`error` key, empty `posts`, or invalid stdout): section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 9.
+1. Let `rd_stdout` = Reddit terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `rd_json = JSON.parse(rd_stdout)` inside try/catch or equivalent safe parse.
+3. If `rd_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(rd_json.posts) && rd_json.posts.length > 0`:
+   - Read **`rd_json.posts`** (`posts[]` stdout array key) only — each item uses `title`, `url`, `upvotes`, `commentCount` (numbers), optional `publishedAt` (ISO string).
+   - When building §9 push signals, nest engagement under `sourceMetadata`: `posts[].upvotes` → `sourceMetadata.upvotes`, `posts[].commentCount` → `sourceMetadata.commentCount` (omit `commentCount` when absent), `posts[].publishedAt` → `sourceMetadata.publishedAt` when present.
+   - Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names **without** `r/` prefix) and OAuth credentials when enabled.
+   - For Discord **Reddit**, list each post as `- <title> — <upvotes> upvotes, <commentCount> comments`.
+5. Else → failure (empty `posts`, invalid shape, or parse error).
+6. On failure: section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 9.
+7. **Anti-pattern:** Do not read `stories[]`, `repos[]`, or `entries[]` from Reddit stdout — those keys belong to Sources 5, 7, and 9 only.
 
 ## Source 9 — Newsletters / RSS
 
@@ -194,15 +214,25 @@ Call `terminal` exactly once for curated RSS/Substack feeds. The script reads `M
 terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-Parse stdout JSON:
+Stdout shape (RSS only — do not confuse with Sources 5, 7, or 8 keys):
 
-- `entries[]` with `title`, `url`, optional `publishedAt` (ISO string), optional `author`.
-- When building §9 push signals, nest metadata under `sourceMetadata`: `entries[].publishedAt` → `sourceMetadata.publishedAt`, `entries[].author` → `sourceMetadata.author` when present — **never** leave metadata at the signal root.
-- Emit up to **N** entries total (default **10**, configurable via `MORNING_DIGEST_RSS_MAX_TOTAL`; default **3** per feed via `MORNING_DIGEST_RSS_MAX_PER_FEED`); requires `MORNING_DIGEST_RSS_FEEDS` (comma-separated feed URLs) when enabled.
+```json
+{ "entries": [{ "title": "...", "url": "https://...", "publishedAt": "2026-06-09T08:00:00.000Z", "author": "..." }] }
+```
 
-For Discord **Newsletters / RSS**, list each entry as `- <title>` (optional ` — <author>` when present).
+**After the RSS terminal returns** (mandatory stdout threading — mirror Source 5 / §9 scoring):
 
-On failure (`error` key, empty `entries`, or invalid stdout): section header **Newsletters / RSS** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+1. Let `rss_stdout` = RSS terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `rss_json = JSON.parse(rss_stdout)` inside try/catch or equivalent safe parse.
+3. If `rss_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(rss_json.entries) && rss_json.entries.length > 0`:
+   - Read **`rss_json.entries`** (`entries[]` stdout array key) only — each item uses `title`, `url`, optional `publishedAt` (ISO string), optional `author`.
+   - When building §9 push signals, nest metadata under `sourceMetadata`: `entries[].publishedAt` → `sourceMetadata.publishedAt`, `entries[].author` → `sourceMetadata.author` when present — **never** leave metadata at the signal root.
+   - Emit up to **N** entries total (default **10**, configurable via `MORNING_DIGEST_RSS_MAX_TOTAL`; default **3** per feed via `MORNING_DIGEST_RSS_MAX_PER_FEED`); requires `MORNING_DIGEST_RSS_FEEDS` (comma-separated feed URLs) when enabled.
+   - For Discord **Newsletters / RSS**, list each entry as `- <title>` (optional ` — <author>` when present).
+5. Else → failure (empty `entries`, invalid shape, or parse error).
+6. On failure: section header **Newsletters / RSS** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+7. **Anti-pattern:** Do not read `stories[]`, `repos[]`, or `posts[]` from RSS stdout — those keys belong to Sources 5, 7, and 8 only.
 
 ## Source 6 — Vault context (NotebookLM)
 

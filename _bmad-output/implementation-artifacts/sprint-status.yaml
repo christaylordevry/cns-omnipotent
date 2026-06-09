@@ -454,15 +454,16 @@ development_status:
   epic-64-retrospective: done
 
   # Epic 65 — Native Source Adapter Expansion v1 (reference: last30days codebook only; Omnipotent.md)
-  epic-65: in-progress
+  epic-65: done
   65-1-digest-source-types-github-adapter: done
   65-2-reddit-public-json-spike: done
   65-3-reddit-credential-adapter: done
   65-4-rss-adapter: done
   # 65-2 blocks 65-3; 65-4 parallel with 65-3 (no dependency on 65-3)
-  # Stories: 65-1 GitHub → 65-2 Reddit spike → 65-3 Reddit adapter → 65-4 RSS → 65-5 HN optional → 65-6 HN TypeError hotfix
+  # Stories: 65-1 GitHub → 65-2 Reddit spike → 65-3 Reddit adapter → 65-4 RSS → 65-5 HN optional (waived) → 65-6 HN TypeError hotfix → 65-7 Sources 7–9 stdout threading hotfix
   65-6-fix-hn-typeerror-morning-digest-task-prompt: done
-  65-3-reddit-adapter: backlog
+  65-7-imperative-stdout-threading-sources-7-9: done
+  epic-65-retrospective: done
 
   # Epic 66 — Nexus Agent Orchestration (renumbered from sprint-change-proposal-2026-06-06 Epic 64+)
   epic-66: backlog
