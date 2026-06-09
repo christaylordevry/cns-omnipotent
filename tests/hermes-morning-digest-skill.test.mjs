@@ -316,7 +316,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
   });
 
-  it("task-prompt Source 4 arXiv, Source 5 HackerNews, Source 7 GitHub (Story 61-1, 61-4, 65-1)", () => {
+  it("task-prompt Source 4 arXiv, Source 5 HackerNews, Source 7 GitHub, Source 8 Reddit (Story 61-1, 61-4, 65-1, 65-3)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const source4End = taskBody.indexOf("## Source 5");
     const source4 = taskBody.slice(taskBody.indexOf("## Source 4"), source4End);
@@ -330,18 +330,28 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source5.includes("**HackerNews**"));
     assert.ok(source5.includes("stories[]"));
 
-    const source7End = taskBody.indexOf("## Source 6");
+    const source7End = taskBody.indexOf("## Source 8");
     const source7 = taskBody.slice(source5End, source7End);
     assert.ok(source7.includes("hermes-run-github.sh"));
     assert.ok(source7.includes("**GitHub**"));
     assert.ok(source7.includes("repos[]"));
+    assert.ok(source7.includes("continue** to Source 8"));
 
-    const source6 = taskBody.slice(source7End);
+    const source8End = taskBody.indexOf("## Source 6");
+    const source8 = taskBody.slice(source7End, source8End);
+    assert.ok(source8.includes("hermes-run-reddit.sh"));
+    assert.ok(source8.includes("**Reddit**"));
+    assert.ok(source8.includes("posts[]"));
+    assert.ok(source8.includes("sourceMetadata.upvotes"));
+    assert.ok(source8.includes("continue** to Source 6"));
+
+    const source6 = taskBody.slice(source8End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
     assert.ok(source6.includes("buildDigestSignals"));
     assert.ok(source6.includes("perplexityText"));
     assert.ok(source6.includes('"arxiv"'));
     assert.ok(source6.includes('"hackernews"'));
+    assert.ok(source6.includes('"reddit"'));
     assert.ok(source6.includes('"trends"'));
     assert.ok(source6.includes('"headlines"'));
     assert.ok(source6.includes("arXiv titles (up to 3)"));

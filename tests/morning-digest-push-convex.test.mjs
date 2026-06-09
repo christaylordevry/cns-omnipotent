@@ -105,6 +105,53 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(first.length, 16);
 	});
 
+	it('passes reddit sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-05',
+				ranAt: 1_749_091_200_000,
+				topTrend: 'AI agents',
+				focusKeyword: 'AI agents',
+			},
+			signals: [
+				{
+					section: 'reddit',
+					sourceType: 'reddit',
+					title: 'Example ML post',
+					url: 'https://www.reddit.com/r/MachineLearning/comments/abc123/example/',
+					rank: 1,
+					externalId: 'rdabcdef12345678',
+					sourceMetadata: { upvotes: 420, commentCount: 37, publishedAt: '2026-06-09T08:00:00.000Z' },
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-reddit' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.status, 'ok');
+		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
+		assert.ok(addCall);
+		assert.equal(addCall.args.signal.section, 'reddit');
+		assert.equal(addCall.args.signal.sourceType, 'reddit');
+		assert.deepEqual(addCall.args.signal.sourceMetadata, {
+			upvotes: 420,
+			commentCount: 37,
+			publishedAt: '2026-06-09T08:00:00.000Z',
+		});
+	});
+
 	it('passes github sourceType through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];

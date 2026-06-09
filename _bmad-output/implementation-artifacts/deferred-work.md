@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 65-3-reddit-credential-adapter (2026-06-09)
+
+- `r/` prefix in `MORNING_DIGEST_REDDIT_SUBREDDITS` corrupts OAuth URL silently — operator misconfig; story docs say omit `r/` prefix; strip guard optional in future hardening.
+
 ## Deferred from: code review of 65-2-reddit-public-json-spike (2026-06-09)
 
 - Network/timeout failures labeled `parse-error` — spec allows indicator; distinct `timeout`/`network-error` would aid ops but not required for gate script.
