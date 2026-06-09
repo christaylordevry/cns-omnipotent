@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 65-9-surface-intelligence-scoring-inspector-drawer (2026-06-09)
+
+- Scoring panel absent during `getDigestSignalsForRun` fetch with no loading indicator — matches 63-5 drawer defer pattern; optional polish story.
+- Rank fallback when keyword misses shows highest `rankScore` in run — by design per T1.2; operator brief accepts run-level fallback.
+
 ## Deferred from: code review of 65-8-build-digest-signals-github-reddit-caps (2026-06-09)
 
 - `signalsFromParsedInput` guard path untested for github/reddit/rss-only payloads — AC4 satisfied in code; CLI regression test optional hardening.
