@@ -20,6 +20,9 @@ const SOURCE_PRIOR = {
   google_trends: 10,
   deep_signal: 5,
   arxiv: 0,
+  github: 5,
+  reddit: 8,
+  rss: 5,
 };
 
 const TREND_PROXY_PRIOR = {
@@ -28,12 +31,15 @@ const TREND_PROXY_PRIOR = {
   newsapi: 35,
   arxiv: 25,
   deep_signal: 50,
+  github: 40,
+  reddit: 42,
+  rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,

@@ -300,6 +300,28 @@ describe('scoreNovelty normative table', () => {
   });
 });
 
+describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
+  const runAt = Date.parse('2026-06-09T12:00:00Z');
+
+  it('assigns non-zero trend proxy priors for github, reddit, and rss', () => {
+    assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
+    assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
+    assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
+  });
+
+  it('assigns non-zero urgency via github source prior', () => {
+    const urgency = scoreUrgency(
+      {
+        title: 'owner/example-repo',
+        sourceType: 'github',
+        sourceMetadata: { publishedAt: '2026-06-09T08:00:00Z' },
+      },
+      baseCtx({ runAt }),
+    );
+    assert.ok(urgency > 0);
+  });
+});
+
 describe('scoreUrgency', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
@@ -544,6 +566,20 @@ describe('scoreMomentum', () => {
     const norm = normalizeEngagement(signal);
     assert.equal(norm, 100);
     assert.equal(scoreMomentum(signal, norm, baseCtx()), 86);
+  });
+
+  it('github adapter row with stars drives Path A momentum', () => {
+    const signal = {
+      title: 'owner/example-repo',
+      sourceType: 'github',
+      sourceMetadata: { stars: 500 },
+    };
+    const norm = normalizeEngagement(signal);
+    assert.ok(norm !== null && norm >= 0 && norm <= 100);
+    assert.equal(norm, 48);
+    const momentum = scoreMomentum(signal, norm, baseCtx());
+    assert.ok(momentum > 0);
+    assert.equal(momentum, clamp(Math.round(0.75 * norm + 0.25 * trendProxyForSignal(signal)), 0, 100));
   });
 
   it('null normalizedEngagement preserves Path B for non-engagement sources', () => {

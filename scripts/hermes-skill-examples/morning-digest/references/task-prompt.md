@@ -138,15 +138,35 @@ Parse stdout JSON:
 
 For Discord **HackerNews**, list each story as `- <title> — <score> pts, <comments> comments`.
 
-On failure (`error` key, empty `stories`, or invalid stdout): section header **HackerNews** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+On failure (`error` key, empty `stories`, or invalid stdout): section header **HackerNews** + `- (source unavailable: <short reason>)` and **continue** to Source 7.
+
+## Source 7 — GitHub
+
+Call `terminal` exactly once for GitHub repository search. The script reads `MORNING_DIGEST_GITHUB_*` and optional `GITHUB_TOKEN` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"repos":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+Parse stdout JSON:
+
+- `repos[]` with `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
+- When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
+- Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
+
+For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks`.
+
+On failure (`error` key, empty `repos`, or invalid stdout): section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+
+> **Sources 8–9 (Reddit, RSS)** — mapping rows are documented in §9 for Convex push; production Hermes invocation lands in stories 65-3 and 65-4. No terminal call in 65-1.
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 5 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 7 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5 and Source 7 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -154,7 +174,8 @@ After Sources 1–5 complete, assemble a JSON object from parsed tool outputs (s
   "headlines": [{ "title": "<string>", "url": "<optional url>" }],
   "perplexityText": "<Deep Signal body text only — not the Perplexity query string>",
   "arxiv": [{ "title": "<string>", "snippet": "<string>" }],
-  "hackernews": [{ "title": "<string>" }]
+  "hackernews": [{ "title": "<string>" }],
+  "github": [{ "title": "<string>", "url": "<string>", "stars": <number> }]
 }
 ```
 
@@ -163,6 +184,7 @@ After Sources 1–5 complete, assemble a JSON object from parsed tool outputs (s
 - **perplexityText:** the **2–3 sentence Deep Signal** answer from Source 3 when Perplexity succeeded; omit or `""` when Deep Signal is unavailable.
 - **arxiv:** paper **titles** and **snippets** from Source 4 when available; omit or `[]` when arXiv is unavailable.
 - **hackernews:** story **titles** from Source 5 when available; omit or `[]` when HackerNews is unavailable.
+- **github:** repo **titles** from Source 7 when available; omit or `[]` when GitHub is unavailable.
 
 `pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
@@ -355,12 +377,17 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 | `deep_signal` | `deep_signal` | Source 3 body | first 80 chars or `"Deep Signal"` | full text | — | — | `sha256(date + topTrend)` short hex |
 | `arxiv` | `arxiv` | Source 4 `papers[]` | `title` | `snippet` | `link` | — | arxiv id from link (`/\d+\.\d+`) or link hash |
 | `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
+| `github` | `github` | Source 7 `repos[]` | `title` | — | `url` | — | `sha256(url).slice(0,16)` short hex |
+| `reddit` | `reddit` | Source 8 `posts[]` (future — 65-3) | `title` | — | `url` | — | url hash or title+date hash |
+| `rss` | `rss` | Source 9 `items[]` (future — 65-4) | `title` | — | `url` | — | url hash or title+date hash |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
   - HN: map RSS `score` → `points` (number); RSS `comments` → `commentCount` (number). Legacy `sourceMetadata.comments` remains accepted by validators but prefer `points` + `commentCount` for engagement normalization (64-4).
   - arXiv: `categories` (array of strings from `category`) when present.
-  - GitHub/Reddit (future): `stars`, `forks`, `upvotes` when present.
+  - GitHub: map `repos[].stars` → `sourceMetadata.stars` (number, **required** for engagement normalization); map `repos[].forks` → `sourceMetadata.forks` (number) when present; map `repos[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `stars`/`forks` at the signal root — `normalizeEngagement` reads only `sourceMetadata.stars`/`sourceMetadata.forks`; root-level fields score as null silently.
+  - Reddit (future 65-3): `upvotes` (required for normalization), optional `commentCount`, optional `publishedAt`.
+  - RSS (future 65-4): optional `publishedAt`, optional `author`; **no engagement fields**.
 - **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
@@ -370,9 +397,9 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 The `addDigestSignal` validator is a **strict** object: a missing required key **or** an unexpected/`null` value rejects the whole signal, and the push then finalizes the run as `failed` with **zero** signals stored. Build every signal object exactly to this contract:
 
 - **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
-- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal`.
+- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss`.
 - **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`, `scores`, `disposition`, `normalizedEngagement`, `rankScore`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
-- **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
+- **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, `sourceMetadata.stars`, `sourceMetadata.forks`, `sourceMetadata.upvotes`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
 - Do **not** add any key not listed in the table / this contract.
 
 ### `digest_push_payload` shape

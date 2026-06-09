@@ -316,7 +316,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
   });
 
-  it("task-prompt Source 4 arXiv and Source 5 HackerNews (Story 61-1, 61-4)", () => {
+  it("task-prompt Source 4 arXiv, Source 5 HackerNews, Source 7 GitHub (Story 61-1, 61-4, 65-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const source4End = taskBody.indexOf("## Source 5");
     const source4 = taskBody.slice(taskBody.indexOf("## Source 4"), source4End);
@@ -324,13 +324,19 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source4.includes("fetch-arxiv-rss.mjs") || source4.includes("papers[]"));
     assert.ok(source4.includes("**arXiv Preprints**"));
 
-    const source5End = taskBody.indexOf("## Source 6");
+    const source5End = taskBody.indexOf("## Source 7");
     const source5 = taskBody.slice(source4End, source5End);
     assert.ok(source5.includes("hermes-run-hn.sh"));
     assert.ok(source5.includes("**HackerNews**"));
     assert.ok(source5.includes("stories[]"));
 
-    const source6 = taskBody.slice(source5End);
+    const source7End = taskBody.indexOf("## Source 6");
+    const source7 = taskBody.slice(source5End, source7End);
+    assert.ok(source7.includes("hermes-run-github.sh"));
+    assert.ok(source7.includes("**GitHub**"));
+    assert.ok(source7.includes("repos[]"));
+
+    const source6 = taskBody.slice(source7End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
     assert.ok(source6.includes("buildDigestSignals"));
     assert.ok(source6.includes("perplexityText"));
