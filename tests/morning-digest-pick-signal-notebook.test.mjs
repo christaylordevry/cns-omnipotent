@@ -18,6 +18,7 @@ import {
   extractArxivSignals,
   extractHnSignals,
   extractPerplexitySignals,
+  extractRssSignals,
   parseNotebookTitleMap,
   pickSignalNotebook,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs';
@@ -266,6 +267,45 @@ describe('buildDigestSignals', () => {
       Array.from({ length: 5 }, (_, i) => ({ title: `story-${i}` })),
     );
     assert.equal(titles.length, 3);
+  });
+
+  it('extractRssSignals returns top 1 by publishedAt desc', () => {
+    const titles = extractRssSignals([
+      { title: 'Older', publishedAt: '2026-06-07T00:00:00.000Z' },
+      { title: 'Newest', publishedAt: '2026-06-09T00:00:00.000Z' },
+      { title: 'Middle', publishedAt: '2026-06-08T00:00:00.000Z' },
+    ]);
+    assert.deepEqual(titles, ['Newest']);
+  });
+
+  it('places RSS title after HN titles in order', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
+      hackernews: [{ title: 'HN Story One' }],
+      rss: [
+        { title: 'Newsletter Alpha', publishedAt: '2026-06-08T00:00:00.000Z' },
+        { title: 'Newsletter Beta', publishedAt: '2026-06-09T00:00:00.000Z' },
+      ],
+    });
+    const hnIdx = signals.indexOf('HN Story One');
+    const rssIdx = signals.indexOf('Newsletter Beta');
+    assert.ok(hnIdx >= 0 && rssIdx > hnIdx);
+  });
+
+  it('caps combined output at 10 with rss included', () => {
+    const signals = buildDigestSignals({
+      trends: Array.from({ length: 3 }, (_, i) => ({
+        keyword: `trend-${i}`,
+        normalizedValue: 1 - i * 0.01,
+      })),
+      headlines: Array.from({ length: 3 }, (_, i) => ({ title: `headline-${i}` })),
+      perplexityText: 'One concise sentence only.',
+      arxiv: [{ title: 'arxiv-0' }],
+      hackernews: [{ title: 'hn-0' }],
+      rss: [{ title: 'Newsletter pick', publishedAt: '2026-06-09T00:00:00.000Z' }],
+    });
+    assert.equal(signals.length, 10);
+    assert.ok(signals.includes('Newsletter pick'));
   });
 });
 

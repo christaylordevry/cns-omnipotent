@@ -148,6 +148,55 @@ MORNING_DIGEST_HN_ENABLED=1
 
 When disabled, the fetch script returns `{"error":"hackernews disabled"}`.
 
+## GitHub repository search (Story 65-1)
+
+Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as NewsAPI is fine).
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MORNING_DIGEST_GITHUB_QUERIES` | Comma-separated GitHub search strings | required when enabled |
+| `MORNING_DIGEST_GITHUB_MAX_REPOS` | Max repos to return | `5` |
+| `MORNING_DIGEST_GITHUB_ENABLED` | Set `0` or `false` to disable | enabled |
+| `GITHUB_TOKEN` | Optional — raises API rate limits | — |
+
+## Reddit hot listings (Story 65-3)
+
+OAuth credentials required when enabled. Set in `~/.hermes/trend-ingest.env`.
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MORNING_DIGEST_REDDIT_SUBREDDITS` | Comma-separated subreddit names (no `r/` prefix) | required when enabled |
+| `MORNING_DIGEST_REDDIT_MAX_POSTS` | Total post cap | `5` |
+| `MORNING_DIGEST_REDDIT_PER_SUBREDDIT` | Max posts per subreddit | `3` |
+| `MORNING_DIGEST_REDDIT_ENABLED` | Set `0` or `false` to disable | enabled |
+| `REDDIT_CLIENT_ID` | OAuth app client id | required when enabled |
+| `REDDIT_CLIENT_SECRET` | OAuth app secret | required when enabled |
+| `REDDIT_USERNAME` | Script-app Reddit username | required when enabled |
+| `REDDIT_PASSWORD` | Script-app password | required when enabled |
+
+## Newsletters / RSS (Story 65-4)
+
+Public RSS/Atom feeds — no API key. Set in the shell environment or in `~/.hermes/trend-ingest.env`.
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MORNING_DIGEST_RSS_FEEDS` | Comma-separated feed URLs (Substack RSS, etc.) | required when enabled |
+| `MORNING_DIGEST_RSS_MAX_PER_FEED` | Max entries per feed | `3` |
+| `MORNING_DIGEST_RSS_MAX_TOTAL` | Total cap after dedupe | `10` |
+| `MORNING_DIGEST_RSS_ENABLED` | Set `0` or `false` to disable | enabled |
+
+Example operator setup:
+
+```bash
+# In ~/.hermes/trend-ingest.env
+MORNING_DIGEST_RSS_FEEDS=https://example.substack.com/feed,https://newsletter.example.com/rss.xml
+MORNING_DIGEST_RSS_MAX_PER_FEED=3
+MORNING_DIGEST_RSS_MAX_TOTAL=10
+MORNING_DIGEST_RSS_ENABLED=1
+```
+
+When disabled, the fetch script returns `{"error":"rss disabled"}`.
+
 ## NotebookLM title map (Story 61-2)
 
 When `NOTEBOOKLM_NOTEBOOK_IDS` is set for session-close fan-out, registry rows may carry UUID-only titles. Morning digest signal scoring uses **human-readable** titles from this map so Vault context can ROUTED-match watched notebooks.

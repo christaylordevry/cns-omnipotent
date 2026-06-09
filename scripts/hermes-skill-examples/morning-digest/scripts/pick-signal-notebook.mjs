@@ -20,6 +20,7 @@ const MAX_HEADLINE_TITLES = 5;
 const MAX_PERPLEXITY_SIGNALS = 3;
 const MAX_ARXIV_SIGNALS = 3;
 const MAX_HN_SIGNALS = 3;
+const MAX_RSS_SIGNALS = 1;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
 const CNS_REPO_ROOT =
@@ -165,12 +166,48 @@ export function extractHnSignals(hnList) {
 }
 
 /**
+ * @param {Array<{ title?: string, publishedAt?: string }>} rssList
+ * @returns {string[]}
+ */
+export function extractRssSignals(rssList) {
+  if (!Array.isArray(rssList)) {
+    return [];
+  }
+  const sorted = [...rssList].sort((a, b) => {
+    const aMs = Date.parse(String(a?.publishedAt ?? ''));
+    const bMs = Date.parse(String(b?.publishedAt ?? ''));
+    const aValid = !Number.isNaN(aMs);
+    const bValid = !Number.isNaN(bMs);
+    if (aValid && bValid) {
+      return bMs - aMs;
+    }
+    if (aValid) {
+      return -1;
+    }
+    if (bValid) {
+      return 1;
+    }
+    return 0;
+  });
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_RSS_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {{
  *   trends?: Array<{ keyword?: string, normalizedValue?: number }>,
  *   headlines?: Array<{ title?: string } | string>,
  *   perplexityText?: string,
  *   arxiv?: Array<{ title?: string }>,
  *   hackernews?: Array<{ title?: string }>,
+ *   rss?: Array<{ title?: string, publishedAt?: string }>,
  * }} sources
  * @returns {string[]}
  */
@@ -203,6 +240,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractPerplexitySignals(sources.perplexityText).slice(0, MAX_PERPLEXITY_SIGNALS));
   ordered.push(...extractArxivSignals(sources.arxiv));
   ordered.push(...extractHnSignals(sources.hackernews));
+  ordered.push(...extractRssSignals(sources.rss));
 
   return dedupeSignals(ordered);
 }

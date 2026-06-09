@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-09T10:30:00+00:00"
+last_updated: "2026-06-09T12:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -458,6 +458,7 @@ development_status:
   65-1-digest-source-types-github-adapter: done
   65-2-reddit-public-json-spike: done
   65-3-reddit-credential-adapter: done
+  65-4-rss-adapter: done
   # 65-2 blocks 65-3; 65-4 parallel with 65-3 (no dependency on 65-3)
   # Stories: 65-1 GitHub → 65-2 Reddit spike → 65-3 Reddit adapter → 65-4 RSS → 65-5 HN optional
   65-3-reddit-adapter: backlog

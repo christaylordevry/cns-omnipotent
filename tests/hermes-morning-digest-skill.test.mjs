@@ -15,8 +15,12 @@ const trendIngestWrapperPath = join(root, "scripts/session-close/hermes-run-tren
 const newsapiWrapperPath = join(root, "scripts/session-close/hermes-run-newsapi.sh");
 const arxivWrapperPath = join(root, "scripts/session-close/hermes-run-arxiv.sh");
 const hnWrapperPath = join(root, "scripts/session-close/hermes-run-hn.sh");
+const githubWrapperPath = join(root, "scripts/session-close/hermes-run-github.sh");
+const redditWrapperPath = join(root, "scripts/session-close/hermes-run-reddit.sh");
+const rssWrapperPath = join(root, "scripts/session-close/hermes-run-rss.sh");
 const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const fetchHnScriptPath = join(skillDir, "scripts/fetch-hn-rss.mjs");
+const fetchRssScriptPath = join(skillDir, "scripts/fetch-rss-signals.mjs");
 const fetchNewsapiScriptPath = join(skillDir, "scripts/fetch-newsapi-headlines.mjs");
 const pickSignalScriptPath = join(
   skillDir,
@@ -35,7 +39,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.2"));
+    assert.ok(body.includes("version: 1.4.3"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -316,7 +320,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(taskBody.includes("notebook-query/scripts/query-notebook.mjs"));
   });
 
-  it("task-prompt Source 4 arXiv, Source 5 HackerNews, Source 7 GitHub, Source 8 Reddit (Story 61-1, 61-4, 65-1, 65-3)", () => {
+  it("task-prompt Source 4 arXiv, Source 5 HackerNews, Source 7 GitHub, Source 8 Reddit, Source 9 RSS (Story 61-1, 61-4, 65-1, 65-3, 65-4)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const source4End = taskBody.indexOf("## Source 5");
     const source4 = taskBody.slice(taskBody.indexOf("## Source 4"), source4End);
@@ -337,21 +341,31 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source7.includes("repos[]"));
     assert.ok(source7.includes("continue** to Source 8"));
 
-    const source8End = taskBody.indexOf("## Source 6");
+    const source8End = taskBody.indexOf("## Source 9");
     const source8 = taskBody.slice(source7End, source8End);
     assert.ok(source8.includes("hermes-run-reddit.sh"));
     assert.ok(source8.includes("**Reddit**"));
     assert.ok(source8.includes("posts[]"));
     assert.ok(source8.includes("sourceMetadata.upvotes"));
-    assert.ok(source8.includes("continue** to Source 6"));
+    assert.ok(source8.includes("continue** to Source 9"));
 
-    const source6 = taskBody.slice(source8End);
+    const source9End = taskBody.indexOf("## Source 6");
+    const source9 = taskBody.slice(source8End, source9End);
+    assert.ok(source9.includes("hermes-run-rss.sh"));
+    assert.ok(source9.includes("**Newsletters / RSS**"));
+    assert.ok(source9.includes("entries[]"));
+    assert.ok(source9.includes("sourceMetadata.publishedAt"));
+    assert.ok(source9.includes("continue** to Source 6"));
+
+    const source6 = taskBody.slice(source9End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
     assert.ok(source6.includes("buildDigestSignals"));
     assert.ok(source6.includes("perplexityText"));
     assert.ok(source6.includes('"arxiv"'));
     assert.ok(source6.includes('"hackernews"'));
     assert.ok(source6.includes('"reddit"'));
+    assert.ok(source6.includes('"rss"'));
+    assert.ok(source6.includes("RSS title (up to 1,"));
     assert.ok(source6.includes('"trends"'));
     assert.ok(source6.includes('"headlines"'));
     assert.ok(source6.includes("arXiv titles (up to 3)"));
@@ -363,6 +377,25 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(skillBody.includes("DIGEST_SOURCES_JSON"));
     assert.ok(skillBody.includes("arxiv"));
     assert.ok(skillBody.includes("hackernews"));
+    assert.ok(skillBody.includes("hermes-run-rss.sh"));
+    assert.ok(skillBody.includes("entries[]"));
+  });
+
+  it("config-snippet documents RSS env keys (Story 65-4)", () => {
+    const body = readFileSync(configSnippetPath, "utf8");
+    assert.ok(body.includes("MORNING_DIGEST_RSS_FEEDS"));
+    assert.ok(body.includes("MORNING_DIGEST_RSS_MAX_PER_FEED"));
+    assert.ok(body.includes("MORNING_DIGEST_RSS_MAX_TOTAL"));
+  });
+
+  it("wrapper scripts include GitHub, Reddit, and RSS session-close runners (Story 65-1, 65-3, 65-4)", () => {
+    assert.ok(existsSync(githubWrapperPath));
+    assert.ok(existsSync(redditWrapperPath));
+    assert.ok(existsSync(rssWrapperPath));
+    assert.ok(existsSync(fetchRssScriptPath));
+    assert.ok((statSync(rssWrapperPath).mode & 0o111) !== 0);
+    const rssWrapper = readFileSync(rssWrapperPath, "utf8");
+    assert.ok(rssWrapper.includes("fetch-rss-signals.mjs"));
   });
 
   it("config-snippet documents arXiv env keys (Story 61-1)", () => {
@@ -527,7 +560,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.2"));
+    assert.ok(body.includes("version: 1.4.3"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));

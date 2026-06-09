@@ -28,6 +28,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "gray-matter": "^4.0.3",
     "ignore": "^7.0.5",
+    "rss-parser": "^3.13.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

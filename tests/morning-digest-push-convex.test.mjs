@@ -152,6 +152,52 @@ describe('push-digest-convex.mjs', () => {
 		});
 	});
 
+	it('passes rss sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-05',
+				ranAt: 1_749_091_200_000,
+				topTrend: 'AI agents',
+				focusKeyword: 'AI agents',
+			},
+			signals: [
+				{
+					section: 'rss',
+					sourceType: 'rss',
+					title: 'Newsletter headline',
+					url: 'https://example.com/newsletter/post',
+					rank: 1,
+					externalId: 'rsabcdef12345678',
+					sourceMetadata: { publishedAt: '2026-06-09T07:00:00.000Z', author: 'Author Name' },
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-rss' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.status, 'ok');
+		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
+		assert.ok(addCall);
+		assert.equal(addCall.args.signal.section, 'rss');
+		assert.equal(addCall.args.signal.sourceType, 'rss');
+		assert.deepEqual(addCall.args.signal.sourceMetadata, {
+			publishedAt: '2026-06-09T07:00:00.000Z',
+			author: 'Author Name',
+		});
+	});
+
 	it('passes github sourceType through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];

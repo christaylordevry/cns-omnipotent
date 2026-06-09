@@ -174,17 +174,33 @@ Parse stdout JSON:
 
 For Discord **Reddit**, list each post as `- <title> — <upvotes> upvotes, <commentCount> comments`.
 
-On failure (`error` key, empty `posts`, or invalid stdout): section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+On failure (`error` key, empty `posts`, or invalid stdout): section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 9.
 
-> **Source 9 (RSS)** — mapping row is documented in §9 for Convex push; production Hermes invocation lands in story 65-4.
+## Source 9 — Newsletters / RSS
+
+Call `terminal` exactly once for curated RSS/Substack feeds. The script reads `MORNING_DIGEST_RSS_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"entries":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+Parse stdout JSON:
+
+- `entries[]` with `title`, `url`, optional `publishedAt` (ISO string), optional `author`.
+- When building §9 push signals, nest metadata under `sourceMetadata`: `entries[].publishedAt` → `sourceMetadata.publishedAt`, `entries[].author` → `sourceMetadata.author` when present — **never** leave metadata at the signal root.
+- Emit up to **N** entries total (default **10**, configurable via `MORNING_DIGEST_RSS_MAX_TOTAL`; default **3** per feed via `MORNING_DIGEST_RSS_MAX_PER_FEED`); requires `MORNING_DIGEST_RSS_FEEDS` (comma-separated feed URLs) when enabled.
+
+For Discord **Newsletters / RSS**, list each entry as `- <title>` (optional ` — <author>` when present).
+
+On failure (`error` key, empty `entries`, or invalid stdout): section header **Newsletters / RSS** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 8 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 9 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5, Source 7, and Source 8 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5, Source 7, Source 8, and Source 9 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -194,7 +210,8 @@ After Sources 1–5, Source 7, and Source 8 complete, assemble a JSON object fro
   "arxiv": [{ "title": "<string>", "snippet": "<string>" }],
   "hackernews": [{ "title": "<string>" }],
   "github": [{ "title": "<string>", "url": "<string>", "stars": <number> }],
-  "reddit": [{ "title": "<string>", "url": "<string>", "upvotes": <number> }]
+  "reddit": [{ "title": "<string>", "url": "<string>", "upvotes": <number> }],
+  "rss": [{ "title": "<string>", "url": "<string>", "publishedAt": "<optional ISO string>" }]
 }
 ```
 
@@ -205,8 +222,9 @@ After Sources 1–5, Source 7, and Source 8 complete, assemble a JSON object fro
 - **hackernews:** story **titles** from Source 5 when available; omit or `[]` when HackerNews is unavailable.
 - **github:** repo **titles** from Source 7 when available; omit or `[]` when GitHub is unavailable.
 - **reddit:** post **titles** from Source 8 when available; omit or `[]` when Reddit is unavailable.
+- **rss:** newsletter/RSS entry **titles** from Source 9 when available (include `publishedAt` when present for recency sorting in `buildDigestSignals`); omit or `[]` when RSS is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → RSS title (up to 1, most recent by `publishedAt` when available), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -399,7 +417,7 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
 | `hackernews` | `hackernews` | Source 5 `stories[]` | `title` | — | `link` | `score` | HN item id from link/comments URL or title+date hash |
 | `github` | `github` | Source 7 `repos[]` | `title` | — | `url` | — | `sha256(url).slice(0,16)` short hex |
 | `reddit` | `reddit` | Source 8 `posts[]` | `title` | — | `url` | — | url hash or title+date hash |
-| `rss` | `rss` | Source 9 `items[]` (future — 65-4) | `title` | — | `url` | — | url hash or title+date hash |
+| `rss` | `rss` | Source 9 `entries[]` | `title` | — | `url` | — | url hash or title+date hash |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
@@ -407,6 +425,7 @@ Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the 
   - arXiv: `categories` (array of strings from `category`) when present.
   - GitHub: map `repos[].stars` → `sourceMetadata.stars` (number, **required** for engagement normalization); map `repos[].forks` → `sourceMetadata.forks` (number) when present; map `repos[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `stars`/`forks` at the signal root — `normalizeEngagement` reads only `sourceMetadata.stars`/`sourceMetadata.forks`; root-level fields score as null silently.
   - Reddit: map `posts[].upvotes` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `posts[].commentCount` → `sourceMetadata.commentCount` (number) when present; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `upvotes`/`commentCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`/`sourceMetadata.commentCount`; root-level fields score as null silently.
+  - RSS: map `entries[].publishedAt` → `sourceMetadata.publishedAt` when present; map `entries[].author` → `sourceMetadata.author` when present. **No engagement fields** — omit `stars`, `upvotes`, `points`, etc. **Never** leave `publishedAt`/`author` at the signal root.
 - **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
