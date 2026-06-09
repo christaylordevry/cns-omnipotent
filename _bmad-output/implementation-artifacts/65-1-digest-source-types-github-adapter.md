@@ -2,7 +2,7 @@
 story_id: 65-1
 epic: 65
 title: digest-source-types-github-adapter
-status: review
+status: done
 baseline_commit: 4a7fd2f
 operator_brief: 2026-06-09
 predecessors: 64-1, 64-5, 64-8
@@ -412,6 +412,7 @@ Claude Sonnet 4.6 (Cursor)
 - Extended `SOURCE_PRIOR` / `TREND_PROXY_PRIOR` for github/reddit/rss; `normalizeEngagement` github branch unchanged.
 - Updated task-prompt Source 7 (GitHub) + §9 mapping rows; Reddit/RSS documented as future (65-3/65-4).
 - `bash scripts/verify.sh` green (Omnipotent.md + sibling cns-dashboard); Hermes skill synced.
+- Code review patches applied (2026-06-09): task-prompt §9 nest instruction, fetch→sourceMetadata round-trip test; cns-dashboard schema committed in sibling repo (mirror 64-1). Story closed after re-verify — Omnipotent.md only in this session.
 
 ### File List
 
@@ -432,6 +433,7 @@ Claude Sonnet 4.6 (Cursor)
 ### Change Log
 
 - 2026-06-09: Story 65-1 implementation — schema literals + GitHub adapter + scoring priors + task-prompt Source 7.
+- 2026-06-09: Code review patches closed — §9 nest mapping, round-trip test; verify gate re-run green; status → done.
 
 ### Review Findings
 
