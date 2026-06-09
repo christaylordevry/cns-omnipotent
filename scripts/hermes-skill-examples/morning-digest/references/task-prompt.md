@@ -18,7 +18,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
-7. **Cross-source failures**: run Sources 1–6 independently. A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources **1–5, 7–9, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.)
 
@@ -131,14 +131,24 @@ Call `terminal` exactly once for HackerNews RSS (no API key). The script reads `
 terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-Parse stdout JSON:
+Stdout shape (HN only — do not confuse with Sources 7–9 keys):
 
-- `stories[]` with `title`, `link`, `score`, `comments` (integers).
-- Emit up to **N** stories (default **5**, configurable via `MORNING_DIGEST_HN_MAX_STORIES`).
+```json
+{ "stories": [{ "title": "...", "link": "...", "score": 142, "comments": 12 }] }
+```
 
-For Discord **HackerNews**, list each story as `- <title> — <score> pts, <comments> comments`.
+**After the HN terminal returns** (mandatory stdout threading — mirror §9 scoring / Source 6 pick stdout patterns):
 
-On failure (`error` key, empty `stories`, or invalid stdout): section header **HackerNews** + `- (source unavailable: <short reason>)` and **continue** to Source 7.
+1. Let `hn_stdout` = HN terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `hn_json = JSON.parse(hn_stdout)` inside try/catch or equivalent safe parse.
+3. If `hn_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(hn_json.stories) && hn_json.stories.length > 0`:
+   - Read **`hn_json.stories`** (`stories[]` stdout array key) only — each item uses `title`, `link`, `score`, `comments` (integers from stdout).
+   - Emit up to **N** stories (default **5**, configurable via `MORNING_DIGEST_HN_MAX_STORIES`).
+   - For Discord **HackerNews**, list each story as `- <title> — <score> pts, <comments> comments`.
+5. Else → failure (empty `stories`, invalid shape, or parse error).
+6. On failure: section header **HackerNews** + `- (source unavailable: <short reason>)` and **continue** to Source 7.
+7. **Anti-pattern:** Do not read `repos[]`, `posts[]`, or `entries[]` from HN stdout — those keys belong to Sources 7–9 only.
 
 ## Source 7 — GitHub
 
@@ -402,7 +412,7 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 > **REQUIRED §9 — part 1 of 2 of the completion gate.** This is **part 1 of 2** — do **not** end the task turn after this call; §10 must also fire. Non-negotiable even under context compression. Invoke on **every** run (success or partial failure), exactly as session-close treats its required steps.
 
-Run **after** Sources 1–6 were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
+Run **after** Sources **1–5, 7–9, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 

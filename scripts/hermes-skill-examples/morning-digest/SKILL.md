@@ -1,7 +1,7 @@
 ---
 name: morning-digest
 description: "Hermes morning digest for #hermes: Google Trends dry-run, NewsAPI headlines, Perplexity deep signal, arXiv preprints, HackerNews top stories, NotebookLM vault context on best-matched watched notebook. Posts structured briefing to Discord. No vault writes."
-version: 1.4.3
+version: 1.4.4
 author: CNS Operator
 license: MIT
 metadata:
@@ -62,7 +62,7 @@ The final reply must use the task-prompt headings exactly: `🌅 **Morning Diges
 4. NewsAPI: call `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", workdir=resolved_repo_root, timeout=45)`. It reads `NEWSAPI_API_KEY` only from `$HOME/.hermes/trend-ingest.env` and prints JSON. If it fails, show only `- (source unavailable: <short reason>)`.
 5. Deep Signal: call `mcp__perplexity__search` once using the top parsed Google Trends keyword. If no top trend exists, do not invent a fallback keyword; write `- (source unavailable: no top trend keyword)`. If Perplexity fails or times out, write `- (source unavailable: perplexity timeout)`.
 6. arXiv: call `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", workdir=resolved_repo_root, timeout=45)`. Parse `papers[]` or show `- (source unavailable: <short reason>)` under **arXiv Preprints**.
-7. HackerNews: call `terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)`. Parse `stories[]` or show `- (source unavailable: <short reason>)` under **HackerNews**.
+7. HackerNews: call `terminal(command="bash scripts/session-close/hermes-run-hn.sh", workdir=resolved_repo_root, timeout=45)`. Let `hn_stdout` = terminal stdout (trimmed); try `hn_json = JSON.parse(hn_stdout)` → read **`hn_json.stories`** only (not `repos[]`, `posts[]`, or `entries[]`); render Discord bullets or show `- (source unavailable: <short reason>)` under **HackerNews**; on failure **continue** to Source 7.
 8. GitHub (Source 7): call `terminal(command="bash scripts/session-close/hermes-run-github.sh", workdir=resolved_repo_root, timeout=45)`. Parse `repos[]` or show unavailable under **GitHub** (see task-prompt).
 9. Reddit (Source 8): call `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)`. Parse `posts[]` or show unavailable under **Reddit** (see task-prompt).
 10. Newsletters / RSS (Source 9): call `terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)`. Parse `entries[]` or show unavailable under **Newsletters / RSS** (see task-prompt).
@@ -145,6 +145,7 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 
 ## Pitfalls
 
+- **HackerNews stdout threading (Source 5):** After `hermes-run-hn.sh` returns, let `hn_stdout` = terminal stdout (trimmed), try `hn_json = JSON.parse(hn_stdout)`, and read story rows from **`hn_json.stories`** only before Discord rendering or §9 mapping. Do not read `repos[]`, `posts[]`, or `entries[]` from HN stdout — those keys belong to Sources 7–9.
 - **Scoring stdout threading (§9):** After `score-digest-signals.mjs` returns, you **must** capture stdout, parse `scored_signals = JSON.parse(stdout.trim())`, and assign `digest_push_payload.signals = scored_signals` before building `DIGEST_PUSH_JSON` for push or keyword-candidates. Do not pass pre-scoring signals when scoring stdout parsed successfully.
 - When reproducing or testing `pick-signal-notebook.mjs`, use an absolute registry path. Relative `CNS_NOTEBOOK_REGISTRY_PATH` values can resolve against the repo root unexpectedly.
 - When registry rows have UUID-only titles (common with `NOTEBOOKLM_NOTEBOOK_IDS` fan-out), set `NOTEBOOKLM_NOTEBOOK_TITLES` in `~/.hermes/trend-ingest.env` so signal scoring can F1-match human titles.

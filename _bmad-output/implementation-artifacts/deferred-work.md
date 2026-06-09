@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 65-6-fix-hn-typeerror-morning-digest-task-prompt (2026-06-09)
+
+- Sources 7–9 still use passive "Parse stdout JSON" bullets — same stdout-threading bug class as pre-65-6 HN; out of 65-6 scope.
+- Output contract / SKILL template omit GitHub, Reddit, RSS Discord sections — separate UX story per 65-6 Out of scope.
+
 ## Deferred from: code review of 65-3-reddit-credential-adapter (2026-06-09)
 
 - `r/` prefix in `MORNING_DIGEST_REDDIT_SUBREDDITS` corrupts OAuth URL silently — operator misconfig; story docs say omit `r/` prefix; strip guard optional in future hardening.

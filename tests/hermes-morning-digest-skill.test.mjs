@@ -39,7 +39,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.3"));
+    assert.ok(body.includes("version: 1.4.4"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -381,6 +381,24 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(skillBody.includes("entries[]"));
   });
 
+  it("task-prompt documents imperative HN stdout parsing (Story 65-6)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source5End = taskBody.indexOf("## Source 7");
+    const source5 = taskBody.slice(taskBody.indexOf("## Source 5"), source5End);
+    assert.ok(source5.includes("stories[]"));
+    assert.ok(source5.includes("hn_json") || source5.includes("hn_stdout"));
+    assert.ok(source5.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*repos/i.test(source5),
+      "must anti-pattern repos/posts/entries for HN",
+    );
+    assert.ok(source5.includes("continue** to Source 7"));
+    assert.ok(!source5.includes("continue** to Source 6"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("HackerNews stdout threading"));
+    assert.ok(skillBody.includes("hn_json.stories"));
+  });
+
   it("config-snippet documents RSS env keys (Story 65-4)", () => {
     const body = readFileSync(configSnippetPath, "utf8");
     assert.ok(body.includes("MORNING_DIGEST_RSS_FEEDS"));
@@ -560,7 +578,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.3"));
+    assert.ok(body.includes("version: 1.4.4"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
