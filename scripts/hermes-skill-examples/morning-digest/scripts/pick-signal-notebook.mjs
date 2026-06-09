@@ -20,6 +20,8 @@ const MAX_HEADLINE_TITLES = 5;
 const MAX_PERPLEXITY_SIGNALS = 3;
 const MAX_ARXIV_SIGNALS = 3;
 const MAX_HN_SIGNALS = 3;
+const MAX_GITHUB_SIGNALS = 2;
+const MAX_REDDIT_SIGNALS = 2;
 const MAX_RSS_SIGNALS = 1;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
@@ -166,6 +168,50 @@ export function extractHnSignals(hnList) {
 }
 
 /**
+ * @param {Array<{ title?: string, stars?: number }>} githubList
+ * @returns {string[]}
+ */
+export function extractGithubSignals(githubList) {
+  if (!Array.isArray(githubList)) {
+    return [];
+  }
+  const sorted = [...githubList].sort(
+    (a, b) => (Number(b?.stars) || 0) - (Number(a?.stars) || 0),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_GITHUB_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {Array<{ title?: string, upvotes?: number }>} redditList
+ * @returns {string[]}
+ */
+export function extractRedditSignals(redditList) {
+  if (!Array.isArray(redditList)) {
+    return [];
+  }
+  const sorted = [...redditList].sort(
+    (a, b) => (Number(b?.upvotes) || 0) - (Number(a?.upvotes) || 0),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_REDDIT_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -207,6 +253,8 @@ export function extractRssSignals(rssList) {
  *   perplexityText?: string,
  *   arxiv?: Array<{ title?: string }>,
  *   hackernews?: Array<{ title?: string }>,
+ *   github?: Array<{ title?: string, stars?: number }>,
+ *   reddit?: Array<{ title?: string, upvotes?: number }>,
  *   rss?: Array<{ title?: string, publishedAt?: string }>,
  * }} sources
  * @returns {string[]}
@@ -240,6 +288,8 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractPerplexitySignals(sources.perplexityText).slice(0, MAX_PERPLEXITY_SIGNALS));
   ordered.push(...extractArxivSignals(sources.arxiv));
   ordered.push(...extractHnSignals(sources.hackernews));
+  ordered.push(...extractGithubSignals(sources.github));
+  ordered.push(...extractRedditSignals(sources.reddit));
   ordered.push(...extractRssSignals(sources.rss));
 
   return dedupeSignals(ordered);
@@ -395,7 +445,10 @@ function signalsFromParsedInput(parsed) {
       'headlines' in parsed ||
       'perplexityText' in parsed ||
       'arxiv' in parsed ||
-      'hackernews' in parsed)
+      'hackernews' in parsed ||
+      'github' in parsed ||
+      'reddit' in parsed ||
+      'rss' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

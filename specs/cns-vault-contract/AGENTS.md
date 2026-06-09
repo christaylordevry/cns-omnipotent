@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.35 | Last updated: 2026-06-09
+> Version: 2.1.36 | Last updated: 2026-06-09
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -275,9 +275,9 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Recent Session Context
 
-- Story 64.8: Fix scoring pipeline push threading — review.
-- Story 64.5: Ranked push integration — scoreDigestSignals orchestrator — review.
-- Story 64.4: Cross-source engagement normalization — done.
+- Story 65.7: Imperative stdout threading for Sources 7–9 (GitHub, Reddit, RSS) — done.
+- Story 65.6: Fix HN TypeError in morning digest task-prompt — done.
+- Story 65.4: Curated RSS / Substack adapter — done.
 
 ## 9. Agent Behavior Guidelines
 
@@ -360,6 +360,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-09 | 2.1.36 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-09 | 2.1.35 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-06 | 2.1.34 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-04 | 2.1.33 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |

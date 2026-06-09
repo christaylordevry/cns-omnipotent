@@ -264,7 +264,7 @@ After Sources 1–5, Source 7, Source 8, and Source 9 complete, assemble a JSON 
 - **reddit:** post **titles** from Source 8 when available; omit or `[]` when Reddit is unavailable.
 - **rss:** newsletter/RSS entry **titles** from Source 9 when available (include `publishedAt` when present for recency sorting in `buildDigestSignals`); omit or `[]` when RSS is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → RSS title (up to 1, most recent by `publishedAt` when available), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 

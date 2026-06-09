@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 65-8-build-digest-signals-github-reddit-caps (2026-06-09)
+
+- `signalsFromParsedInput` guard path untested for github/reddit/rss-only payloads — AC4 satisfied in code; CLI regression test optional hardening.
+- Title-less top-N-by-engagement entries consume slice slots without backfill — matches `extractRssSignals` pattern; AC allows "up to 2".
+- Cap-10 eviction can exclude github/reddit/rss when upstream sources fill pool — architectural §7.3 priority order (new sources lowest).
+
 ## Deferred from: code review of 65-6-fix-hn-typeerror-morning-digest-task-prompt (2026-06-09)
 
 - Sources 7–9 still use passive "Parse stdout JSON" bullets — same stdout-threading bug class as pre-65-6 HN; out of 65-6 scope.

@@ -16,8 +16,10 @@ import {
   buildDigestSignals,
   dedupeSignals,
   extractArxivSignals,
+  extractGithubSignals,
   extractHnSignals,
   extractPerplexitySignals,
+  extractRedditSignals,
   extractRssSignals,
   parseNotebookTitleMap,
   pickSignalNotebook,
@@ -278,18 +280,89 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(titles, ['Newest']);
   });
 
-  it('places RSS title after HN titles in order', () => {
+  it('extractGithubSignals ranks by stars desc and caps at 2', () => {
+    const titles = extractGithubSignals([
+      { title: 'low-star/repo', stars: 10 },
+      { title: 'high-star/repo', stars: 9999 },
+      { title: 'mid-star/repo', stars: 500 },
+    ]);
+    assert.deepEqual(titles, ['high-star/repo', 'mid-star/repo']);
+  });
+
+  it('extractRedditSignals ranks by upvotes desc and caps at 2', () => {
+    const titles = extractRedditSignals([
+      { title: 'rd-low', upvotes: 1 },
+      { title: 'rd-high', upvotes: 50 },
+      { title: 'rd-mid', upvotes: 25 },
+    ]);
+    assert.deepEqual(titles, ['rd-high', 'rd-mid']);
+  });
+
+  it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {
+    assert.deepEqual(extractGithubSignals([]), []);
+    assert.deepEqual(extractRedditSignals([]), []);
+  });
+
+  it('buildDigestSignals({ github: [] }) only returns empty', () => {
+    assert.deepEqual(buildDigestSignals({ github: [] }), []);
+  });
+
+  it('places github after HN, reddit after github, and RSS after reddit', () => {
     const signals = buildDigestSignals({
       trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
       hackernews: [{ title: 'HN Story One' }],
+      github: [
+        { title: 'gh-low', stars: 1 },
+        { title: 'gh-high', stars: 100 },
+      ],
+      reddit: [
+        { title: 'rd-low', upvotes: 1 },
+        { title: 'rd-high', upvotes: 50 },
+      ],
       rss: [
         { title: 'Newsletter Alpha', publishedAt: '2026-06-08T00:00:00.000Z' },
         { title: 'Newsletter Beta', publishedAt: '2026-06-09T00:00:00.000Z' },
       ],
     });
     const hnIdx = signals.indexOf('HN Story One');
+    const ghIdx = signals.indexOf('gh-high');
+    const rdIdx = signals.indexOf('rd-high');
     const rssIdx = signals.indexOf('Newsletter Beta');
-    assert.ok(hnIdx >= 0 && rssIdx > hnIdx);
+    assert.ok(hnIdx >= 0 && ghIdx > hnIdx);
+    assert.ok(ghIdx >= 0 && rdIdx > ghIdx);
+    assert.ok(rdIdx >= 0 && rssIdx > rdIdx);
+  });
+
+  it('dedupes github title when headline wins first', () => {
+    const signals = buildDigestSignals({
+      headlines: [{ title: 'Shared Repo Title' }],
+      github: [{ title: 'shared repo title', stars: 100 }],
+    });
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0], 'Shared Repo Title');
+  });
+
+  it('caps combined output at 10 with github, reddit, and rss included', () => {
+    const signals = buildDigestSignals({
+      trends: [{ keyword: 'trend-0', normalizedValue: 1 }],
+      headlines: [{ title: 'headline-0' }],
+      perplexityText: 'One concise sentence only.',
+      arxiv: [{ title: 'arxiv-0' }],
+      hackernews: [{ title: 'hn-0' }],
+      github: [
+        { title: 'gh-high', stars: 100 },
+        { title: 'gh-low', stars: 1 },
+      ],
+      reddit: [
+        { title: 'rd-high', upvotes: 50 },
+        { title: 'rd-low', upvotes: 1 },
+      ],
+      rss: [{ title: 'Newsletter pick', publishedAt: '2026-06-09T00:00:00.000Z' }],
+    });
+    assert.equal(signals.length, 10);
+    assert.ok(signals.includes('gh-high'));
+    assert.ok(signals.includes('rd-high'));
+    assert.ok(signals.includes('Newsletter pick'));
   });
 
   it('caps combined output at 10 with rss included', () => {
