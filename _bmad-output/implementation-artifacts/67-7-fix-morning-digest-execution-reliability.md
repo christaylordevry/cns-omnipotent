@@ -392,7 +392,7 @@ Claude Sonnet 4.6 (Cursor Agent)
 - **T6:** Four contract tests (3 task-prompt + 1 SKILL.md guardrails).
 - **pick-signal-routing.md:** Added one-line pitfall — Source 6 before Sources 9–10 yields incomplete `digest_sources`.
 - **T7:** Hermes skill synced; `bash scripts/verify.sh` green (Omnipotent.md + cns-dashboard).
-- Operator live re-validation on next `#hermes` digest run recommended (out of scope for this story).
+- **Live validation deferred to 2026-06-11 session kickoff** (07:00 cron). Pre-hardening live gaps still open: Product Hunt section missing from Discord output; §9 Convex push not observed via `push-digest-convex.mjs`; GitHub still posting link previews. Core ingest pipeline (adapters, scoring, validators, env) is solid — issue class is prompt-level; task-prompt hardening committed; cron is first real test.
 
 ### File List
 
@@ -418,3 +418,4 @@ Claude Sonnet 4.6 (Cursor Agent)
 - 2026-06-10 — Story 67-7 created: morning digest execution reliability hotfix (§9 anti-improvisation, Sources 9–10 terminal gates, GitHub bullet format); Omnipotent.md task-prompt hardening only.
 - 2026-06-10 — Story 67-7 implemented: prompt/skill hardening, contract tests, pick-signal-routing pitfall, SKILL v1.4.6; verify green.
 - 2026-06-10 — Code review patches applied: structural contract tests, `node -e` forbidden, hard gate wording, strict collection order in SKILL, GitHub DO NOT phrasing; verify green.
+- 2026-06-10 — Sprint status synced `done`; session kickoff notes for 2026-06-11 in `deferred-work.md` §Session kickoff (live validation checklist).

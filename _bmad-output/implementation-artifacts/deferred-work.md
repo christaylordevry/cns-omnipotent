@@ -1,5 +1,20 @@
 # Deferred work
 
+## Session kickoff — 2026-06-11 (Epic 67 live validation)
+
+**Context:** Story **67-7** (prompt/skill hardening) is **done** in repo — contract tests green, Hermes skill synced. Core ingest pipeline (adapters, scoring, Convex validators, env vars) is solid. Remaining failures are **prompt-level execution reliability** — agents still deviate under context compression despite task-prompt guards. Further hardening may follow; do not reopen adapter scripts unless cron evidence proves a script defect.
+
+**First real validation:** **07:00 machine-local cron** (`morning-digest cron:…`) — inspect Discord `#hermes` post + Convex `digestRuns` / `digestSignals` after run.
+
+| # | Open item (observed pre-67-7 live) | What to check tomorrow |
+|---|-----------------------------------|------------------------|
+| 1 | **Product Hunt section missing** from digest Discord output | `**Product Hunt**` header present; `hermes-run-producthunt.sh` terminal fired; `(source unavailable)` vs bullets |
+| 2 | **§9 Convex push not firing** via `push-digest-convex.mjs` | `digestRuns` row for run date; `digestSignals` populated; Hermes logs for `PUSH_SCRIPT` / `push-digest-convex` terminal (not improvised HTTP/MCP) |
+| 3 | **GitHub format** — link previews vs bullets | Discord shows `- owner/repo — N stars, M forks` not bare `https://github.com/…` URL cards |
+| 4 | **07:00 cron** | End-to-end: Sources 9–10 before Source 6, full Output Contract, §9+§10 push terminals |
+
+**If cron passes all four:** close live-validation loop; consider **67-6** compare smoke or Epic 67 retro. **If any fail:** capture Discord transcript + Convex state; next story is likely another prompt-orchestration tighten (not adapter rewrite).
+
 ## Deferred from: code review of 67-5-producthunt-adapter-source-10 (2026-06-10)
 
 - Empty/malformed GraphQL shape returns `{launches:[]}` not `{error}` — task-prompt step 5 treats empty launches as failure; optional adapter hardening.
