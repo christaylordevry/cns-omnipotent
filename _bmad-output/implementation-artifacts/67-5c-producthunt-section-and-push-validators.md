@@ -2,7 +2,7 @@
 story_id: 67-5c
 epic: 67
 title: producthunt-section-and-push-validators
-status: ready-for-dev
+status: review
 baseline_date: 2026-06-10
 operator_brief: 2026-06-10
 predecessors: 67-5b
@@ -14,7 +14,7 @@ companion_story: 67-5b-producthunt-sourcetype-validator
 
 # Story 67.5c: Add `producthunt` section value + fix push validators
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -118,14 +118,14 @@ After **67-5b** alone, this test may fail (valid `sourceType` + valid `section: 
 
 ## Tasks / Subtasks
 
-- [ ] **T0** Verify 67-5b prerequisite (AC: 2)
-  - [ ] Read `digestSourceTypeValue` — confirm `v.literal('producthunt')` present
-  - [ ] If missing: halt, complete 67-5b first
-- [ ] **T1** Add section literal (AC: 1, 6)
-  - [ ] Add `v.literal('producthunt')` to `digestSectionValue` after `v.literal('rss')`
-  - [ ] Do not modify `digestSourceTypeValue`, `keywordSourceTypeValue`, or `sourceMetadataValidator`
-- [ ] **T2** Update digest tests (AC: 3, 5, 6)
-  - [ ] Replace `addDigestSignal rejects invalid sourceType literal` producthunt case with **`addDigestSignal accepts producthunt signal with upvotes metadata`** (mirror `github` test at lines 412–435)
+- [x] **T0** Verify 67-5b prerequisite (AC: 2)
+  - [x] Read `digestSourceTypeValue` — confirm `v.literal('producthunt')` present
+  - [x] If missing: halt, complete 67-5b first
+- [x] **T1** Add section literal (AC: 1, 6)
+  - [x] Add `v.literal('producthunt')` to `digestSectionValue` after `v.literal('rss')`
+  - [x] Do not modify `digestSourceTypeValue`, `keywordSourceTypeValue`, or `sourceMetadataValidator`
+- [x] **T2** Update digest tests (AC: 3, 5, 6)
+  - [x] Replace `addDigestSignal rejects invalid sourceType literal` producthunt case with **`addDigestSignal accepts producthunt signal with upvotes metadata`** (mirror `github` test at lines 412–435)
   - [ ] Payload shape:
 
 ```typescript
@@ -140,11 +140,11 @@ After **67-5b** alone, this test may fail (valid `sourceType` + valid `section: 
 }
 ```
 
-  - [ ] Assert stored signal: `section: 'producthunt'`, `sourceType: 'producthunt'`, `sourceMetadata: { upvotes: 500 }`
-  - [ ] **Preserve rejection coverage:** add/rename a test that rejects a **still-invalid** literal (e.g. `sourceType: 'tiktok'` or `'invalid_source'`) so the suite still guards unknown source types
-- [ ] **T3** Verify (AC: 4, 5)
-  - [ ] `npx convex dev --once`
-  - [ ] `npm test` — record final pass count in Completion Notes
+  - [x] Assert stored signal: `section: 'producthunt'`, `sourceType: 'producthunt'`, `sourceMetadata: { upvotes: 500 }`
+  - [x] **Preserve rejection coverage:** add/rename a test that rejects a **still-invalid** literal (e.g. `sourceType: 'tiktok'` or `'invalid_source'`) so the suite still guards unknown source types
+- [x] **T3** Verify (AC: 4, 5)
+  - [x] `npx convex dev --once`
+  - [x] `npm test` — record final pass count in Completion Notes
 
 ## Dev Notes
 
@@ -226,10 +226,20 @@ Deploy **67-5b then 67-5c** in sequence, or squash both validator commits before
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Verified 67-5b prerequisite: `digestSourceTypeValue` already includes `v.literal('producthunt')`.
+- Added `v.literal('producthunt')` to `digestSectionValue` in `cns-dashboard/convex/validators.ts`.
+- Added `addDigestSignal accepts producthunt signal with upvotes metadata` acceptance test in `tests/convex/digest.test.ts` (paired section + sourceType, `sourceMetadata: { upvotes: 500 }`).
+- Rejection coverage preserved: existing `addDigestSignal rejects invalid sourceType literal` test still uses `invalid_source`.
+- `npx convex dev --once` exit 0 (dev deployment `exciting-pony-764`).
+- `npm test` and `bash scripts/verify.sh` green — **460** tests (459 baseline + 1 new acceptance test).
+
 ### File List
+
+- `cns-dashboard/convex/validators.ts`
+- `cns-dashboard/tests/convex/digest.test.ts`
