@@ -10,6 +10,7 @@ Capture the debugging lessons from the `morning-digest-pick-signal-notebook.test
 - The pick-signal CLI should accept a registry path from `process.argv[3]` first, then fall back to `CNS_NOTEBOOK_REGISTRY_PATH`, then the default registry location.
 - Isolated routing tests should clear unrelated digest payload env such as `DIGEST_SOURCES_JSON` so they exercise the scorer/router only.
 - If a direct CLI reproduction returns `NO_ROUTE`, verify both the registry path and the active watched registry contents before changing the scorer logic.
+- **Source 6 before Sources 9–10 (hard gate):** Do **not** run `pick-signal-notebook.mjs` (Source 6 / NotebookLM) until `hermes-run-rss.sh` and `hermes-run-producthunt.sh` terminals have both returned. Running Source 6 early yields incomplete `digest_sources` (missing `rss` / `producthunt`) and **invalidates the run** — same non-negotiable gate as task-prompt Steps 9–10.
 
 ## Repro recipe
 

@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-10T12:00:00+10:00
+# last_updated: 2026-06-10T14:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-10T12:00:00+00:00"
+last_updated: "2026-06-10T04:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -486,4 +486,5 @@ development_status:
   67-5b-producthunt-sourcetype-validator: done
   67-5c-producthunt-section-and-push-validators: done
   67-6-compare-smoke-test-documentation: backlog
+  67-7-fix-morning-digest-execution-reliability: done
   epic-67-retrospective: optional

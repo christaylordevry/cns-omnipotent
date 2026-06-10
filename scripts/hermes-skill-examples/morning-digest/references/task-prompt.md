@@ -26,9 +26,11 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 5 | HackerNews | `terminal(command="bash scripts/session-close/hermes-run-hn.sh", …)` |
 | 7 | GitHub | `terminal(command="bash scripts/session-close/hermes-run-github.sh", …)` |
 | 8 | Reddit | `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", …)` |
-| 9 | Newsletters / RSS | `terminal(command="bash scripts/session-close/hermes-run-rss.sh", …)` |
-| 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` |
-| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) |
+| 9 | Newsletters / RSS | `terminal(command="bash scripts/session-close/hermes-run-rss.sh", …)` — **MUST fire before Source 6** |
+| 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` — **MUST fire before Source 6** |
+| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) — **only after steps 9 and 10** |
+
+**Steps 9–10 gate:** Sources 9 and 10 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping either terminal invalidates the run.
 
 **Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, and 6** complete → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
@@ -42,7 +44,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
 7. **Cross-source failures**: run Sources **1–5, 7–10, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
-9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.)
+9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
 
 ## Tool-call rule
 
@@ -195,10 +197,11 @@ Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
    - Read **`gh_json.repos`** (`repos[]` stdout array key) only — each item uses `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
    - Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
-   - For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks`.
+   - For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks` where `<title>` is `repos[].title` (owner/repo string).
 5. Else → failure (empty `repos`, invalid shape, or parse error).
 6. On failure: section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 8.
 7. **Anti-pattern:** Do not read `stories[]`, `posts[]`, or `entries[]` from GitHub stdout — those keys belong to Sources 5, 8, and 9 only.
+8. **Anti-pattern (Discord):** **DO NOT post bare URLs or link previews** in **GitHub** — do not post bare `repos[].url` values, angle-bracket URLs, or markdown autolinks; Discord renders **link preview cards** instead of contract bullets. Required bullet: `- owner/repo — N stars, M forks` using `repos[].title`; `url` is for §9 Convex mapping only.
 
 ## Source 8 — Reddit
 
@@ -236,6 +239,8 @@ Call `terminal` exactly once for curated RSS/Substack feeds. The script reads `M
 terminal(command="bash scripts/session-close/hermes-run-rss.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
+**Pre-flight gate:** If the `hermes-run-rss.sh` terminal has not fired, do not proceed to Source 10 or Source 6.
+
 Stdout shape (RSS only — do not confuse with Sources 5, 7, or 8 keys):
 
 ```json
@@ -264,6 +269,8 @@ Call `terminal` exactly once for Product Hunt daily launches via GraphQL. The sc
 terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
+**Pre-flight gate:** If the `hermes-run-producthunt.sh` terminal has not fired, do not proceed to Source 6.
+
 Stdout shape (Product Hunt only — do not confuse with Sources 5, 7, 8, or 9 keys):
 
 ```json
@@ -287,6 +294,8 @@ Stdout shape (Product Hunt only — do not confuse with Sources 5, 7, 8, or 9 ke
 ## Source 6 — Vault context (NotebookLM)
 
 Run **after** Source 10 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+
+**Prerequisite:** Terminals for Sources **9** and **10** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until both terminals complete.
 
 ### Build `digest_sources` (for scoring)
 
@@ -409,6 +418,7 @@ Vault context failure does **not** abort the digest.
 - <title> — <stars> stars, <forks> forks
 - ...
 (or - (source unavailable: <short reason>) when Source 7 failed)
+(DO NOT post bare URLs or link previews — use `- owner/repo — N stars, M forks` bullets from `title` only; `url` is for §9 Convex mapping.)
 
 **Reddit** (hot posts)
 - <title> — <upvotes> upvotes, <commentCount> comments
@@ -652,6 +662,29 @@ build digest_push_payload (unscored signals)
 `DIGEST_PUSH_JSON` in the push command must reference `digest_push_payload` **after** signal replacement — not a stale copy from before scoring.
 
 The script always exits **0**. Stderr warnings use prefix `score-digest-signals:`.
+
+### DO NOT improvise — digest Convex push (pinned)
+
+> **CRITICAL: Follow this sequence exactly.** Non-negotiable even under context compression.
+
+**Forbidden:**
+
+- Direct `fetch` to Convex `/api/mutation` or any Convex HTTP endpoint
+- MCP Convex tools (`createDigestRun`, `addDigestSignal`, etc.)
+- Hand-rolled `createDigestRun` / `addDigestSignal` loops in Node or shell
+- Hand-rolled `node -e` one-liners or inline scripts that call Convex mutations directly
+- Summarizing push as "done" without a `terminal` invocation
+- Substituting `log-notebook-query.mjs` or any other script for digest entity push
+
+**Required:** exactly one `terminal` call executing `node "$PUSH_SCRIPT"` where `PUSH_SCRIPT` resolves to `push-digest-convex.mjs` (repo path or `~/.hermes/skills/cns/morning-digest/scripts/` fallback).
+
+**Before invoking the push terminal** (mandatory — mirror scoring stdout threading):
+
+1. Let `push_script` = `resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs"` (fallback only when repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/push-digest-convex.mjs`).
+2. Ensure `digest_push_payload` is **post-scoring** (scoring stdout replacement completed per steps above).
+3. **MUST** invoke the `terminal(...)` block below — no alternative transport.
+4. Let `push_stdout` / exit code be observability only; fire-and-forget **result** handling unchanged.
+5. **Anti-pattern:** Do not push digest entities by any path other than `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`.
 
 ### Terminal invocation (REQUIRED — part 1 of 2 completion gate — do not end the task turn here)
 

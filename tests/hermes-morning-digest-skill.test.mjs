@@ -41,7 +41,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.5"));
+    assert.ok(body.includes("version: 1.4.6"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
@@ -628,6 +628,113 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("score-digest-signals.mjs"));
   });
 
+  it("task-prompt §9 documents non-improvisable push-digest-convex terminal (Story 67-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const postPost = taskBody.slice(
+      taskBody.indexOf("## Post-post — Push digest entities to Convex"),
+      taskBody.indexOf("## Post-post — Push keyword candidates to Convex"),
+    );
+    const pushTerminalBlock = postPost.slice(
+      postPost.indexOf("### Terminal invocation (REQUIRED — part 1 of 2 completion gate"),
+      postPost.indexOf("**After terminal returns**"),
+    );
+
+    assert.ok(/DO NOT improvise/i.test(postPost));
+    assert.ok(/direct.*fetch.*Convex/i.test(postPost));
+    assert.ok(/MCP Convex/i.test(postPost));
+    assert.ok(/hand-rolled.*node -e/i.test(postPost));
+    assert.ok(/Do not push digest entities by any path other than/i.test(postPost));
+
+    assert.match(
+      pushTerminalBlock,
+      /terminal\(\s*\n\s*command="PUSH_SCRIPT=<shellQuote\(push_script\)> DIGEST_PUSH_JSON=<shellQuote\(JSON\.stringify\(digest_push_payload\)\)> node \\"\$PUSH_SCRIPT\\""/,
+    );
+    assert.match(pushTerminalBlock, /workdir=resolved_repo_root,\s*\n\s*timeout=45/);
+    assert.doesNotMatch(
+      pushTerminalBlock,
+      /command="DIGEST_PUSH_JSON=.*node push-digest-convex\.mjs"/,
+    );
+  });
+
+  it("task-prompt Sources 9-10 terminal-fire gates (Story 67-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const checklistEnd = taskBody.indexOf("## Hard constraints");
+    const checklist = taskBody.slice(
+      taskBody.indexOf("## REQUIRED SOURCES — terminal checklist"),
+      checklistEnd,
+    );
+    const source9End = taskBody.indexOf("## Source 10");
+    const source9 = taskBody.slice(taskBody.indexOf("## Source 9"), source9End);
+    const source10End = taskBody.indexOf("## Source 6");
+    const source10 = taskBody.slice(taskBody.indexOf("## Source 10"), source10End);
+    const source6End = taskBody.indexOf("### Build `digest_sources`");
+    const source6Lead = taskBody.slice(
+      taskBody.indexOf("## Source 6"),
+      source6End,
+    );
+
+    assert.ok(checklist.includes("hermes-run-rss.sh"));
+    assert.ok(checklist.includes("hermes-run-producthunt.sh"));
+    assert.ok(
+      (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 2,
+      "checklist rows 9 and 10 must both require MUST fire before Source 6",
+    );
+    assert.ok(
+      checklist.includes("Steps 9–10 gate") &&
+        checklist.includes("invalidates the run"),
+    );
+    assert.ok(
+      source9.includes("hermes-run-rss.sh") &&
+        source9.includes("has not fired, do not proceed to Source 10 or Source 6"),
+    );
+    assert.ok(
+      source10.includes("hermes-run-producthunt.sh") &&
+        source10.includes("has not fired, do not proceed to Source 6"),
+    );
+    assert.ok(
+      source6Lead.includes("Prerequisite:") &&
+        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until both terminals complete"),
+    );
+  });
+
+  it("task-prompt GitHub Discord bullets not bare URLs (Story 67-7)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source7End = taskBody.indexOf("## Source 8");
+    const source7 = taskBody.slice(taskBody.indexOf("## Source 7"), source7End);
+    const outputContract = taskBody.slice(taskBody.indexOf("## Output contract"));
+
+    assert.ok(source7.includes("DO NOT post bare URLs or link previews"));
+    assert.ok(source7.includes("- owner/repo — N stars, M forks"));
+    assert.ok(source7.includes("stars") && source7.includes("forks"));
+    assert.ok(outputContract.includes("DO NOT post bare URLs or link previews"));
+    assert.ok(outputContract.includes("- owner/repo — N stars, M forks"));
+  });
+
+  it("SKILL.md documents Story 67-7 execution guardrails", () => {
+    const body = readFileSync(skillPath, "utf8");
+    const executionRule = body.slice(
+      body.indexOf("## Execution rule"),
+      body.indexOf("## Inline task contract"),
+    );
+    const outputTemplate = body.slice(
+      body.indexOf("Output exactly:"),
+      body.indexOf("For NO_ROUTE"),
+    );
+
+    assert.ok(executionRule.includes("1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6"));
+    assert.ok(body.includes("hermes-run-producthunt.sh"));
+    assert.ok(body.includes("§9 push — DO NOT improvise"));
+    assert.ok(body.includes("hand-rolled `node -e`"));
+    assert.ok(body.includes("DO NOT post bare URLs or link previews"));
+    assert.ok(body.includes("Product Hunt stdout threading"));
+    assert.ok(body.includes("Sources 9–10 terminal-fire gate"));
+    assert.ok(outputTemplate.includes("**GitHub** (trending repos)"));
+    assert.ok(outputTemplate.includes("**Reddit** (hot posts)"));
+    assert.ok(outputTemplate.includes("**Newsletters / RSS**"));
+    assert.ok(outputTemplate.includes("**Product Hunt** (daily launches)"));
+    assert.ok(outputTemplate.includes("- <title> — <stars> stars, <forks> forks"));
+  });
+
   it("task-prompt documents post-post keyword candidates push after digest push (Story 62-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const digestIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");
@@ -661,7 +768,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.5"));
+    assert.ok(body.includes("version: 1.4.6"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
