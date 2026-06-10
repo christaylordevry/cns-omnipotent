@@ -19,7 +19,8 @@ if [[ ! -f "$JOB_ID_FILE" ]]; then
   exit 1
 fi
 
-if ! hermes gateway status 2>/dev/null | grep -qi "gateway is running"; then
+# Matches: "✓ User gateway service is running" (current) and legacy "gateway is running"
+if ! hermes gateway status 2>/dev/null | grep -qiE 'gateway service is running|gateway is running'; then
   echo "hermes-morning-digest: Hermes gateway is not running; aborting (no Discord delivery, no digest run)." >&2
   exit 1
 fi

@@ -286,7 +286,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(installBody.includes("install_wsl_crontab_line"));
     assert.ok(installBody.includes("chmod +x"));
 
-    assert.ok(runBody.includes("gateway is running"));
+    assert.ok(runBody.includes("gateway service is running|gateway is running"));
     assert.ok(runBody.includes("hermes cron run"));
     assert.ok(runBody.includes("hermes cron tick"));
     assert.ok(runBody.includes("morning-digest-skill-cron-job-id"));
