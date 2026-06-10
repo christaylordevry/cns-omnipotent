@@ -483,7 +483,7 @@ development_status:
   67-3-personal-relevance-v2-nexus-goals: done
   67-4-signal-seeds-chip-inspector: done
   67-5-producthunt-adapter-source-10: done
-  67-5b-producthunt-sourcetype-validator: review
-  67-5c-producthunt-section-and-push-validators: ready-for-dev
+  67-5b-producthunt-sourcetype-validator: done
+  67-5c-producthunt-section-and-push-validators: done
   67-6-compare-smoke-test-documentation: backlog
   epic-67-retrospective: optional

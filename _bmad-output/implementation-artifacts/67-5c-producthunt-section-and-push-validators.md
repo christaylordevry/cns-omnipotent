@@ -2,7 +2,7 @@
 story_id: 67-5c
 epic: 67
 title: producthunt-section-and-push-validators
-status: review
+status: done
 baseline_date: 2026-06-10
 operator_brief: 2026-06-10
 predecessors: 67-5b
@@ -14,7 +14,7 @@ companion_story: 67-5b-producthunt-sourcetype-validator
 
 # Story 67.5c: Add `producthunt` section value + fix push validators
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -243,3 +243,10 @@ Composer
 
 - `cns-dashboard/convex/validators.ts`
 - `cns-dashboard/tests/convex/digest.test.ts`
+
+---
+
+## Story Completion Status
+
+- **Status:** done
+- **Completion note:** `producthunt` accepted in `digestSectionValue`; paired push acceptance test green; verify.sh **460** tests.

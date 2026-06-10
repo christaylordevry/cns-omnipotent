@@ -2,7 +2,7 @@
 story_id: 67-5b
 epic: 67
 title: producthunt-sourcetype-validator
-status: review
+status: done
 baseline_date: 2026-06-10
 operator_brief: 2026-06-10
 predecessors: 67-5
@@ -13,7 +13,7 @@ parent_story: 67-5-producthunt-adapter-source-10
 
 # Story 67.5b: Add `producthunt` to `digestSourceTypeValue`
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -203,5 +203,5 @@ Composer
 
 ## Story Completion Status
 
-- **Status:** review
-- **Completion note:** `producthunt` accepted in `digestSourceTypeValue`; Convex dev deploy + verify green (459 tests). Section literal deferred to 67-5c.
+- **Status:** done
+- **Completion note:** `producthunt` accepted in `digestSourceTypeValue`; Convex dev deploy + verify green (459 tests). Section literal completed in 67-5c.

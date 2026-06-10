@@ -10,6 +10,28 @@ For documentation purposes only (do not re-evaluate at runtime):
 - Manual trigger: first non-empty line equals `morning-digest` or begins with `morning-digest ` (case-sensitive; single-line message). See `references/trigger-pattern.md`.
 - Cron: operator schedule per `references/cron-snippet.md` / `references/trigger-pattern.md` (`--skill morning-digest`; not the Discord line-1 grammar).
 
+## REQUIRED SOURCES — terminal checklist (non-negotiable)
+
+> **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired. A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
+
+**Strict collection order:** 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6
+
+| Step | Source | Required invocation |
+|------|--------|---------------------|
+| 0 | Date | `terminal(...)` machine-local date (Tool-call rule below) |
+| 1 | Google Trends | `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", …)` |
+| 2 | NewsAPI | `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", …)` |
+| 3 | Perplexity | `mcp__perplexity__search` once (when Source 1 yields a top keyword) |
+| 4 | arXiv | `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", …)` |
+| 5 | HackerNews | `terminal(command="bash scripts/session-close/hermes-run-hn.sh", …)` |
+| 7 | GitHub | `terminal(command="bash scripts/session-close/hermes-run-github.sh", …)` |
+| 8 | Reddit | `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", …)` |
+| 9 | Newsletters / RSS | `terminal(command="bash scripts/session-close/hermes-run-rss.sh", …)` |
+| 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` |
+| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) |
+
+**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, and 6** complete → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+
 ## Hard constraints (must follow)
 
 1. **Channel**: Discord `#hermes` only.
@@ -18,7 +40,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
-7. **Cross-source failures**: run Sources **1–5, 7–9, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources **1–5, 7–10, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.)
 
@@ -382,6 +404,26 @@ Vault context failure does **not** abort the digest.
 - <title> — <score> pts, <comments> comments
 - ...
 (or - (source unavailable: <short reason>) when Source 5 failed)
+
+**GitHub** (trending repos)
+- <title> — <stars> stars, <forks> forks
+- ...
+(or - (source unavailable: <short reason>) when Source 7 failed)
+
+**Reddit** (hot posts)
+- <title> — <upvotes> upvotes, <commentCount> comments
+- ...
+(or - (source unavailable: <short reason>) when Source 8 failed)
+
+**Newsletters / RSS**
+- <title> (optional — <author> when present)
+- ...
+(or - (source unavailable: <short reason>) when Source 9 failed)
+
+**Product Hunt** (daily launches)
+- <title> — <votesCount> votes
+- ... (optional tagline sub-bullet when present)
+(or - (source unavailable: <short reason>) when Source 10 failed)
 
 **Vault context** (NotebookLM — <route.title>)
 <answer text, max 500 chars; if longer truncate with … suffix>
