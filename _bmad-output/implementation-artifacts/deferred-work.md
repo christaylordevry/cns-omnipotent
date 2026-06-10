@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 67-5-producthunt-adapter-source-10 (2026-06-10)
+
+- Empty/malformed GraphQL shape returns `{launches:[]}` not `{error}` — task-prompt step 5 treats empty launches as failure; optional adapter hardening.
+- `hermes-run-github.sh` lacks HOME remap — pre-existing; not introduced by 67-5 (producthunt correctly mirrors newsapi).
+
 ## Deferred from: code review of 65-9-surface-intelligence-scoring-inspector-drawer (2026-06-09)
 
 - Scoring panel absent during `getDigestSignalsForRun` fetch with no loading indicator — matches 63-5 drawer defer pattern; optional polish story.

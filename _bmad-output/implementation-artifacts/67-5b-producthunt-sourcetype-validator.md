@@ -2,7 +2,7 @@
 story_id: 67-5b
 epic: 67
 title: producthunt-sourcetype-validator
-status: ready-for-dev
+status: review
 baseline_date: 2026-06-10
 operator_brief: 2026-06-10
 predecessors: 67-5
@@ -13,7 +13,7 @@ parent_story: 67-5-producthunt-adapter-source-10
 
 # Story 67.5b: Add `producthunt` to `digestSourceTypeValue`
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -107,15 +107,15 @@ Run `npm test` from cns-dashboard and record exact pass/fail count.
 
 ## Tasks / Subtasks
 
-- [ ] **T1** Add literal (AC: 1, 2, 4)
-  - [ ] Open `cns-dashboard/convex/validators.ts`
-  - [ ] Add `v.literal('producthunt')` to `digestSourceTypeValue` union after `v.literal('rss')` (alphabetical optional; mirror 65-1 append-after-rss pattern)
-  - [ ] Do **not** touch `digestSectionValue`, `keywordSourceTypeValue`, or `sourceMetadataValidator`
-- [ ] **T2** Verify Convex (AC: 1)
-  - [ ] From cns-dashboard: `npx convex dev --once`
-- [ ] **T3** Verify tests (AC: 3)
-  - [ ] From cns-dashboard: `npm test`
-  - [ ] Record pass count; note any rejection-test failure per **Test tension** above
+- [x] **T1** Add literal (AC: 1, 2, 4)
+  - [x] Open `cns-dashboard/convex/validators.ts`
+  - [x] Add `v.literal('producthunt')` to `digestSourceTypeValue` union after `v.literal('rss')` (alphabetical optional; mirror 65-1 append-after-rss pattern)
+  - [x] Do **not** touch `digestSectionValue`, `keywordSourceTypeValue`, or `sourceMetadataValidator`
+- [x] **T2** Verify Convex (AC: 1)
+  - [x] From cns-dashboard: `npx convex dev --once`
+- [x] **T3** Verify tests (AC: 3)
+  - [x] From cns-dashboard: `npm test`
+  - [x] Record pass count; note any rejection-test failure per **Test tension** above
 
 ## Dev Notes
 
@@ -184,10 +184,24 @@ export const digestSourceTypeValue = v.union(
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
-
-### Debug Log References
+Composer
 
 ### Completion Notes List
 
+- Added `v.literal('producthunt')` to `digestSourceTypeValue` in `cns-dashboard/convex/validators.ts` (single-file diff per AC 4).
+- `digestSignalInputValidator`, `digestSignalRowValidator`, and `digestSignalListItemValidator` inherit the extended union automatically — no manual edits.
+- `npx convex dev --once` exit 0 (dev deployment `exciting-pony-764`).
+- `npm test` and `bash scripts/verify.sh` green — **459** tests (baseline 451 + growth from parallel epic work).
+- **Test tension:** not triggered — `digest.test.ts` already uses `invalid_source` for rejection coverage, not `producthunt`.
+- **Section gap:** end-to-end ProductHunt push still requires **67-5c** (`digestSectionValue` literal) — out of scope for this story.
+
 ### File List
+
+- `cns-dashboard/convex/validators.ts`
+
+---
+
+## Story Completion Status
+
+- **Status:** review
+- **Completion note:** `producthunt` accepted in `digestSourceTypeValue`; Convex dev deploy + verify green (459 tests). Section literal deferred to 67-5c.

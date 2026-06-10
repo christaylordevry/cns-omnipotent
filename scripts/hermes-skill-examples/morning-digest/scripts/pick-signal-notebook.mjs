@@ -23,6 +23,7 @@ const MAX_HN_SIGNALS = 3;
 const MAX_GITHUB_SIGNALS = 2;
 const MAX_REDDIT_SIGNALS = 2;
 const MAX_RSS_SIGNALS = 1;
+const MAX_PRODUCTHUNT_SIGNALS = 2;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
 const CNS_REPO_ROOT =
@@ -212,6 +213,28 @@ export function extractRedditSignals(redditList) {
 }
 
 /**
+ * @param {Array<{ title?: string, votesCount?: number }>} producthuntList
+ * @returns {string[]}
+ */
+export function extractProductHuntSignals(producthuntList) {
+  if (!Array.isArray(producthuntList)) {
+    return [];
+  }
+  const sorted = [...producthuntList].sort(
+    (a, b) => (Number(b?.votesCount) || 0) - (Number(a?.votesCount) || 0),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_PRODUCTHUNT_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -256,6 +279,7 @@ export function extractRssSignals(rssList) {
  *   github?: Array<{ title?: string, stars?: number }>,
  *   reddit?: Array<{ title?: string, upvotes?: number }>,
  *   rss?: Array<{ title?: string, publishedAt?: string }>,
+ *   producthunt?: Array<{ title?: string, votesCount?: number }>,
  * }} sources
  * @returns {string[]}
  */
@@ -291,6 +315,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractGithubSignals(sources.github));
   ordered.push(...extractRedditSignals(sources.reddit));
   ordered.push(...extractRssSignals(sources.rss));
+  ordered.push(...extractProductHuntSignals(sources.producthunt));
 
   return dedupeSignals(ordered);
 }

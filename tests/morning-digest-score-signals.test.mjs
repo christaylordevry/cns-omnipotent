@@ -310,9 +310,10 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
+    assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -415,6 +416,32 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
       }),
       100,
     );
+  });
+
+  it('producthunt at upvotes cap without comments → 75', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'PH cap launch',
+        sourceType: 'producthunt',
+        sourceMetadata: { upvotes: 10000 },
+      }),
+      75,
+    );
+  });
+
+  it('producthunt parity with reddit at same upvotes', () => {
+    const upvotes = 420;
+    const ph = normalizeEngagement({
+      title: 'PH launch',
+      sourceType: 'producthunt',
+      sourceMetadata: { upvotes },
+    });
+    const rd = normalizeEngagement({
+      title: 'RD post',
+      sourceType: 'reddit',
+      sourceMetadata: { upvotes },
+    });
+    assert.equal(ph, rd);
   });
 
   it('hackernews at zero engagement → 0', () => {

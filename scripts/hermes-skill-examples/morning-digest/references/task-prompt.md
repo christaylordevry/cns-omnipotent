@@ -231,16 +231,44 @@ Stdout shape (RSS only — do not confuse with Sources 5, 7, or 8 keys):
    - Emit up to **N** entries total (default **10**, configurable via `MORNING_DIGEST_RSS_MAX_TOTAL`; default **3** per feed via `MORNING_DIGEST_RSS_MAX_PER_FEED`); requires `MORNING_DIGEST_RSS_FEEDS` (comma-separated feed URLs) when enabled.
    - For Discord **Newsletters / RSS**, list each entry as `- <title>` (optional ` — <author>` when present).
 5. Else → failure (empty `entries`, invalid shape, or parse error).
-6. On failure: section header **Newsletters / RSS** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+6. On failure: section header **Newsletters / RSS** + `- (source unavailable: <short reason>)` and **continue** to Source 10.
 7. **Anti-pattern:** Do not read `stories[]`, `repos[]`, or `posts[]` from RSS stdout — those keys belong to Sources 5, 7, and 8 only.
+
+## Source 10 — Product Hunt
+
+Call `terminal` exactly once for Product Hunt daily launches via GraphQL. The script reads `MORNING_DIGEST_PRODUCTHUNT_*` and `PRODUCTHUNT_API_KEY` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"launches":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+Stdout shape (Product Hunt only — do not confuse with Sources 5, 7, 8, or 9 keys):
+
+```json
+{ "launches": [{ "title": "...", "tagline": "...", "url": "https://www.producthunt.com/posts/...", "votesCount": 42 }] }
+```
+
+**After the Product Hunt terminal returns** (mandatory stdout threading — mirror Sources 7–9):
+
+1. Let `ph_stdout` = Product Hunt terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `ph_json = JSON.parse(ph_stdout)` inside try/catch or equivalent safe parse.
+3. If `ph_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(ph_json.launches) && ph_json.launches.length > 0`:
+   - Read **`ph_json.launches`** (`launches[]` stdout array key) only — each item uses `title`, `tagline`, `url`, `votesCount` (number), optional `createdAt` (ISO string).
+   - When building §9 push signals, nest engagement under `sourceMetadata`: `launches[].votesCount` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `launches[].tagline` → `summary` for §9; map `launches[].createdAt` → `sourceMetadata.publishedAt` when present.
+   - Emit up to **N** launches (default **5**, configurable via `MORNING_DIGEST_PRODUCTHUNT_MAX_LAUNCHES`); requires `PRODUCTHUNT_API_KEY` when enabled.
+   - For Discord **Product Hunt**, list each launch as `- <title> — <votesCount> votes` (optional tagline sub-bullet when present).
+5. Else → failure (empty `launches`, invalid shape, or parse error).
+6. On failure: section header **Product Hunt** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+7. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `stories[]`, or `entries[]` from Product Hunt stdout — those keys belong to Sources 5, 7, 8, and 9 only.
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 9 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 10 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5, Source 7, Source 8, and Source 9 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5, Source 7, Source 8, Source 9, and Source 10 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -251,7 +279,8 @@ After Sources 1–5, Source 7, Source 8, and Source 9 complete, assemble a JSON 
   "hackernews": [{ "title": "<string>" }],
   "github": [{ "title": "<string>", "url": "<string>", "stars": <number> }],
   "reddit": [{ "title": "<string>", "url": "<string>", "upvotes": <number> }],
-  "rss": [{ "title": "<string>", "url": "<string>", "publishedAt": "<optional ISO string>" }]
+  "rss": [{ "title": "<string>", "url": "<string>", "publishedAt": "<optional ISO string>" }],
+  "producthunt": [{ "title": "<string>", "url": "<string>", "votesCount": <number> }]
 }
 ```
 
@@ -263,8 +292,9 @@ After Sources 1–5, Source 7, Source 8, and Source 9 complete, assemble a JSON 
 - **github:** repo **titles** from Source 7 when available; omit or `[]` when GitHub is unavailable.
 - **reddit:** post **titles** from Source 8 when available; omit or `[]` when Reddit is unavailable.
 - **rss:** newsletter/RSS entry **titles** from Source 9 when available (include `publishedAt` when present for recency sorting in `buildDigestSignals`); omit or `[]` when RSS is unavailable.
+- **producthunt:** launch **titles** from Source 10 when available (include `votesCount` for ranking in `buildDigestSignals`); omit or `[]` when Product Hunt is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -442,7 +472,7 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 > **REQUIRED §9 — part 1 of 2 of the completion gate.** This is **part 1 of 2** — do **not** end the task turn after this call; §10 must also fire. Non-negotiable even under context compression. Invoke on **every** run (success or partial failure), exactly as session-close treats its required steps.
 
-Run **after** Sources **1–5, 7–9, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
+Run **after** Sources **1–5, 7–10, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 
@@ -458,6 +488,7 @@ Run **after** Sources **1–5, 7–9, and 6** were attempted, `digest_sources` w
 | `github` | `github` | Source 7 `repos[]` | `title` | — | `url` | — | `sha256(url).slice(0,16)` short hex |
 | `reddit` | `reddit` | Source 8 `posts[]` | `title` | — | `url` | — | url hash or title+date hash |
 | `rss` | `rss` | Source 9 `entries[]` | `title` | — | `url` | — | url hash or title+date hash |
+| `producthunt` | `producthunt` | Source 10 `launches[]` | `title` | `tagline` | `url` | — | url hash or title+date hash |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
@@ -466,6 +497,7 @@ Run **after** Sources **1–5, 7–9, and 6** were attempted, `digest_sources` w
   - GitHub: map `repos[].stars` → `sourceMetadata.stars` (number, **required** for engagement normalization); map `repos[].forks` → `sourceMetadata.forks` (number) when present; map `repos[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `stars`/`forks` at the signal root — `normalizeEngagement` reads only `sourceMetadata.stars`/`sourceMetadata.forks`; root-level fields score as null silently.
   - Reddit: map `posts[].upvotes` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `posts[].commentCount` → `sourceMetadata.commentCount` (number) when present; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `upvotes`/`commentCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`/`sourceMetadata.commentCount`; root-level fields score as null silently.
   - RSS: map `entries[].publishedAt` → `sourceMetadata.publishedAt` when present; map `entries[].author` → `sourceMetadata.author` when present. **No engagement fields** — omit `stars`, `upvotes`, `points`, etc. **Never** leave `publishedAt`/`author` at the signal root.
+  - Product Hunt: map `launches[].votesCount` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `launches[].tagline` → `summary`; map `launches[].createdAt` → `sourceMetadata.publishedAt` when present. **Never** leave `votesCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`; root-level fields score as null silently.
 - **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
@@ -475,7 +507,7 @@ Run **after** Sources **1–5, 7–9, and 6** were attempted, `digest_sources` w
 The `addDigestSignal` validator is a **strict** object: a missing required key **or** an unexpected/`null` value rejects the whole signal, and the push then finalizes the run as `failed` with **zero** signals stored. Build every signal object exactly to this contract:
 
 - **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
-- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss`.
+- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt`.
 - **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`, `scores`, `disposition`, `normalizedEngagement`, `rankScore`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
 - **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, `sourceMetadata.stars`, `sourceMetadata.forks`, `sourceMetadata.upvotes`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
 - Do **not** add any key not listed in the table / this contract.

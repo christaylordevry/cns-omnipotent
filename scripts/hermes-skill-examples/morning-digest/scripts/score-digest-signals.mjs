@@ -26,6 +26,7 @@ const SOURCE_PRIOR = {
   arxiv: 0,
   github: 5,
   reddit: 8,
+  producthunt: 8,
   rss: 5,
 };
 
@@ -37,13 +38,14 @@ const TREND_PROXY_PRIOR = {
   deep_signal: 50,
   github: 40,
   reddit: 42,
+  producthunt: 42,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -155,7 +157,8 @@ export function normalizeEngagement(signal) {
           0.15 * logNorm(meta.forks, GH_FORKS_CAP),
       );
     }
-    case 'reddit': {
+    case 'reddit':
+    case 'producthunt': {
       if (!Number.isFinite(meta.upvotes)) {
         return null;
       }

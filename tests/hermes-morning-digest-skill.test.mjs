@@ -18,9 +18,11 @@ const hnWrapperPath = join(root, "scripts/session-close/hermes-run-hn.sh");
 const githubWrapperPath = join(root, "scripts/session-close/hermes-run-github.sh");
 const redditWrapperPath = join(root, "scripts/session-close/hermes-run-reddit.sh");
 const rssWrapperPath = join(root, "scripts/session-close/hermes-run-rss.sh");
+const producthuntWrapperPath = join(root, "scripts/session-close/hermes-run-producthunt.sh");
 const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const fetchHnScriptPath = join(skillDir, "scripts/fetch-hn-rss.mjs");
 const fetchRssScriptPath = join(skillDir, "scripts/fetch-rss-signals.mjs");
+const fetchProductHuntScriptPath = join(skillDir, "scripts/fetch-producthunt-launches.mjs");
 const fetchNewsapiScriptPath = join(skillDir, "scripts/fetch-newsapi-headlines.mjs");
 const pickSignalScriptPath = join(
   skillDir,
@@ -349,15 +351,23 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source8.includes("sourceMetadata.upvotes"));
     assert.ok(source8.includes("continue** to Source 9"));
 
-    const source9End = taskBody.indexOf("## Source 6");
+    const source9End = taskBody.indexOf("## Source 10");
     const source9 = taskBody.slice(source8End, source9End);
     assert.ok(source9.includes("hermes-run-rss.sh"));
     assert.ok(source9.includes("**Newsletters / RSS**"));
     assert.ok(source9.includes("entries[]"));
     assert.ok(source9.includes("sourceMetadata.publishedAt"));
-    assert.ok(source9.includes("continue** to Source 6"));
+    assert.ok(source9.includes("continue** to Source 10"));
 
-    const source6 = taskBody.slice(source9End);
+    const source10End = taskBody.indexOf("## Source 6");
+    const source10 = taskBody.slice(source9End, source10End);
+    assert.ok(source10.includes("hermes-run-producthunt.sh"));
+    assert.ok(source10.includes("**Product Hunt**"));
+    assert.ok(source10.includes("launches[]"));
+    assert.ok(source10.includes("sourceMetadata.upvotes"));
+    assert.ok(source10.includes("continue** to Source 6"));
+
+    const source6 = taskBody.slice(source10End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
     assert.ok(source6.includes("buildDigestSignals"));
     assert.ok(source6.includes("perplexityText"));
@@ -365,7 +375,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source6.includes('"hackernews"'));
     assert.ok(source6.includes('"reddit"'));
     assert.ok(source6.includes('"rss"'));
+    assert.ok(source6.includes('"producthunt"'));
     assert.ok(source6.includes("RSS title (up to 1,"));
+    assert.ok(source6.includes("Product Hunt launch titles (up to 2,"));
     assert.ok(source6.includes('"trends"'));
     assert.ok(source6.includes('"headlines"'));
     assert.ok(source6.includes("arXiv titles (up to 3)"));
@@ -435,7 +447,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("task-prompt documents imperative RSS stdout parsing (Story 65-7)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const source9End = taskBody.indexOf("## Source 6");
+    const source9End = taskBody.indexOf("## Source 10");
     const source9 = taskBody.slice(taskBody.indexOf("## Source 9"), source9End);
     assert.ok(source9.includes("entries[]"));
     assert.ok(source9.includes("rss_json") || source9.includes("rss_stdout"));
@@ -444,10 +456,24 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       /anti-pattern|Do not read.*stories/i.test(source9),
       "must anti-pattern wrong keys for RSS",
     );
-    assert.ok(source9.includes("continue** to Source 6"));
+    assert.ok(source9.includes("continue** to Source 10"));
     const skillBody = readFileSync(skillPath, "utf8");
     assert.ok(skillBody.includes("RSS stdout threading"));
     assert.ok(skillBody.includes("rss_json.entries"));
+  });
+
+  it("task-prompt documents imperative Product Hunt stdout parsing (Story 67-5)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source10End = taskBody.indexOf("## Source 6");
+    const source10 = taskBody.slice(taskBody.indexOf("## Source 10"), source10End);
+    assert.ok(source10.includes("launches[]"));
+    assert.ok(source10.includes("ph_json") || source10.includes("ph_stdout"));
+    assert.ok(source10.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*repos/i.test(source10),
+      "must anti-pattern wrong keys for Product Hunt",
+    );
+    assert.ok(source10.includes("continue** to Source 6"));
   });
 
   it("config-snippet documents RSS env keys (Story 65-4)", () => {
@@ -457,14 +483,20 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("MORNING_DIGEST_RSS_MAX_TOTAL"));
   });
 
-  it("wrapper scripts include GitHub, Reddit, and RSS session-close runners (Story 65-1, 65-3, 65-4)", () => {
+  it("wrapper scripts include GitHub, Reddit, RSS, and Product Hunt session-close runners (Story 65-1, 65-3, 65-4, 67-5)", () => {
     assert.ok(existsSync(githubWrapperPath));
     assert.ok(existsSync(redditWrapperPath));
     assert.ok(existsSync(rssWrapperPath));
+    assert.ok(existsSync(producthuntWrapperPath));
     assert.ok(existsSync(fetchRssScriptPath));
+    assert.ok(existsSync(fetchProductHuntScriptPath));
     assert.ok((statSync(rssWrapperPath).mode & 0o111) !== 0);
+    assert.ok((statSync(producthuntWrapperPath).mode & 0o111) !== 0);
     const rssWrapper = readFileSync(rssWrapperPath, "utf8");
     assert.ok(rssWrapper.includes("fetch-rss-signals.mjs"));
+    const producthuntWrapper = readFileSync(producthuntWrapperPath, "utf8");
+    assert.ok(producthuntWrapper.includes("fetch-producthunt-launches.mjs"));
+    assert.ok(producthuntWrapper.includes(".hermes/home"));
   });
 
   it("config-snippet documents arXiv env keys (Story 61-1)", () => {
