@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-09T18:00:00+10:00
+# last_updated: 2026-06-10T12:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-09T20:00:00+00:00"
+last_updated: "2026-06-10T21:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -474,3 +474,16 @@ development_status:
   66-4-swap-investigation-provider-openrouter: done
   66-2-agent-orchestration-workspace-screen-10: backlog
   epic-66-retrospective: optional
+
+  # Epic 67 — Signal Quality + Source Expansion (prd + architecture 2026-06-09)
+  epic-67: in-progress
+  # Gate: 67-1 validates live digest before 67-5 ProductHunt; 67-3/67-4 parallel; 67-2 operator Reddit OAuth; 67-6 needs ≥2 runs
+  67-1-live-digest-validation: done
+  67-2-reddit-oauth-retry-live-wiring: backlog
+  67-3-personal-relevance-v2-nexus-goals: done
+  67-4-signal-seeds-chip-inspector: done
+  67-5-producthunt-adapter-source-10: ready-for-dev
+  67-5b-producthunt-sourcetype-validator: ready-for-dev
+  67-5c-producthunt-section-and-push-validators: ready-for-dev
+  67-6-compare-smoke-test-documentation: backlog
+  epic-67-retrospective: optional

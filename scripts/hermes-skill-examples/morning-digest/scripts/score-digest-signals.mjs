@@ -14,6 +14,10 @@ const BREAKING_TITLE_RE =
   /\b(breaking|launch|released|announces|emergency|critical|cve-\d|outage|today)\b/i;
 const NOVELTY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** ADR-E67-004 — nexus-goals.yaml limits (anti-drift surface). */
+export const NEXUS_GOALS_MAX_PHRASES = 20;
+export const DEFAULT_GOAL_WEIGHT = 2.0;
+
 const SOURCE_PRIOR = {
   newsapi: 15,
   hackernews: 10,
@@ -63,6 +67,7 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  * @typedef {{
  *   domainTokens: string[],
  *   personalTokens: string[],
+ *   goalWeightedTokens: Array<{ token: string, weight: number }>,
  *   epicNumericTokens: string[],
  *   noveltyHistoryEntries: NoveltyHistoryEntry[],
  *   runAt: number,
@@ -179,6 +184,40 @@ export function f1Score(tokensA, tokensB) {
 }
 
 /**
+ * Weighted F1 for personal relevance tiers (ADR-E67-004 FR-7).
+ *
+ * @param {string[]} signalTokens
+ * @param {Array<{ token: string, weight: number }>} weightedRefTokens
+ * @returns {number}
+ */
+export function weightedPersonalF1(signalTokens, weightedRefTokens) {
+  if (signalTokens.length === 0 || weightedRefTokens.length === 0) {
+    return 0;
+  }
+  const signalSet = new Set(signalTokens);
+  let weightedIntersection = 0;
+  let totalRefWeight = 0;
+  for (const { token, weight } of weightedRefTokens) {
+    const w = Number.isFinite(weight) && weight > 0 ? weight : DEFAULT_GOAL_WEIGHT;
+    totalRefWeight += w;
+    if (signalSet.has(token)) {
+      weightedIntersection += w;
+    }
+  }
+  if (weightedIntersection === 0 || totalRefWeight === 0) {
+    return 0;
+  }
+  const precision = weightedIntersection / signalTokens.length;
+  const recall = weightedIntersection / totalRefWeight;
+  const denominator = precision + recall;
+  if (denominator === 0) {
+    return 0;
+  }
+  const f1val = (2 * precision * recall) / denominator;
+  return Math.round(clamp(f1val * 100, 0, 100));
+}
+
+/**
  * @param {string} title
  * @param {string} [summary]
  * @returns {string[]}
@@ -278,6 +317,192 @@ export function parseDevelopmentStatus(yaml) {
   }
 
   return entries;
+}
+
+/**
+ * Line-safe subset parser for ~/.hermes/nexus-goals.yaml (ADR-E67-004).
+ *
+ * @param {string} yaml
+ * @returns {{ version: number | null, goals: { phrase: string, weight: number }[], malformed: boolean }}
+ */
+export function parseNexusGoalsYaml(yaml) {
+  /** @type {number | null} */
+  let version = null;
+  let inGoals = false;
+  /** @type {string | null} */
+  let currentPhrase = null;
+  let currentWeight = DEFAULT_GOAL_WEIGHT;
+  /** @type {{ phrase: string, weight: number }[]} */
+  const goals = [];
+  let sawGoalsSection = false;
+  let malformed = false;
+
+  const flushCurrent = () => {
+    if (currentPhrase) {
+      const weight =
+        Number.isFinite(currentWeight) && currentWeight > 0
+          ? currentWeight
+          : DEFAULT_GOAL_WEIGHT;
+      goals.push({ phrase: currentPhrase, weight });
+      currentPhrase = null;
+      currentWeight = DEFAULT_GOAL_WEIGHT;
+    }
+  };
+
+  for (const rawLine of yaml.split('\n')) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const versionMatch = trimmed.match(/^version:\s*(\d+)\s*$/);
+    if (versionMatch) {
+      version = Number(versionMatch[1]);
+      continue;
+    }
+
+    if (/^goals:\s*$/.test(trimmed)) {
+      inGoals = true;
+      sawGoalsSection = true;
+      continue;
+    }
+
+    if (inGoals && /^[A-Za-z0-9_]+:\s*$/.test(trimmed) && !trimmed.startsWith('-')) {
+      flushCurrent();
+      inGoals = false;
+      continue;
+    }
+
+    if (!inGoals) {
+      if (/^-\s+/.test(trimmed)) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    const listPhraseMatch = trimmed.match(/^-\s+phrase:\s*(.+)$/i);
+    if (listPhraseMatch) {
+      flushCurrent();
+      currentPhrase = listPhraseMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      currentWeight = DEFAULT_GOAL_WEIGHT;
+      if (!currentPhrase) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    const bareListMatch = trimmed.match(/^-\s+(.+)$/);
+    if (bareListMatch && !/^phrase:/i.test(bareListMatch[1]) && !/^weight:/i.test(bareListMatch[1])) {
+      flushCurrent();
+      currentPhrase = bareListMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      currentWeight = DEFAULT_GOAL_WEIGHT;
+      if (!currentPhrase) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    const phraseMatch = rawLine.match(/^\s+phrase:\s*(.+)$/i);
+    if (phraseMatch) {
+      if (!currentPhrase) {
+        currentPhrase = phraseMatch[1].trim().replace(/^['"]|['"]$/g, '');
+        currentWeight = DEFAULT_GOAL_WEIGHT;
+        if (!currentPhrase) {
+          malformed = true;
+        }
+      }
+      continue;
+    }
+
+    const weightMatch =
+      rawLine.match(/^\s+weight:\s*([\d.]+)\s*$/i) || trimmed.match(/^weight:\s*([\d.]+)\s*$/i);
+    if (weightMatch) {
+      if (!currentPhrase) {
+        malformed = true;
+        continue;
+      }
+      const parsedWeight = Number(weightMatch[1]);
+      if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+        malformed = true;
+      } else {
+        currentWeight = parsedWeight;
+      }
+      continue;
+    }
+
+    if (/^-\s+/.test(trimmed) || /^\s+\w+:/.test(rawLine)) {
+      malformed = true;
+    }
+  }
+
+  flushCurrent();
+
+  if (sawGoalsSection && version == null) {
+    malformed = true;
+  }
+
+  return { version, goals, malformed };
+}
+
+/**
+ * @param {{ phrase: string, weight: number }[]} goals
+ * @returns {Array<{ token: string, weight: number }>}
+ */
+export function buildGoalWeightedTokens(goals) {
+  /** @type {Array<{ token: string, weight: number }>} */
+  const goalWeightedTokens = [];
+  for (const { phrase, weight } of goals.slice(0, NEXUS_GOALS_MAX_PHRASES)) {
+    const w = Number.isFinite(weight) && weight > 0 ? weight : DEFAULT_GOAL_WEIGHT;
+    for (const token of tokenizeForScoring(phrase)) {
+      goalWeightedTokens.push({ token, weight: w });
+    }
+  }
+  return goalWeightedTokens;
+}
+
+/**
+ * @param {string} operatorHome
+ * @returns {Promise<{ goalWeightedTokens: Array<{ token: string, weight: number }>, diagnostic?: string }>}
+ */
+export async function loadNexusGoals(operatorHome) {
+  const goalsPath = join(operatorHome, '.hermes', 'nexus-goals.yaml');
+  try {
+    const raw = await readFile(goalsPath, 'utf8');
+    const parsed = parseNexusGoalsYaml(raw);
+
+    if (parsed.malformed) {
+      return {
+        goalWeightedTokens: [],
+        diagnostic: 'score-digest-signals: warning — malformed nexus-goals.yaml',
+      };
+    }
+
+    if (parsed.version !== 1) {
+      if (parsed.version != null) {
+        return {
+          goalWeightedTokens: [],
+          diagnostic: `score-digest-signals: warning — unsupported nexus-goals.yaml version ${parsed.version}`,
+        };
+      }
+      return { goalWeightedTokens: [] };
+    }
+
+    return {
+      goalWeightedTokens: buildGoalWeightedTokens(parsed.goals),
+    };
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+      return { goalWeightedTokens: [] };
+    }
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'read error';
+    return {
+      goalWeightedTokens: [],
+      diagnostic: `score-digest-signals: warning — nexus-goals.yaml unreadable (${reason})`,
+    };
+  }
 }
 
 /**
@@ -441,6 +666,13 @@ export async function loadScoringContext(env = process.env) {
   const resolvedRunAt = Number.isFinite(runAt) && runAt > 0 ? runAt : Date.now();
 
   const operatorHome = await resolveOperatorHome(env);
+  const nexusGoals = await loadNexusGoals(operatorHome);
+  if (nexusGoals.diagnostic) {
+    console.error(nexusGoals.diagnostic);
+  }
+  const goalWeightedTokens = nexusGoals.goalWeightedTokens;
+  const goalTokenSet = new Set(goalWeightedTokens.map(({ token }) => token));
+
   const watchlistPath = join(operatorHome, '.hermes', 'trend-watchlist.yaml');
 
   /** @type {string[]} */
@@ -489,12 +721,14 @@ export async function loadScoringContext(env = process.env) {
     ...new Set(domainKeywords.flatMap((keyword) => tokenizeForScoring(keyword))),
   ];
   const personalTokens = [
-    ...new Set([
-      ...sprintTokens,
-      ...projectEntities.flatMap((entity) => tokenizeForScoring(entity)),
-      ...personalWatchlistKeywords.flatMap((keyword) => tokenizeForScoring(keyword)),
-      ...keywordCandidateTerms.flatMap((term) => tokenizeForScoring(term)),
-    ]),
+    ...new Set(
+      [
+        ...sprintTokens,
+        ...projectEntities.flatMap((entity) => tokenizeForScoring(entity)),
+        ...personalWatchlistKeywords.flatMap((keyword) => tokenizeForScoring(keyword)),
+        ...keywordCandidateTerms.flatMap((term) => tokenizeForScoring(term)),
+      ].filter((token) => !goalTokenSet.has(token)),
+    ),
   ];
 
   const noveltyHistoryAll = parseNoveltyHistoryJson(env.DIGEST_NOVELTY_HISTORY_JSON);
@@ -510,6 +744,7 @@ export async function loadScoringContext(env = process.env) {
   return {
     domainTokens,
     personalTokens,
+    goalWeightedTokens,
     epicNumericTokens,
     noveltyHistoryEntries,
     runAt: resolvedRunAt,
@@ -537,9 +772,14 @@ export function scoreRelevance(signal, ctx) {
  */
 export function scorePersonalRelevance(signal, ctx) {
   const signalTokens = tokenizeSignalText(signal.title, signal.summary);
-  const base = f1Score(signalTokens, ctx.personalTokens);
+  const baseTier = weightedPersonalF1(
+    signalTokens,
+    ctx.personalTokens.map((token) => ({ token, weight: 1 })),
+  );
+  const goalTier = weightedPersonalF1(signalTokens, ctx.goalWeightedTokens ?? []);
+  const combined = Math.max(baseTier, goalTier);
   const epicBonus = ctx.epicNumericTokens.some((token) => signalTokens.includes(token)) ? 15 : 0;
-  return clamp(base + epicBonus, 0, 100);
+  return clamp(combined + epicBonus, 0, 100);
 }
 
 /**

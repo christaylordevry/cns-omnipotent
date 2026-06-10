@@ -1,0 +1,16 @@
+# Operator copy: cp scripts/nexus-goals.yaml.example ~/.hermes/nexus-goals.yaml
+# Quarterly focus phrases for morning-digest personalRelevance v2 (ADR-E67-004).
+# Not committed to repo; not vault WriteGate.
+
+version: 1
+goals:
+  - phrase: "Nexus intelligence cockpit"
+    weight: 2.0
+  - phrase: "morning digest signal quality"
+  - phrase: "Convex real-time dashboard"
+    weight: 1.5
+  - phrase: "personal relevance scoring"
+  - phrase: "Hermes Discord gateway"
+  - phrase: "vault IO WriteGate"
+  - phrase: "signal seeds inspector"
+  - phrase: "ProductHunt adapter"

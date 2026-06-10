@@ -18,12 +18,17 @@ import {
   GH_STARS_CAP,
   HN_COMMENTS_CAP,
   HN_POINTS_CAP,
+  buildGoalWeightedTokens,
+  DEFAULT_GOAL_WEIGHT,
+  loadNexusGoals,
   loadScoringContext,
   logNorm,
+  NEXUS_GOALS_MAX_PHRASES,
   normalizeEngagement,
   overlapRatio,
   parseDevelopmentStatus,
   parseDigestSignalsJson,
+  parseNexusGoalsYaml,
   parseNoveltyHistoryJson,
   parseWatchlistYaml,
   RANK_WEIGHT_MOMENTUM,
@@ -46,6 +51,7 @@ import {
   scoreUrgency,
   tokenizeSignalText,
   trendProxyForSignal,
+  weightedPersonalF1,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -59,6 +65,7 @@ function baseCtx(overrides = {}) {
   return {
     domainTokens: [],
     personalTokens: [],
+    goalWeightedTokens: [],
     epicNumericTokens: [],
     noveltyHistoryEntries: [],
     runAt: Date.parse('2026-06-09T12:00:00Z'),
@@ -723,6 +730,283 @@ describe('deriveDisposition', () => {
       ),
       'watch',
     );
+  });
+});
+
+describe('nexus-goals.yaml loader and weighted personalRelevance', () => {
+  it('parseNexusGoalsYaml reads version, phrases, and per-phrase weights', () => {
+    const yaml = `version: 1
+goals:
+  - phrase: "Nexus intelligence cockpit"
+    weight: 2.0
+  - phrase: morning digest signal quality
+  - phrase: "Convex real-time dashboard"
+    weight: 1.5
+`;
+    const parsed = parseNexusGoalsYaml(yaml);
+    assert.equal(parsed.version, 1);
+    assert.equal(parsed.malformed, false);
+    assert.equal(parsed.goals.length, 3);
+    assert.equal(parsed.goals[0].phrase, 'Nexus intelligence cockpit');
+    assert.equal(parsed.goals[0].weight, 2.0);
+    assert.equal(parsed.goals[1].phrase, 'morning digest signal quality');
+    assert.equal(parsed.goals[1].weight, DEFAULT_GOAL_WEIGHT);
+    assert.equal(parsed.goals[2].weight, 1.5);
+  });
+
+  it('buildGoalWeightedTokens tokenizes phrases and caps at NEXUS_GOALS_MAX_PHRASES', () => {
+    const goals = Array.from({ length: 21 }, (_, index) => ({
+      phrase: `focus area number ${index + 1}`,
+      weight: 2.0,
+    }));
+    const tokens = buildGoalWeightedTokens(goals);
+    const phrasesLoaded = goals.slice(0, NEXUS_GOALS_MAX_PHRASES);
+    const expectedCount = phrasesLoaded.reduce(
+      (sum, goal) => sum + tokenizeSignalText(goal.phrase).length,
+      0,
+    );
+    assert.equal(tokens.length, expectedCount);
+    assert.ok(!tokens.some(({ token }) => token === String(21)));
+  });
+
+  it('loadNexusGoals returns empty set when file is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-missing-'));
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.equal(loaded.diagnostic, undefined);
+  });
+
+  it('parseNexusGoalsYaml handles empty file without throw', () => {
+    const parsed = parseNexusGoalsYaml('');
+    assert.equal(parsed.version, null);
+    assert.deepEqual(parsed.goals, []);
+    assert.equal(parsed.malformed, false);
+  });
+
+  it('loadNexusGoals handles empty file without throw or diagnostic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-empty-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(join(hermesDir, 'nexus-goals.yaml'), '', 'utf8');
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.equal(loaded.diagnostic, undefined);
+  });
+
+  it('parseNexusGoalsYaml handles missing goals key without throw', () => {
+    const parsed = parseNexusGoalsYaml('version: 1\n');
+    assert.equal(parsed.version, 1);
+    assert.deepEqual(parsed.goals, []);
+    assert.equal(parsed.malformed, false);
+  });
+
+  it('loadNexusGoals returns empty goals for version-only file without throw', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-no-goals-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(join(hermesDir, 'nexus-goals.yaml'), 'version: 1\n', 'utf8');
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.equal(loaded.diagnostic, undefined);
+  });
+
+  it('loadNexusGoals rejects quoted-string weight with malformed diagnostic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-weight-str-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `version: 1
+goals:
+  - phrase: "test phrase"
+    weight: "2.0"
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.match(loaded.diagnostic ?? '', /score-digest-signals: warning — malformed nexus-goals.yaml/);
+  });
+
+  it('loadNexusGoals emits diagnostic for malformed YAML', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-bad-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `goals:
+  - not-a-phrase-key: broken
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.match(loaded.diagnostic ?? '', /score-digest-signals: warning — malformed nexus-goals.yaml/);
+  });
+
+  it('loadNexusGoals warns on unsupported version', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-ver-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `version: 2
+goals:
+  - phrase: "future schema"
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusGoals(root);
+    assert.deepEqual(loaded.goalWeightedTokens, []);
+    assert.match(loaded.diagnostic ?? '', /unsupported nexus-goals.yaml version 2/);
+  });
+
+  it('valid goals file via temp operator home yields higher personalRelevance', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-score-'));
+    const operatorHome = join(root, 'operator');
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `version: 1
+goals:
+  - phrase: "Nexus intelligence cockpit"
+    weight: 2.0
+`,
+      'utf8',
+    );
+
+    const ctxWithGoals = await loadScoringContext({
+      HOME: operatorHome,
+      CNS_REPO_ROOT: root,
+      DIGEST_NOVELTY_HISTORY_JSON: '[]',
+    });
+    const ctxWithoutGoals = baseCtx({ personalTokens: [], goalWeightedTokens: [], epicNumericTokens: [] });
+    const signal = {
+      title: 'Nexus intelligence cockpit ships scoring panel',
+      sourceType: 'newsapi',
+    };
+
+    const withGoals = scorePersonalRelevance(signal, ctxWithGoals);
+    const withoutGoals = scorePersonalRelevance(signal, ctxWithoutGoals);
+    assert.ok(withGoals > withoutGoals);
+    assert.ok(ctxWithGoals.goalWeightedTokens.length > 0);
+  });
+
+  it('per-phrase weight 1.5 scores lower than default 2.0 for same overlap', () => {
+    const signalTokens = tokenizeSignalText('Nexus intelligence cockpit ships scoring panel');
+    const refTokens = ['nexus', 'intelligence', 'cockpit'].map((token) => ({ token, weight: 2.0 }));
+    const lighter = ['nexus', 'intelligence', 'cockpit'].map((token) => ({ token, weight: 1.5 }));
+    assert.ok(weightedPersonalF1(signalTokens, refTokens) > weightedPersonalF1(signalTokens, lighter));
+  });
+
+  it('FR-7 fixture delta is at least 15 points with vs without goals', () => {
+    const signal = {
+      title: 'Nexus intelligence cockpit ships scoring panel',
+      sourceType: 'newsapi',
+    };
+    const withoutGoals = baseCtx({ personalTokens: [], goalWeightedTokens: [], epicNumericTokens: [] });
+    const withGoals = baseCtx({
+      personalTokens: [],
+      goalWeightedTokens: buildGoalWeightedTokens([
+        { phrase: 'Nexus intelligence cockpit', weight: 2.0 },
+      ]),
+      epicNumericTokens: [],
+    });
+    const delta =
+      scorePersonalRelevance(signal, withGoals) - scorePersonalRelevance(signal, withoutGoals);
+    assert.ok(delta >= 15, `expected delta >= 15, got ${delta}`);
+  });
+
+  it('loadScoringContext integration loads goals and excludes goal tokens from personalTokens', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-ctx-'));
+    const operatorHome = join(root, 'operator');
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'trend-watchlist.yaml'),
+      `version: 1
+keywords:
+  - AI agents
+personal:
+  - Nexus intelligence cockpit
+`,
+      'utf8',
+    );
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `version: 1
+goals:
+  - phrase: "Nexus intelligence cockpit"
+    weight: 2.0
+`,
+      'utf8',
+    );
+
+    const stderrChunks = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    };
+    try {
+      const ctx = await loadScoringContext({
+        HOME: operatorHome,
+        CNS_REPO_ROOT: root,
+        DIGEST_NOVELTY_HISTORY_JSON: '[]',
+      });
+      assert.ok(ctx.goalWeightedTokens.some(({ token }) => token === 'nexus'));
+      assert.ok(!ctx.personalTokens.includes('nexus'));
+      assert.ok(!ctx.personalTokens.includes('intelligence'));
+      assert.ok(!ctx.personalTokens.includes('cockpit'));
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+    assert.equal(stderrChunks.join('').includes('nexus-goals'), false);
+  });
+
+  it('loadScoringContext excludes sprint entity tokens overlapping goal phrases from personalTokens', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-goals-sprint-overlap-'));
+    const operatorHome = join(root, 'operator');
+    const hermesDir = join(operatorHome, '.hermes');
+    const artifacts = join(root, 'repo', '_bmad-output', 'implementation-artifacts');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(artifacts, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-goals.yaml'),
+      `version: 1
+goals:
+  - phrase: "morning digest signal quality"
+    weight: 2.0
+`,
+      'utf8',
+    );
+    await writeFile(
+      join(artifacts, 'sprint-status.yaml'),
+      `development_status:
+  epic-67: in-progress
+`,
+      'utf8',
+    );
+
+    const ctx = await loadScoringContext({
+      HOME: operatorHome,
+      CNS_REPO_ROOT: join(root, 'repo'),
+      MORNING_DIGEST_SPRINT_STATUS_PATH: join(artifacts, 'sprint-status.yaml'),
+      MORNING_DIGEST_PROJECT_ENTITIES: 'morning digest,CNS',
+      DIGEST_NOVELTY_HISTORY_JSON: '[]',
+    });
+
+    for (const { token } of ctx.goalWeightedTokens) {
+      assert.ok(
+        !ctx.personalTokens.includes(token),
+        `goal token "${token}" must not appear in personalTokens`,
+      );
+    }
+    assert.ok(ctx.personalTokens.includes('cns'));
+    assert.ok(ctx.personalTokens.includes('epic'));
+    assert.ok(!ctx.personalTokens.includes('morning'));
+    assert.ok(!ctx.personalTokens.includes('digest'));
   });
 });
 
