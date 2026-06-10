@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-11T09:20:00+10:00"
+last_updated: "2026-06-11T09:45:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -490,6 +490,6 @@ development_status:
   67-7-fix-morning-digest-execution-reliability: done
   # Ops hotfixes — 2026-06-11 live validation: cron gateway grep false negative + WSL stale gateway.pid
   67-8-fix-morning-digest-cron-gateway-check: done
-  67-9-fix-hermes-gateway-stale-pid-lock: ready-for-dev
+  67-9-fix-hermes-gateway-stale-pid-lock: done
   67-10-push-watchdog-convex-push-failure-safe: done
   epic-67-retrospective: optional

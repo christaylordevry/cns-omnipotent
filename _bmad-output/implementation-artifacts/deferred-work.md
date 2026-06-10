@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 67-9-fix-hermes-gateway-stale-pid-lock (2026-06-11)
+
+- PID reuse after WSL suspend can fool `kill -0` — accepted limitation; flock/TOCTOU hardening out of scope (36-1 defer).
+- Watchdog/@reboot TOCTOU double-start window — flock out of scope per story AC idempotent best-effort.
+
 ## Session kickoff — 2026-06-11 (Epic 67 live validation)
 
 **Context:** Story **67-7** (prompt/skill hardening) is **done** in repo — contract tests green, Hermes skill synced. Core ingest pipeline (adapters, scoring, Convex validators, env vars) is solid. Remaining failures are **prompt-level execution reliability** — agents still deviate under context compression despite task-prompt guards. Further hardening may follow; do not reopen adapter scripts unless cron evidence proves a script defect.
