@@ -10,7 +10,11 @@ LOG_FILE="${MORNING_DIGEST_SKILL_CRON_LOG:-$HOME/.hermes/logs/morning-digest-ski
 JOB_ID_FILE="${MORNING_DIGEST_SKILL_CRON_JOB_ID_FILE:-$HOME/.hermes/morning-digest-skill-cron-job-id}"
 HERMES_CONFIG="${HERMES_CONFIG:-$HOME/.hermes/config.yaml}"
 CRON_TAG="cns-morning-digest-skill"
+WATCHDOG_CRON_TAG="cns-push-digest-watchdog"
+WATCHDOG_RUNNER="$REPO_ROOT/scripts/run-push-digest-watchdog-cron.sh"
+WATCHDOG_LOG_FILE="${PUSH_DIGEST_WATCHDOG_CRON_LOG:-$HOME/.hermes/logs/push-digest-watchdog.log}"
 DEFAULT_CRON="0 7 * * *"
+DEFAULT_WATCHDOG_CRON="15 7 * * *"
 HERMES_SCHEDULE_DUMMY="${MORNING_DIGEST_SKILL_HERMES_SCHEDULE:-0 0 1 1 *}"
 JOB_NAME="morning-digest"
 JOB_PROMPT="Run morning-digest skill: trends, NewsAPI, Perplexity, NotebookLM vault context."
@@ -79,23 +83,29 @@ remove_morning_digest_skill_jobs() {
   done <<< "$output"
 }
 
-install_wsl_crontab_line() {
-  local cron_line="$1"
+install_wsl_crontab_lines() {
+  local digest_line="$1"
+  local watchdog_line="$2"
   local existing filtered
   existing="$(crontab -l 2>/dev/null || true)"
-  filtered="$(printf '%s\n' "$existing" | grep -v "$CRON_TAG" | sed '/^[[:space:]]*$/d' || true)"
+  filtered="$(printf '%s\n' "$existing" | grep -v "$CRON_TAG" | grep -v "$WATCHDOG_CRON_TAG" | sed '/^[[:space:]]*$/d' || true)"
   {
     printf '%s\n' "$filtered"
-    printf '%s\n' "$cron_line"
+    printf '%s\n' "$digest_line"
+    printf '%s\n' "$watchdog_line"
   } | crontab -
 }
 
 mkdir -p "$(dirname "$LOG_FILE")"
+mkdir -p "$(dirname "$WATCHDOG_LOG_FILE")"
 mkdir -p "$(dirname "$JOB_ID_FILE")"
 chmod +x "$RUNNER"
+chmod +x "$WATCHDOG_RUNNER"
 
 CRON_EXPR="$(resolve_morning_digest_cron)"
+WATCHDOG_CRON_EXPR="${PUSH_DIGEST_WATCHDOG_CRON:-$DEFAULT_WATCHDOG_CRON}"
 CRON_LINE="${CRON_EXPR} CRON_TZ=Australia/Sydney /bin/bash \"$RUNNER\" >>\"$LOG_FILE\" 2>&1 # $CRON_TAG"
+WATCHDOG_CRON_LINE="${WATCHDOG_CRON_EXPR} CRON_TZ=Australia/Sydney /bin/bash \"$WATCHDOG_RUNNER\" >>\"$WATCHDOG_LOG_FILE\" 2>&1 # $WATCHDOG_CRON_TAG"
 
 export HERMES_ACCEPT_HOOKS="${HERMES_ACCEPT_HOOKS:-1}"
 
@@ -122,13 +132,17 @@ fi
 
 printf '%s\n' "$JOB_ID" >"$JOB_ID_FILE"
 
-install_wsl_crontab_line "$CRON_LINE"
+install_wsl_crontab_lines "$CRON_LINE" "$WATCHDOG_CRON_LINE"
 
 echo "Installed morning-digest skill cron."
 echo "WSL schedule: $CRON_EXPR (CRON_TZ=Australia/Sydney on crontab line)"
+echo "Push watchdog schedule: $WATCHDOG_CRON_EXPR (CRON_TZ=Australia/Sydney on crontab line)"
 echo "Hermes job schedule: $HERMES_SCHEDULE_DUMMY (dummy; WSL line is the real trigger)"
 echo "Log: $LOG_FILE"
+echo "Watchdog log: $WATCHDOG_LOG_FILE"
 echo "Job id file: $JOB_ID_FILE"
-echo "Crontab line:"
+echo "Crontab lines:"
 echo "  $CRON_LINE"
+echo "  $WATCHDOG_CRON_LINE"
 echo "Override WSL schedule: export MORNING_DIGEST_CRON='...' or set morning_digest.cron in $HERMES_CONFIG, then re-run this script."
+echo "Override watchdog schedule: export PUSH_DIGEST_WATCHDOG_CRON='...', then re-run this script."

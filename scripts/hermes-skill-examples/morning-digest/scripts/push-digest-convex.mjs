@@ -19,7 +19,7 @@ const FINALIZE_PATH = 'digest:finalizeDigestRun';
  * @param {string} convexUrl
  * @returns {string}
  */
-function normalizeConvexUrl(convexUrl) {
+export function normalizeConvexUrl(convexUrl) {
   return convexUrl.replace(/\/$/, '');
 }
 

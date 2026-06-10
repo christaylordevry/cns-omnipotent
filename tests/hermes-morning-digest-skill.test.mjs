@@ -119,7 +119,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
   });
 
-  it("task-prompt defines output contract, all three sources, and machine-local date", () => {
+  it("task-prompt defines output contract, all three sources, and Sydney civil date", () => {
     assert.ok(existsSync(taskPromptPath));
     const body = readFileSync(taskPromptPath, "utf8");
 
@@ -133,8 +133,8 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(body.includes("NEWSAPI"));
     assert.ok(body.includes("mcp__perplexity__search"));
-    assert.ok(body.includes("process.env.TZ"));
-    assert.ok(!body.includes("Australia/Sydney"));
+    assert.ok(body.includes("Australia/Sydney"));
+    assert.ok(body.includes("Intl.DateTimeFormat"));
     assert.ok(!body.includes("```bash"));
     assert.ok(!body.includes("run_terminal_cmd"));
 
@@ -273,17 +273,22 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const runBody = readFileSync(runPath, "utf8");
 
     assert.ok(installBody.includes("cns-morning-digest-skill"));
+    assert.ok(installBody.includes("cns-push-digest-watchdog"));
     assert.ok(installBody.includes('grep -v "$CRON_TAG"'));
+    assert.ok(installBody.includes('grep -v "$WATCHDOG_CRON_TAG"'));
     assert.ok(installBody.includes("0 7 * * *"));
+    assert.ok(installBody.includes("15 7 * * *"));
     assert.ok(installBody.includes("CRON_TZ=Australia/Sydney"));
     assert.ok(installBody.includes("MORNING_DIGEST_CRON"));
+    assert.ok(installBody.includes("run-push-digest-watchdog-cron.sh"));
+    assert.ok(installBody.includes("push-digest-watchdog.log"));
     assert.ok(installBody.includes("--skill morning-digest"));
     assert.ok(installBody.includes("--name"));
     assert.ok(installBody.includes("--deliver discord"));
     assert.ok(installBody.includes("0 0 1 1 *"));
     assert.ok(installBody.includes(".env.live-chain"));
     assert.ok(installBody.includes("morning-digest-skill-cron-job-id"));
-    assert.ok(installBody.includes("install_wsl_crontab_line"));
+    assert.ok(installBody.includes("install_wsl_crontab_lines"));
     assert.ok(installBody.includes("chmod +x"));
 
     assert.ok(runBody.includes("gateway service is running|gateway is running"));
@@ -589,35 +594,41 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("task-prompt documents post-post scoring before digest push (Story 64-5)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const postPost = taskBody.slice(
-      taskBody.indexOf("## Post-post — Push digest entities to Convex"),
+    const preDiscord = taskBody.slice(
+      taskBody.indexOf("## Pre-Discord — Build, score, and persist digest push payload"),
     );
-    assert.ok(postPost.includes("score-digest-signals.mjs"));
-    assert.ok(postPost.includes("DIGEST_SIGNALS_JSON"));
-    assert.ok(postPost.includes("DIGEST_RUN_AT"));
-    assert.ok(postPost.includes("Score signals before push"));
-    assert.ok(postPost.includes("DIGEST_NOVELTY_HISTORY_JSON"));
-    assert.ok(postPost.includes("rankScore"));
-    assert.ok(postPost.includes("timeout=30"));
+    assert.ok(preDiscord.includes("score-digest-signals.mjs"));
+    assert.ok(preDiscord.includes("DIGEST_SIGNALS_JSON"));
+    assert.ok(preDiscord.includes("DIGEST_RUN_AT"));
+    assert.ok(preDiscord.includes("Score signals before push"));
+    assert.ok(preDiscord.includes("DIGEST_NOVELTY_HISTORY_JSON"));
+    assert.ok(preDiscord.includes("rankScore"));
+    assert.ok(preDiscord.includes("timeout=30"));
   });
 
   it("task-prompt documents imperative scoring stdout threading (Story 64-8)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
+    const preDiscord = taskBody.slice(
+      taskBody.indexOf("## Pre-Discord — Build, score, and persist digest push payload"),
+      taskBody.indexOf("## Output contract (post to `#hermes`)"),
+    );
     const postPost = taskBody.slice(
       taskBody.indexOf("## Post-post — Push digest entities to Convex"),
     );
-    assert.ok(postPost.includes("scored_signals"));
-    assert.ok(postPost.includes("digest_push_payload.signals = scored_signals"));
-    assert.ok(postPost.includes("JSON.parse"));
-    assert.ok(postPost.includes("score_stdout"));
+    assert.ok(preDiscord.includes("scored_signals"));
+    assert.ok(preDiscord.includes("digest_push_payload.signals = scored_signals"));
+    assert.ok(preDiscord.includes("JSON.parse"));
+    assert.ok(preDiscord.includes("score_stdout"));
     assert.ok(
-      postPost.includes(
+      preDiscord.includes(
         "Do not pass pre-scoring `digest_push_payload.signals` to `push-digest-convex.mjs`",
       ),
     );
-    const scoringIdx = postPost.indexOf("Score signals before push");
+    const scoringIdx = preDiscord.indexOf("Score signals before push");
+    const artifactIdx = preDiscord.indexOf("### Persist digest push artifact");
     const pushIdx = postPost.indexOf("push-digest-convex.mjs");
-    assert.ok(scoringIdx >= 0 && pushIdx > scoringIdx);
+    assert.ok(scoringIdx >= 0 && artifactIdx > scoringIdx);
+    assert.ok(pushIdx >= 0);
     assert.ok(postPost.includes("keyword candidates terminal (same post-scoring payload)"));
   });
 
@@ -733,6 +744,35 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(outputTemplate.includes("**Newsletters / RSS**"));
     assert.ok(outputTemplate.includes("**Product Hunt** (daily launches)"));
     assert.ok(outputTemplate.includes("- <title> — <stars> stars, <forks> forks"));
+  });
+
+  it("task-prompt documents persist digest push artifact before Discord post (Story 67-10)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const preDiscord = taskBody.slice(
+      taskBody.indexOf("## Pre-Discord — Build, score, and persist digest push payload"),
+      taskBody.indexOf("## Output contract (post to `#hermes`)"),
+    );
+    const artifactIdx = preDiscord.indexOf("### Persist digest push artifact");
+    const scoringIdx = preDiscord.indexOf("### Score signals before push");
+    const outputIdx = taskBody.indexOf("## Output contract (post to `#hermes`)");
+    const digestPushIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");
+
+    assert.ok(scoringIdx >= 0);
+    assert.ok(artifactIdx > scoringIdx, "scoring must precede artifact write");
+    assert.ok(outputIdx > artifactIdx, "artifact section must appear before Output contract");
+    assert.ok(digestPushIdx > outputIdx);
+    assert.ok(taskBody.includes("digest-push-"));
+    assert.ok(taskBody.includes("write-digest-push-artifact.mjs"));
+    assert.ok(taskBody.includes("before Discord post"));
+    assert.ok(
+      taskBody.includes("Do not") && taskBody.includes("post to `#hermes` until this terminal returns"),
+    );
+    assert.ok(taskBody.includes("resolveOperatorHome"));
+    assert.ok(taskBody.includes("Australia/Sydney"));
+    const preDiscordIdx = taskBody.indexOf(
+      "## Pre-Discord — Build, score, and persist digest push payload",
+    );
+    assert.ok(preDiscordIdx >= 0 && preDiscordIdx < outputIdx);
   });
 
   it("task-prompt documents post-post keyword candidates push after digest push (Story 62-1)", () => {

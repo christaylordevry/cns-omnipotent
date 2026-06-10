@@ -12,13 +12,13 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 ## REQUIRED SOURCES — terminal checklist (non-negotiable)
 
-> **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired. A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
+> **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6
+**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6 → build → score → artifact → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
-| 0 | Date | `terminal(...)` machine-local date (Tool-call rule below) |
+| 0 | Date | `terminal(...)` **Australia/Sydney** civil date (Tool-call rule below; matches cron `CRON_TZ`) |
 | 1 | Google Trends | `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", …)` |
 | 2 | NewsAPI | `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", …)` |
 | 3 | Perplexity | `mcp__perplexity__search` once (when Source 1 yields a top keyword) |
@@ -32,7 +32,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 **Steps 9–10 gate:** Sources 9 and 10 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping either terminal invalidates the run.
 
-**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, and 6** complete → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -41,10 +41,10 @@ For documentation purposes only (do not re-evaluate at runtime):
 3. **No dashboard relay**, no digest archive JSONL. **NotebookLM:** read-only via `query-notebook.mjs` after signal scoring — no `source_add`, no session-close fan-out, no `mcp__notebooklm__notebook_query`.
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
-6. **Date line**: `YYYY-MM-DD` from **machine-local** civil date (`process.env.TZ` if set, else OS default). Do not hardcode a region timezone in commands or config.
+6. **Date line**: `YYYY-MM-DD` from **Australia/Sydney** civil date (same as morning-digest / push-watchdog cron `CRON_TZ=Australia/Sydney`). Use the Step 0 terminal below — do not use machine-local OS timezone for digest headers, `digest_push_payload.run.date`, or artifact filenames.
 7. **Cross-source failures**: run Sources **1–5, 7–10, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
-9. **Required completion gate (non-negotiable)**: After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until both terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize either call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
+9. **Required completion gate (non-negotiable)**: After building and scoring `digest_push_payload`, **persist the digest push artifact** to `~/.hermes/digest-push-<YYYY-MM-DD>.json` **before** posting to `#hermes` (see **Persist digest push artifact**). After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until the artifact terminal **and both** push terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize the artifact write or either push call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
 
 ## Tool-call rule
 
@@ -57,11 +57,11 @@ Resolve **`resolved_repo_root`** as:
 
 Use `resolved_repo_root` as the `workdir` argument for every `terminal(...)` call in this task.
 
-Before source collection, call `terminal` once to get the machine-local date:
+Before source collection, call `terminal` once to get the **Australia/Sydney** civil date (matches cron and push-watchdog artifact lookup):
 
-`terminal(command="node -e \"const d=new Date(); const p=n=>String(n).padStart(2,'0'); console.log(d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()))\"", workdir=resolved_repo_root, timeout=10)`
+`terminal(command="node -e \"console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date()))\"", workdir=resolved_repo_root, timeout=10)`
 
-Use that stdout value for `<YYYY-MM-DD>`.
+Use that stdout value for `<YYYY-MM-DD>` everywhere in this task — Output contract header, `digest_push_payload.run.date`, and artifact filename.
 
 ## Source 1 — Google Trends
 
@@ -386,6 +386,76 @@ Parse stdout JSON `{ answer, elapsed_ms }`. Save **`answer_full = answer`** (ful
 
 Vault context failure does **not** abort the digest.
 
+## Pre-Discord — Build, score, and persist digest push payload (REQUIRED)
+
+After Sources **1–5, 7–10, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
+
+**Discord post is forbidden** until **both** the scoring terminal **and** the **Persist digest push artifact** terminal below return. The artifact must capture **post-scoring** `digest_push_payload` (same payload §9 will push later).
+
+### Score signals before push (REQUIRED — Epic 64-5)
+
+After building unscored `digest_push_payload.signals` from the §9 mapping table and **before** the artifact write or Discord post, invoke the scoring terminal:
+
+```text
+terminal(
+  command="SCORE_SCRIPT=<shellQuote(score_script)> DIGEST_SIGNALS_JSON=<shellQuote(JSON.stringify(digest_push_payload.signals))> DIGEST_RUN_AT=<shellQuote(String(digest_start_ms))> node \"$SCORE_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Where:
+
+```text
+score_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/score-digest-signals.mjs`
+
+**Scoring context env** (passed through to `loadScoringContext` — set when available):
+
+| Env | Purpose |
+|-----|---------|
+| `CNS_REPO_ROOT` | Repo root for sprint-status watchlist (defaults to Omnipotent.md) |
+| `MORNING_DIGEST_PROJECT_ENTITIES` | Comma-separated project entity names for personal relevance |
+| `DIGEST_KEYWORD_CANDIDATES_JSON` | Personal keyword candidates from §10 upsert path |
+| `DIGEST_NOVELTY_HISTORY_JSON` | Prior digest titles for novelty scoring — prefer **`{ title, sourceType, seenAt? }[]`** when history is available, e.g. `[{"title":"Prior HN story","sourceType":"hackernews","seenAt":1749000000000}]`; legacy `string[]` still accepted |
+| `DIGEST_RUN_AT` | Same numeric `digest_start_ms` as `run.ranAt` |
+
+**After the scoring terminal returns** (mandatory stdout threading — mirror Source 6 pick/query stdout patterns):
+
+1. Let `score_stdout` = scoring terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `scored_signals = JSON.parse(score_stdout)`.
+3. If `Array.isArray(scored_signals) && scored_signals.length > 0`:
+   - `digest_push_payload.signals = scored_signals` (replace the entire array; do not merge).
+4. Else (empty stdout, invalid JSON, or `[]`):
+   - keep existing unscored `digest_push_payload.signals` (architecture §9 degraded mode).
+5. Do **not** call `JSON.stringify(digest_push_payload)` for push or artifact until step 3 or 4 completes.
+6. **Anti-pattern:** Do not pass pre-scoring `digest_push_payload.signals` to `push-digest-convex.mjs` when step 3 assigned scored signals.
+
+The script always exits **0**. Stderr warnings use prefix `score-digest-signals:`.
+
+### Persist digest push artifact (REQUIRED — before Discord post)
+
+> **REQUIRED — recovery artifact for §9 watchdog.** Non-negotiable even under context compression. Invoke **after** scoring stdout replacement completes (above) and **before** posting the Output contract to `#hermes`. The 07:15 push-digest-watchdog cron replays Convex push from this file when the agent skips §9.
+
+**Precondition:** `digest_push_payload` is **post-scoring** (scoring stdout replacement completed). Use `digest_push_payload.run.date` as `<YYYY-MM-DD>` in the artifact filename (Australia/Sydney from Step 0).
+
+1. Let `artifact_script` = `resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs"` (fallback only when repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/write-digest-push-artifact.mjs`).
+2. **MUST** invoke the `terminal(...)` block below — no alternative write path.
+3. **Do not** post to `#hermes` until this terminal returns.
+4. Under Hermes HOME isolation, the script resolves operator home via `resolveOperatorHome` — artifact lands in the operator's `~/.hermes/digest-push-<YYYY-MM-DD>.json`, not the isolated profile nested path.
+
+```text
+terminal(
+  command="ARTIFACT_SCRIPT=<shellQuote(artifact_script)> DIGEST_PUSH_JSON=<shellQuote(JSON.stringify(digest_push_payload))> node \"$ARTIFACT_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=15
+)
+```
+
+The script always exits **0**. Stderr warnings use prefix `write-digest-push-artifact:`.
+
 ## Output contract (post to `#hermes`)
 
 ```text
@@ -610,58 +680,21 @@ Omit `workspaceId`. Push available signals even when some sources failed.
 
 ### Score signals before push (REQUIRED — Epic 64-5)
 
-After building unscored `digest_push_payload.signals` from the mapping table above and **before** `JSON.stringify(digest_push_payload)` for Convex push, invoke the scoring terminal:
-
-```text
-terminal(
-  command="SCORE_SCRIPT=<shellQuote(score_script)> DIGEST_SIGNALS_JSON=<shellQuote(JSON.stringify(digest_push_payload.signals))> DIGEST_RUN_AT=<shellQuote(String(digest_start_ms))> node \"$SCORE_SCRIPT\"",
-  workdir=resolved_repo_root,
-  timeout=30
-)
-```
-
-Where:
-
-```text
-score_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs"
-```
-
-Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/score-digest-signals.mjs`
-
-**Scoring context env** (passed through to `loadScoringContext` — set when available):
-
-| Env | Purpose |
-|-----|---------|
-| `CNS_REPO_ROOT` | Repo root for sprint-status watchlist (defaults to Omnipotent.md) |
-| `MORNING_DIGEST_PROJECT_ENTITIES` | Comma-separated project entity names for personal relevance |
-| `DIGEST_KEYWORD_CANDIDATES_JSON` | Personal keyword candidates from §10 upsert path |
-| `DIGEST_NOVELTY_HISTORY_JSON` | Prior digest titles for novelty scoring — prefer **`{ title, sourceType, seenAt? }[]`** when history is available, e.g. `[{"title":"Prior HN story","sourceType":"hackernews","seenAt":1749000000000}]`; legacy `string[]` still accepted |
-| `DIGEST_RUN_AT` | Same numeric `digest_start_ms` as `run.ranAt` |
-
-**After the scoring terminal returns** (mandatory stdout threading — mirror Source 6 pick/query stdout patterns):
-
-1. Let `score_stdout` = scoring terminal **stdout** (trim whitespace; stderr is observability only).
-2. Try `scored_signals = JSON.parse(score_stdout)`.
-3. If `Array.isArray(scored_signals) && scored_signals.length > 0`:
-   - `digest_push_payload.signals = scored_signals` (replace the entire array; do not merge).
-4. Else (empty stdout, invalid JSON, or `[]`):
-   - keep existing unscored `digest_push_payload.signals` (architecture §9 degraded mode).
-5. Do **not** call `JSON.stringify(digest_push_payload)` for push until step 3 or 4 completes.
-6. **Anti-pattern:** Do not pass pre-scoring `digest_push_payload.signals` to `push-digest-convex.mjs` when step 3 assigned scored signals.
+> **Executed in Pre-Discord section above** (before Discord post and before §9 push). The scoring terminal, stdout threading, and anti-patterns are documented there — do not skip or defer scoring to the post-Discord §9 block.
 
 **Pipeline order (fixed):**
 
 ```text
 build digest_push_payload (unscored signals)
-  → scoring terminal
+  → scoring terminal (Pre-Discord)
   → capture stdout → digest_push_payload.signals = scored_signals
+  → persist digest push artifact terminal (post-scoring payload to ~/.hermes/digest-push-<date>.json)
+  → Discord Output contract post
   → push terminal (DIGEST_PUSH_JSON uses post-scoring payload)
   → keyword candidates terminal (same post-scoring payload)
 ```
 
 `DIGEST_PUSH_JSON` in the push command must reference `digest_push_payload` **after** signal replacement — not a stale copy from before scoring.
-
-The script always exits **0**. Stderr warnings use prefix `score-digest-signals:`.
 
 ### DO NOT improvise — digest Convex push (pinned)
 
