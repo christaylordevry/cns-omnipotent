@@ -24,6 +24,7 @@ const MAX_GITHUB_SIGNALS = 2;
 const MAX_REDDIT_SIGNALS = 2;
 const MAX_RSS_SIGNALS = 1;
 const MAX_PRODUCTHUNT_SIGNALS = 2;
+const MAX_TWITTER_SIGNALS = 2;
 const MAX_BLUESKY_SIGNALS = 2;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
@@ -244,6 +245,36 @@ function blueskyEngagementRank(post) {
 }
 
 /**
+ * @param {{ likes?: number, reposts?: number }} post
+ * @returns {number}
+ */
+function twitterEngagementRank(post) {
+  return (Number(post?.likes) || 0) + (Number(post?.reposts) || 0);
+}
+
+/**
+ * @param {Array<{ title?: string, likes?: number, reposts?: number }>} twitterList
+ * @returns {string[]}
+ */
+export function extractTwitterSignals(twitterList) {
+  if (!Array.isArray(twitterList)) {
+    return [];
+  }
+  const sorted = [...twitterList].sort(
+    (a, b) => twitterEngagementRank(b) - twitterEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_TWITTER_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, likes?: number, reposts?: number }>} blueskyList
  * @returns {string[]}
  */
@@ -311,6 +342,7 @@ export function extractRssSignals(rssList) {
  *   reddit?: Array<{ title?: string, upvotes?: number }>,
  *   rss?: Array<{ title?: string, publishedAt?: string }>,
  *   producthunt?: Array<{ title?: string, votesCount?: number }>,
+ *   twitter?: Array<{ title?: string, likes?: number, reposts?: number }>,
  *   bluesky?: Array<{ title?: string, likes?: number, reposts?: number }>,
  * }} sources
  * @returns {string[]}
@@ -348,6 +380,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractRedditSignals(sources.reddit));
   ordered.push(...extractRssSignals(sources.rss));
   ordered.push(...extractProductHuntSignals(sources.producthunt));
+  ordered.push(...extractTwitterSignals(sources.twitter));
   ordered.push(...extractBlueskySignals(sources.bluesky));
 
   return dedupeSignals(ordered);
@@ -506,7 +539,10 @@ function signalsFromParsedInput(parsed) {
       'hackernews' in parsed ||
       'github' in parsed ||
       'reddit' in parsed ||
-      'rss' in parsed)
+      'rss' in parsed ||
+      'producthunt' in parsed ||
+      'twitter' in parsed ||
+      'bluesky' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

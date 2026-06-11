@@ -21,6 +21,7 @@ import {
   extractPerplexitySignals,
   extractProductHuntSignals,
   extractBlueskySignals,
+  extractTwitterSignals,
   extractRedditSignals,
   extractRssSignals,
   parseNotebookTitleMap,
@@ -309,6 +310,15 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(titles, ['ph-high', 'ph-mid']);
   });
 
+  it('extractTwitterSignals ranks by likes + reposts desc and caps at 2', () => {
+    const titles = extractTwitterSignals([
+      { title: 'x-low', likes: 1, reposts: 0 },
+      { title: 'x-high', likes: 100, reposts: 50 },
+      { title: 'x-mid', likes: 40, reposts: 10 },
+    ]);
+    assert.deepEqual(titles, ['x-high', 'x-mid']);
+  });
+
   it('extractBlueskySignals ranks by likes + reposts desc and caps at 2', () => {
     const titles = extractBlueskySignals([
       { title: 'bsky-low', likes: 1, reposts: 0 },
@@ -327,7 +337,7 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(buildDigestSignals({ github: [] }), []);
   });
 
-  it('places github after HN, reddit after github, RSS after reddit, Product Hunt after RSS, and Bluesky after Product Hunt', () => {
+  it('places github after HN, reddit after github, RSS after reddit, and Product Hunt after RSS', () => {
     const signals = buildDigestSignals({
       trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
       hackernews: [{ title: 'HN Story One' }],
@@ -347,22 +357,48 @@ describe('buildDigestSignals', () => {
         { title: 'ph-low', votesCount: 1 },
         { title: 'ph-high', votesCount: 500 },
       ],
-      bluesky: [
-        { title: 'bsky-low', likes: 1, reposts: 0 },
-        { title: 'bsky-high', likes: 100, reposts: 50 },
-      ],
     });
     const hnIdx = signals.indexOf('HN Story One');
     const ghIdx = signals.indexOf('gh-high');
     const rdIdx = signals.indexOf('rd-high');
     const rssIdx = signals.indexOf('Newsletter Beta');
     const phIdx = signals.indexOf('ph-high');
-    const bskyIdx = signals.indexOf('bsky-high');
     assert.ok(hnIdx >= 0 && ghIdx > hnIdx);
     assert.ok(ghIdx >= 0 && rdIdx > ghIdx);
     assert.ok(rdIdx >= 0 && rssIdx > rdIdx);
     assert.ok(rssIdx >= 0 && phIdx > rssIdx);
-    assert.ok(phIdx >= 0 && bskyIdx > phIdx);
+  });
+
+  it('buildDigestSignals accepts twitter-only digest_sources object', () => {
+    const signals = buildDigestSignals({
+      twitter: [
+        { title: 'x-high', likes: 100, reposts: 50 },
+        { title: 'x-low', likes: 1, reposts: 0 },
+      ],
+    });
+    assert.deepEqual(signals, ['x-high', 'x-low']);
+  });
+
+  it('places Twitter after Product Hunt and Bluesky after Twitter', () => {
+    const signals = buildDigestSignals({
+      producthunt: [
+        { title: 'ph-low', votesCount: 1 },
+        { title: 'ph-high', votesCount: 500 },
+      ],
+      twitter: [
+        { title: 'x-low', likes: 1, reposts: 0 },
+        { title: 'x-high', likes: 100, reposts: 50 },
+      ],
+      bluesky: [
+        { title: 'bsky-low', likes: 1, reposts: 0 },
+        { title: 'bsky-high', likes: 100, reposts: 50 },
+      ],
+    });
+    const phIdx = signals.indexOf('ph-high');
+    const xIdx = signals.indexOf('x-high');
+    const bskyIdx = signals.indexOf('bsky-high');
+    assert.ok(phIdx >= 0 && xIdx > phIdx);
+    assert.ok(xIdx >= 0 && bskyIdx > xIdx);
   });
 
   it('dedupes github title when headline wins first', () => {
@@ -666,6 +702,20 @@ describe('pick-signal-notebook.mjs CLI', () => {
     assert.equal(payload.route.status, 'ROUTED');
     assert.equal(payload.route.id, 'ai-watch-1');
     assert.ok(payload.winning_score >= 0.2);
+  });
+
+  it('routes twitter-only DIGEST_SOURCES_JSON through buildDigestSignals guard', async () => {
+    const registryPath = await writeRegistry(watchRegistry);
+    const { stdout } = await runPick({
+      signals: [],
+      digestSources: {
+        twitter: [{ title: 'ai agent orchestration update', likes: 100, reposts: 50 }],
+      },
+      registryPath,
+    });
+    const payload = JSON.parse(stdout.trim());
+    assert.equal(payload.route.status, 'ROUTED');
+    assert.equal(payload.winning_signal, 'ai agent orchestration update');
   });
 
   it('prefers DIGEST_SOURCES_JSON over SIGNALS_JSON when both set', async () => {

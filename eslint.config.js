@@ -10,6 +10,7 @@ const ignores = [
   ".ralph/**",
   ".claude/worktrees/**",
   "package-lock.json",
+  "scripts/hermes-skill-examples/morning-digest/scripts/vendor/**",
 ];
 
 export default tseslint.config(

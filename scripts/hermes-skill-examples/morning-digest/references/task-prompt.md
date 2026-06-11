@@ -14,7 +14,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 12 → 6 → build → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6 → build → score → artifact → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
@@ -28,12 +28,13 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 8 | Reddit | `terminal(command="bash scripts/session-close/hermes-run-reddit.sh", …)` |
 | 9 | Newsletters / RSS | `terminal(command="bash scripts/session-close/hermes-run-rss.sh", …)` — **MUST fire before Source 6** |
 | 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` — **MUST fire before Source 6** |
+| 11 | X / Twitter | `terminal(command="bash scripts/session-close/hermes-run-x.sh", …)` — **MUST fire before Source 6** |
 | 12 | Bluesky | `terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", …)` — **MUST fire before Source 6** |
-| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) — **only after steps 9, 10, and 12** |
+| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) — **only after steps 9, 10, 11, and 12** |
 
-**Steps 9–12 gate:** Sources 9, 10, and 12 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping any of these terminals invalidates the run.
+**Steps 9–12 gate:** Sources 9, 10, 11, and 12 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping any of these terminals invalidates the run.
 
-**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 12, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -43,7 +44,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **Australia/Sydney** civil date (same as morning-digest / push-watchdog cron `CRON_TZ=Australia/Sydney`). Use the Step 0 terminal below — do not use machine-local OS timezone for digest headers, `digest_push_payload.run.date`, or artifact filenames.
-7. **Cross-source failures**: run Sources **1–5, 7–10, 12, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 12 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources **1–5, 7–11, 12, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion gate (non-negotiable)**: After building and scoring `digest_push_payload`, **persist the digest push artifact** to `~/.hermes/digest-push-<YYYY-MM-DD>.json` **before** posting to `#hermes` (see **Persist digest push artifact**). After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until the artifact terminal **and both** push terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize the artifact write or either push call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
 
@@ -270,7 +271,7 @@ Call `terminal` exactly once for Product Hunt daily launches via GraphQL. The sc
 terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-**Pre-flight gate:** If the `hermes-run-producthunt.sh` terminal has not fired, do not proceed to Source 12 or Source 6.
+**Pre-flight gate:** If the `hermes-run-producthunt.sh` terminal has not fired, do not proceed to Source 11 or Source 6.
 
 Stdout shape (Product Hunt only — do not confuse with Sources 5, 7, 8, or 9 keys):
 
@@ -289,8 +290,38 @@ Stdout shape (Product Hunt only — do not confuse with Sources 5, 7, 8, or 9 ke
    - Emit up to **N** launches (default **5**, configurable via `MORNING_DIGEST_PRODUCTHUNT_MAX_LAUNCHES`); requires `PRODUCTHUNT_API_KEY` when enabled.
    - For Discord **Product Hunt**, list each launch as `- <title> — <votesCount> votes` (optional tagline sub-bullet when present).
 5. Else → failure (empty `launches`, invalid shape, or parse error).
-6. On failure: section header **Product Hunt** + `- (source unavailable: <short reason>)` and **continue** to Source 12.
+6. On failure: section header **Product Hunt** + `- (source unavailable: <short reason>)` and **continue** to Source 11.
 7. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `stories[]`, or `entries[]` from Product Hunt stdout — those keys belong to Sources 5, 7, 8, and 9 only.
+
+## Source 11 — X / Twitter
+
+Call `terminal` exactly once for X/Twitter curated accounts and optional search queries via vendored bird-search GraphQL. The script reads `X_AUTH_TOKEN`, `X_CT0`, and `MORNING_DIGEST_X_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-x.sh", workdir=resolved_repo_root, timeout=60)
+```
+
+**Pre-flight gate:** If the `hermes-run-x.sh` terminal has not fired, do not proceed to Source 12 or Source 6.
+
+Stdout shape (X / Twitter only — do not confuse with Sources 5, 7, 8, 9, or 10 keys):
+
+```json
+{ "posts": [{ "title": "...", "authorHandle": "karpathy", "url": "https://x.com/karpathy/status/123", "likes": 1200, "reposts": 340, "replies": 89, "quotes": 12, "publishedAt": "2026-06-11T08:00:00Z" }] }
+```
+
+**After the X / Twitter terminal returns** (mandatory stdout threading — mirror Sources 7–10):
+
+1. Let `x_stdout` = X / Twitter terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `x_json = JSON.parse(x_stdout)` inside try/catch or equivalent safe parse.
+3. If `x_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(x_json.posts) && x_json.posts.length > 0`:
+   - Read **`x_json.posts`** (`posts[]` stdout array key) only — each item uses `title`, `authorHandle`, `url`, `likes`, `reposts`, `replies`, `quotes` (numbers), optional `publishedAt` (ISO string).
+   - When building §9 push signals, nest engagement under `sourceMetadata`: `posts[].likes` → `sourceMetadata.likes`, `posts[].reposts` → `sourceMetadata.reposts`, `posts[].replies` → `sourceMetadata.replies`, `posts[].quotes` → `sourceMetadata.quotes`; map `posts[].authorHandle` → `sourceMetadata.authorHandle`; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `posts[].title` → `summary`.
+   - Emit up to **N** posts (default **20**, hard cap **50** via `MORNING_DIGEST_X_MAX_TWEETS`); requires `X_AUTH_TOKEN` + `X_CT0` session cookies when enabled.
+   - For Discord **X / Twitter**, list each post as `- <title> — <likes> likes, <reposts> reposts` (optional author sub-bullet when present).
+5. Else → failure (empty `posts`, invalid shape, or parse error).
+6. On failure: section header **X / Twitter** + `- (source unavailable: <short reason>)` and **continue** to Source 12.
+7. **Anti-pattern:** Do not read `launches[]`, `repos[]`, `stories[]`, or `entries[]` from X stdout — those keys belong to Sources 5, 7, 9, and 10 only.
 
 ## Source 12 — Bluesky
 
@@ -326,11 +357,11 @@ Stdout shape (Bluesky only — do not confuse with Sources 5, 7, 8, 9, or 10 key
 
 Run **after** Source 12 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
-**Prerequisite:** Terminals for Sources **9**, **10**, and **12** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all three terminals complete.
+**Prerequisite:** Terminals for Sources **9**, **10**, **11**, and **12** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all four terminals complete.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5, Source 7, Source 8, Source 9, Source 10, and Source 12 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, and Source 12 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -343,6 +374,7 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, and Source 12 comp
   "reddit": [{ "title": "<string>", "url": "<string>", "upvotes": <number> }],
   "rss": [{ "title": "<string>", "url": "<string>", "publishedAt": "<optional ISO string>" }],
   "producthunt": [{ "title": "<string>", "url": "<string>", "votesCount": <number> }],
+  "twitter": [{ "title": "<string>", "url": "<string>", "likes": <number>, "reposts": <number> }],
   "bluesky": [{ "title": "<string>", "url": "<string>", "likes": <number>, "reposts": <number> }]
 }
 ```
@@ -356,9 +388,10 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, and Source 12 comp
 - **reddit:** post **titles** from Source 8 when available; omit or `[]` when Reddit is unavailable.
 - **rss:** newsletter/RSS entry **titles** from Source 9 when available (include `publishedAt` when present for recency sorting in `buildDigestSignals`); omit or `[]` when RSS is unavailable.
 - **producthunt:** launch **titles** from Source 10 when available (include `votesCount` for ranking in `buildDigestSignals`); omit or `[]` when Product Hunt is unavailable.
+- **twitter:** post **titles** from Source 11 when available (include `likes` and `reposts` for ranking in `buildDigestSignals`); omit or `[]` when X / Twitter is unavailable.
 - **bluesky:** post **titles** from Source 12 when available (include `likes` and `reposts` for ranking in `buildDigestSignals`); omit or `[]` when Bluesky is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → Bluesky post titles (up to 2, highest likes + reposts), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -421,7 +454,7 @@ Vault context failure does **not** abort the digest.
 
 ## Pre-Discord — Build, score, and persist digest push payload (REQUIRED)
 
-After Sources **1–5, 7–10, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
+After Sources **1–5, 7–11, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
 
 **Discord post is forbidden** until **dedupe**, **scoring**, and the **Persist digest push artifact** terminals return. The artifact must capture **post-dedup, post-scoring** `digest_push_payload` (same payload §9 will push later).
 
@@ -578,6 +611,11 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 - ... (optional tagline sub-bullet when present)
 (or - (source unavailable: <short reason>) when Source 10 failed)
 
+**X / Twitter**
+- <title> — <likes> likes, <reposts> reposts
+- ...
+(or - (source unavailable: <short reason>) when Source 11 failed)
+
 **Bluesky**
 - <title> — <likes> likes, <reposts> reposts
 - ...
@@ -672,7 +710,7 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 > **REQUIRED §9 — part 1 of 2 of the completion gate.** This is **part 1 of 2** — do **not** end the task turn after this call; §10 must also fire. Non-negotiable even under context compression. Invoke on **every** run (success or partial failure), exactly as session-close treats its required steps.
 
-Run **after** Sources **1–5, 7–10, 12, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
+Run **after** Sources **1–5, 7–11, 12, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 
@@ -689,6 +727,7 @@ Run **after** Sources **1–5, 7–10, 12, and 6** were attempted, `digest_sourc
 | `reddit` | `reddit` | Source 8 `posts[]` | `title` | — | `url` | — | url hash or title+date hash |
 | `rss` | `rss` | Source 9 `entries[]` | `title` | — | `url` | — | url hash or title+date hash |
 | `producthunt` | `producthunt` | Source 10 `launches[]` | `title` | `tagline` | `url` | — | url hash or title+date hash |
+| `twitter` | `twitter` | Source 11 `posts[]` | `title` | first 200 chars of `title` | `url` | — | url hash or title+date hash |
 | `bluesky` | `bluesky` | Source 12 `posts[]` | `title` | first 200 chars of `title` | `url` | — | url hash or title+date hash |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
@@ -699,6 +738,7 @@ Run **after** Sources **1–5, 7–10, 12, and 6** were attempted, `digest_sourc
   - Reddit: map `posts[].upvotes` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `posts[].commentCount` → `sourceMetadata.commentCount` (number) when present; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `upvotes`/`commentCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`/`sourceMetadata.commentCount`; root-level fields score as null silently.
   - RSS: map `entries[].publishedAt` → `sourceMetadata.publishedAt` when present; map `entries[].author` → `sourceMetadata.author` when present. **No engagement fields** — omit `stars`, `upvotes`, `points`, etc. **Never** leave `publishedAt`/`author` at the signal root.
   - Product Hunt: map `launches[].votesCount` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `launches[].tagline` → `summary`; map `launches[].createdAt` → `sourceMetadata.publishedAt` when present. **Never** leave `votesCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`; root-level fields score as null silently.
+  - X / Twitter: map `posts[].likes` / `posts[].reposts` / `posts[].replies` / `posts[].quotes` → same keys under `sourceMetadata` (numbers); map `posts[].authorHandle` → `sourceMetadata.authorHandle`; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `posts[].title` → `summary`. **Never** leave engagement fields at the signal root — `normalizeEngagement` reads only `sourceMetadata.likes`/`reposts`/`replies`/`quotes`; root-level fields score as null silently.
   - Bluesky: map `posts[].likes` / `posts[].reposts` / `posts[].replies` / `posts[].quotes` → same keys under `sourceMetadata` (numbers); map `posts[].authorHandle` → `sourceMetadata.authorHandle`; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `posts[].title` → `summary`. **Never** leave engagement fields at the signal root — `normalizeEngagement` reads only `sourceMetadata.likes`/`reposts`/`replies`/`quotes`; root-level fields score as null silently.
 - **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
@@ -709,7 +749,7 @@ Run **after** Sources **1–5, 7–10, 12, and 6** were attempted, `digest_sourc
 The `addDigestSignal` validator is a **strict** object: a missing required key **or** an unexpected/`null` value rejects the whole signal, and the push then finalizes the run as `failed` with **zero** signals stored. Build every signal object exactly to this contract:
 
 - **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
-- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `bluesky`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `bluesky`.
+- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky`.
 - **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`, `scores`, `disposition`, `normalizedEngagement`, `rankScore`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
 - **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, `sourceMetadata.stars`, `sourceMetadata.forks`, `sourceMetadata.upvotes`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
 - Do **not** add any key not listed in the table / this contract.

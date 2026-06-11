@@ -19,11 +19,13 @@ const githubWrapperPath = join(root, "scripts/session-close/hermes-run-github.sh
 const redditWrapperPath = join(root, "scripts/session-close/hermes-run-reddit.sh");
 const rssWrapperPath = join(root, "scripts/session-close/hermes-run-rss.sh");
 const producthuntWrapperPath = join(root, "scripts/session-close/hermes-run-producthunt.sh");
+const xWrapperPath = join(root, "scripts/session-close/hermes-run-x.sh");
 const blueskyWrapperPath = join(root, "scripts/session-close/hermes-run-bluesky.sh");
 const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const fetchHnScriptPath = join(skillDir, "scripts/fetch-hn-rss.mjs");
 const fetchRssScriptPath = join(skillDir, "scripts/fetch-rss-signals.mjs");
 const fetchProductHuntScriptPath = join(skillDir, "scripts/fetch-producthunt-launches.mjs");
+const fetchXScriptPath = join(skillDir, "scripts/fetch-x-signals.mjs");
 const fetchBlueskyScriptPath = join(skillDir, "scripts/fetch-bluesky-signals.mjs");
 const fetchNewsapiScriptPath = join(skillDir, "scripts/fetch-newsapi-headlines.mjs");
 const pickSignalScriptPath = join(
@@ -366,16 +368,24 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source9.includes("sourceMetadata.publishedAt"));
     assert.ok(source9.includes("continue** to Source 10"));
 
-    const source10End = taskBody.indexOf("## Source 12");
+    const source10End = taskBody.indexOf("## Source 11");
     const source10 = taskBody.slice(source9End, source10End);
     assert.ok(source10.includes("hermes-run-producthunt.sh"));
     assert.ok(source10.includes("**Product Hunt**"));
     assert.ok(source10.includes("launches[]"));
     assert.ok(source10.includes("sourceMetadata.upvotes"));
-    assert.ok(source10.includes("continue** to Source 12"));
+    assert.ok(source10.includes("continue** to Source 11"));
+
+    const source11End = taskBody.indexOf("## Source 12");
+    const source11 = taskBody.slice(source10End, source11End);
+    assert.ok(source11.includes("hermes-run-x.sh"));
+    assert.ok(source11.includes("**X / Twitter**"));
+    assert.ok(source11.includes("posts[]"));
+    assert.ok(source11.includes("sourceMetadata.likes"));
+    assert.ok(source11.includes("continue** to Source 12"));
 
     const source12End = taskBody.indexOf("## Source 6");
-    const source12 = taskBody.slice(source10End, source12End);
+    const source12 = taskBody.slice(source11End, source12End);
     assert.ok(source12.includes("hermes-run-bluesky.sh"));
     assert.ok(source12.includes("**Bluesky**"));
     assert.ok(source12.includes("posts[]"));
@@ -391,9 +401,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source6.includes('"reddit"'));
     assert.ok(source6.includes('"rss"'));
     assert.ok(source6.includes('"producthunt"'));
+    assert.ok(source6.includes('"twitter"'));
     assert.ok(source6.includes('"bluesky"'));
     assert.ok(source6.includes("RSS title (up to 1,"));
     assert.ok(source6.includes("Product Hunt launch titles (up to 2,"));
+    assert.ok(source6.includes("X / Twitter post titles (up to 2,"));
     assert.ok(source6.includes("Bluesky post titles (up to 2,"));
     assert.ok(source6.includes('"trends"'));
     assert.ok(source6.includes('"headlines"'));
@@ -481,7 +493,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("task-prompt documents imperative Product Hunt stdout parsing (Story 67-5)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const source10End = taskBody.indexOf("## Source 12");
+    const source10End = taskBody.indexOf("## Source 11");
     const source10 = taskBody.slice(taskBody.indexOf("## Source 10"), source10End);
     assert.ok(source10.includes("launches[]"));
     assert.ok(source10.includes("ph_json") || source10.includes("ph_stdout"));
@@ -490,7 +502,24 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       /anti-pattern|Do not read.*repos/i.test(source10),
       "must anti-pattern wrong keys for Product Hunt",
     );
-    assert.ok(source10.includes("continue** to Source 12"));
+    assert.ok(source10.includes("continue** to Source 11"));
+  });
+
+  it("task-prompt documents imperative X / Twitter stdout parsing (Story 68-6)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source11End = taskBody.indexOf("## Source 12");
+    const source11 = taskBody.slice(taskBody.indexOf("## Source 11"), source11End);
+    assert.ok(source11.includes("posts[]"));
+    assert.ok(source11.includes("x_json") || source11.includes("x_stdout"));
+    assert.ok(source11.includes("JSON.parse"));
+    assert.ok(
+      /anti-pattern|Do not read.*launches/i.test(source11),
+      "must anti-pattern wrong keys for X / Twitter",
+    );
+    assert.ok(source11.includes("continue** to Source 12"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("X / Twitter stdout threading"));
+    assert.ok(skillBody.includes("x_json.posts"));
   });
 
   it("task-prompt documents imperative Bluesky stdout parsing (Story 68-5)", () => {
@@ -517,23 +546,29 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("MORNING_DIGEST_RSS_MAX_TOTAL"));
   });
 
-  it("wrapper scripts include GitHub, Reddit, RSS, Product Hunt, and Bluesky session-close runners (Story 65-1, 65-3, 65-4, 67-5, 68-5)", () => {
+  it("wrapper scripts include GitHub, Reddit, RSS, Product Hunt, X, and Bluesky session-close runners (Story 65-1, 65-3, 65-4, 67-5, 68-5, 68-6)", () => {
     assert.ok(existsSync(githubWrapperPath));
     assert.ok(existsSync(redditWrapperPath));
     assert.ok(existsSync(rssWrapperPath));
     assert.ok(existsSync(producthuntWrapperPath));
+    assert.ok(existsSync(xWrapperPath));
     assert.ok(existsSync(blueskyWrapperPath));
     assert.ok(existsSync(fetchRssScriptPath));
     assert.ok(existsSync(fetchProductHuntScriptPath));
+    assert.ok(existsSync(fetchXScriptPath));
     assert.ok(existsSync(fetchBlueskyScriptPath));
     assert.ok((statSync(rssWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(producthuntWrapperPath).mode & 0o111) !== 0);
+    assert.ok((statSync(xWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(blueskyWrapperPath).mode & 0o111) !== 0);
     const rssWrapper = readFileSync(rssWrapperPath, "utf8");
     assert.ok(rssWrapper.includes("fetch-rss-signals.mjs"));
     const producthuntWrapper = readFileSync(producthuntWrapperPath, "utf8");
     assert.ok(producthuntWrapper.includes("fetch-producthunt-launches.mjs"));
     assert.ok(producthuntWrapper.includes(".hermes/home"));
+    const xWrapper = readFileSync(xWrapperPath, "utf8");
+    assert.ok(xWrapper.includes("fetch-x-signals.mjs"));
+    assert.ok(xWrapper.includes(".hermes/home"));
     const blueskyWrapper = readFileSync(blueskyWrapperPath, "utf8");
     assert.ok(blueskyWrapper.includes("fetch-bluesky-signals.mjs"));
     assert.ok(blueskyWrapper.includes(".hermes/home"));
@@ -729,7 +764,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
   });
 
-  it("task-prompt Sources 9-12 terminal-fire gates (Story 67-7, 68-5)", () => {
+  it("task-prompt Sources 9-12 terminal-fire gates (Story 67-7, 68-5, 68-6)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const checklistEnd = taskBody.indexOf("## Hard constraints");
     const checklist = taskBody.slice(
@@ -738,10 +773,12 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     const source9End = taskBody.indexOf("## Source 10");
     const source9 = taskBody.slice(taskBody.indexOf("## Source 9"), source9End);
-    const source10End = taskBody.indexOf("## Source 12");
+    const source10End = taskBody.indexOf("## Source 11");
     const source10 = taskBody.slice(taskBody.indexOf("## Source 10"), source10End);
+    const source11End = taskBody.indexOf("## Source 12");
+    const source11 = taskBody.slice(taskBody.indexOf("## Source 11"), source11End);
     const source12End = taskBody.indexOf("## Source 6");
-    const source12 = taskBody.slice(taskBody.indexOf("## Source 12"), source12End);
+    const source12 = taskBody.slice(source11End, source12End);
     const source6End = taskBody.indexOf("### Build `digest_sources`");
     const source6Lead = taskBody.slice(
       taskBody.indexOf("## Source 6"),
@@ -750,10 +787,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     assert.ok(checklist.includes("hermes-run-rss.sh"));
     assert.ok(checklist.includes("hermes-run-producthunt.sh"));
+    assert.ok(checklist.includes("hermes-run-x.sh"));
     assert.ok(checklist.includes("hermes-run-bluesky.sh"));
     assert.ok(
-      (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 3,
-      "checklist rows 9, 10, and 12 must all require MUST fire before Source 6",
+      (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 4,
+      "checklist rows 9, 10, 11, and 12 must all require MUST fire before Source 6",
     );
     assert.ok(
       checklist.includes("Steps 9–12 gate") &&
@@ -765,7 +803,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(
       source10.includes("hermes-run-producthunt.sh") &&
-        source10.includes("has not fired, do not proceed to Source 12 or Source 6"),
+        source10.includes("has not fired, do not proceed to Source 11 or Source 6"),
+    );
+    assert.ok(
+      source11.includes("hermes-run-x.sh") &&
+        source11.includes("has not fired, do not proceed to Source 12 or Source 6"),
     );
     assert.ok(
       source12.includes("hermes-run-bluesky.sh") &&
@@ -773,7 +815,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(
       source6Lead.includes("Prerequisite:") &&
-        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all three terminals complete"),
+        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all four terminals complete"),
     );
   });
 
@@ -801,19 +843,22 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       body.indexOf("For NO_ROUTE"),
     );
 
-    assert.ok(executionRule.includes("1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 12 → 6"));
+    assert.ok(executionRule.includes("1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6"));
     assert.ok(body.includes("hermes-run-producthunt.sh"));
+    assert.ok(body.includes("hermes-run-x.sh"));
     assert.ok(body.includes("hermes-run-bluesky.sh"));
     assert.ok(body.includes("§9 push — DO NOT improvise"));
     assert.ok(body.includes("hand-rolled `node -e`"));
     assert.ok(body.includes("DO NOT post bare URLs or link previews"));
     assert.ok(body.includes("Product Hunt stdout threading"));
+    assert.ok(body.includes("X / Twitter stdout threading"));
     assert.ok(body.includes("Bluesky stdout threading"));
     assert.ok(body.includes("Sources 9–12 terminal-fire gate"));
     assert.ok(outputTemplate.includes("**GitHub** (trending repos)"));
     assert.ok(outputTemplate.includes("**Reddit** (hot posts)"));
     assert.ok(outputTemplate.includes("**Newsletters / RSS**"));
     assert.ok(outputTemplate.includes("**Product Hunt** (daily launches)"));
+    assert.ok(outputTemplate.includes("**X / Twitter**"));
     assert.ok(outputTemplate.includes("**Bluesky**"));
     assert.ok(outputTemplate.includes("- <title> — <stars> stars, <forks> forks"));
   });

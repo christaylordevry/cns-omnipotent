@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 68-6-x-twitter-adapter-source-11 (2026-06-11)
+
+- `quoteCount` always 0 on live bird-search path — vendor `mapTweetResult` does not populate quotes; 5% scoring weight inert until vendor patch.
+- Day-granular `since:YYYY-MM-DD` without post-fetch hour filter — AC 2 explicitly binds date-only `since:`; Bluesky-style `filterByLookback` out of spec for this story.
+
 ## Deferred from: code review of 68-5-bluesky-adapter-source-12 (2026-06-11)
 
 - Terminal timeout budget vs 8 default actors — 45s Hermes timeout vs worst-case ~240s serial fetch; operator can trim `MORNING_DIGEST_BSKY_ACTORS`.

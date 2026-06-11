@@ -310,10 +310,11 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, producthunt, bluesky, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
+    assert.equal(trendProxyForSignal({ title: 'X post', sourceType: 'twitter' }), 40);
     assert.equal(trendProxyForSignal({ title: 'BSKY post', sourceType: 'bluesky' }), 38);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
@@ -328,6 +329,16 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
       baseCtx({ runAt }),
     );
     assert.ok(urgency > 0);
+  });
+
+  it('assigns higher urgency for twitter than arxiv via SOURCE_PRIOR 9 vs 0', () => {
+    const signalBase = {
+      title: 'Stable title without breaking keywords',
+      sourceMetadata: { publishedAt: '2026-06-09T08:00:00Z' },
+    };
+    const twitterUrgency = scoreUrgency({ ...signalBase, sourceType: 'twitter' }, baseCtx({ runAt }));
+    const arxivUrgency = scoreUrgency({ ...signalBase, sourceType: 'arxiv' }, baseCtx({ runAt }));
+    assert.ok(twitterUrgency > arxivUrgency);
   });
 
   it('assigns higher urgency for bluesky than arxiv via SOURCE_PRIOR 7 vs 0', () => {
@@ -453,6 +464,33 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
       sourceMetadata: { upvotes },
     });
     assert.equal(ph, rd);
+  });
+
+  it('twitter at engagement caps → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'X cap post',
+        sourceType: 'twitter',
+        sourceMetadata: {
+          likes: 50000,
+          reposts: 10000,
+          replies: 5000,
+          quotes: 2000,
+        },
+      }),
+      100,
+    );
+  });
+
+  it('twitter with all zero engagement → null', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'X zero post',
+        sourceType: 'twitter',
+        sourceMetadata: { likes: 0, reposts: 0, replies: 0, quotes: 0 },
+      }),
+      null,
+    );
   });
 
   it('bluesky at engagement caps → 100', () => {
