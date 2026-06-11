@@ -118,6 +118,7 @@ describe('post-digest-discord', () => {
     );
     assert.equal(calls[0].method, 'POST');
     assert.equal(calls[0].body.content, '# Morning Digest\n\n- Signal one');
+    assert.deepEqual(calls[0].body.allowed_mentions, { parse: [] });
     assert.equal(calls[0].headers?.Authorization, 'Bot test-token');
   });
 
@@ -143,5 +144,33 @@ describe('post-digest-discord', () => {
     assert.equal(calls.length, 2);
     assert.equal(calls[0].body.content, paraA);
     assert.equal(calls[1].body.content, paraB);
+  });
+
+  it('postDigestToDiscord renders Node payloads into at most two messages', async () => {
+    const signals = Array.from({ length: 90 }, (_, index) => ({
+      sourceType: ['github', 'newsapi', 'rss'][index % 3],
+      title: `Signal ${index} ${'ranked digest title '.repeat(10)}`,
+      url: `https://example.com/signals/${index}?detail=${'x'.repeat(60)}`,
+      rankScore: 90 - index,
+    }));
+    const { fetchFn, calls } = makeFetchStub([
+      { status: 200, body: { id: 'msg-1' } },
+      { status: 200, body: { id: 'msg-2' } },
+    ]);
+
+    const result = await postDigestToDiscord(
+      {
+        run: { date: '2026-06-12', topTrend: 'AI agents' },
+        signals,
+      },
+      { HERMES_DISCORD_TOKEN: 'test-token' },
+      { fetchFn },
+    );
+
+    assert.equal(result.ok, true);
+    assert.ok(calls.length >= 1 && calls.length <= 2);
+    assert.match(calls[0].body.content, /# Morning Digest: 2026-06-12/);
+    assert.match(calls.map((call) => call.body.content).join('\n'), /## GitHub/);
+    assert.ok(calls.every((call) => call.body.content.length <= 2000));
   });
 });

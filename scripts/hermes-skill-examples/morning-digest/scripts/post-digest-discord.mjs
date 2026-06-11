@@ -129,7 +129,7 @@ async function postDiscordMessage(channelId, token, content, fetchFn, timeoutMs)
           Authorization: `Bot ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
         signal: controller.signal,
       },
     );

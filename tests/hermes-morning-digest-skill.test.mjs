@@ -268,13 +268,17 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
   it("cron install + runner scripts exist with contract defaults (Story 55-3)", () => {
     const installPath = join(root, "scripts/install-morning-digest-cron.sh");
     const runPath = join(root, "scripts/run-morning-digest-cron.sh");
+    const watchdogRunPath = join(root, "scripts/run-push-digest-watchdog-cron.sh");
     assert.ok(existsSync(installPath));
     assert.ok(existsSync(runPath));
+    assert.ok(existsSync(watchdogRunPath));
     assert.ok((statSync(installPath).mode & 0o111) !== 0);
     assert.ok((statSync(runPath).mode & 0o111) !== 0);
+    assert.ok((statSync(watchdogRunPath).mode & 0o111) !== 0);
 
     const installBody = readFileSync(installPath, "utf8");
     const runBody = readFileSync(runPath, "utf8");
+    const watchdogRunBody = readFileSync(watchdogRunPath, "utf8");
 
     assert.ok(installBody.includes("cns-morning-digest-skill"));
     assert.ok(installBody.includes("cns-push-digest-watchdog"));
@@ -300,10 +304,13 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(installBody.includes("chmod +x"));
 
     assert.ok(runBody.includes("gateway service is running|gateway is running"));
-    assert.ok(runBody.includes("hermes cron run"));
-    assert.ok(runBody.includes("hermes cron tick"));
-    assert.ok(runBody.includes("morning-digest-skill-cron-job-id"));
+    assert.match(runBody, /node "\$REPO_ROOT\/scripts\/run-digest-convex-completion\.mjs"/);
     assert.ok(!runBody.includes("hermes-morning-digest-"));
+    assert.ok(watchdogRunBody.indexOf("NODE_BIN=") < watchdogRunBody.indexOf("set -euo pipefail"));
+    assert.match(
+      watchdogRunBody,
+      /exec node "\$REPO_ROOT\/scripts\/run-digest-convex-completion\.mjs"/,
+    );
   });
 
   it("SKILL.md forbids aborting digest on single-source failure", () => {

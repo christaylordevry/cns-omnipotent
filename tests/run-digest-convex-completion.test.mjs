@@ -70,6 +70,12 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.ok(artifact.signals.some((row) => row.sourceType === 'producthunt'));
     assert.ok(Array.isArray(artifact.run.sourceOutcomes));
     assert.ok(artifact.run.sourceOutcomes.some((row) => row.sourceKey === 'google_trends'));
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=discord-post-failed/);
+    assert.match(logRaw, /action=completion-backfill-push/);
   });
 
   it('force-rescore bypasses watchdog already-pushed and rescores artifact', async () => {
