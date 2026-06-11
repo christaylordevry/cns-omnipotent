@@ -1202,6 +1202,64 @@ export function collectNormalizedWatchHandles(nexusPeople) {
 /**
  * @param {DigestSignal} signal
  * @param {NexusPerson[]} nexusPeople
+ * @returns {{ personName: string, matchedHandle?: string, bonusPoints: number, matchType: 'handle' | 'name' } | null}
+ */
+export function resolvePeopleMatch(signal, nexusPeople) {
+  if (!Array.isArray(nexusPeople) || nexusPeople.length === 0) {
+    return null;
+  }
+
+  const rawHandle = signal.sourceMetadata?.authorHandle;
+  if (typeof rawHandle === 'string' && rawHandle.trim()) {
+    const signalNormalized = normalizePeopleHandle(rawHandle);
+    if (signalNormalized.length > 0) {
+      for (const person of nexusPeople) {
+        for (const platformHandles of Object.values(person.handles ?? {})) {
+          if (!Array.isArray(platformHandles)) {
+            continue;
+          }
+          for (const handle of platformHandles) {
+            const normalized = normalizePeopleHandle(handle);
+            if (normalized.length > 0 && normalized === signalNormalized) {
+              return {
+                personName: person.name,
+                matchedHandle: normalized,
+                bonusPoints: PEOPLE_HANDLE_MATCH_BONUS,
+                matchType: 'handle',
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const signalTokens = tokenizeSignalText(signal.title, signal.summary);
+  let bestNameF1 = 0;
+  /** @type {string | null} */
+  let bestPersonName = null;
+  for (const person of nexusPeople) {
+    const nameTokens = tokenizeForScoring(person.name ?? '');
+    const nameF1 = f1Score(signalTokens, nameTokens);
+    if (nameF1 > bestNameF1) {
+      bestNameF1 = nameF1;
+      bestPersonName = person.name;
+    }
+  }
+  if (bestNameF1 >= PEOPLE_NAME_F1_THRESHOLD && bestPersonName) {
+    return {
+      personName: bestPersonName,
+      bonusPoints: PEOPLE_NAME_MATCH_BONUS,
+      matchType: 'name',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * @param {DigestSignal} signal
+ * @param {NexusPerson[]} nexusPeople
  * @returns {{ handleBonus: number, nameBonus: number }}
  */
 export function scorePeopleBonuses(signal, nexusPeople) {
@@ -1490,6 +1548,10 @@ export function scoreDigestSignals(signals, ctx) {
     };
     const rankScore = computeRankScore(scores, normalizedEngagement);
     const disposition = deriveDisposition(scores, rankScore);
+    const peopleMatch = resolvePeopleMatch(
+      /** @type {DigestSignal} */ (signal),
+      ctx.nexusPeople ?? [],
+    );
     /** @type {Record<string, unknown>} */
     const out = {
       ...signal,
@@ -1498,6 +1560,12 @@ export function scoreDigestSignals(signals, ctx) {
       rankScore,
       _oi: originalIndex,
     };
+    if (peopleMatch) {
+      out.sourceMetadata = {
+        ...(/** @type {DigestSignal} */ (signal).sourceMetadata ?? {}),
+        peopleMatch,
+      };
+    }
     if (normalizedEngagement != null && Number.isFinite(normalizedEngagement)) {
       out.normalizedEngagement = normalizedEngagement;
     }

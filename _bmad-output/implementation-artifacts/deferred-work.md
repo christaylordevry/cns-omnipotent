@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 69-2-people-match-indicator (2026-06-11)
+
+- `scorePeopleBonuses` not refactored to delegate to `resolvePeopleMatch` — T1.1 dev note requested shared lookup; handle/name traversal duplicated. Fix when next touching people scoring.
+- `normalizeScorePercent(1)` → 100 fraction heuristic — pre-existing in `nexus-inspector-scoring.ts`; low priority unless scoring scale changes.
+- `resolveScoredDigestSignal` bidirectional keyword substring match — pre-existing topic/keyword inspector resolution; separate story if false-positive reports surface.
+
 ## Deferred from: code review of 68-3-personal-relevance-v3-people-bonus (2026-06-11)
 
 - `collectNormalizedWatchHandles` rebuilt per signal in `scorePeopleBonuses` — 30-person cap makes impact negligible; cache on context if watchlist grows.

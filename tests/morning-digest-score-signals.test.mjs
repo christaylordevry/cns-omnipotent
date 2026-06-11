@@ -34,6 +34,7 @@ import {
   PEOPLE_NAME_MATCH_BONUS,
   normalizeEngagement,
   normalizePeopleHandle,
+  resolvePeopleMatch,
   scorePeopleBonuses,
   parseNexusPeopleYaml,
   overlapRatio,
@@ -1521,6 +1522,106 @@ describe('personalRelevance v3 people bonus', () => {
     assert.equal(PEOPLE_HANDLE_MATCH_BONUS, 20);
     assert.equal(PEOPLE_NAME_MATCH_BONUS, 10);
     assert.equal(PEOPLE_NAME_F1_THRESHOLD, 30);
+  });
+});
+
+describe('peopleMatch push metadata (69-2)', () => {
+  const karpathyPeople = [
+    {
+      name: 'Andrej Karpathy',
+      handles: { twitter: ['karpathy'], bluesky: ['karpathy.bsky.social'] },
+      tags: [],
+      weight: 2.5,
+    },
+  ];
+  const darioPeople = [
+    {
+      name: 'Dario Amodei',
+      handles: { twitter: ['darioamodei'] },
+      tags: [],
+      weight: 2.5,
+    },
+  ];
+  const emptyCtx = baseCtx({ personalTokens: [], goalWeightedTokens: [], epicNumericTokens: [] });
+
+  it('Karpathy Bluesky handle resolves handle peopleMatch metadata', () => {
+    const signal = {
+      title: 'New training run results',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+    const match = resolvePeopleMatch(signal, karpathyPeople);
+    assert.deepEqual(match, {
+      personName: 'Andrej Karpathy',
+      matchedHandle: 'karpathy.bsky.social',
+      bonusPoints: 20,
+      matchType: 'handle',
+    });
+  });
+
+  it('handle match takes precedence when both handle and name bonuses apply', () => {
+    const signal = {
+      title: 'Andrej Karpathy shares new training insights',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+    const match = resolvePeopleMatch(signal, karpathyPeople);
+    assert.deepEqual(match, {
+      personName: 'Andrej Karpathy',
+      matchedHandle: 'karpathy.bsky.social',
+      bonusPoints: 20,
+      matchType: 'handle',
+    });
+  });
+
+  it('Dario name-only title resolves name peopleMatch without matchedHandle', () => {
+    const signal = {
+      title: 'Dario Amodei discusses AI safety roadmap',
+      sourceType: 'newsapi',
+    };
+    const match = resolvePeopleMatch(signal, darioPeople);
+    assert.deepEqual(match, {
+      personName: 'Dario Amodei',
+      bonusPoints: 10,
+      matchType: 'name',
+    });
+    assert.equal(match?.matchedHandle, undefined);
+  });
+
+  it('empty nexusPeople yields null peopleMatch', () => {
+    const signal = {
+      title: 'Dario Amodei discusses AI safety roadmap',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: 'darioamodei' },
+    };
+    assert.equal(resolvePeopleMatch(signal, []), null);
+  });
+
+  it('scoreDigestSignals integration includes sourceMetadata.peopleMatch', () => {
+    const signal = {
+      title: 'New training run results',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social', likes: 42 },
+    };
+    const ctx = baseCtx({ ...emptyCtx, nexusPeople: karpathyPeople });
+    const [scored] = scoreDigestSignals([signal], ctx);
+    assert.deepEqual(scored.sourceMetadata.peopleMatch, {
+      personName: 'Andrej Karpathy',
+      matchedHandle: 'karpathy.bsky.social',
+      bonusPoints: 20,
+      matchType: 'handle',
+    });
+    assert.equal(scored.sourceMetadata.likes, 42);
+  });
+
+  it('scoreDigestSignals omits peopleMatch when no bonus applies', () => {
+    const signal = {
+      title: 'Unrelated market headline about quarterly earnings',
+      sourceType: 'newsapi',
+    };
+    const ctx = baseCtx({ ...emptyCtx, nexusPeople: darioPeople });
+    const [scored] = scoreDigestSignals([signal], ctx);
+    assert.equal(scored.sourceMetadata, undefined);
   });
 });
 
