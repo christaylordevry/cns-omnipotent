@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // pick-signal-notebook.mjs
 // Usage: DIGEST_SOURCES_JSON='{"trends":[...],"headlines":[...],"perplexityText":"..."}' node pick-signal-notebook.mjs [registryPath]
 // Legacy: SIGNALS_JSON='["keyword",...]' node pick-signal-notebook.mjs [registryPath]

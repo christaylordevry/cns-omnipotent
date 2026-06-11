@@ -14,7 +14,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6 → build → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
@@ -30,7 +30,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` — **MUST fire before Source 6** |
 | 11 | X / Twitter | `terminal(command="bash scripts/session-close/hermes-run-x.sh", …)` — **MUST fire before Source 6** |
 | 12 | Bluesky | `terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", …)` — **MUST fire before Source 6** |
-| 6 | Vault context | `pick-signal-notebook.mjs`, then `query-notebook.mjs` when ROUTED (Source 6) — **only after steps 9, 10, 11, and 12** |
+| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, and 12** |
 
 **Steps 9–12 gate:** Sources 9, 10, 11, and 12 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping any of these terminals invalidates the run.
 
@@ -406,10 +406,16 @@ Use `shellQuote(...)` for `DIGEST_SOURCES_JSON`, `NOTEBOOK_ID`, `NOTEBOOK_QUERY`
 Call `terminal` once:
 
 ```text
-terminal(command="DIGEST_SOURCES_JSON=<shellQuote(JSON.stringify(digest_sources))> node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs", workdir=resolved_repo_root, timeout=30)
+terminal(
+  command="PICK_SCRIPT=<shellQuote(resolved_repo_root + '/scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs')> DIGEST_SOURCES_JSON=<shellQuote(JSON.stringify(digest_sources))> node \"$PICK_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=30
+)
 ```
 
 The script also supports legacy `SIGNALS_JSON=<shellQuote(signals_json)>` (JSON array of strings) for manual runs, `node .../pick-signal-notebook.mjs <registryPath>` when `DIGEST_SOURCES_JSON` or `SIGNALS_JSON` is set, and legacy `node ... '<json-array>' <registryPath>` when neither env is set.
+
+**Anti-pattern:** Do **not** invoke this script with `bash` — `.mjs` files are ES modules and require `node` (`import: command not found` under bash).
 
 Parse stdout JSON: `{ route, winning_signal, winning_score, elapsed_ms }`.
 
@@ -456,11 +462,30 @@ Vault context failure does **not** abort the digest.
 
 After Sources **1–5, 7–11, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
 
-**Discord post is forbidden** until **dedupe**, **scoring**, and the **Persist digest push artifact** terminals return. The artifact must capture **post-dedup, post-scoring** `digest_push_payload` (same payload §9 will push later).
+**Discord post is forbidden** until **§9 map construction**, **dedupe**, **scoring**, and the **Persist digest push artifact** terminals return. The artifact must capture **post-dedup, post-scoring** `digest_push_payload` (same payload §9 will push later).
+
+### Build `digest_push_payload.signals` from §9 map (REQUIRED — non-negotiable)
+
+> **Pin this gate.** Epic 68-8 live validation failed when dedupe ran with empty `DIGEST_SIGNALS_JSON` because this step was skipped. **Do not invoke `dedupe-digest-signals.mjs` until this section completes.**
+
+**Precondition:** Terminals for Sources **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, and 6** have fired (success or `(source unavailable)` recorded). Source 6 (`pick-signal-notebook.mjs`) runs **only after** Sources 9–12 complete — vault routing does **not** substitute for §9 signal assembly.
+
+**Mandatory assembly (from adapter stdout only — not memory):**
+
+1. Initialize `digest_push_payload = { run: { … }, signals: [] }` with `run.date` from Step 0, `run.ranAt = digest_start_ms`, and optional run fields from Sources 1–3 / Source 6 when available (`topTrend`, `focusKeyword`, `deepSignalSummary`, `notebookId`, `vaultContextSummary`).
+2. For **each** source that returned parseable stdout, append signals to `digest_push_payload.signals[]` using the **Signal mapping (`signals[]`)** table in **§9 Post-post — Push digest entities to Convex** (Sources 1–5, 7–12). Thread stdout from each adapter terminal (`events[]`, `headlines[]`, `papers[]`, `stories[]`, `repos[]`, `posts[]`, `entries[]`, `launches[]`, `posts[]` for X, `posts[]` for Bluesky) — skip sections that failed with `(source unavailable)`.
+3. Assign provisional integer `rank` per signal (section order is fine pre-scoring; scoring replaces ranks from `rankScore`).
+4. **Gate check before dedupe:** Let `signals_json = JSON.stringify(digest_push_payload.signals)`. If **any** source succeeded but `digest_push_payload.signals.length === 0`, **stop** — re-read adapter stdout and re-run §9 mapping; do **not** call dedupe with an empty array. When at least one source succeeded, `signals_json` must be a non-empty JSON array string.
+5. **Anti-patterns (must not ship):**
+   - Invoking `dedupe-digest-signals.mjs` before step 4 completes
+   - Building `DIGEST_SIGNALS_JSON` from notebook routing titles (`pick-signal-notebook.mjs` cap-10) instead of full §9 adapter mapping
+   - Hand-rolling signals from Discord display text instead of parsed terminal JSON
+
+**Pipeline order (binding):** adapters → Source 6 → **§9 map (this section)** → **dedup** → score → artifact → Discord → push.
 
 ### Dedupe signals before scoring (REQUIRED — Epic 68-1)
 
-After building unscored `digest_push_payload.signals` from the §9 mapping table and **before** the scoring terminal, invoke the dedupe terminal:
+After **§9 map construction** (above) assigns unscored `digest_push_payload.signals` and **before** the scoring terminal, invoke the dedupe terminal:
 
 ```text
 terminal(

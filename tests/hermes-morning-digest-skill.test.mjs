@@ -711,6 +711,39 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(skillBody.includes("Dedupe stdout threading"));
   });
 
+  it("task-prompt documents §9 map gate before dedupe (Story 68-9)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const preDiscord = taskBody.slice(
+      taskBody.indexOf("## Pre-Discord — Build, score, and persist digest push payload"),
+      taskBody.indexOf("## Output contract (post to `#hermes`)"),
+    );
+    const mapIdx = preDiscord.indexOf("Build `digest_push_payload.signals` from §9 map");
+    const dedupeIdx = preDiscord.indexOf("Dedupe signals before scoring");
+
+    assert.ok(mapIdx >= 0);
+    assert.ok(dedupeIdx > mapIdx);
+    assert.ok(preDiscord.includes("Do not invoke `dedupe-digest-signals.mjs` until"));
+    assert.ok(preDiscord.includes("non-negotiable"));
+    assert.ok(preDiscord.includes("adapters → Source 6 → **§9 map"));
+  });
+
+  it("task-prompt and SKILL.md invoke pick-signal-notebook with node not bash (Story 68-9)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const skillBody = readFileSync(skillPath, "utf8");
+
+    assert.ok(taskBody.includes("PICK_SCRIPT"));
+    assert.ok(taskBody.includes('node \\"$PICK_SCRIPT\\"') || taskBody.includes('node "$PICK_SCRIPT"'));
+    assert.ok(!taskBody.match(/bash scripts[^\n]*pick-signal-notebook\.mjs/i));
+    assert.ok(skillBody.includes("`.mjs` scripts require `node`") || skillBody.includes("Never invoke `.mjs` scripts with `bash`"));
+    assert.ok(skillBody.includes('node "$PICK_SCRIPT"'));
+    assert.ok(!skillBody.match(/bash scripts[^\n]*pick-signal-notebook\.mjs/i));
+  });
+
+  it("pick-signal-notebook.mjs has node shebang (Story 68-9)", () => {
+    const head = readFileSync(pickSignalScriptPath, "utf8").split("\n", 2).join("\n");
+    assert.ok(head.startsWith("#!/usr/bin/env node"));
+  });
+
   it("task-prompt documents imperative scoring stdout threading (Story 64-8)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const preDiscord = taskBody.slice(
