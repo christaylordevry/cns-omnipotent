@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-11T12:00:00+10:00
+# last_updated: 2026-06-11T18:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-11T15:00:00+10:00"
+last_updated: "2026-06-11T22:55:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -498,7 +498,7 @@ development_status:
   # Signal-value sequencing: 68-1 dedup first → 68-4 schema → 68-5 Bluesky ∥ 68-2 people → 68-3 → 68-6/68-7 X → 68-8 gate
   epic-68: in-progress
   68-1-cross-source-dedup-engine: done
-  68-2-people-watchlist-loader: backlog
+  68-2-people-watchlist-loader: done
   68-3-personal-relevance-v3-people-bonus: backlog
   68-4-schema-literals-twitter-bluesky: done
   68-5-bluesky-adapter-source-12: done

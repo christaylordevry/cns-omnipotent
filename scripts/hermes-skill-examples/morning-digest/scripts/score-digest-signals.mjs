@@ -18,6 +18,11 @@ const NOVELTY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 export const NEXUS_GOALS_MAX_PHRASES = 20;
 export const DEFAULT_GOAL_WEIGHT = 2.0;
 
+/** Epic 68 FR-4 — nexus-people.yaml limits (anti-drift surface). */
+export const NEXUS_PEOPLE_MAX_PEOPLE = 30;
+export const NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM = 3;
+export const DEFAULT_PERSON_WEIGHT = 2.5;
+
 const SOURCE_PRIOR = {
   newsapi: 15,
   hackernews: 10,
@@ -71,9 +76,16 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  *   seenAt?: number,
  * }} NoveltyHistoryEntry
  * @typedef {{
+ *   name: string,
+ *   handles: Record<string, string[]>,
+ *   tags: string[],
+ *   weight: number,
+ * }} NexusPerson
+ * @typedef {{
  *   domainTokens: string[],
  *   personalTokens: string[],
  *   goalWeightedTokens: Array<{ token: string, weight: number }>,
+ *   nexusPeople: NexusPerson[],
  *   epicNumericTokens: string[],
  *   noveltyHistoryEntries: NoveltyHistoryEntry[],
  *   runAt: number,
@@ -557,6 +569,345 @@ export async function loadNexusGoals(operatorHome) {
 }
 
 /**
+ * @param {string} raw
+ * @returns {string}
+ */
+export function normalizePeopleHandle(raw) {
+  return String(raw).trim().replace(/^@+/, '').toLowerCase();
+}
+
+/**
+ * @param {string} raw Bracketed inline YAML flow array, e.g. `["llm", "research"]`.
+ * @returns {string[] | null}
+ */
+function parseInlineTagArray(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+    return null;
+  }
+  /** @type {string[]} */
+  const tags = [];
+  for (const match of trimmed.slice(1, -1).matchAll(/"([^"]*)"|'([^']*)'/g)) {
+    const tag = (match[1] ?? match[2] ?? '').trim();
+    if (tag) {
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
+
+/**
+ * @param {Record<string, string[]>} handles
+ * @returns {Record<string, string[]>}
+ */
+function finalizePeopleHandles(handles) {
+  /** @type {Record<string, string[]>} */
+  const result = {};
+  for (const [platform, rawHandles] of Object.entries(handles)) {
+    const key = platform.trim().toLowerCase();
+    if (!key) {
+      continue;
+    }
+    const normalized = [
+      ...new Set(
+        rawHandles.map((handle) => normalizePeopleHandle(handle)).filter((handle) => handle.length > 0),
+      ),
+    ];
+    result[key] = normalized.slice(0, NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM);
+  }
+  return result;
+}
+
+/**
+ * Line-safe subset parser for ~/.hermes/nexus-people.yaml (Epic 68 FR-4).
+ *
+ * @param {string} yaml
+ * @returns {{ version: number | null, people: NexusPerson[], malformed: boolean }}
+ */
+export function parseNexusPeopleYaml(yaml) {
+  /** @type {number | null} */
+  let version = null;
+  let inPeople = false;
+  let inHandles = false;
+  let inTags = false;
+  /** @type {string | null} */
+  let currentPlatform = null;
+  /** @type {string | null} */
+  let currentName = null;
+  /** @type {Record<string, string[]>} */
+  let currentHandles = {};
+  /** @type {string[]} */
+  let currentTags = [];
+  let currentWeight = DEFAULT_PERSON_WEIGHT;
+  /** @type {NexusPerson[]} */
+  const people = [];
+  let sawPeopleSection = false;
+  let malformed = false;
+
+  const flushCurrent = () => {
+    if (currentName) {
+      const weight =
+        Number.isFinite(currentWeight) && currentWeight > 0
+          ? currentWeight
+          : DEFAULT_PERSON_WEIGHT;
+      people.push({
+        name: currentName,
+        handles: finalizePeopleHandles(currentHandles),
+        tags: [...currentTags],
+        weight,
+      });
+    }
+    currentName = null;
+    currentHandles = {};
+    currentTags = [];
+    currentWeight = DEFAULT_PERSON_WEIGHT;
+    inHandles = false;
+    inTags = false;
+    currentPlatform = null;
+  };
+
+  const addHandle = (platform, value) => {
+    const key = platform.trim().toLowerCase();
+    const handle = normalizePeopleHandle(value);
+    if (!key || !handle) {
+      return;
+    }
+    if (!currentHandles[key]) {
+      currentHandles[key] = [];
+    }
+    currentHandles[key].push(handle);
+  };
+
+  for (const rawLine of yaml.split('\n')) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const versionMatch = trimmed.match(/^version:\s*(\d+)\s*$/);
+    if (versionMatch) {
+      version = Number(versionMatch[1]);
+      continue;
+    }
+
+    if (/^people:\s*$/.test(trimmed)) {
+      flushCurrent();
+      inPeople = true;
+      sawPeopleSection = true;
+      continue;
+    }
+
+    if (
+      inPeople &&
+      /^[A-Za-z0-9_]+:\s*$/.test(trimmed) &&
+      !trimmed.startsWith('-') &&
+      !/^\s/.test(rawLine)
+    ) {
+      flushCurrent();
+      inPeople = false;
+      continue;
+    }
+
+    if (!inPeople) {
+      if (/^-\s+/.test(trimmed)) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    const listNameMatch = trimmed.match(/^-\s+name:\s*(.+)$/i);
+    if (listNameMatch) {
+      flushCurrent();
+      currentName = listNameMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      if (!currentName) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    if (/^-\s+/.test(trimmed) && !/^-\s+name:/i.test(trimmed)) {
+      if (inTags) {
+        const tagMatch = trimmed.match(/^-\s+(.+)$/);
+        if (tagMatch) {
+          const tag = tagMatch[1].trim().replace(/^['"]|['"]$/g, '');
+          if (tag) {
+            currentTags.push(tag);
+          }
+        } else {
+          malformed = true;
+        }
+        continue;
+      }
+      if (inHandles && currentPlatform) {
+        const handleMatch = trimmed.match(/^-\s+(.+)$/);
+        if (handleMatch) {
+          addHandle(currentPlatform, handleMatch[1]);
+        } else {
+          malformed = true;
+        }
+        continue;
+      }
+      malformed = true;
+      continue;
+    }
+
+    const handlesSectionMatch = rawLine.match(/^\s+handles:\s*$/i);
+    if (handlesSectionMatch && currentName) {
+      inHandles = true;
+      inTags = false;
+      currentPlatform = null;
+      continue;
+    }
+
+    const tagsSectionMatch = rawLine.match(/^\s+tags:\s*$/i);
+    if (tagsSectionMatch && currentName) {
+      inHandles = false;
+      inTags = true;
+      currentPlatform = null;
+      continue;
+    }
+
+    const tagsInlineMatch = rawLine.match(/^\s+tags:\s+(.+)$/i);
+    if (tagsInlineMatch && currentName) {
+      inHandles = false;
+      inTags = false;
+      currentPlatform = null;
+      const value = tagsInlineMatch[1].trim();
+      if (value.startsWith('[') && value.endsWith(']')) {
+        const parsedTags = parseInlineTagArray(value);
+        if (!parsedTags || parsedTags.length === 0) {
+          malformed = true;
+        } else {
+          currentTags.push(...parsedTags);
+        }
+      } else {
+        const tag = value.replace(/^['"]|['"]$/g, '');
+        if (!tag) {
+          malformed = true;
+        } else {
+          currentTags.push(tag);
+        }
+      }
+      continue;
+    }
+
+    const quotedWeightMatch = rawLine.match(/^\s+weight:\s*['"][^'"]+['"]\s*$/i);
+    if (quotedWeightMatch && currentName) {
+      inHandles = false;
+      inTags = false;
+      malformed = true;
+      continue;
+    }
+
+    const weightMatch =
+      rawLine.match(/^\s+weight:\s*([\d.]+)\s*$/i) || trimmed.match(/^weight:\s*([\d.]+)\s*$/i);
+    if (weightMatch && currentName) {
+      inHandles = false;
+      inTags = false;
+      const parsedWeight = Number(weightMatch[1]);
+      if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+        malformed = true;
+      } else {
+        currentWeight = parsedWeight;
+      }
+      continue;
+    }
+
+    const platformKeyOnlyMatch = rawLine.match(/^\s{4,}(\w+):\s*$/i);
+    if (inHandles && currentName && platformKeyOnlyMatch) {
+      currentPlatform = platformKeyOnlyMatch[1];
+      continue;
+    }
+
+    const platformScalarMatch = rawLine.match(/^\s{4,}(\w+):\s*(.+)$/i);
+    if (inHandles && currentName && platformScalarMatch) {
+      const platform = platformScalarMatch[1];
+      if (platform.toLowerCase() === 'tags') {
+        malformed = true;
+        continue;
+      }
+      const value = platformScalarMatch[2].trim().replace(/^['"]|['"]$/g, '');
+      currentPlatform = null;
+      addHandle(platform, value);
+      continue;
+    }
+
+    const nameMatch = rawLine.match(/^\s+name:\s*(.+)$/i);
+    if (nameMatch && !currentName) {
+      currentName = nameMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      if (!currentName) {
+        malformed = true;
+      }
+      continue;
+    }
+
+    if ((/^-\s+/.test(trimmed) || /^\s+\w+:/.test(rawLine)) && currentName && !inHandles && !inTags) {
+      malformed = true;
+    }
+  }
+
+  flushCurrent();
+
+  if (sawPeopleSection && version == null) {
+    malformed = true;
+  }
+
+  return { version, people, malformed };
+}
+
+/**
+ * @param {string} operatorHome
+ * @returns {Promise<{ people: NexusPerson[], diagnostic?: string }>}
+ */
+export async function loadNexusPeople(operatorHome) {
+  const peoplePath = join(operatorHome, '.hermes', 'nexus-people.yaml');
+  try {
+    const raw = await readFile(peoplePath, 'utf8');
+    const parsed = parseNexusPeopleYaml(raw);
+
+    if (parsed.malformed) {
+      return {
+        people: [],
+        diagnostic: 'score-digest-signals: warning — malformed nexus-people.yaml',
+      };
+    }
+
+    if (parsed.version !== 1) {
+      if (parsed.version != null) {
+        return {
+          people: [],
+          diagnostic: `score-digest-signals: warning — unsupported nexus-people.yaml version ${parsed.version}`,
+        };
+      }
+      return { people: [] };
+    }
+
+    let people = parsed.people;
+    if (people.length > NEXUS_PEOPLE_MAX_PEOPLE) {
+      people = people.slice(0, NEXUS_PEOPLE_MAX_PEOPLE);
+      return {
+        people,
+        diagnostic: `score-digest-signals: warning — nexus-people.yaml truncated to ${NEXUS_PEOPLE_MAX_PEOPLE} people`,
+      };
+    }
+
+    return { people };
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+      return { people: [] };
+    }
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'read error';
+    return {
+      people: [],
+      diagnostic: `score-digest-signals: warning — nexus-people.yaml unreadable (${reason})`,
+    };
+  }
+}
+
+/**
  * @param {{ key: string, status: string }[]} entries
  * @returns {{ sprintTokens: string[], epicNumericTokens: string[] }}
  */
@@ -721,7 +1072,12 @@ export async function loadScoringContext(env = process.env) {
   if (nexusGoals.diagnostic) {
     console.error(nexusGoals.diagnostic);
   }
+  const nexusPeopleResult = await loadNexusPeople(operatorHome);
+  if (nexusPeopleResult.diagnostic) {
+    console.error(nexusPeopleResult.diagnostic);
+  }
   const goalWeightedTokens = nexusGoals.goalWeightedTokens;
+  const nexusPeople = nexusPeopleResult.people;
   const goalTokenSet = new Set(goalWeightedTokens.map(({ token }) => token));
 
   const watchlistPath = join(operatorHome, '.hermes', 'trend-watchlist.yaml');
@@ -796,6 +1152,7 @@ export async function loadScoringContext(env = process.env) {
     domainTokens,
     personalTokens,
     goalWeightedTokens,
+    nexusPeople,
     epicNumericTokens,
     noveltyHistoryEntries,
     runAt: resolvedRunAt,

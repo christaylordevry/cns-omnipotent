@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 68-2-people-watchlist-loader (2026-06-11)
+
+- Hyphenated platform names (e.g. `x-twitter`) not supported by `\w+` regex in line-safe parser — line-parser limitation; not in A2 schema.
+- `authorHandle` not added to `DigestSignal.sourceMetadata` JSDoc — deferred to 68-3 per story dev notes.
+
 ## Deferred from: code review of 68-8-live-digest-validation (2026-06-11)
 
 - No `--people-done` CLI flag for C6 when 68-2/68-3 ship — backlog waiver path sufficient until people stories land.

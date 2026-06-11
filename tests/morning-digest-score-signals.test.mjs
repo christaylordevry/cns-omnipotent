@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -20,11 +21,17 @@ import {
   HN_POINTS_CAP,
   buildGoalWeightedTokens,
   DEFAULT_GOAL_WEIGHT,
+  DEFAULT_PERSON_WEIGHT,
   loadNexusGoals,
+  loadNexusPeople,
   loadScoringContext,
   logNorm,
   NEXUS_GOALS_MAX_PHRASES,
+  NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM,
+  NEXUS_PEOPLE_MAX_PEOPLE,
   normalizeEngagement,
+  normalizePeopleHandle,
+  parseNexusPeopleYaml,
   overlapRatio,
   parseDevelopmentStatus,
   parseDigestSignalsJson,
@@ -55,10 +62,12 @@ import {
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
 
 const execFileAsync = promisify(execFile);
+const testDir = dirname(fileURLToPath(import.meta.url));
 const scoreScript = join(
-  dirname(fileURLToPath(import.meta.url)),
+  testDir,
   '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs',
 );
+const nexusPeopleExamplePath = join(testDir, '../scripts/nexus-people.yaml.example');
 
 /** @returns {import('../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs').ScoringContext} */
 function baseCtx(overrides = {}) {
@@ -66,6 +75,7 @@ function baseCtx(overrides = {}) {
     domainTokens: [],
     personalTokens: [],
     goalWeightedTokens: [],
+    nexusPeople: [],
     epicNumericTokens: [],
     noveltyHistoryEntries: [],
     runAt: Date.parse('2026-06-09T12:00:00Z'),
@@ -1110,6 +1120,247 @@ goals:
     assert.ok(ctx.personalTokens.includes('epic'));
     assert.ok(!ctx.personalTokens.includes('morning'));
     assert.ok(!ctx.personalTokens.includes('digest'));
+  });
+});
+
+describe('nexus-people.yaml loader', () => {
+  const validFixture = `version: 1
+people:
+  - name: "Andrej Karpathy"
+    handles:
+      twitter: "karpathy"
+      bluesky: "karpathy.bsky.social"
+    tags:
+      - llm
+      - research
+    weight: 2.5
+  - name: "Dario Amodei"
+    handles:
+      twitter: "darioamodei"
+    tags:
+      - ai-safety
+`;
+
+  it('parseNexusPeopleYaml reads version, people, handles, tags, and weights', () => {
+    const parsed = parseNexusPeopleYaml(validFixture);
+    assert.equal(parsed.version, 1);
+    assert.equal(parsed.malformed, false);
+    assert.equal(parsed.people.length, 2);
+    assert.equal(parsed.people[0].name, 'Andrej Karpathy');
+    assert.deepEqual(parsed.people[0].handles.twitter, ['karpathy']);
+    assert.deepEqual(parsed.people[0].handles.bluesky, ['karpathy.bsky.social']);
+    assert.deepEqual(parsed.people[0].tags, ['llm', 'research']);
+    assert.equal(parsed.people[0].weight, 2.5);
+    assert.equal(parsed.people[1].weight, DEFAULT_PERSON_WEIGHT);
+  });
+
+  it('normalizePeopleHandle lowercases and strips leading @', () => {
+    assert.equal(normalizePeopleHandle('@Karpathy'), 'karpathy');
+    assert.equal(normalizePeopleHandle('KARPATHY'), 'karpathy');
+    assert.equal(normalizePeopleHandle('  @TwitterUser  '), 'twitteruser');
+  });
+
+  it('parseNexusPeopleYaml parses inline tags array (A2 schema)', () => {
+    const yaml = `version: 1
+people:
+  - name: "Andrej Karpathy"
+    handles:
+      twitter: "karpathy"
+    tags: ["llm", "research"]
+`;
+    const parsed = parseNexusPeopleYaml(yaml);
+    assert.equal(parsed.malformed, false);
+    assert.deepEqual(parsed.people[0].tags, ['llm', 'research']);
+    assert.equal(parsed.people[0].handles.tags, undefined);
+  });
+
+  it('parseNexusPeopleYaml normalizes uppercase platform keys and handles in parser context', () => {
+    const yaml = `version: 1
+people:
+  - name: "Test Person"
+    handles:
+      Twitter: "@KARPATHY"
+`;
+    const parsed = parseNexusPeopleYaml(yaml);
+    assert.equal(parsed.malformed, false);
+    assert.deepEqual(parsed.people[0].handles.twitter, ['karpathy']);
+  });
+
+  it('parseNexusPeopleYaml round-trips scripts/nexus-people.yaml.example', () => {
+    const example = readFileSync(nexusPeopleExamplePath, 'utf8');
+    const parsed = parseNexusPeopleYaml(example);
+    assert.equal(parsed.malformed, false);
+    assert.equal(parsed.version, 1);
+    assert.ok(parsed.people.length >= 8);
+    assert.deepEqual(parsed.people[0].tags, ['llm', 'research']);
+    assert.deepEqual(parsed.people[0].handles.twitter, ['karpathy']);
+    assert.equal(parsed.people[0].handles.tags, undefined);
+  });
+
+  it('parseNexusPeopleYaml caps handles at NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM per platform', () => {
+    const yaml = `version: 1
+people:
+  - name: "Test Person"
+    handles:
+      twitter:
+        - one
+        - two
+        - three
+        - four
+`;
+    const parsed = parseNexusPeopleYaml(yaml);
+    assert.equal(parsed.people[0].handles.twitter.length, NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM);
+    assert.deepEqual(parsed.people[0].handles.twitter, ['one', 'two', 'three']);
+  });
+
+  it('loadNexusPeople truncates to NEXUS_PEOPLE_MAX_PEOPLE with diagnostic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-trunc-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    const peopleLines = Array.from(
+      { length: 31 },
+      (_, index) => `  - name: "Person ${index + 1}"\n    handles:\n      twitter: "p${index + 1}"`,
+    ).join('\n');
+    await writeFile(
+      join(hermesDir, 'nexus-people.yaml'),
+      `version: 1\npeople:\n${peopleLines}\n`,
+      'utf8',
+    );
+    const loaded = await loadNexusPeople(root);
+    assert.equal(loaded.people.length, NEXUS_PEOPLE_MAX_PEOPLE);
+    assert.match(
+      loaded.diagnostic ?? '',
+      new RegExp(`truncated to ${NEXUS_PEOPLE_MAX_PEOPLE} people`),
+    );
+    assert.match(loaded.diagnostic ?? '', /score-digest-signals:/);
+    assert.match(loaded.diagnostic ?? '', /nexus-people.yaml/);
+  });
+
+  it('loadNexusPeople returns empty set when file is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-missing-'));
+    const loaded = await loadNexusPeople(root);
+    assert.deepEqual(loaded.people, []);
+    assert.equal(loaded.diagnostic, undefined);
+  });
+
+  it('loadNexusPeople emits diagnostic for malformed YAML', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-bad-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-people.yaml'),
+      `people:
+  - not-a-name-key: broken
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusPeople(root);
+    assert.deepEqual(loaded.people, []);
+    assert.match(loaded.diagnostic ?? '', /score-digest-signals: warning — malformed nexus-people.yaml/);
+  });
+
+  it('loadNexusPeople warns on unsupported version', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-ver-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-people.yaml'),
+      `version: 2
+people:
+  - name: "Future Schema"
+    handles:
+      twitter: "future"
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusPeople(root);
+    assert.deepEqual(loaded.people, []);
+    assert.match(loaded.diagnostic ?? '', /unsupported nexus-people.yaml version 2/);
+  });
+
+  it('parseNexusPeopleYaml handles empty file without throw', () => {
+    const parsed = parseNexusPeopleYaml('');
+    assert.equal(parsed.version, null);
+    assert.deepEqual(parsed.people, []);
+    assert.equal(parsed.malformed, false);
+  });
+
+  it('loadNexusPeople handles empty file without throw or diagnostic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-empty-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(join(hermesDir, 'nexus-people.yaml'), '', 'utf8');
+    const loaded = await loadNexusPeople(root);
+    assert.deepEqual(loaded.people, []);
+    assert.equal(loaded.diagnostic, undefined);
+  });
+
+  it('parseNexusPeopleYaml handles version-only file without throw', () => {
+    const parsed = parseNexusPeopleYaml('version: 1\n');
+    assert.equal(parsed.version, 1);
+    assert.deepEqual(parsed.people, []);
+    assert.equal(parsed.malformed, false);
+  });
+
+  it('loadNexusPeople rejects quoted-string weight with malformed diagnostic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-weight-str-'));
+    const hermesDir = join(root, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-people.yaml'),
+      `version: 1
+people:
+  - name: "Test Person"
+    handles:
+      twitter: "test"
+    weight: "2.5"
+`,
+      'utf8',
+    );
+    const loaded = await loadNexusPeople(root);
+    assert.deepEqual(loaded.people, []);
+    assert.match(loaded.diagnostic ?? '', /score-digest-signals: warning — malformed nexus-people.yaml/);
+  });
+
+  it('loadScoringContext integration loads nexusPeople from temp operator home', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-ctx-'));
+    const operatorHome = join(root, 'operator');
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(join(hermesDir, 'nexus-people.yaml'), validFixture, 'utf8');
+
+    const ctx = await loadScoringContext({
+      HOME: operatorHome,
+      CNS_REPO_ROOT: root,
+      DIGEST_NOVELTY_HISTORY_JSON: '[]',
+    });
+    assert.ok(ctx.nexusPeople.length > 0);
+    assert.equal(ctx.nexusPeople[0].name, 'Andrej Karpathy');
+  });
+
+  it('scorePersonalRelevance is unchanged when nexusPeople is populated (no bonus in 68-2)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-people-antidrift-'));
+    const operatorHome = join(root, 'operator');
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(join(hermesDir, 'nexus-people.yaml'), validFixture, 'utf8');
+
+    const ctxWithPeople = await loadScoringContext({
+      HOME: operatorHome,
+      CNS_REPO_ROOT: root,
+      DIGEST_NOVELTY_HISTORY_JSON: '[]',
+    });
+    const ctxWithoutPeople = baseCtx({ personalTokens: [], goalWeightedTokens: [], epicNumericTokens: [] });
+    const signal = {
+      title: 'Karpathy shares new LLM training insights',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+
+    const withPeople = scorePersonalRelevance(signal, ctxWithPeople);
+    const withoutPeople = scorePersonalRelevance(signal, ctxWithoutPeople);
+    assert.equal(withPeople, withoutPeople);
+    assert.ok(ctxWithPeople.nexusPeople.length > 0);
   });
 });
 

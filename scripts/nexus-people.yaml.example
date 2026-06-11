@@ -1,0 +1,50 @@
+# Operator copy: cp scripts/nexus-people.yaml.example ~/.hermes/nexus-people.yaml
+# Quarterly people watchlist for morning-digest personalRelevance v3 (Epic 68 FR-4).
+# Not committed to repo; not vault WriteGate. Max 30 people; max 3 handles per platform.
+
+version: 1
+people:
+  - name: "Andrej Karpathy"
+    handles:
+      twitter: "karpathy"
+      bluesky: "karpathy.bsky.social"
+    tags: ["llm", "research"]
+    weight: 2.5
+  - name: "Dario Amodei"
+    handles:
+      twitter: "darioamodei"
+    tags: ["ai-safety", "anthropic"]
+  - name: "Demis Hassabis"
+    handles:
+      twitter: "demishassabis"
+    tags: ["deepmind", "agi"]
+  - name: "Sam Altman"
+    handles:
+      twitter: "sama"
+      bluesky: "samaltman.bsky.social"
+    tags: ["openai", "startups"]
+  - name: "Yann LeCun"
+    handles:
+      twitter: "ylecun"
+      bluesky: "yann.lecun.net"
+    tags: ["meta", "deep-learning"]
+  - name: "Andrew Ng"
+    handles:
+      twitter: "AndrewYNg"
+    tags: ["education", "ml"]
+  - name: "Geoffrey Hinton"
+    handles:
+      twitter: "geoffreyhinton"
+    tags: ["ai-safety", "research"]
+  - name: "Greg Brockman"
+    handles:
+      twitter: "gdb"
+    tags: ["openai", "engineering"]
+  - name: "Ilya Sutskever"
+    handles:
+      twitter: "ilyasut"
+    tags: ["llm", "research"]
+  - name: "Fei-Fei Li"
+    handles:
+      twitter: "drfeifei"
+    tags: ["computer-vision", "stanford"]
