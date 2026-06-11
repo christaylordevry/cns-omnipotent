@@ -20,8 +20,11 @@ if [[ ! -f "$JOB_ID_FILE" ]]; then
   exit 1
 fi
 
+# hermes gateway status may exit non-zero (e.g. outdated systemd unit warning) even when
+# running; with pipefail that poisons the grep pipeline. Capture output first, ignore exit.
 # Matches: "✓ User gateway service is running" (current) and legacy "gateway is running"
-if ! hermes gateway status 2>/dev/null | grep -qiE 'gateway service is running|gateway is running'; then
+_gw_out=$(hermes gateway status 2>&1 || true)
+if ! printf '%s\n' "$_gw_out" | grep -qiE 'gateway service is running|gateway is running'; then
   echo "run-morning-digest-cron: Hermes gateway is not running; aborting (no Discord delivery, no digest run)." >&2
   exit 1
 fi
