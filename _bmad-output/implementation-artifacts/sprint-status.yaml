@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-12T12:00:00+00:00"
+last_updated: "2026-06-12T18:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -498,7 +498,7 @@ development_status:
 
   # Epic 68 — Source Expansion: X/Twitter, Bluesky, Cross-Source Dedup (prd 2026-06-11)
   # Signal-value sequencing: 68-1 dedup first → 68-4 schema → 68-5 Bluesky ∥ 68-2 people → 68-3 → 68-6/68-7 X → 68-8 gate
-  epic-68: in-progress
+  epic-68: done
   68-1-cross-source-dedup-engine: done
   68-2-people-watchlist-loader: done
   68-3-personal-relevance-v3-people-bonus: done
@@ -506,7 +506,7 @@ development_status:
   68-5-bluesky-adapter-source-12: done
   68-6-x-twitter-adapter-source-11: done
   68-7-x-integration-env-docs: done
-  68-8-live-digest-validation: in-progress
+  68-8-live-digest-validation: done # C6 pass 2026-06-12 (emollick personalRelevance:37); overall:pass — C7/C11 manual pending
   68-9-morning-digest-pipeline-integration-fixes: done
   68-10-digest-convex-completion-gate: done
   # Pipeline reliability (Tier 1A operator brief 2026-06-11): bound Perplexity blob + reorder to stop mid-run compression dropping §9 push gate
