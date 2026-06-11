@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-12T04:00:00+00:00"
+last_updated: "2026-06-12T12:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -493,7 +493,7 @@ development_status:
   67-9-fix-hermes-gateway-stale-pid-lock: done
   67-10-push-watchdog-convex-push-failure-safe: done
   # Ops hotfix — 2026-06-11: cron minimal PATH — hermes/node not found under WSL cron
-  67-11-fix-cron-environment-path: review
+  67-11-fix-cron-environment-path: done
   epic-67-retrospective: optional
 
   # Epic 68 — Source Expansion: X/Twitter, Bluesky, Cross-Source Dedup (prd 2026-06-11)
@@ -510,7 +510,7 @@ development_status:
   68-9-morning-digest-pipeline-integration-fixes: done
   68-10-digest-convex-completion-gate: done
   # Pipeline reliability (Tier 1A operator brief 2026-06-11): bound Perplexity blob + reorder to stop mid-run compression dropping §9 push gate
-  68-11-bound-perplexity-deep-signal-terminal-adapter: review
+  68-11-bound-perplexity-deep-signal-terminal-adapter: done
   epic-68-retrospective: optional
 
   # Epic 69 — Nexus Intelligence UI: Signal Surface + Operator Visibility (prd 2026-06-11)
@@ -519,13 +519,13 @@ development_status:
   69-4-digest-signal-feed-disposition-hierarchy: done
   69-1-inspector-dedup-merge-provenance: review
   69-2-people-match-indicator: done
-  69-3-source-health-panel: ready-for-dev
+  69-3-source-health-panel: review
   69-5-investigation-workspace-screen-10: ready-for-dev
   epic-69-retrospective: optional
 
   # Epic 70 — Deterministic Morning Digest Orchestrator (operator brief 2026-06-12)
   # Replaces Hermes agent cron with Node collectAdapterOutputs → dedupe → score → Convex → Discord
-  epic-70: in-progress
+  epic-70: done
   70-1-wire-node-orchestrator-cron: done
   70-2-discord-post-step: done
   70-3-errors-by-source-date-skew-signal-quality: done
