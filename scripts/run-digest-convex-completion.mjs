@@ -12,6 +12,10 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
+import {
+  resolveDigestMarkdownFromPayload,
+  resolveSourceOutcomes,
+} from './hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 import { readDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
@@ -191,13 +195,30 @@ export function parseCompletionCliArgs(argv) {
 
 /**
  * @param {Record<string, unknown>} payload
+ * @param {Record<string, unknown> | undefined} adapterResults
+ */
+function attachSourceOutcomes(payload, adapterResults) {
+  const outcomes = resolveSourceOutcomes({
+    markdown: resolveDigestMarkdownFromPayload(payload),
+    run: payload.run,
+    signals: Array.isArray(payload.signals) ? payload.signals : [],
+    adapterResults,
+  });
+  if (outcomes.length > 0) {
+    payload.run = { ...payload.run, sourceOutcomes: outcomes };
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} payload
  * @param {number} ranAt
  * @param {Record<string, string | undefined>} env
  * @param {(action: string, exitCode: number, detail?: string) => Promise<void>} log
  * @param {string} successAction
+ * @param {Record<string, unknown> | undefined} [adapterResults]
  * @returns {Promise<{ action: string; exitCode: number }>}
  */
-async function scoreWriteAndPush(payload, ranAt, env, log, successAction) {
+async function scoreWriteAndPush(payload, ranAt, env, log, successAction, adapterResults) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
   try {
     signals = await dedupeSignals(signals, env);
@@ -212,6 +233,8 @@ async function scoreWriteAndPush(payload, ranAt, env, log, successAction) {
     await log('completion-pipeline-failed', 0, detail);
     return { action: 'completion-pipeline-failed', exitCode: 0 };
   }
+
+  attachSourceOutcomes(payload, adapterResults);
 
   const writeResult = await writeDigestPushArtifact({
     ...env,
@@ -339,7 +362,7 @@ export async function runDigestConvexCompletion(opts = {}) {
     return { action: 'completion-no-signals', exitCode: 0 };
   }
 
-  return scoreWriteAndPush(payload, ranAt, env, log, 'completion-backfill-push');
+  return scoreWriteAndPush(payload, ranAt, env, log, 'completion-backfill-push', adapterOutputs);
 }
 
 async function main() {

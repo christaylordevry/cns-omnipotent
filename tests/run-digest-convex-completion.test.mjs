@@ -68,6 +68,8 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.ok(artifact.signals.some((row) => row.sourceType === 'twitter'));
     assert.ok(artifact.signals.some((row) => row.sourceType === 'bluesky'));
     assert.ok(artifact.signals.some((row) => row.sourceType === 'producthunt'));
+    assert.ok(Array.isArray(artifact.run.sourceOutcomes));
+    assert.ok(artifact.run.sourceOutcomes.some((row) => row.sourceKey === 'google_trends'));
   });
 
   it('force-rescore bypasses watchdog already-pushed and rescores artifact', async () => {
