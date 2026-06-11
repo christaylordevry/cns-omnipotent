@@ -14,14 +14,13 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 3 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
 | 0 | Date | `terminal(...)` **Australia/Sydney** civil date (Tool-call rule below; matches cron `CRON_TZ`) |
 | 1 | Google Trends | `terminal(command="bash scripts/session-close/hermes-run-trend-ingest.sh", …)` |
 | 2 | NewsAPI | `terminal(command="bash scripts/session-close/hermes-run-newsapi.sh", …)` |
-| 3 | Perplexity | `mcp__perplexity__search` once (when Source 1 yields a top keyword) |
 | 4 | arXiv | `terminal(command="bash scripts/session-close/hermes-run-arxiv.sh", …)` |
 | 5 | HackerNews | `terminal(command="bash scripts/session-close/hermes-run-hn.sh", …)` |
 | 7 | GitHub | `terminal(command="bash scripts/session-close/hermes-run-github.sh", …)` |
@@ -29,12 +28,15 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 9 | Newsletters / RSS | `terminal(command="bash scripts/session-close/hermes-run-rss.sh", …)` — **MUST fire before Source 6** |
 | 10 | Product Hunt | `terminal(command="bash scripts/session-close/hermes-run-producthunt.sh", …)` — **MUST fire before Source 6** |
 | 11 | X / Twitter | `terminal(command="bash scripts/session-close/hermes-run-x.sh", …)` — **MUST fire before Source 6** |
-| 12 | Bluesky | `terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", …)` — **MUST fire before Source 6** |
-| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, and 12** |
+| 12 | Bluesky | `terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", …)` — **MUST fire before Source 3** |
+| 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 12, before Source 6**; top keyword from Source 1 only |
+| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, and 3** |
 
-**Steps 9–12 gate:** Sources 9, 10, 11, and 12 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 6 or Discord post. Skipping any of these terminals invalidates the run.
+**Steps 9–12 gate:** Sources 9, 10, 11, and 12 terminals **MUST fire** (and record success or `(source unavailable)`) before Source 3 or Source 6. Skipping any of these terminals invalidates the run.
 
-**Gate:** Only after steps **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source 12 and before Source 6 or Discord post.
+
+**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -44,7 +46,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **Australia/Sydney** civil date (same as morning-digest / push-watchdog cron `CRON_TZ=Australia/Sydney`). Use the Step 0 terminal below — do not use machine-local OS timezone for digest headers, `digest_push_payload.run.date`, or artifact filenames.
-7. **Cross-source failures**: run Sources **1–5, 7–11, 12, and 6** independently (collection order: 1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources **1–5, 7–12, 3, and 6** independently (collection order: 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 3 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion gate (non-negotiable)**: After building and scoring `digest_push_payload`, **persist the digest push artifact** to `~/.hermes/digest-push-<YYYY-MM-DD>.json` **before** posting to `#hermes` (see **Persist digest push artifact**). After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until the artifact terminal **and both** push terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize the artifact write or either push call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
 
@@ -118,17 +120,41 @@ Stdout shape:
 
 Emit up to **5** headline **titles** under **Headlines** (use `title` from each object; `url` is for Convex `digestSignals` push only).
 
-On failure (missing key, HTTP error, empty results): `- (source unavailable: <short reason>)` and **continue** to Source 3.
+On failure (missing key, HTTP error, empty results): `- (source unavailable: <short reason>)` and **continue** to Source 4.
 
 ## Source 3 — Perplexity deep signal
 
-Call `mcp__perplexity__search` exactly once when Source 1 produced at least one trend keyword. If Source 1 failed or returned no usable keyword, do **not** invent a fallback keyword from headlines; mark Deep Signal unavailable with the required bullet.
+> **Runtime position:** fires **after Source 12 (Bluesky), before Source 6 (Vault context)** — not at position 3 in the collection order. The section number is retained for Output Contract / §9 mapping compatibility.
 
-- Keyword: **top** item from Source 1 (after sort).
-- Query: `<keyword> — latest news and developments last 24 hours — CNS operator brief`
-- Target **2–3 sentences** in **Deep Signal** section when Perplexity succeeds.
-- Soft cap **45s** — on timeout, write `- (source unavailable: perplexity timeout)`.
-- Missing top trend keyword: write `- (source unavailable: no top trend keyword)`.
+**Pre-flight gate:** If the `hermes-run-perplexity.sh` terminal has not fired, do not proceed to Source 6.
+
+Call `terminal` exactly once for Perplexity deep signal when Source 1 produced at least one trend keyword. If Source 1 failed or returned no usable keyword, do **not** invent a fallback keyword from headlines; mark Deep Signal unavailable with the required bullet.
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", workdir=resolved_repo_root, timeout=45)
+```
+
+Where `top_trend_keyword` is the **top** item from Source 1 (after sort by `normalizedValue` descending). Use the same `shellQuote(value)` transform as Source 6.
+
+Stdout shape (Perplexity only):
+
+```json
+{ "deepSignal": "2-3 sentence sweep...", "topTrend": "ai agents" }
+```
+
+**After the Perplexity terminal returns** (mandatory stdout threading):
+
+1. Let `pplx_stdout` = Perplexity terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `pplx_json = JSON.parse(pplx_stdout)` inside try/catch or equivalent safe parse.
+3. If `pplx_json.error` (string) → treat as failure; reason = that string.
+4. Else if `typeof pplx_json.deepSignal === 'string' && pplx_json.deepSignal.trim()`:
+   - Emit **2–3 sentences** under **Deep Signal** using `pplx_json.deepSignal` (already ≤1200 chars from adapter).
+   - Use `pplx_json.topTrend` for the section header keyword when present.
+5. Else → failure (empty `deepSignal`, invalid shape, or parse error).
+6. On failure: section header **Deep Signal** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+7. Missing top trend keyword (do not call terminal): write `- (source unavailable: no top trend keyword)`.
+
+Failure mapping: `perplexity timeout` → `- (source unavailable: perplexity timeout)`; `missing PERPLEXITY_API_KEY` → `- (source unavailable: missing PERPLEXITY_API_KEY)`.
 
 ## Source 4 — arXiv preprints
 
@@ -331,7 +357,7 @@ Call `terminal` exactly once for Bluesky public author feeds via AT Protocol App
 terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-**Pre-flight gate:** If the `hermes-run-bluesky.sh` terminal has not fired, do not proceed to Source 6.
+**Pre-flight gate:** If the `hermes-run-bluesky.sh` terminal has not fired, do not proceed to Source 3 or Source 6.
 
 Stdout shape (Bluesky only — do not confuse with Sources 5, 7, 8, 9, or 10 keys):
 
@@ -350,14 +376,14 @@ Stdout shape (Bluesky only — do not confuse with Sources 5, 7, 8, 9, or 10 key
    - Emit up to **N** posts (default **25**, hard max **50**, configurable via `MORNING_DIGEST_BSKY_MAX_POSTS`); uses public `getAuthorFeed` only — no app password in v1.
    - For Discord **Bluesky**, list each post as `- <title> — <likes> likes, <reposts> reposts` (optional author sub-bullet when present).
 5. Else → failure (empty `posts`, invalid shape, or parse error).
-6. On failure: section header **Bluesky** + `- (source unavailable: <short reason>)` and **continue** to Source 6.
+6. On failure: section header **Bluesky** + `- (source unavailable: <short reason>)` and **continue** to Source 3.
 7. **Anti-pattern:** Do not read `launches[]`, `repos[]`, `stories[]`, or `entries[]` from Bluesky stdout — those keys belong to Sources 5, 7, 9, and 10 only.
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 12 completes. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 12 and Source 3 complete. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
-**Prerequisite:** Terminals for Sources **9**, **10**, **11**, and **12** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all four terminals complete.
+**Prerequisite:** Terminals for Sources **9**, **10**, **11**, **12**, and **3** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all five terminals complete.
 
 ### Build `digest_sources` (for scoring)
 
@@ -460,7 +486,7 @@ Vault context failure does **not** abort the digest.
 
 ## Pre-Discord — Build, score, and persist digest push payload (REQUIRED)
 
-After Sources **1–5, 7–11, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
+After Sources **1–5, 7–12, 3, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
 
 **Discord post is forbidden** until **§9 map construction**, **dedupe**, **scoring**, and the **Persist digest push artifact** terminals return. The artifact must capture **post-dedup, post-scoring** `digest_push_payload` (same payload §9 will push later).
 
@@ -468,7 +494,7 @@ After Sources **1–5, 7–11, and 6** complete and `digest_sources` is assemble
 
 > **Pin this gate.** Epic 68-8 live validation failed when dedupe ran with empty `DIGEST_SIGNALS_JSON` because this step was skipped. **Do not invoke `dedupe-digest-signals.mjs` until this section completes.**
 
-**Precondition:** Terminals for Sources **0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, and 6** have fired (success or `(source unavailable)` recorded). Source 6 (`pick-signal-notebook.mjs`) runs **only after** Sources 9–12 complete — vault routing does **not** substitute for §9 signal assembly.
+**Precondition:** Terminals for Sources **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 3, and 6** have fired (success or `(source unavailable)` recorded). Source 6 (`pick-signal-notebook.mjs`) runs **only after** Sources 9–12 and Source 3 complete — vault routing does **not** substitute for §9 signal assembly.
 
 **Mandatory assembly (from adapter stdout only — not memory):**
 
@@ -735,7 +761,7 @@ Do **not** post the warning for `ok` or `skipped-env`. Do **not** treat log fail
 
 > **REQUIRED §9 — part 1 of 2 of the completion gate.** This is **part 1 of 2** — do **not** end the task turn after this call; §10 must also fire. Non-negotiable even under context compression. Invoke on **every** run (success or partial failure), exactly as session-close treats its required steps.
 
-Run **after** Sources **1–5, 7–11, 12, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
+Run **after** Sources **1–5, 7–12, 3, and 6** were attempted, `digest_sources` was assembled, the full digest was posted to `#hermes`, and the notebook Convex log step (when applicable) has finished — so `notebookId` and `vaultContextSummary` are available on ROUTED+success runs. This step is **mandatory** and runs **after** the Discord post, but it is only **half** of the completion gate — §10 (`push-keyword-candidates.mjs`) must fire next with the same payload. Failure handling is **fire-and-forget** — the push script always exits **0** and you never post a Discord warning on failure — but "fire-and-forget" applies only to the *result*, never to whether the call runs. The invocation itself is required.
 
 **Precondition:** Discord post complete. Build `digest_push_payload` from parsed source outputs (not memory).
 
@@ -944,8 +970,7 @@ Always `exit_code: 0`. Do **not** post Discord warnings for keyword candidate pu
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `dedupe-digest-signals.mjs` (Pre-Discord, before scoring); `score-digest-signals.mjs` (Pre-Discord, after dedup); `write-digest-push-artifact.mjs` (Pre-Discord, before Discord post); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
-| `mcp__perplexity__search` | Deep signal only |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; Perplexity deep signal (`hermes-run-perplexity.sh`); `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `dedupe-digest-signals.mjs` (Pre-Discord, before scoring); `score-digest-signals.mjs` (Pre-Discord, after dedup); `write-digest-push-artifact.mjs` (Pre-Discord, before Discord post); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
 | Discord reply | Final formatted digest |
 
 **Forbidden:** `vault_write`, `vault_append_daily`, `vault_create_note`, `mcp__notebooklm__notebook_query`, Firecrawl, dashboard APIs, session-close NotebookLM fan-out.

@@ -45,14 +45,14 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: morning-digest"));
-    assert.ok(body.includes("version: 1.4.7"));
+    assert.ok(body.includes("version: 1.5.0"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
     assert.ok(body.includes("hermes-run-hn.sh"));
     assert.ok(body.includes("## Pitfalls"));
     assert.ok(body.includes("pick-signal-routing.md"));
-    assert.ok(body.includes("requires_toolsets: [terminal, perplexity]"));
+    assert.ok(body.includes("requires_toolsets: [terminal]"));
     assert.ok(body.includes("morning-digest"));
     assert.ok(body.includes("explicit `terminal(...)` calls"));
     assert.ok(body.includes("execute the digest immediately"));
@@ -67,7 +67,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("trend-ingest.py"));
     assert.ok(body.includes("hermes-run-trend-ingest.sh"));
     assert.ok(body.includes("hermes-run-newsapi.sh"));
-    assert.ok(body.includes("mcp__perplexity__search"));
+    assert.ok(body.includes("hermes-run-perplexity.sh"));
     assert.ok(body.includes("pick-signal-notebook.mjs"));
     assert.ok(body.includes("query-notebook.mjs"));
     assert.ok(body.includes("**Vault context**"));
@@ -136,7 +136,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
         (body.includes("Source 2") || body.includes("Cross-source")),
     );
     assert.ok(body.includes("NEWSAPI"));
-    assert.ok(body.includes("mcp__perplexity__search"));
+    assert.ok(body.includes("hermes-run-perplexity.sh"));
     assert.ok(body.includes("Australia/Sydney"));
     assert.ok(body.includes("Intl.DateTimeFormat"));
     assert.ok(!body.includes("```bash"));
@@ -194,7 +194,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       ),
     );
     assert.ok(body.includes("Call `terminal` exactly once for NewsAPI"));
-    assert.ok(body.includes("Call `mcp__perplexity__search` exactly once"));
+    assert.ok(body.includes("hermes-run-perplexity.sh"));
     assert.ok(
       body.includes("pick-signal-notebook.mjs") && body.includes("query-notebook.mjs"),
     );
@@ -394,7 +394,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source12.includes("**Bluesky**"));
     assert.ok(source12.includes("posts[]"));
     assert.ok(source12.includes("sourceMetadata.likes"));
-    assert.ok(source12.includes("continue** to Source 6"));
+    assert.ok(source12.includes("continue** to Source 3"));
 
     const source6 = taskBody.slice(source12End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
@@ -537,7 +537,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       /anti-pattern|Do not read.*launches/i.test(source12),
       "must anti-pattern wrong keys for Bluesky",
     );
-    assert.ok(source12.includes("continue** to Source 6"));
+    assert.ok(source12.includes("continue** to Source 3"));
     const skillBody = readFileSync(skillPath, "utf8");
     assert.ok(skillBody.includes("Bluesky stdout threading"));
     assert.ok(skillBody.includes("bsky_json.posts"));
@@ -826,6 +826,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const source11 = taskBody.slice(taskBody.indexOf("## Source 11"), source11End);
     const source12End = taskBody.indexOf("## Source 6");
     const source12 = taskBody.slice(source11End, source12End);
+    const source3End = taskBody.indexOf("## Source 4");
+    const source3 = taskBody.slice(
+      taskBody.indexOf("## Source 3"),
+      source3End,
+    );
     const source6End = taskBody.indexOf("### Build `digest_sources`");
     const source6Lead = taskBody.slice(
       taskBody.indexOf("## Source 6"),
@@ -836,9 +841,14 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(checklist.includes("hermes-run-producthunt.sh"));
     assert.ok(checklist.includes("hermes-run-x.sh"));
     assert.ok(checklist.includes("hermes-run-bluesky.sh"));
+    assert.ok(checklist.includes("hermes-run-perplexity.sh"));
     assert.ok(
-      (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 4,
-      "checklist rows 9, 10, 11, and 12 must all require MUST fire before Source 6",
+      (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 3,
+      "checklist rows 9, 10, and 11 must require MUST fire before Source 6",
+    );
+    assert.ok(
+      checklist.includes("MUST fire before Source 3"),
+      "checklist row 12 must gate Source 3 before Source 6",
     );
     assert.ok(
       checklist.includes("Steps 9–12 gate") &&
@@ -858,11 +868,19 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(
       source12.includes("hermes-run-bluesky.sh") &&
-        source12.includes("has not fired, do not proceed to Source 6"),
+        source12.includes("has not fired, do not proceed to Source 3 or Source 6"),
+    );
+    assert.ok(
+      source3.includes("hermes-run-perplexity.sh") &&
+        source3.includes("has not fired, do not proceed to Source 6"),
+    );
+    assert.ok(
+      checklist.includes("**Source 3 gate:**") &&
+        checklist.includes("before Source 6 or Discord post"),
     );
     assert.ok(
       source6Lead.includes("Prerequisite:") &&
-        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all four terminals complete"),
+        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all five terminals complete"),
     );
   });
 
@@ -890,10 +908,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       body.indexOf("For NO_ROUTE"),
     );
 
-    assert.ok(executionRule.includes("1 → 2 → 3 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 6"));
+    assert.ok(executionRule.includes("1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 3 → 6"));
     assert.ok(body.includes("hermes-run-producthunt.sh"));
     assert.ok(body.includes("hermes-run-x.sh"));
     assert.ok(body.includes("hermes-run-bluesky.sh"));
+    assert.ok(body.includes("hermes-run-perplexity.sh"));
     assert.ok(body.includes("§9 push — DO NOT improvise"));
     assert.ok(body.includes("hand-rolled `node -e`"));
     assert.ok(body.includes("DO NOT post bare URLs or link previews"));
@@ -901,6 +920,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("X / Twitter stdout threading"));
     assert.ok(body.includes("Bluesky stdout threading"));
     assert.ok(body.includes("Sources 9–12 terminal-fire gate"));
+    assert.ok(body.includes("Source 3 terminal-fire gate"));
     assert.ok(outputTemplate.includes("**GitHub** (trending repos)"));
     assert.ok(outputTemplate.includes("**Reddit** (hot posts)"));
     assert.ok(outputTemplate.includes("**Newsletters / RSS**"));
@@ -974,7 +994,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("SKILL.md v1.3.0 documents six sources, digest entity push, keyword candidates push, and awaited Vault context log (Story 61-5, 62-1, 61-4, 52-2)", () => {
     const body = readFileSync(skillPath, "utf8");
-    assert.ok(body.includes("version: 1.4.7"));
+    assert.ok(body.includes("version: 1.5.0"));
     assert.ok(body.includes("**arXiv Preprints**"));
     assert.ok(body.includes("**HackerNews**"));
     assert.ok(body.includes("hermes-run-arxiv.sh"));
