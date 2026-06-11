@@ -606,6 +606,31 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(preDiscord.includes("timeout=30"));
   });
 
+  it("task-prompt documents cross-source dedup before scoring (Story 68-1)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const preDiscord = taskBody.slice(
+      taskBody.indexOf("## Pre-Discord — Build, score, and persist digest push payload"),
+      taskBody.indexOf("## Output contract (post to `#hermes`)"),
+    );
+    const dedupeIdx = preDiscord.indexOf("Dedupe signals before scoring");
+    const scoringIdx = preDiscord.indexOf("Score signals before push");
+    const artifactIdx = preDiscord.indexOf("### Persist digest push artifact");
+
+    assert.ok(preDiscord.includes("dedupe-digest-signals.mjs"));
+    assert.ok(preDiscord.includes("deduped_signals"));
+    assert.ok(preDiscord.includes("digest_push_payload.signals = deduped_signals"));
+    assert.ok(
+      preDiscord.includes("adapters → §9 map → **dedup** → score → artifact → Discord → push"),
+    );
+    assert.ok(dedupeIdx >= 0 && scoringIdx > dedupeIdx);
+    assert.ok(artifactIdx > scoringIdx);
+    assert.ok(preDiscord.includes("dedupe-digest-signals:"));
+
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("dedupe-digest-signals.mjs"));
+    assert.ok(skillBody.includes("Dedupe stdout threading"));
+  });
+
   it("task-prompt documents imperative scoring stdout threading (Story 64-8)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const preDiscord = taskBody.slice(
@@ -627,6 +652,8 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const scoringIdx = preDiscord.indexOf("Score signals before push");
     const artifactIdx = preDiscord.indexOf("### Persist digest push artifact");
     const pushIdx = postPost.indexOf("push-digest-convex.mjs");
+    const dedupeIdx = preDiscord.indexOf("Dedupe signals before scoring");
+    assert.ok(dedupeIdx >= 0 && scoringIdx > dedupeIdx);
     assert.ok(scoringIdx >= 0 && artifactIdx > scoringIdx);
     assert.ok(pushIdx >= 0);
     assert.ok(postPost.includes("keyword candidates terminal (same post-scoring payload)"));
@@ -753,11 +780,13 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       taskBody.indexOf("## Output contract (post to `#hermes`)"),
     );
     const artifactIdx = preDiscord.indexOf("### Persist digest push artifact");
+    const dedupeIdx = preDiscord.indexOf("Dedupe signals before scoring");
     const scoringIdx = preDiscord.indexOf("### Score signals before push");
     const outputIdx = taskBody.indexOf("## Output contract (post to `#hermes`)");
     const digestPushIdx = taskBody.indexOf("## Post-post — Push digest entities to Convex");
 
-    assert.ok(scoringIdx >= 0);
+    assert.ok(dedupeIdx >= 0);
+    assert.ok(scoringIdx > dedupeIdx, "dedupe must precede scoring");
     assert.ok(artifactIdx > scoringIdx, "scoring must precede artifact write");
     assert.ok(outputIdx > artifactIdx, "artifact section must appear before Output contract");
     assert.ok(digestPushIdx > outputIdx);

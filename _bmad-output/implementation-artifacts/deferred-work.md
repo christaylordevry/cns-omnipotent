@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 68-1-cross-source-dedup-engine (2026-06-11)
+
+- Entity match merges distinct stories sharing ≥2 proper nouns within 24h — spec-compliant per AC #1 rule 4 / addendum A4; quality tradeoff deferred.
+- Union-find transitive title clustering can merge A–C when only A–B and B–C exceed Jaccard threshold — inherent to incremental clustering; acceptable for v1.
+
 ## Deferred from: code review of 67-9-fix-hermes-gateway-stale-pid-lock (2026-06-11)
 
 - PID reuse after WSL suspend can fool `kill -0` — accepted limitation; flock/TOCTOU hardening out of scope (36-1 defer).

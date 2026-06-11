@@ -390,11 +390,51 @@ Vault context failure does **not** abort the digest.
 
 After Sources **1–5, 7–10, and 6** complete and `digest_sources` is assembled, build `digest_push_payload` from parsed source outputs (not memory) using the shape and signal mapping in **§9 Post-post — Push digest entities to Convex** below.
 
-**Discord post is forbidden** until **both** the scoring terminal **and** the **Persist digest push artifact** terminal below return. The artifact must capture **post-scoring** `digest_push_payload` (same payload §9 will push later).
+**Discord post is forbidden** until **dedupe**, **scoring**, and the **Persist digest push artifact** terminals return. The artifact must capture **post-dedup, post-scoring** `digest_push_payload` (same payload §9 will push later).
+
+### Dedupe signals before scoring (REQUIRED — Epic 68-1)
+
+After building unscored `digest_push_payload.signals` from the §9 mapping table and **before** the scoring terminal, invoke the dedupe terminal:
+
+```text
+terminal(
+  command="DEDUPE_SCRIPT=<shellQuote(dedupe_script)> DIGEST_SIGNALS_JSON=<shellQuote(JSON.stringify(digest_push_payload.signals))> node \"$DEDUPE_SCRIPT\"",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Where:
+
+```text
+dedupe_script = resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/dedupe-digest-signals.mjs"
+```
+
+Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/dedupe-digest-signals.mjs`
+
+**After the dedupe terminal returns** (mandatory stdout threading — same pattern as scoring):
+
+1. Let `dedupe_stdout` = dedupe terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `deduped_signals = JSON.parse(dedupe_stdout)`.
+3. If `Array.isArray(deduped_signals) && deduped_signals.length > 0`:
+   - `digest_push_payload.signals = deduped_signals` (replace the entire array; do not merge).
+4. Else (empty stdout, invalid JSON, or `[]`):
+   - keep existing unscored `digest_push_payload.signals` (degraded mode passthrough).
+5. Do **not** invoke scoring until step 3 or 4 completes.
+
+The script always exits **0**. Stderr warnings use prefix `dedupe-digest-signals:`.
+
+**Pipeline order (binding):** adapters → §9 map → **dedup** → score → artifact → Discord → push.
+
+**Anti-patterns (must not ship):**
+
+- Dedup inside `pick-signal-notebook.mjs`
+- Dedup after `scoreDigestSignals()` (engagement winner needs pre-score proxy)
+- Dedup only on cap-10 notebook titles
 
 ### Score signals before push (REQUIRED — Epic 64-5)
 
-After building unscored `digest_push_payload.signals` from the §9 mapping table and **before** the artifact write or Discord post, invoke the scoring terminal:
+After dedupe stdout replacement completes and **before** the artifact write or Discord post, invoke the scoring terminal:
 
 ```text
 terminal(
@@ -437,9 +477,9 @@ The script always exits **0**. Stderr warnings use prefix `score-digest-signals:
 
 ### Persist digest push artifact (REQUIRED — before Discord post)
 
-> **REQUIRED — recovery artifact for §9 watchdog.** Non-negotiable even under context compression. Invoke **after** scoring stdout replacement completes (above) and **before** posting the Output contract to `#hermes`. The 07:15 push-digest-watchdog cron replays Convex push from this file when the agent skips §9.
+> **REQUIRED — recovery artifact for §9 watchdog.** Non-negotiable even under context compression. Invoke **after** dedupe and scoring stdout replacement complete (above) and **before** posting the Output contract to `#hermes`. The 07:15 push-digest-watchdog cron replays Convex push from this file when the agent skips §9.
 
-**Precondition:** `digest_push_payload` is **post-scoring** (scoring stdout replacement completed). Use `digest_push_payload.run.date` as `<YYYY-MM-DD>` in the artifact filename (Australia/Sydney from Step 0).
+**Precondition:** `digest_push_payload` is **post-dedup, post-scoring** (dedupe stdout replacement, then scoring stdout replacement completed). Use `digest_push_payload.run.date` as `<YYYY-MM-DD>` in the artifact filename (Australia/Sydney from Step 0).
 
 1. Let `artifact_script` = `resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs"` (fallback only when repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/write-digest-push-artifact.mjs`).
 2. **MUST** invoke the `terminal(...)` block below — no alternative write path.
@@ -686,9 +726,11 @@ Omit `workspaceId`. Push available signals even when some sources failed.
 
 ```text
 build digest_push_payload (unscored signals)
+  → dedupe terminal (Pre-Discord)
+  → capture stdout → digest_push_payload.signals = deduped_signals
   → scoring terminal (Pre-Discord)
   → capture stdout → digest_push_payload.signals = scored_signals
-  → persist digest push artifact terminal (post-scoring payload to ~/.hermes/digest-push-<date>.json)
+  → persist digest push artifact terminal (post-dedup, post-scoring payload to ~/.hermes/digest-push-<date>.json)
   → Discord Output contract post
   → push terminal (DIGEST_PUSH_JSON uses post-scoring payload)
   → keyword candidates terminal (same post-scoring payload)
@@ -797,7 +839,7 @@ Always `exit_code: 0`. Do **not** post Discord warnings for keyword candidate pu
 
 | Tool | Use |
 |------|-----|
-| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `score-digest-signals.mjs` (post-post, before push); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
+| `terminal` | Machine-local date; trend dry-run; NewsAPI; arXiv RSS; HackerNews RSS; `pick-signal-notebook.mjs`; `query-notebook.mjs`; `log-notebook-query.mjs` (post-post, success only); `dedupe-digest-signals.mjs` (Pre-Discord, before scoring); `score-digest-signals.mjs` (Pre-Discord, after dedup); `write-digest-push-artifact.mjs` (Pre-Discord, before Discord post); `push-digest-convex.mjs` (post-post, all runs); `push-keyword-candidates.mjs` (post-post, all runs) |
 | `mcp__perplexity__search` | Deep signal only |
 | Discord reply | Final formatted digest |
 
