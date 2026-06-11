@@ -18,10 +18,10 @@ const RECENT_RUNS_LIMIT = 10;
 const SIGNALS_LIMIT = 100;
 const MIN_SCORED_SIGNALS = 30;
 const MAX_UNSCORED_RATIO = 0.1;
-const PEOPLE_RELEVANCE_THRESHOLD = 0.2;
+export const PEOPLE_RELEVANCE_THRESHOLD = 20;
 
 export const CLI_HELP_TEXT =
-  'Usage: node scripts/validate-epic-68-digest.mjs [--digest-run-id <id> | --latest] [--json] [--x-go | --x-no-go]';
+  'Usage: node scripts/validate-epic-68-digest.mjs [--digest-run-id <id> | --latest] [--json] [--x-go | --x-no-go] [--people-done]';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -146,7 +146,7 @@ export function hasPeopleBoostEvidence(signals) {
         : undefined;
     return (
       typeof personalRelevance === 'number' &&
-      personalRelevance > PEOPLE_RELEVANCE_THRESHOLD &&
+      personalRelevance >= PEOPLE_RELEVANCE_THRESHOLD &&
       typeof authorHandle === 'string' &&
       authorHandle.trim().length > 0
     );
@@ -337,8 +337,8 @@ export function formatChecklistTable(checks) {
  * }}
  */
 export function parseCliArgs(argv) {
-  /** @type {{ digestRunId?: string; latest: boolean; json: boolean; xStatus?: 'go' | 'no-go' }} */
-  const parsed = { latest: false, json: false };
+  /** @type {{ digestRunId?: string; latest: boolean; json: boolean; peopleDone: boolean; xStatus?: 'go' | 'no-go' }} */
+  const parsed = { latest: false, json: false, peopleDone: false };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -346,6 +346,8 @@ export function parseCliArgs(argv) {
       parsed.latest = true;
     } else if (arg === '--json') {
       parsed.json = true;
+    } else if (arg === '--people-done') {
+      parsed.peopleDone = true;
     } else if (arg === '--x-go') {
       parsed.xStatus = 'go';
     } else if (arg === '--x-no-go') {
@@ -416,9 +418,8 @@ export async function runValidateEpic68Digest(opts = {}) {
   const env = opts.env ?? process.env;
   const argv = opts.argv ?? process.argv.slice(2);
   const repoRootPath = opts.repoRootPath ?? repoRoot;
-  const peopleStoriesDone = opts.peopleStoriesDone ?? false;
-
   const cli = parseCliArgs(argv);
+  const peopleStoriesDone = opts.peopleStoriesDone ?? cli.peopleDone;
   const convexEnv = await resolveConvexPushEnv(env);
   if (!convexEnv) {
     throw new Error('CONVEX_URL and CONVEX_DEPLOY_KEY required (trend-ingest.env)');

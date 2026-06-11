@@ -85,7 +85,7 @@ describe('Story 68-8 validate-epic-68-digest', () => {
     assert.equal(
       hasPeopleBoostEvidence([
         {
-          scores: { personalRelevance: 0.5 },
+          scores: { personalRelevance: 45 },
           sourceMetadata: { authorHandle: '@alice' },
         },
       ]),
@@ -94,11 +94,31 @@ describe('Story 68-8 validate-epic-68-digest', () => {
     assert.equal(
       hasPeopleBoostEvidence([
         {
-          scores: { personalRelevance: 0.1 },
+          scores: { personalRelevance: 10 },
           sourceMetadata: { authorHandle: '@alice' },
         },
       ]),
       false,
+    );
+    assert.equal(
+      hasPeopleBoostEvidence([
+        {
+          scores: { personalRelevance: 20 },
+          sourceMetadata: { authorHandle: '@alice' },
+        },
+      ]),
+      true,
+      'handle-only boost at threshold should pass C6',
+    );
+    assert.equal(
+      hasPeopleBoostEvidence([
+        {
+          scores: { personalRelevance: 19 },
+          sourceMetadata: { authorHandle: '@alice' },
+        },
+      ]),
+      false,
+      'score below threshold should not pass C6',
     );
   });
 
@@ -317,10 +337,11 @@ describe('Story 68-8 validate-epic-68-digest', () => {
   });
 
   it('parseCliArgs parses flags', () => {
-    const parsed = parseCliArgs(['--latest', '--json', '--x-no-go']);
+    const parsed = parseCliArgs(['--latest', '--json', '--x-no-go', '--people-done']);
     assert.equal(parsed.latest, true);
     assert.equal(parsed.json, true);
     assert.equal(parsed.xStatus, 'no-go');
+    assert.equal(parsed.peopleDone, true);
   });
 
   it('parseCliArgs rejects both --x-go and --x-no-go regardless of order', () => {

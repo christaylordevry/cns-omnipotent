@@ -23,6 +23,11 @@ export const NEXUS_PEOPLE_MAX_PEOPLE = 30;
 export const NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM = 3;
 export const DEFAULT_PERSON_WEIGHT = 2.5;
 
+/** Epic 68 FR-5 — personalRelevance v3 people watchlist bonuses (addendum A2). */
+export const PEOPLE_HANDLE_MATCH_BONUS = 20;
+export const PEOPLE_NAME_MATCH_BONUS = 10;
+export const PEOPLE_NAME_F1_THRESHOLD = 30;
+
 const SOURCE_PRIOR = {
   newsapi: 15,
   hackernews: 10,
@@ -68,6 +73,7 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  *     stars?: number,
  *     forks?: number,
  *     upvotes?: number,
+ *     authorHandle?: string,
  *   },
  * }} DigestSignal
  * @typedef {{
@@ -1174,6 +1180,63 @@ export function scoreRelevance(signal, ctx) {
 }
 
 /**
+ * @param {NexusPerson[]} nexusPeople
+ * @returns {Set<string>}
+ */
+export function collectNormalizedWatchHandles(nexusPeople) {
+  /** @type {Set<string>} */
+  const handles = new Set();
+  for (const person of nexusPeople) {
+    for (const platformHandles of Object.values(person.handles ?? {})) {
+      for (const handle of platformHandles) {
+        const normalized = normalizePeopleHandle(handle);
+        if (normalized.length > 0) {
+          handles.add(normalized);
+        }
+      }
+    }
+  }
+  return handles;
+}
+
+/**
+ * @param {DigestSignal} signal
+ * @param {NexusPerson[]} nexusPeople
+ * @returns {{ handleBonus: number, nameBonus: number }}
+ */
+export function scorePeopleBonuses(signal, nexusPeople) {
+  if (!Array.isArray(nexusPeople) || nexusPeople.length === 0) {
+    return { handleBonus: 0, nameBonus: 0 };
+  }
+
+  const watchHandles = collectNormalizedWatchHandles(nexusPeople);
+  let handleBonus = 0;
+  const rawHandle = signal.sourceMetadata?.authorHandle;
+  if (typeof rawHandle === 'string' && rawHandle.trim()) {
+    const normalized = normalizePeopleHandle(rawHandle);
+    if (normalized.length > 0 && watchHandles.has(normalized)) {
+      handleBonus = PEOPLE_HANDLE_MATCH_BONUS;
+    }
+  }
+
+  let nameBonus = 0;
+  const signalTokens = tokenizeSignalText(signal.title, signal.summary);
+  let bestNameF1 = 0;
+  for (const person of nexusPeople) {
+    const nameTokens = tokenizeForScoring(person.name ?? '');
+    const nameF1 = f1Score(signalTokens, nameTokens);
+    if (nameF1 > bestNameF1) {
+      bestNameF1 = nameF1;
+    }
+  }
+  if (bestNameF1 >= PEOPLE_NAME_F1_THRESHOLD) {
+    nameBonus = PEOPLE_NAME_MATCH_BONUS;
+  }
+
+  return { handleBonus, nameBonus };
+}
+
+/**
  * @param {DigestSignal} signal
  * @param {ScoringContext} ctx
  * @returns {number}
@@ -1187,7 +1250,10 @@ export function scorePersonalRelevance(signal, ctx) {
   const goalTier = weightedPersonalF1(signalTokens, ctx.goalWeightedTokens ?? []);
   const combined = Math.max(baseTier, goalTier);
   const epicBonus = ctx.epicNumericTokens.some((token) => signalTokens.includes(token)) ? 15 : 0;
-  return clamp(combined + epicBonus, 0, 100);
+  const nexusPeople = ctx.nexusPeople ?? [];
+  const { handleBonus, nameBonus } =
+    nexusPeople.length > 0 ? scorePeopleBonuses(signal, nexusPeople) : { handleBonus: 0, nameBonus: 0 };
+  return clamp(combined + epicBonus + handleBonus + nameBonus, 0, 100);
 }
 
 /**

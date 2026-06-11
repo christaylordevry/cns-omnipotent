@@ -29,8 +29,12 @@ import {
   NEXUS_GOALS_MAX_PHRASES,
   NEXUS_PEOPLE_MAX_HANDLES_PER_PLATFORM,
   NEXUS_PEOPLE_MAX_PEOPLE,
+  PEOPLE_HANDLE_MATCH_BONUS,
+  PEOPLE_NAME_F1_THRESHOLD,
+  PEOPLE_NAME_MATCH_BONUS,
   normalizeEngagement,
   normalizePeopleHandle,
+  scorePeopleBonuses,
   parseNexusPeopleYaml,
   overlapRatio,
   parseDevelopmentStatus,
@@ -1338,7 +1342,7 @@ people:
     assert.equal(ctx.nexusPeople[0].name, 'Andrej Karpathy');
   });
 
-  it('scorePersonalRelevance is unchanged when nexusPeople is populated (no bonus in 68-2)', async () => {
+  it('scorePersonalRelevance applies handle bonus when nexusPeople is populated (68-3)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'nexus-people-antidrift-'));
     const operatorHome = join(root, 'operator');
     const hermesDir = join(operatorHome, '.hermes');
@@ -1359,8 +1363,164 @@ people:
 
     const withPeople = scorePersonalRelevance(signal, ctxWithPeople);
     const withoutPeople = scorePersonalRelevance(signal, ctxWithoutPeople);
-    assert.equal(withPeople, withoutPeople);
+    assert.ok(withPeople - withoutPeople >= PEOPLE_HANDLE_MATCH_BONUS);
     assert.ok(ctxWithPeople.nexusPeople.length > 0);
+  });
+});
+
+describe('personalRelevance v3 people bonus', () => {
+  const karpathyPeople = [
+    {
+      name: 'Andrej Karpathy',
+      handles: { twitter: ['karpathy'], bluesky: ['karpathy.bsky.social'] },
+      tags: [],
+      weight: 2.5,
+    },
+  ];
+  const darioPeople = [
+    {
+      name: 'Dario Amodei',
+      handles: { twitter: ['darioamodei'] },
+      tags: [],
+      weight: 2.5,
+    },
+  ];
+  const emptyCtx = baseCtx({ personalTokens: [], goalWeightedTokens: [], epicNumericTokens: [] });
+
+  it('handle match Karpathy yields at least +20 vs empty nexusPeople', () => {
+    const signal = {
+      title: 'New training run results',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+    const withPeople = baseCtx({ ...emptyCtx, nexusPeople: karpathyPeople });
+    const withoutPeople = baseCtx({ ...emptyCtx, nexusPeople: [] });
+    const delta =
+      scorePersonalRelevance(signal, withPeople) - scorePersonalRelevance(signal, withoutPeople);
+    assert.ok(delta >= PEOPLE_HANDLE_MATCH_BONUS, `expected delta >= ${PEOPLE_HANDLE_MATCH_BONUS}, got ${delta}`);
+  });
+
+  it('handle normalization @Karpathy matches karpathy', () => {
+    const signalAt = {
+      title: 'Training update',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: '@Karpathy' },
+    };
+    const signalPlain = {
+      title: 'Training update',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: 'karpathy' },
+    };
+    const ctx = baseCtx({ ...emptyCtx, nexusPeople: karpathyPeople });
+    assert.equal(scorePersonalRelevance(signalAt, ctx), scorePersonalRelevance(signalPlain, ctx));
+  });
+
+  it('bluesky handle karpathy.bsky.social earns +20 when configured', () => {
+    const signal = {
+      title: 'Post',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+    const bonuses = scorePeopleBonuses(signal, karpathyPeople);
+    assert.equal(bonuses.handleBonus, PEOPLE_HANDLE_MATCH_BONUS);
+    assert.equal(bonuses.nameBonus, 0);
+  });
+
+  it('name match Dario Amodei without handle earns at least +10', () => {
+    const signal = {
+      title: 'Dario Amodei discusses AI safety roadmap',
+      sourceType: 'newsapi',
+    };
+    const withPeople = baseCtx({ ...emptyCtx, nexusPeople: darioPeople });
+    const withoutPeople = baseCtx({ ...emptyCtx, nexusPeople: [] });
+    const delta =
+      scorePersonalRelevance(signal, withPeople) - scorePersonalRelevance(signal, withoutPeople);
+    assert.ok(delta >= PEOPLE_NAME_MATCH_BONUS, `expected delta >= ${PEOPLE_NAME_MATCH_BONUS}, got ${delta}`);
+  });
+
+  it('name F1 below threshold yields no name bonus', () => {
+    const signal = {
+      title: 'Unrelated market headline about quarterly earnings',
+      sourceType: 'newsapi',
+    };
+    const bonuses = scorePeopleBonuses(signal, darioPeople);
+    assert.equal(bonuses.nameBonus, 0);
+  });
+
+  it('both handle and name bonuses stack to +30', () => {
+    const signal = {
+      title: 'Dario Amodei discusses AI safety roadmap',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: 'darioamodei' },
+    };
+    const bonuses = scorePeopleBonuses(signal, darioPeople);
+    assert.equal(bonuses.handleBonus, PEOPLE_HANDLE_MATCH_BONUS);
+    assert.equal(bonuses.nameBonus, PEOPLE_NAME_MATCH_BONUS);
+    assert.equal(bonuses.handleBonus + bonuses.nameBonus, 30);
+  });
+
+  it('stacks with goal-weighted personal relevance', () => {
+    const signal = {
+      title: 'Omnipotent weekly update',
+      sourceType: 'bluesky',
+      sourceMetadata: { authorHandle: 'karpathy.bsky.social' },
+    };
+    const withGoalsOnly = baseCtx({
+      personalTokens: [],
+      goalWeightedTokens: [{ token: 'omnipotent', weight: 2 }, { token: 'vault', weight: 2 }],
+      epicNumericTokens: [],
+      nexusPeople: [],
+    });
+    const withGoalsAndPeople = baseCtx({
+      ...withGoalsOnly,
+      nexusPeople: karpathyPeople,
+    });
+    const withoutGoals = baseCtx({
+      personalTokens: [],
+      goalWeightedTokens: [],
+      epicNumericTokens: [],
+      nexusPeople: [],
+    });
+    const goalsDelta = scorePersonalRelevance(signal, withGoalsOnly) - scorePersonalRelevance(signal, withoutGoals);
+    const peopleDelta =
+      scorePersonalRelevance(signal, withGoalsAndPeople) - scorePersonalRelevance(signal, withGoalsOnly);
+    assert.ok(goalsDelta > 0);
+    assert.ok(peopleDelta >= PEOPLE_HANDLE_MATCH_BONUS);
+    assert.equal(scorePeopleBonuses(signal, karpathyPeople).handleBonus, PEOPLE_HANDLE_MATCH_BONUS);
+  });
+
+  it('empty nexusPeople yields zero people bonuses', () => {
+    const signal = {
+      title: 'Dario Amodei discusses AI safety',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: 'darioamodei' },
+    };
+    const bonuses = scorePeopleBonuses(signal, []);
+    assert.equal(bonuses.handleBonus, 0);
+    assert.equal(bonuses.nameBonus, 0);
+  });
+
+  it('clamp at 100 caps high base plus people bonuses', () => {
+    const signal = {
+      title: 'Omnipotent vault scoring digest framework omnipotent vault',
+      sourceType: 'twitter',
+      sourceMetadata: { authorHandle: 'karpathy' },
+    };
+    const ctx = baseCtx({
+      personalTokens: ['omnipotent', 'vault', 'scoring', 'digest', 'framework'],
+      goalWeightedTokens: [],
+      epicNumericTokens: ['68'],
+      nexusPeople: karpathyPeople,
+    });
+    const score = scorePersonalRelevance(signal, ctx);
+    assert.ok(score <= 100);
+    assert.equal(score, 100);
+  });
+
+  it('exports people bonus constants', () => {
+    assert.equal(PEOPLE_HANDLE_MATCH_BONUS, 20);
+    assert.equal(PEOPLE_NAME_MATCH_BONUS, 10);
+    assert.equal(PEOPLE_NAME_F1_THRESHOLD, 30);
   });
 });
 

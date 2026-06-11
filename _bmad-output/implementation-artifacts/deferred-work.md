@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 68-3-personal-relevance-v3-people-bonus (2026-06-11)
+
+- `collectNormalizedWatchHandles` rebuilt per signal in `scorePeopleBonuses` — 30-person cap makes impact negligible; cache on context if watchlist grows.
+
 ## Deferred from: code review of 68-2-people-watchlist-loader (2026-06-11)
 
 - Hyphenated platform names (e.g. `x-twitter`) not supported by `\w+` regex in line-safe parser — line-parser limitation; not in A2 schema.
