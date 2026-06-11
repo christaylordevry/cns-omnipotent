@@ -18,6 +18,7 @@ import {
 } from './hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 import { readDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
+import { postDigestToDiscord } from './hermes-skill-examples/morning-digest/scripts/post-digest-discord.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
 import {
   formatWatchdogLogLine,
@@ -247,6 +248,14 @@ async function scoreWriteAndPush(payload, ranAt, env, log, successAction, adapte
 
   try {
     await pushPayload(payload, env);
+    const discordResult = await postDigestToDiscord(payload, env);
+    if (discordResult.ok) {
+      const detail =
+        discordResult.messageIds.length > 0 ? discordResult.messageIds.join(',') : undefined;
+      await log('discord-post-ok', 0, detail);
+    } else {
+      await log('discord-post-failed', 0, discordResult.error);
+    }
     await log(successAction, 0);
     return { action: successAction, exitCode: 0 };
   } catch (err) {
