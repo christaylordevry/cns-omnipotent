@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-11T16:05:00+10:00
+# last_updated: 2026-06-11T18:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-11T12:00:00+00:00"
+last_updated: "2026-06-11T20:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -492,6 +492,8 @@ development_status:
   67-8-fix-morning-digest-cron-gateway-check: done
   67-9-fix-hermes-gateway-stale-pid-lock: done
   67-10-push-watchdog-convex-push-failure-safe: done
+  # Ops hotfix — 2026-06-11: cron minimal PATH — hermes/node not found under WSL cron
+  67-11-fix-cron-environment-path: review
   epic-67-retrospective: optional
 
   # Epic 68 — Source Expansion: X/Twitter, Bluesky, Cross-Source Dedup (prd 2026-06-11)
@@ -516,5 +518,5 @@ development_status:
   69-1-inspector-dedup-merge-provenance: review
   69-2-people-match-indicator: done
   69-3-source-health-panel: ready-for-dev
-  69-5-investigation-workspace-screen-10: backlog
+  69-5-investigation-workspace-screen-10: ready-for-dev
   epic-69-retrospective: optional

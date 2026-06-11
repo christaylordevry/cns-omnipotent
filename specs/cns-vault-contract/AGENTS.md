@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.38 | Last updated: 2026-06-10
+> Version: 2.1.39 | Last updated: 2026-06-11
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -258,23 +258,31 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ## 8. Current Focus
 
-# Section 8 Synthesis
-The session-close process has been successfully completed under the real mode with all steps marked as 'ok'.
+### Project Status
 
-## Key Highlights:
-1. **Deterministic Phase Complete**: The initial phase has been executed without errors, setting the stage for downstream processes.
-2. **Vault Export**: The CNS Vault has been successfully exported to the designated file path with a complete and verified data set.
-3. **Tests Passing**: All tests have cleared successfully, ensuring code stability and robustness with 642 passing tests.
-4. **Daily Rhythm Update**: Auto blocks for daily rhythm have been updated, indicating successful routine maintenance and updates.
-5. **Memory Update**: The memory file has been updated with recent session data, securing continuity in data retention.
+- Epic 54: in progress
+- Epic 55: in progress
+- Epic 56: in progress
+- Epic 60: in progress
+- Epic 61: in progress
+- Epic 64: in progress
+- Epic 65: in progress
+- Epic 66: in progress
+- Epic 67: in progress
+- Epic 68: in progress
+- Epic 69: in progress — 69-1 review, 69-3 ready-for-dev, 69-5 ready-for-dev
 
-## NotebookLM Fan-out
-NotebookLM targets have been identified and the appropriate export path has been set for integration.
+### Current Priorities
 
-- IDs: 981466f0-de1c-4551-93a9-f3bc2a24b184, dc6abf1a-99d2-428d-af63-107591ff2c2e, f037c741-f7e1-4a90-880f-d2d38986767b
+1. Complete in-progress epics swiftly.
+2. Review and push updates for ready-for-dev stories.
+3. Maintain code and process stability through tests.
 
-## Convex Push Status
-Successfully pushed to Convex server with status 'ok', marking completion of data synchronization tasks.
+### Recent Session Context
+
+- Story 69.5: Investigation Workspace — Screen 10 — ready-for-dev
+- Story 69.3: Source Health Panel — ready for dev, under review
+- Story 69.2: People Match Indicator — successfully concluded
 
 ## 9. Agent Behavior Guidelines
 
@@ -357,6 +365,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-11 | 2.1.39 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-10 | 2.1.38 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-09 | 2.1.37 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-09 | 2.1.36 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |

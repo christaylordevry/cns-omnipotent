@@ -3,6 +3,10 @@
 # Invokes Hermes skill cron job via `hermes cron run` + `tick` — not Discord text trigger.
 set -euo pipefail
 
+NODE_BIN="$(ls -d "$HOME/.nvm/versions/node/"*/bin 2>/dev/null | sort -V | tail -1)"
+export PATH="${NODE_BIN:-$HOME/.nvm/versions/node/v24.14.0/bin}:$HOME/.local/bin:${PATH:-}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOB_ID_FILE="${MORNING_DIGEST_SKILL_CRON_JOB_ID_FILE:-$HOME/.hermes/morning-digest-skill-cron-job-id}"
 
