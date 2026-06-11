@@ -29,5 +29,7 @@ fi
 echo "Installed Hermes skill to: $DEST_DIR"
 echo "Next: bind morning-digest in #hermes via ~/.hermes/config.yaml (see $DEST_DIR/references/config-snippet.md)."
 echo "Cron: bash scripts/install-morning-digest-cron.sh (default 07:00 Australia/Sydney; see $DEST_DIR/references/cron-snippet.md)."
+echo "Convex completion hook: bash scripts/install-morning-digest-convex-completion-hook.sh (Story 68-10; restart gateway after install)."
+bash "$REPO_ROOT/scripts/install-morning-digest-convex-completion-hook.sh"
 echo "Migration: comment out legacy 26-7 WSL crontab line in Operator Guide §15.2 — keep scripts as fallback."
 echo "NotebookLM: Vault context requires notebook-query scripts in repo (51-1) and nlm on PATH."

@@ -506,4 +506,5 @@ development_status:
   68-7-x-integration-env-docs: done
   68-8-live-digest-validation: in-progress
   68-9-morning-digest-pipeline-integration-fixes: done
+  68-10-digest-convex-completion-gate: done
   epic-68-retrospective: optional

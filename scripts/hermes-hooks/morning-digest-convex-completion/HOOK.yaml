@@ -1,0 +1,4 @@
+name: morning-digest-convex-completion
+description: Backfill Convex digest push when morning-digest agent ends without §9 (Story 68-10)
+events:
+  - agent:end

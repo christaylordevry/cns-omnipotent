@@ -1,0 +1,297 @@
+#!/usr/bin/env node
+/**
+ * Deterministic Convex completion for morning-digest (Story 68-10).
+ * 1) Replay artifact via push-digest-watchdog when present.
+ * 2) Otherwise re-fetch adapters, build payload, dedupe, score, artifact, push.
+ */
+
+import { execFile } from 'node:child_process';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
+import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
+import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
+import {
+  formatWatchdogLogLine,
+  resolveWatchdogLogPath,
+  runPushDigestWatchdog,
+} from './push-digest-watchdog.mjs';
+
+const execFileAsync = promisify(execFile);
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const scriptsDir = join(repoRoot, 'scripts/hermes-skill-examples/morning-digest/scripts');
+const sessionCloseDir = join(repoRoot, 'scripts/session-close');
+
+/**
+ * @param {string} envTz
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export function formatSydneyDate(envTz, now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: envTz?.trim() || 'Australia/Sydney',
+  }).format(now);
+}
+
+/**
+ * @param {string} stdout
+ * @returns {unknown | null}
+ */
+export function parseAdapterStdout(stdout) {
+  const trimmed = String(stdout ?? '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string} wrapperName
+ * @param {Record<string, string | undefined>} env
+ * @param {number} timeoutMs
+ * @returns {Promise<string>}
+ */
+async function runWrapper(wrapperName, env, timeoutMs) {
+  const wrapperPath = join(sessionCloseDir, wrapperName);
+  const { stdout } = await execFileAsync('bash', [wrapperPath], {
+    cwd: repoRoot,
+    env: { ...process.env, ...env },
+    timeout: timeoutMs,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return stdout;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<{
+ *   trends?: unknown;
+ *   newsapi?: unknown;
+ *   arxiv?: unknown;
+ *   hackernews?: unknown;
+ *   github?: unknown;
+ *   reddit?: unknown;
+ *   rss?: unknown;
+ *   producthunt?: unknown;
+ *   twitter?: unknown;
+ *   bluesky?: unknown;
+ * }>}
+ */
+export async function collectAdapterOutputs(env) {
+  const mergedEnv = await mergeTrendIngestEnv(env);
+  const results = {};
+
+  const tasks = [
+    ['trends', () => runWrapper('hermes-run-trend-ingest.sh', mergedEnv, 60_000)],
+    ['newsapi', () => runWrapper('hermes-run-newsapi.sh', mergedEnv, 45_000)],
+    ['arxiv', () => runWrapper('hermes-run-arxiv.sh', mergedEnv, 45_000)],
+    ['hackernews', () => runWrapper('hermes-run-hn.sh', mergedEnv, 45_000)],
+    ['github', () => runWrapper('hermes-run-github.sh', mergedEnv, 45_000)],
+    ['reddit', () => runWrapper('hermes-run-reddit.sh', mergedEnv, 45_000)],
+    ['rss', () => runWrapper('hermes-run-rss.sh', mergedEnv, 45_000)],
+    ['producthunt', () => runWrapper('hermes-run-producthunt.sh', mergedEnv, 45_000)],
+    ['twitter', () => runWrapper('hermes-run-x.sh', mergedEnv, 45_000)],
+    ['bluesky', () => runWrapper('hermes-run-bluesky.sh', mergedEnv, 45_000)],
+  ];
+
+  for (const [key, runner] of tasks) {
+    try {
+      const stdout = await runner();
+      const parsed = parseAdapterStdout(stdout);
+      if (parsed && typeof parsed === 'object') {
+        results[key] = parsed;
+      }
+    } catch {
+      // Adapter failures are non-fatal — continue with partial sources.
+    }
+  }
+
+  return results;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} signals
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+async function dedupeSignals(signals, env) {
+  const dedupeScript = join(scriptsDir, 'dedupe-digest-signals.mjs');
+  const { stdout } = await execFileAsync('node', [dedupeScript], {
+    cwd: repoRoot,
+    env: { ...process.env, ...env, DIGEST_SIGNALS_JSON: JSON.stringify(signals) },
+    timeout: 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const parsed = parseAdapterStdout(stdout);
+  return Array.isArray(parsed) ? parsed : signals;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} signals
+ * @param {number} ranAt
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+async function scoreSignals(signals, ranAt, env) {
+  const scoreScript = join(scriptsDir, 'score-digest-signals.mjs');
+  const { stdout } = await execFileAsync('node', [scoreScript], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      ...env,
+      DIGEST_SIGNALS_JSON: JSON.stringify(signals),
+      DIGEST_RUN_AT: String(ranAt),
+    },
+    timeout: 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const parsed = parseAdapterStdout(stdout);
+  return Array.isArray(parsed) ? parsed : signals;
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<void>}
+ */
+async function pushPayload(payload, env) {
+  const digestPushJson = JSON.stringify(payload);
+  const pushScript = join(scriptsDir, 'push-digest-convex.mjs');
+  const candidatesScript = join(scriptsDir, 'push-keyword-candidates.mjs');
+  const childEnv = { ...process.env, ...env, DIGEST_PUSH_JSON: digestPushJson };
+
+  await execFileAsync('node', [pushScript], { cwd: repoRoot, env: childEnv, timeout: 45_000 });
+  await execFileAsync('node', [candidatesScript], { cwd: repoRoot, env: childEnv, timeout: 45_000 });
+}
+
+/**
+ * @param {string} logPath
+ * @param {string} line
+ */
+async function appendLog(logPath, line) {
+  await mkdir(dirname(logPath), { recursive: true });
+  await appendFile(logPath, `${line}\n`, 'utf8');
+}
+
+/**
+ * @param {{
+ *   env?: Record<string, string | undefined>;
+ *   todayDate?: string;
+ *   collectFn?: typeof collectAdapterOutputs;
+ *   watchdogFn?: typeof runPushDigestWatchdog;
+ * }} [opts]
+ * @returns {Promise<{ action: string; exitCode: number }>}
+ */
+export async function runDigestConvexCompletion(opts = {}) {
+  const env = opts.env ?? process.env;
+  const todayDate =
+    opts.todayDate ?? formatSydneyDate(env.CRON_TZ ?? env.TZ ?? 'Australia/Sydney');
+  const operatorHome = await resolveOperatorHome(env);
+  const logPath = resolveWatchdogLogPath(operatorHome);
+  const log = async (action, exitCode, detail) => {
+    await appendLog(
+      logPath,
+      formatWatchdogLogLine(action, { date: todayDate, exit: exitCode, detail }),
+    );
+  };
+
+  const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
+  const watchdogResult = await watchdogFn({ env, todayDate });
+  if (watchdogResult.action === 'skipped-already-pushed' || watchdogResult.action === 'recovered-push') {
+    return watchdogResult;
+  }
+
+  if (watchdogResult.action !== 'skipped-no-artifact') {
+    return watchdogResult;
+  }
+
+  const collectFn = opts.collectFn ?? collectAdapterOutputs;
+  const ranAt = Date.now();
+  const adapterOutputs = await collectFn(env);
+
+  const trendsPayload = /** @type {{ events?: Array<{ keyword?: string; normalizedValue?: number }> }} */ (
+    adapterOutputs.trends ?? {}
+  );
+  const topTrend = trendsPayload.events?.[0]?.keyword;
+
+  const payload = buildDigestPushPayload({
+    date: todayDate,
+    ranAt,
+    trends: trendsPayload,
+    newsapi: /** @type {never} */ (adapterOutputs.newsapi ?? {}),
+    arxiv: /** @type {never} */ (adapterOutputs.arxiv ?? {}),
+    hackernews: /** @type {never} */ (adapterOutputs.hackernews ?? {}),
+    github: /** @type {never} */ (adapterOutputs.github ?? {}),
+    reddit: /** @type {never} */ (adapterOutputs.reddit ?? {}),
+    rss: /** @type {never} */ (adapterOutputs.rss ?? {}),
+    producthunt: /** @type {never} */ (adapterOutputs.producthunt ?? {}),
+    twitter: /** @type {never} */ (adapterOutputs.twitter ?? {}),
+    bluesky: /** @type {never} */ (adapterOutputs.bluesky ?? {}),
+    runMeta: {
+      topTrend: topTrend ? String(topTrend) : undefined,
+      focusKeyword: topTrend ? String(topTrend) : undefined,
+    },
+  });
+
+  if (!Array.isArray(payload.signals) || payload.signals.length === 0) {
+    await log('completion-no-signals', 0, 'adapter-refetch-empty');
+    return { action: 'completion-no-signals', exitCode: 0 };
+  }
+
+  let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
+  try {
+    signals = await dedupeSignals(signals, env);
+    payload.signals = signals;
+    signals = await scoreSignals(signals, ranAt, env);
+    payload.signals = signals;
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'pipeline-error';
+    await log('completion-pipeline-failed', 0, detail);
+    return { action: 'completion-pipeline-failed', exitCode: 0 };
+  }
+
+  const writeResult = await writeDigestPushArtifact({
+    ...env,
+    DIGEST_PUSH_JSON: JSON.stringify(payload),
+  });
+  if (writeResult.status !== 'ok') {
+    await log('completion-artifact-failed', 0, writeResult.reason);
+    return { action: 'completion-artifact-failed', exitCode: 0 };
+  }
+
+  try {
+    await pushPayload(payload, env);
+    await log('completion-backfill-push', 0);
+    return { action: 'completion-backfill-push', exitCode: 0 };
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'push-error';
+    await log('completion-backfill-push-failed', 0, detail);
+    return { action: 'completion-backfill-push-failed', exitCode: 0 };
+  }
+}
+
+async function main() {
+  await runDigestConvexCompletion();
+  process.exit(0);
+}
+
+const isMain =
+  import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}` ||
+  process.argv[1]?.endsWith('run-digest-convex-completion.mjs');
+
+if (isMain) {
+  main().catch(() => process.exit(0));
+}

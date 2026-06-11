@@ -14,4 +14,4 @@ if [[ -f "$REPO_ROOT/.env.live-chain" ]]; then
   set +a
 fi
 
-exec node "$REPO_ROOT/scripts/push-digest-watchdog.mjs"
+exec node "$REPO_ROOT/scripts/run-digest-convex-completion.mjs"

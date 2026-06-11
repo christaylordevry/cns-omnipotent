@@ -282,6 +282,10 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(installBody.includes('grep -v "$WATCHDOG_CRON_TAG"'));
     assert.ok(installBody.includes("0 7 * * *"));
     assert.ok(installBody.includes("15 7 * * *"));
+    assert.ok(installBody.includes("0 13 * * *"));
+    assert.ok(installBody.includes("30 18 * * *"));
+    assert.ok(installBody.includes("cns-push-digest-watchdog-afternoon"));
+    assert.ok(installBody.includes("cns-push-digest-watchdog-evening"));
     assert.ok(installBody.includes("CRON_TZ=Australia/Sydney"));
     assert.ok(installBody.includes("MORNING_DIGEST_CRON"));
     assert.ok(installBody.includes("run-push-digest-watchdog-cron.sh"));
