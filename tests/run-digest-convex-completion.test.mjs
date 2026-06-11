@@ -208,6 +208,63 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.ok((ylecun.scores?.personalRelevance ?? 0) >= 20);
   });
 
+  it('force-rescore applies people bonus when HOME is Hermes profile-isolated', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-hermes-home-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'nexus-people.yaml'),
+      [
+        'version: 1',
+        'people:',
+        '  - name: "Ethan Mollick"',
+        '    handles:',
+        '      twitter: [emollick]',
+        '    tags: [ai, education]',
+        '    weight: 2.5',
+        '',
+      ].join('\n'),
+    );
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: { date: '2026-06-11', ranAt: 1, status: 'published' },
+        signals: [
+          {
+            sourceType: 'twitter',
+            title: 'AI in education',
+            url: 'https://x.com/emollick/status/1',
+            sourceMetadata: { authorHandle: 'emollick', likes: 5 },
+            scores: { personalRelevance: 0, momentum: 0, novelty: 0, relevance: 0, urgency: 0 },
+          },
+        ],
+      }),
+    );
+
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: join(operatorHome, '.hermes', 'home'),
+        HERMES_HOME: join(operatorHome, '.hermes'),
+        USER: 'christ',
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      forceRescore: true,
+      watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
+      collectFn: async () => {
+        throw new Error('collect should not run when artifact rescore succeeds');
+      },
+    });
+
+    assert.equal(result.action, 'completion-force-rescore-push');
+    const updated = JSON.parse(await readFile(join(hermesDir, 'digest-push-2026-06-11.json'), 'utf8'));
+    const emollick = updated.signals.find((row) => row.sourceMetadata?.authorHandle === 'emollick');
+    assert.ok(emollick);
+    assert.ok((emollick.scores?.personalRelevance ?? 0) >= 20);
+  });
+
   it('persists errors_by_source on zero-signals runs when adapters fail', async () => {
     const operatorHome = await mkdtemp(join(tmpdir(), 'completion-no-signals-'));
     const result = await runDigestConvexCompletion({

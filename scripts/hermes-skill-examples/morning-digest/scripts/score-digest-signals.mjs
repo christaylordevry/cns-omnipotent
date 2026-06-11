@@ -591,15 +591,18 @@ function parseInlineTagArray(raw) {
   if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
     return null;
   }
-  /** @type {string[]} */
-  const tags = [];
-  for (const match of trimmed.slice(1, -1).matchAll(/"([^"]*)"|'([^']*)'/g)) {
-    const tag = (match[1] ?? match[2] ?? '').trim();
-    if (tag) {
-      tags.push(tag);
-    }
+  const inner = trimmed.slice(1, -1).trim();
+  if (!inner) {
+    return [];
   }
-  return tags;
+  return inner
+    .split(',')
+    .map((part) => {
+      const token = part.trim();
+      const quoted = token.match(/^['"](.+)['"]$/);
+      return quoted ? quoted[1].trim() : token;
+    })
+    .filter((part) => part.length > 0);
 }
 
 /**
@@ -832,9 +835,21 @@ export function parseNexusPeopleYaml(yaml) {
         malformed = true;
         continue;
       }
-      const value = platformScalarMatch[2].trim().replace(/^['"]|['"]$/g, '');
+      const rawValue = platformScalarMatch[2].trim();
       currentPlatform = null;
-      addHandle(platform, value);
+      if (rawValue.startsWith('[') && rawValue.endsWith(']')) {
+        const parsedHandles = parseInlineTagArray(rawValue);
+        if (parsedHandles === null) {
+          malformed = true;
+        } else {
+          for (const handle of parsedHandles) {
+            addHandle(platform, handle);
+          }
+        }
+      } else {
+        const value = rawValue.replace(/^['"]|['"]$/g, '');
+        addHandle(platform, value);
+      }
       continue;
     }
 
@@ -871,7 +886,7 @@ export async function loadNexusPeople(operatorHome) {
     const raw = await readFile(peoplePath, 'utf8');
     const parsed = parseNexusPeopleYaml(raw);
 
-    if (parsed.malformed) {
+    if (parsed.malformed && parsed.people.length === 0) {
       return {
         people: [],
         diagnostic: 'score-digest-signals: warning — malformed nexus-people.yaml',
@@ -885,7 +900,17 @@ export async function loadNexusPeople(operatorHome) {
           diagnostic: `score-digest-signals: warning — unsupported nexus-people.yaml version ${parsed.version}`,
         };
       }
-      return { people: [] };
+      if (parsed.people.length === 0) {
+        return { people: [] };
+      }
+      let salvagePeople = parsed.people;
+      if (salvagePeople.length > NEXUS_PEOPLE_MAX_PEOPLE) {
+        salvagePeople = salvagePeople.slice(0, NEXUS_PEOPLE_MAX_PEOPLE);
+      }
+      return {
+        people: salvagePeople,
+        diagnostic: 'score-digest-signals: warning — malformed nexus-people.yaml (using valid entries)',
+      };
     }
 
     let people = parsed.people;
@@ -894,6 +919,13 @@ export async function loadNexusPeople(operatorHome) {
       return {
         people,
         diagnostic: `score-digest-signals: warning — nexus-people.yaml truncated to ${NEXUS_PEOPLE_MAX_PEOPLE} people`,
+      };
+    }
+
+    if (parsed.malformed) {
+      return {
+        people,
+        diagnostic: 'score-digest-signals: warning — malformed nexus-people.yaml (using valid entries)',
       };
     }
 

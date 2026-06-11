@@ -1179,6 +1179,23 @@ people:
     assert.equal(parsed.people[0].handles.tags, undefined);
   });
 
+  it('parseNexusPeopleYaml parses unquoted inline tags and handle flow arrays', () => {
+    const yaml = `version: 1
+people:
+  - name: "Ethan Mollick"
+    weight: 2.5
+    handles:
+      bluesky: [emollick.bsky.social]
+      twitter: [emollick]
+    tags: [ai, education]
+`;
+    const parsed = parseNexusPeopleYaml(yaml);
+    assert.equal(parsed.malformed, false);
+    assert.deepEqual(parsed.people[0].handles.twitter, ['emollick']);
+    assert.deepEqual(parsed.people[0].handles.bluesky, ['emollick.bsky.social']);
+    assert.deepEqual(parsed.people[0].tags, ['ai', 'education']);
+  });
+
   it('parseNexusPeopleYaml normalizes uppercase platform keys and handles in parser context', () => {
     const yaml = `version: 1
 people:
@@ -1323,7 +1340,8 @@ people:
       'utf8',
     );
     const loaded = await loadNexusPeople(root);
-    assert.deepEqual(loaded.people, []);
+    assert.equal(loaded.people.length, 1);
+    assert.equal(loaded.people[0].name, 'Test Person');
     assert.match(loaded.diagnostic ?? '', /score-digest-signals: warning — malformed nexus-people.yaml/);
   });
 

@@ -167,11 +167,28 @@ export async function collectAdapterOutputs(env) {
  * @param {Record<string, string | undefined>} env
  * @returns {Promise<Array<Record<string, unknown>>>}
  */
+/**
+ * @param {Record<string, string | undefined>} env
+ * @param {Record<string, string | undefined>} [extra]
+ * @returns {Promise<Record<string, string | undefined>>}
+ */
+async function buildDigestPipelineChildEnv(env, extra = {}) {
+  const operatorHome = await resolveOperatorHome({ ...process.env, ...env });
+  return {
+    ...process.env,
+    ...env,
+    ...extra,
+    HOME: operatorHome,
+  };
+}
+
 async function dedupeSignals(signals, env) {
   const dedupeScript = join(scriptsDir, 'dedupe-digest-signals.mjs');
   const { stdout } = await execFileAsync('node', [dedupeScript], {
     cwd: repoRoot,
-    env: { ...process.env, ...env, DIGEST_SIGNALS_JSON: JSON.stringify(signals) },
+    env: await buildDigestPipelineChildEnv(env, {
+      DIGEST_SIGNALS_JSON: JSON.stringify(signals),
+    }),
     timeout: 30_000,
     maxBuffer: 10 * 1024 * 1024,
   });
@@ -189,12 +206,10 @@ async function scoreSignals(signals, ranAt, env) {
   const scoreScript = join(scriptsDir, 'score-digest-signals.mjs');
   const { stdout } = await execFileAsync('node', [scoreScript], {
     cwd: repoRoot,
-    env: {
-      ...process.env,
-      ...env,
+    env: await buildDigestPipelineChildEnv(env, {
       DIGEST_SIGNALS_JSON: JSON.stringify(signals),
       DIGEST_RUN_AT: String(ranAt),
-    },
+    }),
     timeout: 30_000,
     maxBuffer: 10 * 1024 * 1024,
   });
