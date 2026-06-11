@@ -1,5 +1,14 @@
 # Deferred work
 
+## Deferred from: code review of 68-5-bluesky-adapter-source-12 (2026-06-11)
+
+- Terminal timeout budget vs 8 default actors — 45s Hermes timeout vs worst-case ~240s serial fetch; operator can trim `MORNING_DIGEST_BSKY_ACTORS`.
+- Feed pagination capped at FEED_LIMIT=50 per author — high-volume authors may omit in-window posts beyond first page; acceptable v1 scope.
+- Reply/repost-only feed entries may map poorly — `mapFeedPost` reads `record.text` only; v1 getAuthorFeed scope.
+- Custom AppView host has no allowlist — operator-controlled env override; same trust model as other ingest endpoints.
+- Empty `posts[]` after successful HTTP without `error` key — task-prompt treats empty array as agent-layer failure; consistent with other adapters.
+- Duplicate bluesky cap tests in adapter + score-signals suites — maintenance drift only.
+
 ## Deferred from: code review of 68-1-cross-source-dedup-engine (2026-06-11)
 
 - Entity match merges distinct stories sharing ≥2 proper nouns within 24h — spec-compliant per AC #1 rule 4 / addendum A4; quality tradeoff deferred.

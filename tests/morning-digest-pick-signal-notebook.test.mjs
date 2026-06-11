@@ -20,6 +20,7 @@ import {
   extractHnSignals,
   extractPerplexitySignals,
   extractProductHuntSignals,
+  extractBlueskySignals,
   extractRedditSignals,
   extractRssSignals,
   parseNotebookTitleMap,
@@ -308,6 +309,15 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(titles, ['ph-high', 'ph-mid']);
   });
 
+  it('extractBlueskySignals ranks by likes + reposts desc and caps at 2', () => {
+    const titles = extractBlueskySignals([
+      { title: 'bsky-low', likes: 1, reposts: 0 },
+      { title: 'bsky-high', likes: 100, reposts: 50 },
+      { title: 'bsky-mid', likes: 40, reposts: 10 },
+    ]);
+    assert.deepEqual(titles, ['bsky-high', 'bsky-mid']);
+  });
+
   it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {
     assert.deepEqual(extractGithubSignals([]), []);
     assert.deepEqual(extractRedditSignals([]), []);
@@ -317,7 +327,7 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(buildDigestSignals({ github: [] }), []);
   });
 
-  it('places github after HN, reddit after github, RSS after reddit, and Product Hunt after RSS', () => {
+  it('places github after HN, reddit after github, RSS after reddit, Product Hunt after RSS, and Bluesky after Product Hunt', () => {
     const signals = buildDigestSignals({
       trends: [{ keyword: 'trend-a', normalizedValue: 1 }],
       hackernews: [{ title: 'HN Story One' }],
@@ -337,16 +347,22 @@ describe('buildDigestSignals', () => {
         { title: 'ph-low', votesCount: 1 },
         { title: 'ph-high', votesCount: 500 },
       ],
+      bluesky: [
+        { title: 'bsky-low', likes: 1, reposts: 0 },
+        { title: 'bsky-high', likes: 100, reposts: 50 },
+      ],
     });
     const hnIdx = signals.indexOf('HN Story One');
     const ghIdx = signals.indexOf('gh-high');
     const rdIdx = signals.indexOf('rd-high');
     const rssIdx = signals.indexOf('Newsletter Beta');
     const phIdx = signals.indexOf('ph-high');
+    const bskyIdx = signals.indexOf('bsky-high');
     assert.ok(hnIdx >= 0 && ghIdx > hnIdx);
     assert.ok(ghIdx >= 0 && rdIdx > ghIdx);
     assert.ok(rdIdx >= 0 && rssIdx > rdIdx);
     assert.ok(rssIdx >= 0 && phIdx > rssIdx);
+    assert.ok(phIdx >= 0 && bskyIdx > phIdx);
   });
 
   it('dedupes github title when headline wins first', () => {

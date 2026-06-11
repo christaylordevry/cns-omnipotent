@@ -310,10 +310,11 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, producthunt, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, bluesky, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
+    assert.equal(trendProxyForSignal({ title: 'BSKY post', sourceType: 'bluesky' }), 38);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -327,6 +328,16 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
       baseCtx({ runAt }),
     );
     assert.ok(urgency > 0);
+  });
+
+  it('assigns higher urgency for bluesky than arxiv via SOURCE_PRIOR 7 vs 0', () => {
+    const signalBase = {
+      title: 'Stable title without breaking keywords',
+      sourceMetadata: { publishedAt: '2026-06-09T08:00:00Z' },
+    };
+    const blueskyUrgency = scoreUrgency({ ...signalBase, sourceType: 'bluesky' }, baseCtx({ runAt }));
+    const arxivUrgency = scoreUrgency({ ...signalBase, sourceType: 'arxiv' }, baseCtx({ runAt }));
+    assert.ok(blueskyUrgency > arxivUrgency);
   });
 });
 
@@ -442,6 +453,33 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
       sourceMetadata: { upvotes },
     });
     assert.equal(ph, rd);
+  });
+
+  it('bluesky at engagement caps → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'BSKY cap post',
+        sourceType: 'bluesky',
+        sourceMetadata: {
+          likes: 20000,
+          reposts: 5000,
+          replies: 2000,
+          quotes: 1000,
+        },
+      }),
+      100,
+    );
+  });
+
+  it('bluesky with all zero engagement → null', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'BSKY zero post',
+        sourceType: 'bluesky',
+        sourceMetadata: { likes: 0, reposts: 0, replies: 0, quotes: 0 },
+      }),
+      null,
+    );
   });
 
   it('hackernews at zero engagement → 0', () => {

@@ -27,6 +27,7 @@ const SOURCE_PRIOR = {
   github: 5,
   reddit: 8,
   producthunt: 8,
+  bluesky: 7,
   rss: 5,
 };
 
@@ -39,13 +40,14 @@ const TREND_PROXY_PRIOR = {
   github: 40,
   reddit: 42,
   producthunt: 42,
+  bluesky: 38,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'bluesky' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -101,6 +103,10 @@ export const GH_STARS_CAP = 50000;
 export const GH_FORKS_CAP = 5000;
 export const RD_UPVOTES_CAP = 10000;
 export const RD_COMMENTS_CAP = 2000;
+export const BSKY_LIKES_CAP = 20000;
+export const BSKY_REPOSTS_CAP = 5000;
+export const BSKY_REPLIES_CAP = 2000;
+export const BSKY_QUOTES_CAP = 1000;
 
 /** Architecture §8.1 rankScore weights — normative constants (anti-drift surface). */
 export const RANK_WEIGHT_PERSONAL = 0.3;
@@ -165,6 +171,24 @@ export function normalizeEngagement(signal) {
       return Math.round(
         0.75 * logNorm(meta.upvotes, RD_UPVOTES_CAP) +
           0.25 * logNorm(commentCount, RD_COMMENTS_CAP),
+      );
+    }
+    case 'bluesky': {
+      const likes = meta.likes;
+      const reposts = meta.reposts;
+      const replies = meta.replies;
+      const quotes = meta.quotes;
+      const hasEngagement = [likes, reposts, replies, quotes].some(
+        (value) => Number.isFinite(value) && Number(value) > 0,
+      );
+      if (!hasEngagement) {
+        return null;
+      }
+      return Math.round(
+        0.4 * logNorm(likes, BSKY_LIKES_CAP) +
+          0.3 * logNorm(reposts, BSKY_REPOSTS_CAP) +
+          0.2 * logNorm(replies, BSKY_REPLIES_CAP) +
+          0.1 * logNorm(quotes, BSKY_QUOTES_CAP),
       );
     }
     case 'newsapi':
