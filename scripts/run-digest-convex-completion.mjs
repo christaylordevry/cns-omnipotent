@@ -6,13 +6,14 @@
  */
 
 import { execFile } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
+import { readDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
 import {
   formatWatchdogLogLine,
@@ -181,9 +182,93 @@ async function appendLog(logPath, line) {
 }
 
 /**
+ * @param {string[]} argv
+ * @returns {{ forceRescore: boolean }}
+ */
+export function parseCompletionCliArgs(argv) {
+  return { forceRescore: argv.includes('--force-rescore') };
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {number} ranAt
+ * @param {Record<string, string | undefined>} env
+ * @param {(action: string, exitCode: number, detail?: string) => Promise<void>} log
+ * @param {string} successAction
+ * @returns {Promise<{ action: string; exitCode: number }>}
+ */
+async function scoreWriteAndPush(payload, ranAt, env, log, successAction) {
+  let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
+  try {
+    signals = await dedupeSignals(signals, env);
+    payload.signals = signals;
+    signals = await scoreSignals(signals, ranAt, env);
+    payload.signals = signals;
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'pipeline-error';
+    await log('completion-pipeline-failed', 0, detail);
+    return { action: 'completion-pipeline-failed', exitCode: 0 };
+  }
+
+  const writeResult = await writeDigestPushArtifact({
+    ...env,
+    DIGEST_PUSH_JSON: JSON.stringify(payload),
+  });
+  if (writeResult.status !== 'ok') {
+    await log('completion-artifact-failed', 0, writeResult.reason);
+    return { action: 'completion-artifact-failed', exitCode: 0 };
+  }
+
+  try {
+    await pushPayload(payload, env);
+    await log(successAction, 0);
+    return { action: successAction, exitCode: 0 };
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'push-error';
+    await log(`${successAction}-failed`, 0, detail);
+    return { action: `${successAction}-failed`, exitCode: 0 };
+  }
+}
+
+/**
+ * @param {{
+ *   env: Record<string, string | undefined>;
+ *   todayDate: string;
+ *   operatorHome: string;
+ *   log: (action: string, exitCode: number, detail?: string) => Promise<void>;
+ * }} ctx
+ * @returns {Promise<{ action: string; exitCode: number } | null>}
+ */
+async function tryRescoreFromArtifact(ctx) {
+  const artifactPath = join(ctx.operatorHome, '.hermes', `digest-push-${ctx.todayDate}.json`);
+  let artifactRaw;
+  try {
+    artifactRaw = await readFile(artifactPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  const payload = readDigestPushPayload({ DIGEST_PUSH_JSON: artifactRaw });
+  if (!payload || !Array.isArray(payload.signals) || payload.signals.length === 0) {
+    return null;
+  }
+
+  const ranAt = Date.now();
+  payload.run = { ...payload.run, date: ctx.todayDate, ranAt };
+  return scoreWriteAndPush(payload, ranAt, ctx.env, ctx.log, 'completion-force-rescore-push');
+}
+
+/**
  * @param {{
  *   env?: Record<string, string | undefined>;
  *   todayDate?: string;
+ *   forceRescore?: boolean;
  *   collectFn?: typeof collectAdapterOutputs;
  *   watchdogFn?: typeof runPushDigestWatchdog;
  * }} [opts]
@@ -202,14 +287,23 @@ export async function runDigestConvexCompletion(opts = {}) {
     );
   };
 
-  const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
-  const watchdogResult = await watchdogFn({ env, todayDate });
-  if (watchdogResult.action === 'skipped-already-pushed' || watchdogResult.action === 'recovered-push') {
-    return watchdogResult;
-  }
+  const forceRescore = opts.forceRescore ?? false;
 
-  if (watchdogResult.action !== 'skipped-no-artifact') {
-    return watchdogResult;
+  if (forceRescore) {
+    const rescoreResult = await tryRescoreFromArtifact({ env, todayDate, operatorHome, log });
+    if (rescoreResult) {
+      return rescoreResult;
+    }
+  } else {
+    const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
+    const watchdogResult = await watchdogFn({ env, todayDate });
+    if (watchdogResult.action === 'skipped-already-pushed' || watchdogResult.action === 'recovered-push') {
+      return watchdogResult;
+    }
+
+    if (watchdogResult.action !== 'skipped-no-artifact') {
+      return watchdogResult;
+    }
   }
 
   const collectFn = opts.collectFn ?? collectAdapterOutputs;
@@ -245,46 +339,12 @@ export async function runDigestConvexCompletion(opts = {}) {
     return { action: 'completion-no-signals', exitCode: 0 };
   }
 
-  let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
-  try {
-    signals = await dedupeSignals(signals, env);
-    payload.signals = signals;
-    signals = await scoreSignals(signals, ranAt, env);
-    payload.signals = signals;
-  } catch (err) {
-    const detail =
-      err && typeof err === 'object' && 'message' in err
-        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
-        : 'pipeline-error';
-    await log('completion-pipeline-failed', 0, detail);
-    return { action: 'completion-pipeline-failed', exitCode: 0 };
-  }
-
-  const writeResult = await writeDigestPushArtifact({
-    ...env,
-    DIGEST_PUSH_JSON: JSON.stringify(payload),
-  });
-  if (writeResult.status !== 'ok') {
-    await log('completion-artifact-failed', 0, writeResult.reason);
-    return { action: 'completion-artifact-failed', exitCode: 0 };
-  }
-
-  try {
-    await pushPayload(payload, env);
-    await log('completion-backfill-push', 0);
-    return { action: 'completion-backfill-push', exitCode: 0 };
-  } catch (err) {
-    const detail =
-      err && typeof err === 'object' && 'message' in err
-        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
-        : 'push-error';
-    await log('completion-backfill-push-failed', 0, detail);
-    return { action: 'completion-backfill-push-failed', exitCode: 0 };
-  }
+  return scoreWriteAndPush(payload, ranAt, env, log, 'completion-backfill-push');
 }
 
 async function main() {
-  await runDigestConvexCompletion();
+  const { forceRescore } = parseCompletionCliArgs(process.argv.slice(2));
+  await runDigestConvexCompletion({ forceRescore });
   process.exit(0);
 }
 
