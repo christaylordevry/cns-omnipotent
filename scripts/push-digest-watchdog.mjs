@@ -17,6 +17,7 @@ import {
   readDigestPushPayload,
   resolveConvexPushEnv,
 } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
+import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 import { resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 
 const QUERY_PATH = 'digest:getRecentDigestRuns';
@@ -33,8 +34,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
  * @returns {string}
  */
 export function formatTodayLocalDate(envTz, now = new Date()) {
-  const timeZone = envTz?.trim() || undefined;
-  return new Intl.DateTimeFormat('en-CA', { timeZone }).format(now);
+  return formatSydneyDate(envTz, now);
 }
 
 /**

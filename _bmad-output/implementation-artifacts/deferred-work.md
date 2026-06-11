@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 70-3-errors-by-source-date-skew-signal-quality (2026-06-12)
+
+- `isAdapterErrorPayload` treats `{ error, posts: [] }` as success — intentional heuristic for adapter-only error JSON; empty-array collision unlikely.
+- No dedicated `adapter-result.mjs` unit tests — logic covered indirectly via completion test re-exports.
+- HTML unescape limited to five entities per AC5 — numeric entities and `&apos;` out of scope for this story.
+
 ## Deferred from: code review of 69-2-people-match-indicator (2026-06-11)
 
 - `scorePeopleBonuses` not refactored to delegate to `resolvePeopleMatch` — T1.1 dev note requested shared lookup; handle/name traversal duplicated. Fix when next touching people scoring.

@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import {
   buildPostUrl,
   dedupePostsByUrl,
+  deriveBlueskyTitle,
   fetchAuthorFeed,
   filterByLookback,
   loadBlueskyConfig,
@@ -107,6 +108,20 @@ const FIXTURE_FEED = {
 };
 
 describe('fetch-bluesky-signals.mjs parsing', () => {
+  it('deriveBlueskyTitle skips junk prefix lines and caps at word boundary', () => {
+    const multiLine = ['Full text:', 'Actual insight about agents and tooling.'].join('\n');
+    assert.equal(deriveBlueskyTitle(multiLine, 'simonwillison.net'), 'Actual insight about agents and tooling.');
+
+    const longLine =
+      'This is a deliberately long Bluesky post title that should truncate on a word boundary before eighty characters total';
+    const truncated = deriveBlueskyTitle(longLine, 'simonwillison.net');
+    assert.ok(truncated.endsWith('…'));
+    assert.ok(truncated.length <= 81);
+    assert.doesNotMatch(truncated, /\s…$/);
+
+    assert.equal(deriveBlueskyTitle('', 'karpathy.bsky.social'), '[Bluesky post by @karpathy.bsky.social]');
+  });
+
   it('maps AT Protocol feed item to stdout post shape', () => {
     const mapped = mapFeedPost(FIXTURE_FEED.feed[0]);
     assert.deepEqual(mapped, {
@@ -128,11 +143,27 @@ describe('fetch-bluesky-signals.mjs parsing', () => {
     );
   });
 
-  it('parseAuthorFeedResponse skips invalid posts', () => {
+  it('mapFeedPost uses first meaningful line when record.text is multi-line', () => {
+    const mapped = mapFeedPost({
+      post: {
+        uri: 'at://did:plc:test/app.bsky.feed.post/3lmulti',
+        record: {
+          text: 'Full text:\nMeaningful Bluesky body line.',
+          createdAt: '2026-06-11T07:30:00.000Z',
+        },
+        author: { handle: 'simonwillison.net' },
+        indexedAt: '2026-06-11T07:31:00.000Z',
+      },
+    });
+    assert.equal(mapped?.title, 'Meaningful Bluesky body line.');
+  });
+
+  it('parseAuthorFeedResponse skips structurally invalid posts and uses handle fallback for empty text', () => {
     const posts = parseAuthorFeedResponse(FIXTURE_FEED);
-    assert.equal(posts.length, 2);
+    assert.equal(posts.length, 3);
     assert.equal(posts[0].authorHandle, 'simonwillison.net');
     assert.equal(posts[1].likes, 0);
+    assert.equal(posts[2].title, '[Bluesky post by @invalid.example]');
   });
 
   it('sortAndCapPosts orders by likes + 2×reposts and caps', () => {
@@ -201,7 +232,7 @@ describe('fetch-bluesky-signals.mjs fetchAuthorFeed', () => {
     };
     const result = await fetchAuthorFeed('https://api.bsky.app', 'did:plc:test', fetchFn);
     assert.ok(Array.isArray(result.posts));
-    assert.equal(result.posts?.length, 2);
+    assert.equal(result.posts?.length, 3);
     assert.equal(result.posts?.[0].authorHandle, 'simonwillison.net');
   });
 

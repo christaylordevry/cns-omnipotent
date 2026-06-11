@@ -31,6 +31,11 @@ describe("Story 67-10 push-digest-watchdog", () => {
     assert.equal(date, "2026-06-11");
   });
 
+  it("formatTodayLocalDate defaults to Australia/Sydney when env tz absent", () => {
+    const date = formatTodayLocalDate(undefined, new Date("2026-06-10T20:00:00.000Z"));
+    assert.equal(date, "2026-06-11");
+  });
+
   it("evaluateTodayDigestRuns detects non-failed today row among recent runs", () => {
     const result = evaluateTodayDigestRuns(
       [

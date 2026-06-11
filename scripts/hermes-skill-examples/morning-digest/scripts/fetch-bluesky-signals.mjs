@@ -13,7 +13,8 @@ const MAX_POSTS_DEFAULT = 25;
 const MAX_POSTS_HARD = 50;
 const LOOKBACK_HOURS_DEFAULT = 24;
 const ACTOR_DELAY_MS = 100;
-const TITLE_MAX_CHARS = 280;
+const BSKY_TITLE_MAX_CHARS = 80;
+const JUNK_LINE_RE = /^(full text|thread|re:|fw:):?\s*$/i;
 const FEED_LIMIT = 50;
 
 export const DEFAULT_BSKY_ACTORS = [
@@ -111,17 +112,34 @@ export function buildPostUrl(handle, uri) {
 
 /**
  * @param {string} text
+ * @param {string} [authorHandle]
+ * @returns {string}
+ */
+export function deriveBlueskyTitle(text, authorHandle) {
+  const lines = String(text ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let line = lines.find((candidate) => !JUNK_LINE_RE.test(candidate)) ?? '';
+  if (!line) {
+    const handle = String(authorHandle ?? '').trim();
+    return handle ? `[Bluesky post by @${handle}]` : '[Bluesky post]';
+  }
+  if (line.length <= BSKY_TITLE_MAX_CHARS) {
+    return line;
+  }
+  const slice = line.slice(0, BSKY_TITLE_MAX_CHARS);
+  const lastSpace = slice.lastIndexOf(' ');
+  const truncated = (lastSpace > 20 ? slice.slice(0, lastSpace) : slice).trimEnd();
+  return `${truncated}…`;
+}
+
+/**
+ * @param {string} text
  * @returns {string}
  */
 export function truncateTitle(text) {
-  const trimmed = String(text ?? '').trim();
-  if (!trimmed) {
-    return '';
-  }
-  if (trimmed.length <= TITLE_MAX_CHARS) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, TITLE_MAX_CHARS - 1)}…`;
+  return deriveBlueskyTitle(text);
 }
 
 /**
@@ -154,8 +172,8 @@ export function mapFeedPost(feedItem) {
   }
   const recordRow = /** @type {Record<string, unknown>} */ (record);
   const authorRow = /** @type {Record<string, unknown>} */ (author);
-  const title = truncateTitle(String(recordRow.text ?? ''));
   const authorHandle = String(authorRow.handle ?? '').trim();
+  const title = deriveBlueskyTitle(String(recordRow.text ?? ''), authorHandle);
   const url = buildPostUrl(authorHandle, String(postRow.uri ?? ''));
   if (!title || !authorHandle || !url) {
     return null;

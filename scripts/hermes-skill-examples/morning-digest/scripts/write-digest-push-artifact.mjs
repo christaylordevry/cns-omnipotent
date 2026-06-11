@@ -5,6 +5,7 @@
  *
  * Env:
  *   DIGEST_PUSH_JSON — JSON payload { run: { date }, signals[] }
+ *   run.date must be Australia/Sydney civil YYYY-MM-DD from the caller (formatSydneyDate).
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';

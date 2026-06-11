@@ -42,6 +42,53 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		});
 	});
 
+	it('marks wrapped adapter failures as error outcomes even with zero signals', () => {
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: { topTrend: 'AI agents' },
+			signals: [],
+			adapterResults: {
+				twitter: { success: false, error: 'invalid-json' },
+				reddit: { success: true, data: { posts: [] } },
+			},
+		});
+
+		const twitter = outcomes.find((row) => row.sourceKey === 'twitter');
+		assert.equal(twitter?.status, 'error');
+		assert.equal(twitter?.reason, 'invalid-json');
+		assert.equal(twitter?.signalCount, undefined);
+	});
+
+	it('maps trends collect key failures to google_trends error outcomes', () => {
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: {},
+			signals: [],
+			adapterResults: {
+				trends: { success: false, error: 'timeout' },
+			},
+		});
+
+		const googleTrends = outcomes.find((row) => row.sourceKey === 'google_trends');
+		assert.equal(googleTrends?.status, 'error');
+		assert.equal(googleTrends?.reason, 'timeout');
+	});
+
+	it('marks nested adapter data.error as error outcome when success is true', () => {
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: {},
+			signals: [],
+			adapterResults: {
+				twitter: {
+					success: true,
+					data: { error: 'X session invalid' },
+				},
+			},
+		});
+
+		const twitter = outcomes.find((row) => row.sourceKey === 'twitter');
+		assert.equal(twitter?.status, 'error');
+		assert.equal(twitter?.reason, 'X session invalid');
+	});
+
 	it('builds fired outcomes from payload signals and run fields', () => {
 		const outcomes = buildSourceOutcomesFromPayload({
 			run: {

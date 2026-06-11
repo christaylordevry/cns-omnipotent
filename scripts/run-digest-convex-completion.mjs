@@ -11,7 +11,14 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import {
+  buildErrorsBySource,
+  isAdapterErrorPayload,
+  summarizeAdapterCollection,
+  unwrapAdapterResult,
+} from './hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
+import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 import {
   resolveDigestMarkdownFromPayload,
   resolveSourceOutcomes,
@@ -31,16 +38,12 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scriptsDir = join(repoRoot, 'scripts/hermes-skill-examples/morning-digest/scripts');
 const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 
-/**
- * @param {string} envTz
- * @param {Date} [now]
- * @returns {string}
- */
-export function formatSydneyDate(envTz, now = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: envTz?.trim() || 'Australia/Sydney',
-  }).format(now);
-}
+export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
+export {
+  buildErrorsBySource,
+  summarizeAdapterCollection,
+  unwrapAdapterResult,
+} from './hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
 
 /**
  * @param {string} stdout
@@ -110,15 +113,52 @@ export async function collectAdapterOutputs(env) {
   for (const [key, runner] of tasks) {
     try {
       const stdout = await runner();
-      const parsed = parseAdapterStdout(stdout);
-      if (parsed && typeof parsed === 'object') {
-        results[key] = parsed;
+      const trimmed = String(stdout ?? '').trim();
+      if (!trimmed) {
+        results[key] = { success: false, error: 'empty-stdout' };
+        continue;
       }
-    } catch {
-      // Adapter failures are non-fatal — continue with partial sources.
+
+      let parsed;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        results[key] = { success: false, error: 'invalid-json' };
+        continue;
+      }
+
+      if (!parsed || typeof parsed !== 'object') {
+        results[key] = { success: false, error: 'invalid-json' };
+        continue;
+      }
+
+      if (isAdapterErrorPayload(parsed)) {
+        results[key] = {
+          success: false,
+          error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}`,
+        };
+        continue;
+      }
+
+      results[key] = { success: true, data: parsed };
+    } catch (err) {
+      const isTimeout =
+        err &&
+        typeof err === 'object' &&
+        (('killed' in err && /** @type {{ killed?: boolean }} */ (err).killed) ||
+          ('code' in err && /** @type {{ code?: string }} */ (err).code === 'ETIMEDOUT'));
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 80)
+          : 'exec failed';
+      results[key] = {
+        success: false,
+        error: isTimeout ? 'timeout' : `exec-error:${message}`,
+      };
     }
   }
 
+  console.error(summarizeAdapterCollection(results));
   return results;
 }
 
@@ -308,8 +348,7 @@ async function tryRescoreFromArtifact(ctx) {
  */
 export async function runDigestConvexCompletion(opts = {}) {
   const env = opts.env ?? process.env;
-  const todayDate =
-    opts.todayDate ?? formatSydneyDate(env.CRON_TZ ?? env.TZ ?? 'Australia/Sydney');
+  const todayDate = opts.todayDate ?? formatSydneyDate(env.CRON_TZ ?? env.TZ);
   const operatorHome = await resolveOperatorHome(env);
   const logPath = resolveWatchdogLogPath(operatorHome);
   const log = async (action, exitCode, detail) => {
@@ -341,9 +380,10 @@ export async function runDigestConvexCompletion(opts = {}) {
   const collectFn = opts.collectFn ?? collectAdapterOutputs;
   const ranAt = Date.now();
   const adapterOutputs = await collectFn(env);
+  const errorsBySource = buildErrorsBySource(adapterOutputs);
 
   const trendsPayload = /** @type {{ events?: Array<{ keyword?: string; normalizedValue?: number }> }} */ (
-    adapterOutputs.trends ?? {}
+    unwrapAdapterResult(adapterOutputs.trends)
   );
   const topTrend = trendsPayload.events?.[0]?.keyword;
 
@@ -351,23 +391,35 @@ export async function runDigestConvexCompletion(opts = {}) {
     date: todayDate,
     ranAt,
     trends: trendsPayload,
-    newsapi: /** @type {never} */ (adapterOutputs.newsapi ?? {}),
-    arxiv: /** @type {never} */ (adapterOutputs.arxiv ?? {}),
-    hackernews: /** @type {never} */ (adapterOutputs.hackernews ?? {}),
-    github: /** @type {never} */ (adapterOutputs.github ?? {}),
-    reddit: /** @type {never} */ (adapterOutputs.reddit ?? {}),
-    rss: /** @type {never} */ (adapterOutputs.rss ?? {}),
-    producthunt: /** @type {never} */ (adapterOutputs.producthunt ?? {}),
-    twitter: /** @type {never} */ (adapterOutputs.twitter ?? {}),
-    bluesky: /** @type {never} */ (adapterOutputs.bluesky ?? {}),
+    newsapi: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.newsapi)),
+    arxiv: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.arxiv)),
+    hackernews: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.hackernews)),
+    github: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.github)),
+    reddit: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.reddit)),
+    rss: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.rss)),
+    producthunt: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.producthunt)),
+    twitter: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.twitter)),
+    bluesky: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.bluesky)),
     runMeta: {
       topTrend: topTrend ? String(topTrend) : undefined,
       focusKeyword: topTrend ? String(topTrend) : undefined,
     },
   });
 
+  if (errorsBySource) {
+    payload.run = { ...payload.run, errors_by_source: errorsBySource };
+  }
+
   if (!Array.isArray(payload.signals) || payload.signals.length === 0) {
-    await log('completion-no-signals', 0, 'adapter-refetch-empty');
+    attachSourceOutcomes(payload, adapterOutputs);
+    await writeDigestPushArtifact({
+      ...env,
+      DIGEST_PUSH_JSON: JSON.stringify(payload),
+    });
+    const detail = errorsBySource
+      ? `adapter-refetch-empty ${JSON.stringify(errorsBySource)}`
+      : 'adapter-refetch-empty';
+    await log('completion-no-signals', 0, detail);
     return { action: 'completion-no-signals', exitCode: 0 };
   }
 

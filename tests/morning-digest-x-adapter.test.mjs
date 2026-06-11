@@ -17,6 +17,7 @@ import {
   isSessionInvalidError,
   loadXConfig,
   mapBirdTweet,
+  unescapeHtmlEntities,
   parseAccounts,
   parseSearchQueries,
   runXFetch,
@@ -98,6 +99,15 @@ const FIXTURE_TWEET_SNAKE = {
 };
 
 describe('fetch-x-signals.mjs parsing', () => {
+  it('unescapeHtmlEntities decodes common HTML entities in tweet text', () => {
+    assert.equal(unescapeHtmlEntities('Fish &amp; chips'), 'Fish & chips');
+    const mapped = mapBirdTweet({
+      ...FIXTURE_TWEET,
+      text: 'Fish &amp; chips on the pier',
+    });
+    assert.equal(mapped?.title, 'Fish & chips on the pier');
+  });
+
   it('maps bird-search tweet to stdout post shape (camelCase)', () => {
     const mapped = mapBirdTweet(FIXTURE_TWEET);
     assert.deepEqual(mapped, {

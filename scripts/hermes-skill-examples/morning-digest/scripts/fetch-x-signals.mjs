@@ -137,6 +137,19 @@ export function loadXConfig(env = process.env) {
  * @param {string} text
  * @returns {string}
  */
+export function unescapeHtmlEntities(text) {
+  return String(text ?? '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 export function truncateTitle(text) {
   const trimmed = String(text ?? '').trim();
   if (!trimmed) {
@@ -210,7 +223,9 @@ export function mapBirdTweet(tweet) {
   )
     .trim()
     .replace(/^@/, '');
-  const title = truncateTitle(String(row.text ?? row.full_text ?? ''));
+  const title = truncateTitle(
+    unescapeHtmlEntities(String(row.text ?? row.full_text ?? '')),
+  );
   let url = String(row.permanent_url ?? row.url ?? '').trim();
   if (!url && row.id && authorHandle) {
     url = `https://x.com/${authorHandle}/status/${row.id}`;

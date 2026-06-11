@@ -400,15 +400,36 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
 		}
 
 		const adapterKey =
-			sourceKey === 'newsapi'
-				? 'newsapi'
-				: sourceKey === 'deep_signal'
-					? 'deepSignal'
-					: sourceKey;
+			sourceKey === 'google_trends'
+				? 'trends'
+				: sourceKey === 'newsapi'
+					? 'newsapi'
+					: sourceKey === 'deep_signal'
+						? 'deepSignal'
+						: sourceKey;
 		const adapterPayload = adapterResults[adapterKey];
-		if (adapterPayload && typeof adapterPayload === 'object' && 'error' in adapterPayload) {
-			status = 'error';
-			reason = String(/** @type {{ error?: unknown }} */ (adapterPayload).error ?? 'adapter error');
+		if (adapterPayload && typeof adapterPayload === 'object') {
+			if ('success' in adapterPayload) {
+				const wrapped = /** @type {{ success?: boolean; error?: unknown; data?: unknown }} */ (
+					adapterPayload
+				);
+				if (wrapped.success === false) {
+					status = 'error';
+					reason = String(wrapped.error ?? 'adapter failed');
+				} else if (
+					wrapped.data &&
+					typeof wrapped.data === 'object' &&
+					'error' in /** @type {Record<string, unknown>} */ (wrapped.data)
+				) {
+					status = 'error';
+					reason = String(
+						/** @type {{ error?: unknown }} */ (wrapped.data).error ?? 'adapter error',
+					);
+				}
+			} else if ('error' in adapterPayload) {
+				status = 'error';
+				reason = String(/** @type {{ error?: unknown }} */ (adapterPayload).error ?? 'adapter error');
+			}
 		}
 
 		if (status) {

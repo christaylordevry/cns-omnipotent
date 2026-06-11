@@ -4,6 +4,7 @@
  *
  * Env:
  *   DIGEST_PUSH_JSON — JSON payload { run, signals[] }
+ *   run.date must be Australia/Sydney civil YYYY-MM-DD from the orchestrator (formatSydneyDate).
  *   CONVEX_URL, CONVEX_DEPLOY_KEY (via mergeTrendIngestEnv / operator home)
  */
 
