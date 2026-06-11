@@ -1,5 +1,13 @@
 # Deferred work
 
+## Deferred from: code review of 68-8-live-digest-validation (2026-06-11)
+
+- No `--people-done` CLI flag for C6 when 68-2/68-3 ship — backlog waiver path sufficient until people stories land.
+- No tests for `detectXStatusFromCheckScript` or `runValidateEpic68Digest` mock path — story marks integration smoke optional; pure-function coverage adequate for T1/T2 gate.
+- Empty signals array undifferentiated from partial ingest failure — operator diagnostic polish; live run will surface via script error or FAIL rows.
+- `tryRecoverFromArtifact` always returns exitCode 0 on failed recovery — pre-existing watchdog behavior; 68-8 only exported `postQuery`.
+- Non-UTM query params bypass C5/dedup normalize — pre-existing `normalizeDigestUrl` scope in dedupe pipeline.
+
 ## Deferred from: code review of 68-7-x-integration-env-docs (2026-06-11)
 
 - Partial warning guard lacks `sawSuccess` check — dead branch given current loop structure; only risky if aggregation refactored.

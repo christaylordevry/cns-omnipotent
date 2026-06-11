@@ -44,7 +44,7 @@ export function formatTodayLocalDate(envTz, now = new Date()) {
  * @param {Record<string, unknown>} args
  * @returns {Promise<unknown>}
  */
-async function postQuery(fetchFn, convexEnv, path, args) {
+export async function postQuery(fetchFn, convexEnv, path, args) {
   const response = await fetchFn(`${normalizeConvexUrl(convexEnv.convexUrl)}/api/query`, {
     method: 'POST',
     headers: {
