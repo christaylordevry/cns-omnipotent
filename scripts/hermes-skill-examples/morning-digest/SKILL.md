@@ -170,6 +170,7 @@ Do not wrap the final digest in a code fence. Do not output sample placeholders 
 - **Vault context Convex log (optional telemetry):** On ROUTED + successful `query-notebook.mjs` only, **await** `terminal(..., timeout=15)` for `log-notebook-query.mjs` after the Discord post. Emit `notebook_query_log` JSON; post the silent warning line only on `failed` or `timeout`. Do not alter or retract the digest on log errors.
 - **Partial failure:** keep section headers; one bullet `- (source unavailable: <reason>)` per failed source; never invent trends or headlines. **Never abort** the digest because one source failed — finish all sections, then post.
 - **Secrets:** never print `NEWSAPI_API_KEY` or other credentials in Discord.
+- **X / Twitter (Source 11):** Before debugging cron or digest gaps for X, run `bash scripts/session-close/hermes-run-x-check.sh` (or `fetch-x-signals.mjs --check`). Rotate `X_AUTH_TOKEN` and `X_CT0` per Operator Guide §15.11.1 when check exits non-zero or Discord shows `(source unavailable: X session invalid)`. Epic 68 is completable without X — Bluesky and other sources still post.
 
 ## Coexistence with other `#hermes` skills
 

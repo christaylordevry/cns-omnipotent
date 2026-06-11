@@ -2,7 +2,7 @@
 // Usage: node fetch-x-signals.mjs
 // stdout: {"posts":[...]} or {"error":"..."}; always exit 0 on fetch/parse failure
 
-import { fileURLToPath } from 'node:url';
+import { URL, fileURLToPath } from 'node:url';
 import { setTimeout as delayMs } from 'node:timers/promises';
 
 import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
@@ -20,6 +20,13 @@ const MAX_SEARCH_QUERIES = 3;
 const TITLE_MAX_CHARS = 280;
 const JSON_RETRY_DELAY_MS = 5000;
 const MAX_JSON_RETRIES = 1;
+const CHECK_PROBE_HANDLE = 'karpathy';
+
+export const X_AUTH_REMEDIATION =
+  '[x-auth] X session cookies expired or invalid — update X_AUTH_TOKEN and X_CT0 in ~/.hermes/trend-ingest.env (Operator Guide §15.11.1)';
+
+export const X_AUTH_CONFIGURE_HINT =
+  '[x-auth] configure X_AUTH_TOKEN and X_CT0 in ~/.hermes/trend-ingest.env (Operator Guide §15.11.1)';
 
 export const DEFAULT_X_ACCOUNTS = [
   'karpathy',
@@ -341,9 +348,131 @@ export function appendSinceToQuery(query, sinceDate) {
 }
 
 /**
- * @param {string} message
- * @returns {boolean}
+ * @param {'total' | 'partial'} kind
  */
+export function warnXSessionExpiry(kind) {
+  if (kind === 'partial') {
+    console.error(
+      '[x-auth] X session became invalid mid-run — partial results returned; rotate cookies before next digest',
+    );
+    return;
+  }
+  console.error(X_AUTH_REMEDIATION);
+}
+
+/**
+ * @param {{ error?: string }} payload
+ */
+export function emitXFetchStderr(payload) {
+  if (!payload.error) {
+    return;
+  }
+  if (/session invalid/i.test(payload.error)) {
+    warnXSessionExpiry('total');
+    return;
+  }
+  if (/credentials not configured/i.test(payload.error)) {
+    console.error(X_AUTH_CONFIGURE_HINT);
+  }
+}
+
+/**
+ * @param {{ status: string }} result
+ * @returns {number}
+ */
+export function getCheckExitCode(result) {
+  return result.status === 'ok' || result.status === 'disabled' ? 0 : 1;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @param {{
+ *   searchClient?: { search: (query: string, count: number) => Promise<{ success: boolean, tweets?: unknown[], error?: string }> },
+ *   now?: Date,
+ * }} [options]
+ * @returns {Promise<{ status: string, message: string, credentialsPresent: boolean, liveProbe: boolean }>}
+ */
+export async function checkXSession(env, options = {}) {
+  const config = loadXConfig(env);
+
+  if (!config.enabled) {
+    return {
+      status: 'disabled',
+      message: 'X disabled via MORNING_DIGEST_X_ENABLED',
+      credentialsPresent: false,
+      liveProbe: false,
+    };
+  }
+
+  if (!config.authToken || !config.ct0) {
+    return {
+      status: 'missing_credentials',
+      message: 'X credentials not configured',
+      credentialsPresent: false,
+      liveProbe: false,
+    };
+  }
+
+  const sinceDate = buildSinceDate(24, options.now);
+  const probeQuery = `from:${CHECK_PROBE_HANDLE} since:${sinceDate}`;
+
+  applyXCredentialEnv(env);
+  const client =
+    options.searchClient ??
+    new SearchClient({
+      cookies: {
+        authToken: config.authToken,
+        ct0: config.ct0,
+        cookieHeader: `auth_token=${config.authToken}; ct0=${config.ct0}`,
+      },
+      timeoutMs: FETCH_TIMEOUT_MS,
+    });
+
+  try {
+    const raw = await client.search(probeQuery, 1);
+    if (raw.success) {
+      return {
+        status: 'ok',
+        message: 'X session valid',
+        credentialsPresent: true,
+        liveProbe: true,
+      };
+    }
+    const probeError = String(raw.error ?? 'search failed').slice(0, 120);
+    if (process.env.DEBUG_X_CHECK === '1') {
+      console.error(`[x-check] probe failed: ${probeError}`);
+    }
+    if (isSessionInvalidError(probeError)) {
+      return {
+        status: 'session_invalid',
+        message: 'X session cookies expired or invalid',
+        credentialsPresent: true,
+        liveProbe: true,
+      };
+    }
+    return {
+      status: 'probe_failed',
+      message: probeError,
+      credentialsPresent: true,
+      liveProbe: true,
+    };
+  } catch (err) {
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'probe error';
+    if (process.env.DEBUG_X_CHECK === '1') {
+      console.error(`[x-check] probe exception: ${reason}`);
+    }
+    return {
+      status: 'probe_failed',
+      message: reason,
+      credentialsPresent: true,
+      liveProbe: true,
+    };
+  }
+}
+
 export function isSessionInvalidError(message) {
   const text = String(message ?? '');
   if (/401|403|unauthorized|forbidden/i.test(text)) {
@@ -488,6 +617,9 @@ export async function runXFetch(env, options = {}) {
         if (!sawSuccess && aggregated.length === 0) {
           return { error: 'X session invalid' };
         }
+        if (aggregated.length > 0) {
+          warnXSessionExpiry('partial');
+        }
         break;
       }
       continue;
@@ -522,7 +654,15 @@ if (isMainModule()) {
   try {
     const merged = await mergeTrendIngestEnv(process.env);
     applyXCredentialEnv(merged);
+
+    if (process.argv.includes('--check')) {
+      const result = await checkXSession(merged);
+      process.stdout.write(JSON.stringify(result) + '\n');
+      process.exit(getCheckExitCode(result));
+    }
+
     const payload = await runXFetch(merged);
+    emitXFetchStderr(payload);
     process.stdout.write(JSON.stringify(payload) + '\n');
     process.exit(0);
   } catch (err) {

@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 68-7-x-integration-env-docs (2026-06-11)
+
+- Partial warning guard lacks `sawSuccess` check — dead branch given current loop structure; only risky if aggregation refactored.
+- Double `applyXCredentialEnv` in `--check` path — idempotent today; mirrors main fetch path.
+- `isSessionInvalidError` treats JSON parse errors as session-invalid — pre-existing 68-6 behavior; may cause false rotation on transient CDN errors.
+- `hermes-run-x-check.sh` empty `OPERATOR_HOME` edge case — same pattern as `hermes-run-x.sh`; container root HOME unlikely on operator WSL.
+
 ## Deferred from: code review of 68-6-x-twitter-adapter-source-11 (2026-06-11)
 
 - `quoteCount` always 0 on live bird-search path — vendor `mapTweetResult` does not populate quotes; 5% scoring weight inert until vendor patch.

@@ -440,6 +440,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-05-29 | 1.36.0 | **Morning digest skill (49-6):** §15.11 trend briefing (Google Trends + NewsAPI + Perplexity, no vault writes, 08:00 machine-local cron); §15.2 legacy 26-7 WSL cron line **disabled (commented)** — scripts retained as fallback | 49-6-morning-digest-upgrade |
 | 2026-06-02 | 1.37.0 | **Morning digest cron automation (55-3):** §15.11 one-command install via `install-morning-digest-cron.sh`, default **07:00 Australia/Sydney**, log + schedule overrides; §15.2 legacy line stays commented | 55-3-morning-digest-cron-automation |
 | 2026-06-03 | 1.38.0 | Session close **Story 59-1:** total Hermes session input target **<20k**; LLM reads `section8-input.json` only; deterministic Discord reply via `hermes-run-render-discord-reply.sh`; bump skill `version`, reinstall, restart gateway after deploy | 59-1-session-close-context-reduction |
+| 2026-06-11 | 1.38.1 | **Morning digest X/Twitter (Story 68-7):** §15.11.1 session-cookie setup, `--check` health probe, rotation runbook; optional Source 11 when cookies configured | 68-7-x-integration-env-docs |
 
 ---
 
@@ -924,9 +925,9 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 - Destination: `~/.hermes/skills/cns/vault-lint/`
 - Binding: add **`vault-lint`** to **`#hermes`** `discord.channel_skill_bindings` beside **`hermes-url-ingest-vault`**, **`triage`**, and **`session-close`**.
 
-### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1 + 52-2 + 55-3)
+### 15.11 Morning digest skill (`morning-digest`, Stories 49-6 + 52-1 + 52-2 + 55-3 + 68-7)
 
-**Skill version:** **1.2.4** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no trend Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
+**Skill version:** **1.2.4** (repo mirror + `~/.hermes/skills/cns/morning-digest/`). Daily **trend intelligence** briefing to **`#hermes`**: Google Trends **`trend-ingest.py --dry-run`** (no trend Convex push), NewsAPI headlines from **`$HOME/.hermes/trend-ingest.env`**, one Perplexity deep signal on the top trend, optional **X / Twitter** (Source 11) when session cookies are configured, then **Vault context** from NotebookLM (signal scoring + one CLI query). **No vault writes**, no dashboard relay, no digest archive files. If one source fails, the digest still posts with `(source unavailable: …)` in that section only.
 
 **Vault context (Story 52-1):** After Sources 1–3, the skill builds up to five trend keywords plus five headline titles (deduped), runs `scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs` against watched notebooks in `scripts/session-close/lib/notebook-registry.json`, and on a match invokes `scripts/hermes-skill-examples/notebook-query/scripts/query-notebook.mjs` (same `nlm` / `uvx` prerequisite as §15.x notebook-query — not the NotebookLM MCP). Answers appear under **`Vault context`** in Discord (max 500 characters). Failed routing or query shows `- (source unavailable: …)` without aborting the digest.
 
@@ -946,7 +947,7 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 | Repo mirror | `scripts/hermes-skill-examples/morning-digest/` |
 | Skill install | `bash scripts/install-hermes-skill-morning-digest.sh` |
 | Cron runner | `scripts/run-morning-digest-cron.sh` (gateway guard + `hermes cron run` + `tick`; no Discord text trigger) |
-| Credentials | `~/.hermes/trend-ingest.env` (`NEWSAPI_API_KEY`), `~/.hermes/trend-watchlist.yaml`, `.env.live-chain` (`HERMES_DISCORD_TOKEN`), optional `OMNIPOTENT_REPO` |
+| Credentials | `~/.hermes/trend-ingest.env` (`NEWSAPI_API_KEY`; optional `X_AUTH_TOKEN` + `X_CT0` for Source 11 — see §15.11.1), `~/.hermes/trend-watchlist.yaml`, `.env.live-chain` (`HERMES_DISCORD_TOKEN`), optional `OMNIPOTENT_REPO` |
 | Coexistence | **`investigate-trend`** uses a different trigger prefix; bind both to `#hermes` if needed |
 
 **Install and smoke test:**
@@ -960,6 +961,47 @@ Closes the quality loop opened by Epic 30: after **`/triage-execute`** + **`run-
 **Gateway dependency:** `run-morning-digest-cron.sh` exits **non-zero** if `hermes gateway status` does not show a running gateway — no false “digest delivered” when gateway is down. Same posture as §15.2 legacy launcher.
 
 **Schedule recreate semantics:** Changing `MORNING_DIGEST_CRON` or `morning_digest.cron` alone does not update the installed WSL line until you re-run `bash scripts/install-morning-digest-cron.sh`. The Hermes job always uses a dummy schedule; re-run install recreates it without duplicate digests.
+
+#### 15.11.1 X/Twitter session cookies (Epic 68)
+
+**Purpose:** Source 11 in the morning digest — curated AI/tech accounts via cookie GraphQL (vendored bird-search). No X Developer Portal / Basic tier / `X_BEARER_TOKEN`.
+
+| Item | Value |
+|------|--------|
+| Credential file | `~/.hermes/trend-ingest.env` (`chmod 600`) — same file as NewsAPI (§16.5) |
+| Required keys | `X_AUTH_TOKEN` (`auth_token` cookie), `X_CT0` (`ct0` cookie) |
+| Kill switch | `MORNING_DIGEST_X_ENABLED=0` disables Source 11 without deleting cookies |
+
+**Extract cookies (manual — WSL compatible):**
+
+1. Log in to [x.com](https://x.com) in your browser.
+2. Open DevTools → **Application** → **Cookies** → `https://x.com`.
+3. Copy `auth_token` → paste as `X_AUTH_TOKEN` in `~/.hermes/trend-ingest.env`.
+4. Copy `ct0` → paste as `X_CT0` in the same file.
+5. Do **not** use `@steipete/sweet-cookie` or automated browser reads on WSL.
+
+**Verify session:**
+
+```bash
+# From Omnipotent.md repo root:
+node scripts/hermes-skill-examples/morning-digest/scripts/fetch-x-signals.mjs --check
+# Or via Hermes HOME remap wrapper (Epic 59):
+bash scripts/session-close/hermes-run-x-check.sh
+```
+
+Exit **0** + `"status":"ok"` → session valid; `"status":"disabled"` → X intentionally off. Exit **1** with `"status":"session_invalid"` or `"status":"missing_credentials"` → rotate `X_AUTH_TOKEN` / `X_CT0` before the next digest. Exit **1** with `"status":"probe_failed"` → transient network or timeout; retry `--check` before rotating cookies.
+
+**Symptoms when cookies expire or are missing:**
+
+- Discord digest shows `- (source unavailable: X session invalid)` under **X / Twitter**, or the section has no tweet bullets.
+- `fetch-x-signals.mjs --check` exits non-zero with `"status":"session_invalid"` or `"status":"missing_credentials"`.
+- Normal fetch stderr includes `[x-auth]` remediation pointing here.
+
+**Disable without delete:** set `MORNING_DIGEST_X_ENABLED=0` in `~/.hermes/trend-ingest.env`. Other digest sources (Bluesky, NewsAPI, etc.) continue unchanged.
+
+**Non-goals:** No X API v2 bearer token, no monthly 500k quota guard, no blocking `/session-close` step when check fails.
+
+After editing credentials, re-run `bash scripts/install-hermes-skill-morning-digest.sh` if you changed repo skill docs; cookie values themselves require no reinstall.
 
 ### 15.12 Skill install gate (Story 54-1)
 

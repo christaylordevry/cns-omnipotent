@@ -197,6 +197,41 @@ MORNING_DIGEST_RSS_ENABLED=1
 
 When disabled, the fetch script returns `{"error":"rss disabled"}`.
 
+## X/Twitter session cookies (Story 68-7)
+
+Source 11 in the morning digest. Session cookies load from `$HOME/.hermes/trend-ingest.env` (Epic 59 HOME remap applies in `hermes-run-x.sh` and `hermes-run-x-check.sh` Hermes wrappers).
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `X_AUTH_TOKEN` | `auth_token` cookie from logged-in x.com | _(required for live X)_ |
+| `X_CT0` | `ct0` cookie from logged-in x.com | _(required for live X)_ |
+| `MORNING_DIGEST_X_ENABLED` | Kill switch | `1` |
+| `MORNING_DIGEST_X_ACCOUNTS` | Comma-separated curated handles | 5 defaults (karpathy, sama, ylecun, emollick, simonw) |
+| `MORNING_DIGEST_X_MAX_TWEETS` | Per-run cap (hard max 50) | `20` |
+| `MORNING_DIGEST_X_LOOKBACK_HOURS` | `since:` window for searches | `24` |
+| `MORNING_DIGEST_X_SEARCH_QUERIES` | Optional extra search queries (max 3) | _(empty)_ |
+
+**Health check** (before cron debugging):
+
+```bash
+node scripts/hermes-skill-examples/morning-digest/scripts/fetch-x-signals.mjs --check
+# or via Hermes HOME remap wrapper:
+bash scripts/session-close/hermes-run-x-check.sh
+```
+
+Exit **0** when session valid or X intentionally disabled; exit **1** when credentials missing, session invalid, or probe failed. See Operator Guide §15.11.1 for cookie extraction and rotation.
+
+Example operator setup:
+
+```bash
+# In ~/.hermes/trend-ingest.env
+X_AUTH_TOKEN=your-auth-token-cookie
+X_CT0=your-ct0-cookie
+MORNING_DIGEST_X_ENABLED=1
+```
+
+When disabled, the fetch script returns `{"error":"x disabled"}`. When cookies are missing or expired, stdout shows `{"error":"X session invalid"}` or `{"error":"X credentials not configured"}`; stderr includes actionable `[x-auth]` remediation lines.
+
 ## NotebookLM title map (Story 61-2)
 
 When `NOTEBOOKLM_NOTEBOOK_IDS` is set for session-close fan-out, registry rows may carry UUID-only titles. Morning digest signal scoring uses **human-readable** titles from this map so Vault context can ROUTED-match watched notebooks.

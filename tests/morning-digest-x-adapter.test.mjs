@@ -7,9 +7,13 @@ import { describe, it } from 'node:test';
 
 import {
   DEFAULT_X_ACCOUNTS,
+  X_AUTH_REMEDIATION,
   appendSinceToQuery,
   buildSinceDate,
+  checkXSession,
   dedupePostsByUrl,
+  emitXFetchStderr,
+  getCheckExitCode,
   isSessionInvalidError,
   loadXConfig,
   mapBirdTweet,
@@ -298,17 +302,31 @@ describe('fetch-x-signals.mjs runXFetch', () => {
         return { success: false, error: 'HTTP 403: Forbidden' };
       },
     };
-    const payload = await runXFetch(
-      {
-        X_AUTH_TOKEN: 'auth',
-        X_CT0: 'ct0',
-        MORNING_DIGEST_X_ACCOUNTS: 'karpathy,sama',
-      },
-      { searchClient },
-    );
-    assert.equal(payload.posts?.length, 1);
-    assert.equal(payload.posts?.[0].authorHandle, 'karpathy');
-    assert.equal('error' in payload, false);
+    const stderrChunks = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      stderrChunks.push(args.join(' '));
+    };
+    try {
+      const payload = await runXFetch(
+        {
+          X_AUTH_TOKEN: 'auth',
+          X_CT0: 'ct0',
+          MORNING_DIGEST_X_ACCOUNTS: 'karpathy,sama',
+        },
+        { searchClient },
+      );
+      assert.equal(payload.posts?.length, 1);
+      assert.equal(payload.posts?.[0].authorHandle, 'karpathy');
+      assert.equal('error' in payload, false);
+      assert.ok(
+        stderrChunks.some((line) =>
+          line.includes('X session became invalid mid-run'),
+        ),
+      );
+    } finally {
+      console.error = originalError;
+    }
   });
 
   it('returns X session invalid when auth fails before any success', async () => {
@@ -376,20 +394,156 @@ describe('fetch-x-signals.mjs §9 round-trip', () => {
   });
 });
 
-describe('fetch-x-signals.mjs CLI', () => {
-  it('stdout JSON error and exit 0 when credentials missing', async () => {
-    const { stdout } = await execFileAsync(process.execPath, [fetchScript], {
-      env: {
-        ...process.env,
-        X_AUTH_TOKEN: '',
-        X_CT0: '',
-        AUTH_TOKEN: '',
-        CT0: '',
+describe('fetch-x-signals.mjs checkXSession', () => {
+  it('returns missing_credentials when cookies absent', async () => {
+    const result = await checkXSession({
+      MORNING_DIGEST_X_ENABLED: '1',
+    });
+    assert.equal(result.status, 'missing_credentials');
+    assert.equal(result.credentialsPresent, false);
+    assert.equal(result.liveProbe, false);
+    assert.equal(getCheckExitCode(result), 1);
+  });
+
+  it('returns ok when mock probe succeeds', async () => {
+    const searchClient = {
+      search: async () => ({
+        success: true,
+        tweets: [FIXTURE_TWEET],
+      }),
+    };
+    const result = await checkXSession(
+      {
+        X_AUTH_TOKEN: 'auth',
+        X_CT0: 'ct0',
         MORNING_DIGEST_X_ENABLED: '1',
       },
+      { searchClient },
+    );
+    assert.equal(result.status, 'ok');
+    assert.equal(result.message, 'X session valid');
+    assert.equal(result.credentialsPresent, true);
+    assert.equal(result.liveProbe, true);
+    assert.equal(getCheckExitCode(result), 0);
+  });
+
+  it('returns session_invalid for mock 401 probe', async () => {
+    const searchClient = {
+      search: async () => ({
+        success: false,
+        error: 'HTTP 401: Unauthorized',
+      }),
+    };
+    const result = await checkXSession(
+      {
+        X_AUTH_TOKEN: 'auth',
+        X_CT0: 'ct0',
+      },
+      { searchClient },
+    );
+    assert.equal(result.status, 'session_invalid');
+    assert.equal(result.credentialsPresent, true);
+    assert.equal(getCheckExitCode(result), 1);
+  });
+
+  it('returns session_invalid for HTML interstitial probe', async () => {
+    const searchClient = {
+      search: async () => ({
+        success: false,
+        error: '<!doctype html><html>Sign in to X</html>',
+      }),
+    };
+    const result = await checkXSession(
+      {
+        X_AUTH_TOKEN: 'auth',
+        X_CT0: 'ct0',
+      },
+      { searchClient },
+    );
+    assert.equal(result.status, 'session_invalid');
+    assert.equal(getCheckExitCode(result), 1);
+  });
+
+  it('returns disabled with exit 0 when kill switch set', async () => {
+    const result = await checkXSession({
+      MORNING_DIGEST_X_ENABLED: '0',
+      X_AUTH_TOKEN: 'auth',
+      X_CT0: 'ct0',
+    });
+    assert.equal(result.status, 'disabled');
+    assert.equal(result.liveProbe, false);
+    assert.equal(getCheckExitCode(result), 0);
+  });
+});
+
+describe('fetch-x-signals.mjs CLI', () => {
+  const emptyXCredsEnv = {
+    ...process.env,
+    X_AUTH_TOKEN: '',
+    X_CT0: '',
+    AUTH_TOKEN: '',
+    CT0: '',
+    TWITTER_AUTH_TOKEN: '',
+    TWITTER_CT0: '',
+    MORNING_DIGEST_X_ENABLED: '1',
+  };
+
+  it('stdout JSON error and exit 0 when credentials missing', async () => {
+    const { stdout } = await execFileAsync(process.execPath, [fetchScript], {
+      env: emptyXCredsEnv,
     });
     const parsed = JSON.parse(stdout.trim());
     assert.equal(parsed.error, 'X credentials not configured');
+  });
+
+  it('--check exits 1 with missing_credentials when cookies absent', async () => {
+    await assert.rejects(
+      async () => {
+        await execFileAsync(process.execPath, [fetchScript, '--check'], {
+          env: emptyXCredsEnv,
+        });
+      },
+      (err) => {
+        assert.equal(err.code, 1);
+        const parsed = JSON.parse(String(err.stdout).trim());
+        assert.equal(parsed.status, 'missing_credentials');
+        return true;
+      },
+    );
+  });
+
+  it('--check exits 0 with disabled when kill switch set', async () => {
+    const { stdout } = await execFileAsync(process.execPath, [fetchScript, '--check'], {
+      env: {
+        ...process.env,
+        MORNING_DIGEST_X_ENABLED: '0',
+        X_AUTH_TOKEN: 'auth',
+        X_CT0: 'ct0',
+      },
+    });
+    const parsed = JSON.parse(stdout.trim());
+    assert.equal(parsed.status, 'disabled');
+  });
+
+  it('stderr includes remediation when session invalid on normal fetch', () => {
+    const stderrChunks = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      stderrChunks.push(args.join(' '));
+    };
+    try {
+      emitXFetchStderr({ error: 'X session invalid' });
+      assert.ok(stderrChunks.some((line) => line.includes(X_AUTH_REMEDIATION)));
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('stderr includes configure hint when credentials missing on CLI fetch', async () => {
+    const { stderr } = await execFileAsync(process.execPath, [fetchScript], {
+      env: emptyXCredsEnv,
+    });
+    assert.ok(stderr.includes('configure X_AUTH_TOKEN and X_CT0'));
   });
 });
 

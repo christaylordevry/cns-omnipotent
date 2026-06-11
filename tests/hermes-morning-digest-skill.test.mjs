@@ -646,6 +646,16 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("hackernews disabled"));
   });
 
+  it("config-snippet documents X session cookies and --check (Story 68-7)", () => {
+    const body = readFileSync(configSnippetPath, "utf8");
+    assert.ok(body.includes("X_AUTH_TOKEN"));
+    assert.ok(body.includes("X_CT0"));
+    assert.ok(body.includes("MORNING_DIGEST_X_ENABLED"));
+    assert.ok(body.includes("fetch-x-signals.mjs --check"));
+    assert.ok(body.includes("hermes-run-x-check.sh"));
+    assert.ok(body.includes("§15.11.1"));
+  });
+
   it("task-prompt documents post-post digest Convex push (Story 61-5)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
     const postPost = taskBody.slice(
