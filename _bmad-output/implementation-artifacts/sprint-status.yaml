@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-12T22:00:00+00:00
+# last_updated: 2026-06-12T23:30:00+00:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-12T22:00:00+00:00"
+last_updated: "2026-06-12T23:30:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -468,11 +468,12 @@ development_status:
   epic-65-retrospective: done
 
   # Epic 66 — Nexus Agent Orchestration (renumbered from sprint-change-proposal-2026-06-06 Epic 64+)
-  epic-66: in-progress
+  # Closed 2026-06-12: 66-2 cancelled (superseded by 69-5); 66-1/66-3/66-4 done
+  epic-66: done
   66-3-investigation-sessions-schema-crud-gate: done
   66-1-inspector-ai-action-wiring: done
   66-4-swap-investigation-provider-openrouter: done
-  66-2-agent-orchestration-workspace-screen-10: backlog
+  66-2-agent-orchestration-workspace-screen-10: cancelled # Superseded by 69-5-investigation-workspace-screen-10 (done 2026-06-12)
   epic-66-retrospective: optional
 
   # Epic 67 — Signal Quality + Source Expansion (prd + architecture 2026-06-09)
