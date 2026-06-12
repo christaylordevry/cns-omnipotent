@@ -323,7 +323,7 @@ export function parseSourceOutcomesFromArtifact(markdown) {
 			continue;
 		}
 
-		const headerMatch = line.match(/^#{1,3}\s+(.+)$/);
+		const headerMatch = line.match(/^#{1,2}\s+(.+)$/);
 		if (headerMatch) {
 			currentSourceKey = resolveSourceKeyFromSectionHeader(headerMatch[1]);
 			continue;
@@ -377,10 +377,23 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
 	const signalCounts = new Map();
 	for (const signal of signals) {
 		const sourceType = typeof signal?.sourceType === 'string' ? signal.sourceType : null;
-		if (!sourceType) {
-			continue;
+		if (sourceType) {
+			signalCounts.set(sourceType, (signalCounts.get(sourceType) ?? 0) + 1);
 		}
-		signalCounts.set(sourceType, (signalCounts.get(sourceType) ?? 0) + 1);
+		const contributors = signal?.sourceMetadata?.contributingSources;
+		if (Array.isArray(contributors)) {
+			for (const contributor of contributors) {
+				const contributorKey =
+					typeof contributor?.sourceType === 'string' ? contributor.sourceType : null;
+				if (!contributorKey || contributorKey === sourceType) {
+					continue;
+				}
+				signalCounts.set(
+					contributorKey,
+					(signalCounts.get(contributorKey) ?? 0) + 1,
+				);
+			}
+		}
 	}
 
 	for (const entry of DIGEST_SOURCE_SECTION_MAP) {
@@ -452,11 +465,62 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
  * @param {Array<{ sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} markdownRows
  * @returns {Array<{ sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>}
  */
+/**
+ * @param {'fired' | 'unavailable' | 'error'} status
+ * @returns {boolean}
+ */
+function isHardSourceOutcomeStatus(status) {
+	return status === 'error' || status === 'unavailable';
+}
+
 export function mergeSourceOutcomeRows(payloadRows, markdownRows) {
 	/** @type {Map<string, { sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} */
 	const merged = new Map(payloadRows.map((row) => [row.sourceKey, row]));
-	for (const row of markdownRows) {
-		merged.set(row.sourceKey, row);
+	for (const markdownRow of markdownRows) {
+		const existing = merged.get(markdownRow.sourceKey);
+		if (!existing) {
+			merged.set(markdownRow.sourceKey, markdownRow);
+			continue;
+		}
+		if (markdownRow.status === 'unavailable') {
+			merged.set(markdownRow.sourceKey, markdownRow);
+			continue;
+		}
+		if (
+			isHardSourceOutcomeStatus(existing.status) &&
+			markdownRow.status === 'fired'
+		) {
+			merged.set(markdownRow.sourceKey, {
+				...existing,
+				signalCount: markdownRow.signalCount ?? existing.signalCount,
+			});
+			continue;
+		}
+		merged.set(markdownRow.sourceKey, markdownRow);
+	}
+	return DIGEST_SOURCE_SECTION_MAP.map((entry) => merged.get(entry.sourceKey)).filter(Boolean);
+}
+
+/**
+ * Keep prior error/unavailable rows when adapter results are unavailable (e.g. force-rescore).
+ *
+ * @param {Array<{ sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} outcomes
+ * @param {Array<{ sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} priorOutcomes
+ */
+export function preservePriorHardOutcomes(outcomes, priorOutcomes) {
+	/** @type {Map<string, { sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} */
+	const merged = new Map(outcomes.map((row) => [row.sourceKey, row]));
+	for (const prior of priorOutcomes) {
+		if (!isHardSourceOutcomeStatus(prior.status)) {
+			continue;
+		}
+		const current = merged.get(prior.sourceKey);
+		if (!current || current.status === 'fired') {
+			merged.set(prior.sourceKey, {
+				...prior,
+				signalCount: current?.signalCount ?? prior.signalCount,
+			});
+		}
 	}
 	return DIGEST_SOURCE_SECTION_MAP.map((entry) => merged.get(entry.sourceKey)).filter(Boolean);
 }
@@ -493,12 +557,16 @@ export function resolveDigestMarkdownFromPayload(payload) {
 export function resolveSourceOutcomes(ctx = {}) {
 	const fromPayload = buildSourceOutcomesFromPayload(ctx);
 	const markdown = ctx.markdown?.trim();
-	if (!markdown) {
-		return fromPayload;
+	let outcomes = fromPayload;
+	if (markdown) {
+		const fromMarkdown = parseSourceOutcomesFromArtifact(markdown);
+		if (fromMarkdown.length > 0) {
+			outcomes = mergeSourceOutcomeRows(fromPayload, fromMarkdown);
+		}
 	}
-	const fromMarkdown = parseSourceOutcomesFromArtifact(markdown);
-	if (fromMarkdown.length === 0) {
-		return fromPayload;
+	const priorOutcomes = Array.isArray(ctx.priorOutcomes) ? ctx.priorOutcomes : [];
+	if (priorOutcomes.length > 0) {
+		outcomes = preservePriorHardOutcomes(outcomes, priorOutcomes);
 	}
-	return mergeSourceOutcomeRows(fromPayload, fromMarkdown);
+	return outcomes;
 }

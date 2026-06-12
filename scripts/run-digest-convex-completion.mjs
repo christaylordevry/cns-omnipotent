@@ -254,11 +254,16 @@ export function parseCompletionCliArgs(argv) {
  * @param {Record<string, unknown> | undefined} adapterResults
  */
 function attachSourceOutcomes(payload, adapterResults) {
+  const priorOutcomes =
+    adapterResults == null && payload.run && typeof payload.run === 'object'
+      ? /** @type {unknown} */ (payload.run).sourceOutcomes
+      : undefined;
   const outcomes = resolveSourceOutcomes({
     markdown: resolveDigestMarkdownFromPayload(payload),
     run: payload.run,
     signals: Array.isArray(payload.signals) ? payload.signals : [],
     adapterResults,
+    priorOutcomes: Array.isArray(priorOutcomes) ? priorOutcomes : undefined,
   });
   if (outcomes.length > 0) {
     payload.run = { ...payload.run, sourceOutcomes: outcomes };

@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 
 import {
 	buildSourceOutcomesFromPayload,
+	mergeSourceOutcomeRows,
 	parseSourceOutcomesFromArtifact,
+	preservePriorHardOutcomes,
 	renderDigestMarkdownFromPayload,
 	resolveDigestMarkdownFromPayload,
 	resolveSourceKeyFromSectionHeader,
@@ -105,6 +107,97 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		assert.ok(outcomes.some((row) => row.sourceKey === 'google_trends' && row.status === 'fired'));
 		assert.ok(outcomes.some((row) => row.sourceKey === 'newsapi' && row.signalCount === 1));
 		assert.ok(outcomes.some((row) => row.sourceKey === 'notebook' && row.status === 'fired'));
+	});
+
+	it('counts contributingSources appearances in buildSourceOutcomesFromPayload', () => {
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: {},
+			signals: [
+				{
+					sourceType: 'hackernews',
+					title: 'Merged story',
+					sourceMetadata: {
+						contributingSources: [{ sourceType: 'newsapi' }],
+					},
+				},
+			],
+		});
+
+		assert.equal(
+			outcomes.find((row) => row.sourceKey === 'newsapi')?.signalCount,
+			1,
+		);
+		assert.equal(
+			outcomes.find((row) => row.sourceKey === 'hackernews')?.signalCount,
+			1,
+		);
+	});
+
+	it('mergeSourceOutcomeRows preserves adapter error over markdown fired bullets', () => {
+		const merged = mergeSourceOutcomeRows(
+			[
+				{
+					sourceKey: 'twitter',
+					status: 'error',
+					reason: 'invalid-json',
+				},
+			],
+			[
+				{
+					sourceKey: 'twitter',
+					status: 'fired',
+					signalCount: 2,
+				},
+			],
+		);
+
+		assert.deepEqual(merged.find((row) => row.sourceKey === 'twitter'), {
+			sourceKey: 'twitter',
+			status: 'error',
+			reason: 'invalid-json',
+			signalCount: 2,
+		});
+	});
+
+	it('ignores h3 sub-headers when parsing artifact markdown', () => {
+		const markdown = [
+			'## HackerNews',
+			'### Top Stories',
+			'- [HN item](<https://news.ycombinator.com/item?id=1>)',
+		].join('\n');
+
+		const outcomes = parseSourceOutcomesFromArtifact(markdown);
+		assert.deepEqual(outcomes.find((row) => row.sourceKey === 'hackernews'), {
+			sourceKey: 'hackernews',
+			status: 'fired',
+			signalCount: 1,
+		});
+	});
+
+	it('preservePriorHardOutcomes keeps prior error rows on force-rescore paths', () => {
+		const preserved = preservePriorHardOutcomes(
+			[
+				{
+					sourceKey: 'twitter',
+					status: 'fired',
+					signalCount: 1,
+				},
+			],
+			[
+				{
+					sourceKey: 'twitter',
+					status: 'error',
+					reason: 'invalid-json',
+				},
+			],
+		);
+
+		assert.deepEqual(preserved.find((row) => row.sourceKey === 'twitter'), {
+			sourceKey: 'twitter',
+			status: 'error',
+			reason: 'invalid-json',
+			signalCount: 1,
+		});
 	});
 
 	it('resolveSourceOutcomes merges markdown unavailable with payload fired rows', () => {

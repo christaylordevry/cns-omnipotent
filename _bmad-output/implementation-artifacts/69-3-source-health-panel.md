@@ -4,7 +4,7 @@ baseline_commit: a55caf11390dce1b6cd8f761f011396e09953273
 
 # Story 69.3: Source Health Panel — Query + Push Outcomes + UI
 
-Status: review
+Status: done
 
 **Epic gate:** Requires **69-4 done** (layout gate — `/nexus` digest feed exists). **69-4 is done** (`eae57d6`). Panel attaches to the **right column** beside the digest feed; empty-state copy in the feed may reference source health (optional polish).
 
@@ -219,6 +219,18 @@ type SourceOutcome = {
   - [x] T9.3 `push-digest-convex.mjs` — no change needed if spread passes full `run`; verify explicitly
   - [x] T9.4 Extend `tests/run-digest-convex-completion.test.mjs` — pushed artifact includes `sourceOutcomes` when artifact markdown has unavailable markers
   - [x] T9.5 Run `bash scripts/verify.sh` from Omnipotent.md; call `resolveOperatorHome()` on any script touch per project guardrails
+
+### Review Findings
+
+- [x] [Review][Patch] Brief query failure shows empty state instead of error copy [NexusSourceHealthPanel.svelte:44] — fixed: `noDigestRun` guards on `digestBriefQuery.error == null`.
+- [x] [Review][Patch] Markdown merge overwrites adapter error status [parse-digest-source-outcomes.mjs:455-462] — fixed: `mergeSourceOutcomeRows` preserves payload `error`/`unavailable` over markdown `fired`.
+- [x] [Review][Patch] force-rescore drops adapterResults for sourceOutcomes [run-digest-convex-completion.mjs:351] — fixed: `attachSourceOutcomes` passes `priorOutcomes` when `adapterResults` absent; `preservePriorHardOutcomes` retains error/unavailable rows.
+- [x] [Review][Patch] Parser treats h3 headers as source sections [parse-digest-source-outcomes.mjs:326-329] — fixed: header regex limited to `^#{1,2}`.
+- [x] [Review][Patch] Push builder ignores contributingSources for signalCount [parse-digest-source-outcomes.mjs:377-384] — fixed: `buildSourceOutcomesFromPayload` counts contributor appearances.
+- [x] [Review][Decision] Partial-metadata disclaimer wording [nexus-source-health.ts:35-36] — resolved **C**: disclaimer only when every row is `inferenceMode: 'inferred'`.
+- [x] [Review][Patch] Mobile chip scroll not keyboard-reachable [NexusSourceHealthPanel.svelte:79-82] — fixed: scroll region `role="region"`, `tabindex="0"` on mobile.
+- [x] [Review][Defer] Native `title` tooltip unavailable on touch tap [NexusSourceHealthPanel.svelte:93] — deferred, pre-existing pattern; T5.4 explicitly allowed native `title`; `aria-label` carries reason/count for assistive tech. AC3 "tap" partially unmet for sighted mobile users.
+- [x] [Review][Defer] Twitter section pattern `/\bx\b/i` false positives [parse-digest-source-outcomes.mjs:19] — deferred, low-frequency header collision risk; no production artifact evidence yet.
 
 ## Dev Notes
 
@@ -494,5 +506,6 @@ Composer (Cursor)
 ## Story Completion Status
 
 - Implementation complete; code review batch-fix applied (M1, M2, L1–L3)
-- Status: **review** (pending commit)
-- Sprint tracker: `69-3-source-health-panel` → review
+- Second review pass: 6 patches + decision C applied (2026-06-12)
+- Status: **done**
+- Sprint tracker: `69-3-source-health-panel` → done

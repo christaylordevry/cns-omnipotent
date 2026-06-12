@@ -519,7 +519,7 @@ development_status:
   69-4-digest-signal-feed-disposition-hierarchy: done
   69-1-inspector-dedup-merge-provenance: review
   69-2-people-match-indicator: done
-  69-3-source-health-panel: review
+  69-3-source-health-panel: done
   69-5-investigation-workspace-screen-10: ready-for-dev
   epic-69-retrospective: optional
 

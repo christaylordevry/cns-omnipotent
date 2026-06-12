@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 69-3-source-health-panel (2026-06-12)
+
+- Native `title` tooltip unavailable on touch tap — T5.4 allowed native `title`; `aria-label` covers assistive tech; sighted mobile tap tooltip is polish.
+- Twitter section pattern `/\bx\b/i` false positives — low-frequency header collision risk; no production artifact evidence yet.
+
 ## Deferred from: code review of 70-3-errors-by-source-date-skew-signal-quality (2026-06-12)
 
 - `isAdapterErrorPayload` treats `{ error, posts: [] }` as success — intentional heuristic for adapter-only error JSON; empty-array collision unlikely.
