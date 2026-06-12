@@ -1,14 +1,49 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { readNotebooklmDriveDocId } from "./lib/load-session-close-env.mjs";
 import { matchDriveSourceByDocId } from "./lib/match-drive-source.mjs";
 import { resolveNlmCommand, resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
+import { resolveOperatorHome } from "./lib/operator-home.mjs";
 import { mergeFanoutUpdatesAtPath } from "./merge-notebooklm-fanout.mjs";
+
+const DRIVE_SYNC_LOG_BASENAME = "session-close-drive-sync.log";
+
+/**
+ * Append full drive-sync stderr to operator log before close-report sanitization.
+ *
+ * @param {Array<{ notebook_id?: string; status: string; stderr?: string }>} updates
+ * @param {{ env?: Record<string, string | undefined>; logPath?: string }} [opts]
+ */
+export async function appendDriveSyncFailureLogs(updates, opts = {}) {
+  const failures = updates.filter(
+    (row) => row.status === "failed" && typeof row.stderr === "string" && row.stderr.trim(),
+  );
+  if (failures.length === 0) {
+    return;
+  }
+
+  const logPath =
+    opts.logPath ??
+    join(
+      await resolveOperatorHome(opts.env ?? process.env),
+      ".hermes",
+      "logs",
+      DRIVE_SYNC_LOG_BASENAME,
+    );
+  await mkdir(dirname(logPath), { recursive: true });
+
+  const timestamp = new Date().toISOString();
+  for (const row of failures) {
+    const notebookId = typeof row.notebook_id === "string" ? row.notebook_id : "unknown";
+    const block = `[${timestamp}] notebook_id=${notebookId}\n${row.stderr}\n---\n`;
+    await appendFile(logPath, block, "utf8");
+  }
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -159,8 +194,9 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
  * @param {string} driveDocId
  * @param {unknown[]} targets
  * @param {string} message
+ * @param {string | undefined} driveSyncLogPath
  */
-async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message) {
+async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message, driveSyncLogPath) {
   const updates = targets
     .filter((row) => isObject(row) && typeof row.notebook_id === "string")
     .map((row) => ({
@@ -170,6 +206,7 @@ async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message) 
       error_class: "drive_write_error",
       drive_doc_id: driveDocId,
     }));
+  await appendDriveSyncFailureLogs(updates, { logPath: driveSyncLogPath });
   await mergeFanoutUpdatesAtPath(reportPath, updates);
   return { ok: false, reason: "drive-write-failed", merged: updates.length };
 }
@@ -179,6 +216,7 @@ async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message) 
  * @param {{
  *   driveDocId?: string;
  *   runNlm?: (cmd: string, args: string[]) => Promise<{ stdout: string }>;
+ *   driveSyncLogPath?: string;
  * }} [opts]
  */
 export async function runSyncVaultExportDrive(reportPath, opts = {}) {
@@ -225,7 +263,7 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
         ? driveWrite.message
         : "drive doc overwrite not completed (steps.drive_write missing or not ok)";
     process.stderr.write(`session-close: sync-vault-export-drive skipped (${message})\n`);
-    return mergeDriveWriteFailure(reportPath, driveDocId, targets, message);
+    return mergeDriveWriteFailure(reportPath, driveDocId, targets, message, opts.driveSyncLogPath);
   }
 
   /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate[]} */
@@ -248,6 +286,7 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     });
   }
 
+  await appendDriveSyncFailureLogs(updates, { logPath: opts.driveSyncLogPath });
   await mergeFanoutUpdatesAtPath(reportPath, updates);
 
   return { ok: true, synced: updates.filter((u) => u.status === "ok").length };

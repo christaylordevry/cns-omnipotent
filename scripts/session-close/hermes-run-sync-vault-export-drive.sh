@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH=/home/christ/.nvm/versions/node/v24.14.0/bin:$PATH
+# Story 59-3: operator HOME + nvm PATH before drive-sync (Hermes isolation).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/npm-env.sh
+source "${SCRIPT_DIR}/lib/npm-env.sh"
 
 if ! command -v node &>/dev/null; then
   echo "[hermes-run-sync-vault-export-drive] ERROR: node not found in PATH" >&2

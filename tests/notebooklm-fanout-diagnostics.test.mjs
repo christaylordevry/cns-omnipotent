@@ -40,6 +40,23 @@ describe("classifySourceAddError", () => {
     assert.equal(classifySourceAddError("Could not add file source."), "nlm_source_rejected");
     assert.equal(classifySourceAddError("Could not add source."), "nlm_source_rejected");
   });
+
+  it("classifies nlm_cli_exception for Python tracebacks and Rich box errors", () => {
+    const traceback = `Traceback (most recent call last):
+  File "nlm/cli.py", line 1, in <module>
+    raise RuntimeError("boom")`;
+    assert.equal(classifySourceAddError(traceback), "nlm_cli_exception");
+    assert.equal(
+      classifySourceAddError("╭─ Error ─────────────────────╮\n│ nlm source sync failed      │\n╰─────────────────────────────╯"),
+      "nlm_cli_exception",
+    );
+    assert.equal(
+      classifySourceAddError(
+        "Command failed\n╭─ Error ─────────────────────╮\n│ nlm source sync failed      │\n╰─────────────────────────────╯",
+      ),
+      "nlm_cli_exception",
+    );
+  });
 });
 
 describe("parseHttpStatus", () => {

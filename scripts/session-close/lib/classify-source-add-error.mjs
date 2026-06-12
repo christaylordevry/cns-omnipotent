@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { sanitizeNlmAuthText } from "./nlm-auth-watchdog.mjs";
 
-/** @typedef {'size_limit' | 'auth_error' | 'duplicate_source' | 'api_error' | 'nlm_source_rejected' | 'unknown'} SourceAddErrorClass */
+/** @typedef {'size_limit' | 'auth_error' | 'duplicate_source' | 'api_error' | 'nlm_source_rejected' | 'nlm_cli_exception' | 'unknown'} SourceAddErrorClass */
 
 const CLASS_RULES = [
   {
@@ -85,6 +85,12 @@ export function parseHttpStatus(text) {
  */
 export function classifySourceAddError(text) {
   const haystack = text ?? "";
+  if (/Traceback \(most recent call last\)/.test(haystack)) {
+    return "nlm_cli_exception";
+  }
+  if (/^╭/m.test(haystack)) {
+    return "nlm_cli_exception";
+  }
   for (const rule of CLASS_RULES) {
     if (rule.patterns.some((pattern) => pattern.test(haystack))) {
       return rule.error_class;

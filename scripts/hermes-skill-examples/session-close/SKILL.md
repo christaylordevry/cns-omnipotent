@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
-version: 1.0.14
+version: 1.0.15
 author: CNS Operator
 license: MIT
 metadata:
@@ -75,4 +75,4 @@ Post stdout as the reply. Fallback only if render fails: `references/discord-rep
 - WriteGate protects `AI-Context/**`; do not use Vault IO mutators for AGENTS.
 - Bump `version`, run `bash scripts/install-hermes-skill-session-close.sh`, restart gateway after skill changes.
 - **Phase A tests failure**: If `hermes-run-session-close.sh` reports `failure_class: tests`, check the session-close log for details. This blocks a clean close.
-- **NotebookLM drive-sync failure**: If NotebookLM fan-out with `drive-sync` reports `failed (unknown)`, it indicates an issue with syncing the vault export to Google Drive. This may require manual investigation of the Drive connection or the `hermes-run-sync-vault-export-drive.sh` script.
+- **NotebookLM drive-sync failure**: Check `~/.hermes/logs/session-close-drive-sync.log` for full stderr (close-report keeps a 160-char `error_snippet` only). `error_class: nlm_cli_exception` means an nlm CLI traceback (Typer/Rich); other classes use fan-out diagnostics. Drive wrappers source `lib/npm-env.sh` for operator HOME parity under Hermes isolation.

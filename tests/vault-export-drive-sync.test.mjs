@@ -19,6 +19,7 @@ import {
 import { mergeFanoutIntoCloseReport } from "../scripts/session-close/merge-notebooklm-fanout.mjs";
 import { recordNotebooklmFanoutMode } from "../scripts/session-close/record-notebooklm-fanout-mode.mjs";
 import {
+  appendDriveSyncFailureLogs,
   parseNlmDriveSourceList,
   runSyncVaultExportDrive,
   syncNotebookDriveSource,
@@ -324,6 +325,70 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.equal(row.fanout_status, "ok");
     assert.equal(row.drive_source_id, "src-vault");
     assert.equal(row.drive_doc_id, FIXTURE_DRIVE_DOC);
+  });
+
+  it("appendDriveSyncFailureLogs writes full stderr before close-report sanitization", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "drive-sync-log-"));
+    const logPath = join(dir, "session-close-drive-sync.log");
+    const longStderr = `Traceback (most recent call last):\n${"x".repeat(400)}`;
+
+    await appendDriveSyncFailureLogs(
+      [
+        { notebook_id: FIXTURE_NOTEBOOK, status: "ok" },
+        { notebook_id: "other", status: "failed", stderr: longStderr },
+      ],
+      { logPath },
+    );
+
+    const logged = await readFile(logPath, "utf8");
+    assert.ok(logged.includes(`notebook_id=other`));
+    assert.ok(logged.includes(longStderr));
+    assert.ok(logged.length > 160);
+  });
+
+  it("runSyncVaultExportDrive logs full stderr and classifies nlm_cli_exception", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-nlm-exc-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = join(dir, "session-close-drive-sync.log");
+    const longStderr = `╭─ Error ─────────────────────╮\n│ sync failed                 │\n╰─────────────────────────────╯\n${"y".repeat(300)}`;
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive doc overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+    const runNlm = async (_cmd, args) => {
+      if (args.includes("list")) {
+        return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+      }
+      const err = /** @type {Error & { stderr?: string }} */ (new Error("nlm source sync failed"));
+      err.stderr = longStderr;
+      throw err;
+    };
+
+    await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      runNlm,
+      driveSyncLogPath: logPath,
+    });
+
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    const row = saved.notebooklm_targets[0];
+    assert.equal(row.fanout_status, "failed");
+    assert.equal(row.error_class, "nlm_cli_exception");
+    assert.ok(typeof row.error_snippet === "string");
+    assert.ok(row.error_snippet.length <= 160);
+
+    const logged = await readFile(logPath, "utf8");
+    assert.ok(logged.includes(longStderr));
   });
 
   it("merge applies drive_write_error when explicit error_class set", async () => {
