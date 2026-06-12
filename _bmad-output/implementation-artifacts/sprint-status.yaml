@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-12T14:00:00+10:00
+# last_updated: 2026-06-12T22:00:00+00:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-12T18:00:00+00:00"
+last_updated: "2026-06-12T22:00:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -515,12 +515,13 @@ development_status:
 
   # Epic 69 — Nexus Intelligence UI: Signal Surface + Operator Visibility (prd 2026-06-11)
   # Gate: 69-4 layout gate first — feed must exist before 69-1/69-2/69-3/69-5 attach
-  epic-69: in-progress
+  # Closed 2026-06-12: all stories 69-1..69-5 done; retrospective eligible
+  epic-69: done
   69-4-digest-signal-feed-disposition-hierarchy: done
-  69-1-inspector-dedup-merge-provenance: review
+  69-1-inspector-dedup-merge-provenance: done
   69-2-people-match-indicator: done
   69-3-source-health-panel: done
-  69-5-investigation-workspace-screen-10: ready-for-dev
+  69-5-investigation-workspace-screen-10: done
   epic-69-retrospective: optional
 
   # Epic 70 — Deterministic Morning Digest Orchestrator (operator brief 2026-06-12)
