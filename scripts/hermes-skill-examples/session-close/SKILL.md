@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
-version: 1.0.13
+version: 1.0.14
 author: CNS Operator
 license: MIT
 metadata:
@@ -54,7 +54,7 @@ Dry-run: skip Drive write, sync, and `source_add`; NotebookLM = `skipped in dry-
 Run in order (scripts only — do not load fan-out reference markdown):
 
 1. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh"` — read stdout JSON `mode` (`drive-sync` or `legacy-source-add`)
-2. If `drive-sync`: `hermes-run-write-vault-export-to-drive.sh` then `hermes-run-sync-vault-export-drive.sh` (no `source_add`)
+2. If `drive-sync`: `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-write-vault-export-to-drive.sh"` then `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-sync-vault-export-drive.sh"` (no `source_add`)
 3. If `legacy-source-add`: MCP `source_add` per `close-report.json` target + `hermes-run-merge-notebooklm-fanout.sh` after each call
 4. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh" [--dry-run]`
 
