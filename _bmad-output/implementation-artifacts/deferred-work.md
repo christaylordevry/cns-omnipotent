@@ -1,5 +1,23 @@
 # Deferred work
 
+## Deferred from: code review of 71-4-discord-only-repair-from-day-outcome-record (2026-06-13)
+
+- `recoveryPath = 'none'` for discord-only-repair orchestrator branch — `DigestRecoveryPath` enum has no `discord-only-repair` variant; history shows `recoveryPath: none` for a real recovery operation. Observability polish only; no correctness impact.
+
+## Deferred from: code review of 71-3-structured-run-outcome-record-observability-gate (2026-06-13)
+
+- Hermes Discord `morning-digest` skill writes no outcome record — AC scoped to `runDigestConvexCompletion`; Discord manual path outside observability gate until future wiring.
+- Distinguish Convex query failure from skipped/Convex divergence error strings (`convex-status-query-failed` vs `log-skipped-but-convex-not-published`) — sticky day model limits impact to history diagnostic text; not alerting/correctness under current architecture.
+- `markInvocationStarted` failure before try/finally (disk full, permissions) — rare ops edge; no lock file in epic scope.
+
+## Resolved by: 71-3-structured-run-outcome-record-observability-gate (2026-06-13)
+
+- ~~`deferred-push-only-artifact` writes no watchdog log line — 71-3 outcome record must infer defer from orchestrator logs or add explicit breadcrumb.~~ **Done:** orchestrator logs `push-only-artifact-recovery` and sets `recoveryPath: push-only-artifact`.
+- ~~Legacy `tryRecoverFromArtifact` logs `recovered-push*` vs bucket-3 `pushOnlyFromArtifact` logs `completion-backfill-push` — 71-3 must not treat as equivalent success shapes.~~ **Done:** action mapping table + `recoveryPath` distinguishes paths; both map to `convex.ok` via terminal action set.
+- ~~`skipped-already-pushed` in log alone is terminal without requiring published Convex row — low probability if logging consistent.~~ **Done:** outcome builder cross-checks Convex row; divergence yields `overall: partial` and check script non-zero exit.
+
+## Deferred from: code review of 71-1-fix-watchdog-false-success-on-started-runs (2026-06-13) — moved to Resolved above
+
 ## Deferred from: code review of 69-3-source-health-panel (2026-06-12)
 
 - Native `title` tooltip unavailable on touch tap — T5.4 allowed native `title`; `aria-label` covers assistive tech; sighted mobile tap tooltip is polish.

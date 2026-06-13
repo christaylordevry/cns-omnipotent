@@ -13,18 +13,27 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delayMs } from 'node:timers/promises';
 
 import {
+  classifyDigestRetryBucket,
+  findLatestDigestLogEntryForDate,
+  TERMINAL_CONVEX_STATUSES,
+} from './lib/digest-retry-eligibility.mjs';
+import {
+  readDayOutcomeRecord,
+  resolveDigestOutcomeDir,
+} from './lib/digest-run-outcome.mjs';
+import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
+import { resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
+import {
   normalizeConvexUrl,
   readDigestPushPayload,
   resolveConvexPushEnv,
 } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
-import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
-import { resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 
 const QUERY_PATH = 'digest:getRecentDigestRuns';
 const RECENT_RUNS_LIMIT = 10;
 const QUERY_MAX_ATTEMPTS = 3;
 const QUERY_RETRY_DELAY_MS = 1000;
-const VALID_NON_FAILED_STATUSES = new Set(['started', 'completed', 'published', 'archived']);
+const TERMINAL_CONVEX_SUCCESS_STATUSES = TERMINAL_CONVEX_STATUSES;
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -110,15 +119,17 @@ export async function fetchRecentDigestRuns(fetchFn, convexEnv, opts = {}) {
 /**
  * @param {unknown} runs
  * @param {string} todayDate
- * @returns {{ hasNonFailedToday: boolean; todayFailedOnly: boolean }}
+ * @returns {{ hasNonFailedToday: boolean; todayFailedOnly: boolean; todayConvexStatus: string | null }}
  */
 export function evaluateTodayDigestRuns(runs, todayDate) {
   if (!Array.isArray(runs) || runs.length === 0) {
-    return { hasNonFailedToday: false, todayFailedOnly: false };
+    return { hasNonFailedToday: false, todayFailedOnly: false, todayConvexStatus: null };
   }
 
   let sawToday = false;
   let sawTodayNonFailed = false;
+  /** @type {string | null} */
+  let todayConvexStatus = null;
 
   for (const row of runs) {
     if (!row || typeof row !== 'object') {
@@ -130,7 +141,8 @@ export function evaluateTodayDigestRuns(runs, todayDate) {
     }
     sawToday = true;
     const status = typeof record.status === 'string' ? record.status : '';
-    if (VALID_NON_FAILED_STATUSES.has(status)) {
+    todayConvexStatus = status || null;
+    if (TERMINAL_CONVEX_SUCCESS_STATUSES.has(status)) {
       sawTodayNonFailed = true;
       break;
     }
@@ -139,6 +151,7 @@ export function evaluateTodayDigestRuns(runs, todayDate) {
   return {
     hasNonFailedToday: sawTodayNonFailed,
     todayFailedOnly: sawToday && !sawTodayNonFailed,
+    todayConvexStatus,
   };
 }
 
@@ -175,6 +188,35 @@ async function appendWatchdogLog(opts) {
   const mkdirFn = opts.mkdirFn ?? mkdir;
   await mkdirFn(dirname(opts.logPath), { recursive: true });
   await appendFileFn(opts.logPath, `${opts.line}\n`, 'utf8');
+}
+
+/**
+ * @param {string} operatorHome
+ * @param {string} todayDate
+ * @param {typeof readFile} readFileFn
+ * @returns {Promise<boolean>}
+ */
+async function artifactExists(operatorHome, todayDate, readFileFn) {
+  const artifactPath = join(operatorHome, '.hermes', `digest-push-${todayDate}.json`);
+  try {
+    await readFileFn(artifactPath, 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} logPath
+ * @param {typeof readFile} readFileFn
+ * @returns {Promise<string>}
+ */
+async function readWatchdogLogContent(logPath, readFileFn) {
+  try {
+    return await readFileFn(logPath, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -315,20 +357,67 @@ export async function runPushDigestWatchdog(opts = {}) {
     spawnFn,
   };
 
+  const hasArtifact = await artifactExists(operatorHome, todayDate, readFileFn);
+  const logContent = await readWatchdogLogContent(logPath, readFileFn);
+  const latestLog = findLatestDigestLogEntryForDate(logContent, todayDate);
+
   let queryFailed = false;
+  /** @type {string | null} */
+  let todayConvexStatus = null;
+  /** @type {Record<string, unknown> | null} */
+  let dayOutcome = null;
+
   try {
     const recentRuns = await fetchRecentDigestRuns(fetchFn, convexEnv, {
       maxAttempts: opts.queryMaxAttempts,
       retryDelayMs: opts.queryRetryDelayMs,
       sleepFn: opts.sleepFn,
     });
-    const { hasNonFailedToday } = evaluateTodayDigestRuns(recentRuns, todayDate);
-    if (hasNonFailedToday) {
-      await log('skipped-already-pushed', 0);
-      return { action: 'skipped-already-pushed', exitCode: 0 };
+    const evaluated = evaluateTodayDigestRuns(recentRuns, todayDate);
+    todayConvexStatus = evaluated.todayConvexStatus;
+    if (evaluated.hasNonFailedToday) {
+      const outcomeDir = resolveDigestOutcomeDir(operatorHome);
+      dayOutcome = await readDayOutcomeRecord(outcomeDir, todayDate, readFileFn);
+      if (dayOutcome?.discord?.ok === true) {
+        await log('skipped-already-pushed', 0);
+        return { action: 'skipped-already-pushed', exitCode: 0 };
+      }
     }
   } catch {
     queryFailed = true;
+  }
+
+  if (dayOutcome === null) {
+    const outcomeDir = resolveDigestOutcomeDir(operatorHome);
+    dayOutcome = await readDayOutcomeRecord(outcomeDir, todayDate, readFileFn);
+  }
+
+  const bucket = classifyDigestRetryBucket({
+    latestLogAction: latestLog?.action ?? null,
+    detail: latestLog?.detail ?? null,
+    convexStatus: todayConvexStatus,
+    hasArtifact,
+    dayOutcome,
+  });
+
+  if (bucket === 'terminal-success') {
+    await log('skipped-already-pushed', 0);
+    return { action: 'skipped-already-pushed', exitCode: 0 };
+  }
+
+  if (bucket === 'discord-only-repair') {
+    return { action: 'deferred-discord-only-repair', exitCode: 0 };
+  }
+
+  if (bucket === 'full-pipeline') {
+    const detail = queryFailed ? 'query-retries-exhausted' : undefined;
+    await log('skipped-no-artifact', 0, detail);
+    return { action: 'skipped-no-artifact', exitCode: 0 };
+  }
+
+  if (bucket === 'push-only-artifact' && latestLog?.action === 'completion-convex-push-failed') {
+    // Pattern shared with 71-4 Discord-only repair — retry failed leg from digest-push artifact.
+    return { action: 'deferred-push-only-artifact', exitCode: 0 };
   }
 
   return tryRecoverFromArtifact({
@@ -351,3 +440,10 @@ if (isMain) {
     process.exit(0);
   });
 }
+
+export {
+  classifyDigestRetryBucket,
+  findLatestDigestLogEntryForDate,
+  parseCompletionLogDetail,
+} from './lib/digest-retry-eligibility.mjs';
+export { MISSING_CONVEX_ENV_ERROR } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';

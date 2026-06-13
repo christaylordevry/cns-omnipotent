@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-12T23:30:00+00:00
+# last_updated: 2026-06-13T08:30:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-12T23:30:00+00:00"
+last_updated: "2026-06-13T23:30:00+00:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -532,3 +532,11 @@ development_status:
   70-2-discord-post-step: done
   70-3-errors-by-source-date-skew-signal-quality: done
   epic-70-retrospective: optional
+
+  # Epic 71 — Digest Job-State & Watchdog Truth (audit 2026-06-12; sequencing 71-2 → 71-1 → 71-3 → 71-4)
+  epic-71: done
+  71-1-fix-watchdog-false-success-on-started-runs: done
+  71-2-pushpayload-result-check-gate-discord-on-convex: done
+  71-3-structured-run-outcome-record-observability-gate: done
+  71-4-discord-only-repair-from-day-outcome-record: done
+  epic-71-retrospective: optional

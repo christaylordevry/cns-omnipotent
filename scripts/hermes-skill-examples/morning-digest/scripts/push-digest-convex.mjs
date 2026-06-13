@@ -12,6 +12,8 @@ import { createHash } from 'node:crypto';
 
 import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
 
+export const MISSING_CONVEX_ENV_ERROR = 'missing-convex-env';
+
 const CREATE_PATH = 'digest:createDigestRun';
 const ADD_PATH = 'digest:addDigestSignal';
 const FINALIZE_PATH = 'digest:finalizeDigestRun';
@@ -69,6 +71,74 @@ export async function resolveConvexPushEnv(baseEnv = process.env) {
 }
 
 /**
+ * @param {unknown[]} signals
+ * @returns {number}
+ */
+export function countValidSignals(signals) {
+  if (!Array.isArray(signals)) {
+    return 0;
+  }
+  return signals.filter((signal) => signal && typeof signal === 'object').length;
+}
+
+/**
+ * @param {{
+ *   status: 'ok' | 'failed' | 'skipped' | 'error';
+ *   digestRunId?: string | null;
+ *   signalsWritten?: number;
+ *   reason?: string;
+ *   expectedCount?: number;
+ * }} input
+ * @returns {{ ok: boolean; runId: string | null; signalsWritten: number; error: string | null; exitCode: number }}
+ */
+export function formatPushResult({
+  status,
+  digestRunId = null,
+  signalsWritten = 0,
+  reason,
+  expectedCount = 0,
+}) {
+  if (status === 'skipped') {
+    return {
+      ok: false,
+      runId: null,
+      signalsWritten: 0,
+      error: MISSING_CONVEX_ENV_ERROR,
+      exitCode: 0,
+    };
+  }
+
+  if (status === 'error') {
+    return {
+      ok: false,
+      runId: null,
+      signalsWritten: 0,
+      error: reason === 'invalid-input' ? 'invalid-input' : String(reason ?? 'invalid-input'),
+      exitCode: 2,
+    };
+  }
+
+  if (status === 'ok') {
+    const ok = signalsWritten === expectedCount;
+    return {
+      ok,
+      runId: digestRunId ?? null,
+      signalsWritten,
+      error: ok ? null : `partial-write:${signalsWritten}/${expectedCount}`,
+      exitCode: ok ? 0 : 1,
+    };
+  }
+
+  return {
+    ok: false,
+    runId: digestRunId ?? null,
+    signalsWritten,
+    error: reason ? String(reason).slice(0, 200) : 'unexpected error',
+    exitCode: 1,
+  };
+}
+
+/**
  * @param {typeof fetch} fetchFn
  * @param {{ convexUrl: string; convexDeployKey: string }} convexEnv
  * @param {string} path
@@ -123,18 +193,20 @@ export async function pushDigestToConvex(opts = {}) {
   const payload = readDigestPushPayload(env);
   if (!payload) {
     console.error('push-digest-convex: missing required payload (run.date)');
-    return { status: 'error', reason: 'invalid-input', exitCode: 0 };
+    return formatPushResult({ status: 'error', reason: 'invalid-input' });
   }
 
+  const expectedCount = countValidSignals(payload.signals);
   const convexEnv = await resolveConvexPushEnv(env);
   if (!convexEnv) {
     console.error('push-digest-convex: skipped — missing CONVEX_URL or CONVEX_DEPLOY_KEY');
-    return { status: 'skipped', reason: 'missing-convex-env', exitCode: 0 };
+    return formatPushResult({ status: 'skipped' });
   }
 
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
   /** @type {string | null} */
   let digestRunId = null;
+  let signalsWritten = 0;
 
   try {
     const createdId = await postMutation(fetchFn, convexEnv, CREATE_PATH, {
@@ -153,6 +225,7 @@ export async function pushDigestToConvex(opts = {}) {
       await postMutation(fetchFn, convexEnv, ADD_PATH, {
         signal: { ...signal, digestRunId },
       });
+      signalsWritten += 1;
     }
 
     await postMutation(fetchFn, convexEnv, FINALIZE_PATH, {
@@ -160,7 +233,12 @@ export async function pushDigestToConvex(opts = {}) {
       status: 'published',
     });
 
-    return { status: 'ok', reason: 'pushed', exitCode: 0, digestRunId };
+    return formatPushResult({
+      status: 'ok',
+      digestRunId,
+      signalsWritten,
+      expectedCount,
+    });
   } catch (err) {
     if (digestRunId) {
       try {
@@ -177,13 +255,25 @@ export async function pushDigestToConvex(opts = {}) {
         ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 200)
         : 'unexpected error';
     console.error(`push-digest-convex: warning — ${reason}`);
-    return { status: 'failed', reason, exitCode: 0, digestRunId };
+    return formatPushResult({
+      status: 'failed',
+      digestRunId,
+      signalsWritten,
+      reason,
+      expectedCount,
+    });
   }
 }
 
 async function main() {
-  await pushDigestToConvex();
-  process.exit(0);
+  const result = await pushDigestToConvex();
+  console.log(JSON.stringify({
+    ok: result.ok,
+    runId: result.runId,
+    signalsWritten: result.signalsWritten,
+    error: result.error,
+  }));
+  process.exit(result.exitCode);
 }
 
 const isMain =
@@ -197,6 +287,13 @@ if (isMain) {
         ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 200)
         : 'unexpected error';
     console.error(`push-digest-convex: warning — ${reason}`);
-    process.exit(0);
+    const result = formatPushResult({ status: 'failed', reason });
+    console.log(JSON.stringify({
+      ok: result.ok,
+      runId: result.runId,
+      signalsWritten: result.signalsWritten,
+      error: result.error,
+    }));
+    process.exit(result.exitCode);
   });
 }

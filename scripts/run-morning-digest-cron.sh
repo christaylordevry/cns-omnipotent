@@ -35,4 +35,6 @@ export DISCORD_ALLOWED_ROLES="${DISCORD_ALLOWED_ROLES:-}"
 export DISCORD_ALLOWED_USERS="${DISCORD_ALLOWED_USERS:-}"
 export DISCORD_ALLOW_ALL_USERS="${DISCORD_ALLOW_ALL_USERS:-}"
 
+export DIGEST_TRIGGER=cron
+
 node "$REPO_ROOT/scripts/run-digest-convex-completion.mjs"

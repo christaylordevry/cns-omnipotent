@@ -24,9 +24,22 @@ import {
   resolveSourceOutcomes,
 } from './hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
-import { readDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
+import {
+  countValidSignals,
+  readDigestPushPayload,
+  resolveConvexPushEnv,
+} from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 import { postDigestToDiscord } from './hermes-skill-examples/morning-digest/scripts/post-digest-discord.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
+import {
+  computeOutcomeFromInvocation,
+  markInvocationStarted,
+  mergeInvocationOutcome,
+  queryTodayConvexStatus,
+  resolveDigestOutcomesRoot,
+  resolveDigestTrigger,
+} from './lib/digest-run-outcome.mjs';
+import { collectDigestLogActionsForDate } from './lib/digest-retry-eligibility.mjs';
 import {
   formatWatchdogLogLine,
   resolveWatchdogLogPath,
@@ -218,18 +231,126 @@ async function scoreSignals(signals, ranAt, env) {
 }
 
 /**
+ * @param {string} stdout
+ * @returns {{ ok: boolean; runId?: string | null; signalsWritten?: number; error?: string | null } | null}
+ */
+export function parsePushStdout(stdout) {
+  const lines = String(stdout ?? '')
+    .trim()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const lastLine = lines.at(-1);
+  if (!lastLine) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(lastLine);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    return /** @type {{ ok: boolean; runId?: string | null; signalsWritten?: number; error?: string | null }} */ (
+      parsed
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {number}
+ */
+function expectedSignalCount(payload) {
+  return countValidSignals(Array.isArray(payload.signals) ? payload.signals : []);
+}
+
+/**
+ * @param {{
+ *   ok: boolean;
+ *   runId?: string | null;
+ *   signalsWritten?: number;
+ *   error?: string | null;
+ * }} pushResult
+ * @param {number} expectedCount
+ * @returns {{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }}
+ */
+function normalizePushResult(pushResult, expectedCount) {
+  const signalsWritten = pushResult.signalsWritten ?? 0;
+  const ok = pushResult.ok === true && signalsWritten === expectedCount;
+  if (ok) {
+    return {
+      ok: true,
+      runId: pushResult.runId ?? null,
+      signalsWritten,
+    };
+  }
+  return {
+    ok: false,
+    runId: pushResult.runId ?? null,
+    signalsWritten,
+    error:
+      pushResult.error ??
+      (signalsWritten < expectedCount
+        ? `partial-write:${signalsWritten}/${expectedCount}`
+        : 'convex-push-failed'),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {Record<string, string | undefined>} env
- * @returns {Promise<void>}
+ * @returns {Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>}
  */
-async function pushPayload(payload, env) {
+export async function pushPayload(payload, env) {
   const digestPushJson = JSON.stringify(payload);
   const pushScript = join(scriptsDir, 'push-digest-convex.mjs');
   const candidatesScript = join(scriptsDir, 'push-keyword-candidates.mjs');
   const childEnv = { ...process.env, ...env, DIGEST_PUSH_JSON: digestPushJson };
+  const expectedCount = expectedSignalCount(payload);
 
-  await execFileAsync('node', [pushScript], { cwd: repoRoot, env: childEnv, timeout: 45_000 });
-  await execFileAsync('node', [candidatesScript], { cwd: repoRoot, env: childEnv, timeout: 45_000 });
+  /** @type {{ ok: boolean; runId?: string | null; signalsWritten?: number; error?: string | null } | null} */
+  let parsed;
+
+  try {
+    const { stdout } = await execFileAsync('node', [pushScript], {
+      cwd: repoRoot,
+      env: childEnv,
+      timeout: 45_000,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    parsed = parsePushStdout(stdout);
+  } catch (err) {
+    const stdout =
+      err && typeof err === 'object' && 'stdout' in err
+        ? String(/** @type {{ stdout?: unknown }} */ (err).stdout ?? '')
+        : '';
+    parsed = parsePushStdout(stdout);
+    if (!parsed) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+          : 'push-spawn-failed';
+      return { ok: false, signalsWritten: 0, error: message };
+    }
+  }
+
+  if (!parsed) {
+    return { ok: false, signalsWritten: 0, error: 'invalid-push-stdout' };
+  }
+
+  const normalized = normalizePushResult(parsed, expectedCount);
+  if (!normalized.ok) {
+    return normalized;
+  }
+
+  await execFileAsync('node', [candidatesScript], {
+    cwd: repoRoot,
+    env: childEnv,
+    timeout: 45_000,
+  });
+  return normalized;
 }
 
 /**
@@ -277,9 +398,24 @@ function attachSourceOutcomes(payload, adapterResults) {
  * @param {(action: string, exitCode: number, detail?: string) => Promise<void>} log
  * @param {string} successAction
  * @param {Record<string, unknown> | undefined} [adapterResults]
+ * @param {(payload: Record<string, unknown>, env: Record<string, string | undefined>) => Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>} [pushFn]
+ * @param {{
+ *   pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string } | null;
+ *   discordResult?: { ok: boolean; error?: string | null } | null;
+ *   signalCount?: number;
+ * } | null} [invocation]
  * @returns {Promise<{ action: string; exitCode: number }>}
  */
-async function scoreWriteAndPush(payload, ranAt, env, log, successAction, adapterResults) {
+async function scoreWriteAndPush(
+  payload,
+  ranAt,
+  env,
+  log,
+  successAction,
+  adapterResults,
+  pushFn,
+  invocation,
+) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
   try {
     signals = await dedupeSignals(signals, env);
@@ -306,9 +442,33 @@ async function scoreWriteAndPush(payload, ranAt, env, log, successAction, adapte
     return { action: 'completion-artifact-failed', exitCode: 0 };
   }
 
+  const doPush = pushFn ?? pushPayload;
+  const expectedCount = expectedSignalCount(payload);
   try {
-    await pushPayload(payload, env);
+    const pushResult = normalizePushResult(
+      await doPush(payload, env),
+      expectedCount,
+    );
+    if (!pushResult.ok) {
+      const detail = JSON.stringify({
+        error: pushResult.error?.slice(0, 120) ?? 'convex-push-failed',
+        signalsWritten: pushResult.signalsWritten ?? 0,
+      }).slice(0, 200);
+      if (invocation) {
+        invocation.pushResult = pushResult;
+        invocation.discordResult = null;
+        invocation.signalCount = expectedCount;
+      }
+      await log('completion-convex-push-failed', 0, detail);
+      return { action: 'completion-convex-push-failed', exitCode: 0 };
+    }
+
     const discordResult = await postDigestToDiscord(payload, env);
+    if (invocation) {
+      invocation.pushResult = pushResult;
+      invocation.discordResult = discordResult;
+      invocation.signalCount = expectedCount;
+    }
     if (discordResult.ok) {
       const detail =
         discordResult.messageIds.length > 0 ? discordResult.messageIds.join(',') : undefined;
@@ -334,6 +494,138 @@ async function scoreWriteAndPush(payload, ranAt, env, log, successAction, adapte
  *   todayDate: string;
  *   operatorHome: string;
  *   log: (action: string, exitCode: number, detail?: string) => Promise<void>;
+ *   pushFn?: (payload: Record<string, unknown>, env: Record<string, string | undefined>) => Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>;
+ *   invocation?: {
+ *     pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string } | null;
+ *     discordResult?: { ok: boolean; error?: string | null } | null;
+ *     signalCount?: number;
+ *   } | null;
+ * }} ctx
+ * @returns {Promise<{ action: string; exitCode: number } | null>}
+ */
+async function pushOnlyFromArtifact(ctx) {
+  const artifactPath = join(ctx.operatorHome, '.hermes', `digest-push-${ctx.todayDate}.json`);
+  let artifactRaw;
+  try {
+    artifactRaw = await readFile(artifactPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  const payload = readDigestPushPayload({ DIGEST_PUSH_JSON: artifactRaw });
+  if (!payload || !Array.isArray(payload.signals) || payload.signals.length === 0) {
+    return null;
+  }
+
+  // Pattern shared with 71-4 Discord-only repair — retry failed leg from digest-push artifact.
+  const doPush = ctx.pushFn ?? pushPayload;
+  const expectedCount = expectedSignalCount(payload);
+  try {
+    const pushResult = normalizePushResult(
+      await doPush(payload, ctx.env),
+      expectedCount,
+    );
+    if (!pushResult.ok) {
+      const detail = JSON.stringify({
+        error: pushResult.error?.slice(0, 120) ?? 'convex-push-failed',
+        signalsWritten: pushResult.signalsWritten ?? 0,
+      }).slice(0, 200);
+      if (ctx.invocation) {
+        ctx.invocation.pushResult = pushResult;
+        ctx.invocation.discordResult = null;
+        ctx.invocation.signalCount = expectedCount;
+      }
+      await ctx.log('completion-convex-push-failed', 0, detail);
+      return { action: 'completion-convex-push-failed', exitCode: 0 };
+    }
+
+    const discordResult = await postDigestToDiscord(payload, ctx.env);
+    if (ctx.invocation) {
+      ctx.invocation.pushResult = pushResult;
+      ctx.invocation.discordResult = discordResult;
+      ctx.invocation.signalCount = expectedCount;
+    }
+    if (discordResult.ok) {
+      const detail =
+        discordResult.messageIds.length > 0 ? discordResult.messageIds.join(',') : undefined;
+      await ctx.log('discord-post-ok', 0, detail);
+    } else {
+      await ctx.log('discord-post-failed', 0, discordResult.error);
+    }
+    await ctx.log('completion-backfill-push', 0);
+    return { action: 'completion-backfill-push', exitCode: 0 };
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'push-error';
+    await ctx.log('completion-backfill-push-failed', 0, detail);
+    return { action: 'completion-backfill-push-failed', exitCode: 0 };
+  }
+}
+
+async function discordOnlyFromArtifact(ctx) {
+  const artifactPath = join(ctx.operatorHome, '.hermes', `digest-push-${ctx.todayDate}.json`);
+  let artifactRaw;
+  try {
+    artifactRaw = await readFile(artifactPath, 'utf8');
+  } catch {
+    // deliberately not escalating to full-pipeline — see 71-4 AC3
+    await ctx.log('discord-only-repair-skipped-no-artifact', 0);
+    return { action: 'discord-only-repair-skipped-no-artifact', exitCode: 0 };
+  }
+
+  const payload = readDigestPushPayload({ DIGEST_PUSH_JSON: artifactRaw });
+  if (!payload || !Array.isArray(payload.signals) || payload.signals.length === 0) {
+    // deliberately not escalating to full-pipeline — see 71-4 AC3
+    await ctx.log('discord-only-repair-skipped-no-artifact', 0);
+    return { action: 'discord-only-repair-skipped-no-artifact', exitCode: 0 };
+  }
+
+  const postDigest = ctx.postDigestFn ?? postDigestToDiscord;
+  const expectedCount = expectedSignalCount(payload);
+  try {
+    const discordResult = await postDigest(payload, ctx.env);
+    if (ctx.invocation) {
+      ctx.invocation.discordResult = discordResult;
+      ctx.invocation.signalCount = expectedCount;
+      ctx.invocation.ranAdapters = false;
+    }
+    if (discordResult.ok) {
+      const detail =
+        discordResult.messageIds.length > 0 ? discordResult.messageIds.join(',') : undefined;
+      await ctx.log('discord-only-repair-ok', 0, detail);
+      return { action: 'discord-only-repair-ok', exitCode: 0 };
+    }
+    await ctx.log('discord-only-repair-failed', 0, discordResult.error);
+    return { action: 'discord-only-repair-failed', exitCode: 0 };
+  } catch (err) {
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'discord-error';
+    if (ctx.invocation) {
+      ctx.invocation.discordResult = { ok: false, error: detail };
+      ctx.invocation.signalCount = expectedCount;
+      ctx.invocation.ranAdapters = false;
+    }
+    await ctx.log('discord-only-repair-failed', 0, detail);
+    return { action: 'discord-only-repair-failed', exitCode: 0 };
+  }
+}
+
+/**
+ * @param {{
+ *   env: Record<string, string | undefined>;
+ *   todayDate: string;
+ *   operatorHome: string;
+ *   log: (action: string, exitCode: number, detail?: string) => Promise<void>;
+ *   pushFn?: (payload: Record<string, unknown>, env: Record<string, string | undefined>) => Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>;
+ *   invocation?: {
+ *     pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string } | null;
+ *     discordResult?: { ok: boolean; error?: string | null } | null;
+ *     signalCount?: number;
+ *   } | null;
  * }} ctx
  * @returns {Promise<{ action: string; exitCode: number } | null>}
  */
@@ -353,7 +645,83 @@ async function tryRescoreFromArtifact(ctx) {
 
   const ranAt = Date.now();
   payload.run = { ...payload.run, date: ctx.todayDate, ranAt };
-  return scoreWriteAndPush(payload, ranAt, ctx.env, ctx.log, 'completion-force-rescore-push');
+  return scoreWriteAndPush(
+    payload,
+    ranAt,
+    ctx.env,
+    ctx.log,
+    'completion-force-rescore-push',
+    undefined,
+    ctx.pushFn,
+    ctx.invocation,
+  );
+}
+
+/**
+ * @param {{
+ *   env: Record<string, string | undefined>;
+ *   todayDate: string;
+ *   operatorHome: string;
+ *   logPath: string;
+ *   invocation: {
+ *     recoveryPath: 'full-pipeline' | 'push-only-artifact' | 'watchdog-recover-artifact' | 'none';
+ *     logActions: string[];
+ *     pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string } | null;
+ *     discordResult?: { ok: boolean; error?: string | null } | null;
+ *     adapterOutputs?: Record<string, unknown> | null;
+ *     signalCount?: number;
+ *     ranAdapters?: boolean;
+ *   };
+ *   result: { action: string; exitCode: number };
+ *   fetchFn?: typeof fetch;
+ * }} ctx
+ */
+async function mergeInvocationOutcomeRecord(ctx) {
+  let convexRowStatus = null;
+  try {
+    const convexEnv = await resolveConvexPushEnv(ctx.env);
+    if (convexEnv) {
+      convexRowStatus = await queryTodayConvexStatus(
+        ctx.fetchFn ?? globalThis.fetch,
+        convexEnv,
+        ctx.todayDate,
+      );
+    }
+  } catch {
+    convexRowStatus = null;
+  }
+
+  const logContent = await readFile(ctx.logPath, 'utf8').catch(() => '');
+  const dayLogActions = collectDigestLogActionsForDate(logContent, ctx.todayDate);
+  const logActions =
+    ctx.invocation.logActions.length > 0 ? ctx.invocation.logActions : dayLogActions;
+
+  const outcome = computeOutcomeFromInvocation({
+    trigger: resolveDigestTrigger(ctx.env),
+    date: ctx.todayDate,
+    terminalAction: ctx.result.action,
+    recoveryPath: ctx.invocation.recoveryPath,
+    pushResult: ctx.invocation.pushResult,
+    discordResult: ctx.invocation.discordResult,
+    adapterOutputs: ctx.invocation.adapterOutputs ?? undefined,
+    convexRowStatus,
+    logActions,
+    signalCount: ctx.invocation.signalCount ?? 0,
+  });
+
+  await mergeInvocationOutcome(ctx.outcomeDir, ctx.todayDate, {
+    date: ctx.todayDate,
+    trigger: outcome.trigger,
+    recoveryPath: outcome.recoveryPath,
+    terminalAction: outcome.terminalAction,
+    timestamp: outcome.timestamp,
+    convex: outcome.convex,
+    discord: outcome.discord,
+    sources: outcome.sources,
+    overall: outcome.overall,
+    ranAdapters: ctx.invocation.ranAdapters === true,
+    signalCount: ctx.invocation.signalCount ?? 0,
+  });
 }
 
 /**
@@ -363,6 +731,10 @@ async function tryRescoreFromArtifact(ctx) {
  *   forceRescore?: boolean;
  *   collectFn?: typeof collectAdapterOutputs;
  *   watchdogFn?: typeof runPushDigestWatchdog;
+ *   pushFn?: typeof pushPayload;
+ *   postDigestFn?: typeof postDigestToDiscord;
+ *   fetchFn?: typeof fetch;
+ *   writeOutcomeFn?: typeof mergeInvocationOutcomeRecord;
  * }} [opts]
  * @returns {Promise<{ action: string; exitCode: number }>}
  */
@@ -371,7 +743,17 @@ export async function runDigestConvexCompletion(opts = {}) {
   const todayDate = opts.todayDate ?? formatSydneyDate(env.CRON_TZ ?? env.TZ);
   const operatorHome = await resolveOperatorHome(env);
   const logPath = resolveWatchdogLogPath(operatorHome);
+  const invocation = {
+    recoveryPath: /** @type {'full-pipeline' | 'push-only-artifact' | 'watchdog-recover-artifact' | 'none'} */ ('none'),
+    logActions: /** @type {string[]} */ ([]),
+    pushResult: null,
+    discordResult: null,
+    adapterOutputs: null,
+    signalCount: 0,
+    ranAdapters: false,
+  };
   const log = async (action, exitCode, detail) => {
+    invocation.logActions.push(action);
     await appendLog(
       logPath,
       formatWatchdogLogLine(action, { date: todayDate, exit: exitCode, detail }),
@@ -379,71 +761,150 @@ export async function runDigestConvexCompletion(opts = {}) {
   };
 
   const forceRescore = opts.forceRescore ?? false;
+  const pushFn = opts.pushFn;
+  const writeOutcomeFn = opts.writeOutcomeFn ?? mergeInvocationOutcomeRecord;
+  const outcomeDir = resolveDigestOutcomesRoot(operatorHome);
+  const trigger = resolveDigestTrigger(env);
+  /** @type {{ action: string; exitCode: number }} */
+  let result = { action: 'completion-pipeline-failed', exitCode: 0 };
 
-  if (forceRescore) {
-    const rescoreResult = await tryRescoreFromArtifact({ env, todayDate, operatorHome, log });
-    if (rescoreResult) {
-      return rescoreResult;
+  // Must run before watchdog eligibility — fast-exit paths still need a brief inProgress marker.
+  await markInvocationStarted(outcomeDir, todayDate, { trigger });
+
+  try {
+    if (forceRescore) {
+      invocation.recoveryPath = 'full-pipeline';
+      const rescoreResult = await tryRescoreFromArtifact({
+        env,
+        todayDate,
+        operatorHome,
+        log,
+        pushFn,
+        invocation,
+      });
+      if (rescoreResult) {
+        result = rescoreResult;
+        return result;
+      }
+    } else {
+      const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
+      const watchdogResult = await watchdogFn({ env, todayDate });
+      if (watchdogResult.action === 'skipped-already-pushed') {
+        invocation.recoveryPath = 'none';
+        result = watchdogResult;
+        return result;
+      }
+      if (watchdogResult.action === 'recovered-push') {
+        invocation.recoveryPath = 'watchdog-recover-artifact';
+        result = watchdogResult;
+        return result;
+      }
+
+      if (watchdogResult.action === 'deferred-push-only-artifact') {
+        invocation.recoveryPath = 'push-only-artifact';
+        await log('push-only-artifact-recovery', 0);
+        const pushOnlyResult = await pushOnlyFromArtifact({
+          env,
+          todayDate,
+          operatorHome,
+          log,
+          pushFn,
+          invocation,
+        });
+        if (pushOnlyResult) {
+          result = pushOnlyResult;
+          return result;
+        }
+      } else if (watchdogResult.action === 'deferred-discord-only-repair') {
+        invocation.recoveryPath = 'none';
+        result = await discordOnlyFromArtifact({
+          env,
+          todayDate,
+          operatorHome,
+          log,
+          postDigestFn: opts.postDigestFn,
+          invocation,
+        });
+        return result;
+      } else if (watchdogResult.action !== 'skipped-no-artifact') {
+        result = watchdogResult;
+        return result;
+      }
     }
-  } else {
-    const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
-    const watchdogResult = await watchdogFn({ env, todayDate });
-    if (watchdogResult.action === 'skipped-already-pushed' || watchdogResult.action === 'recovered-push') {
-      return watchdogResult;
-    }
 
-    if (watchdogResult.action !== 'skipped-no-artifact') {
-      return watchdogResult;
-    }
-  }
+    invocation.recoveryPath = 'full-pipeline';
+    const collectFn = opts.collectFn ?? collectAdapterOutputs;
+    const ranAt = Date.now();
+    const adapterOutputs = await collectFn(env);
+    invocation.adapterOutputs = adapterOutputs;
+    invocation.ranAdapters = true;
+    const errorsBySource = buildErrorsBySource(adapterOutputs);
 
-  const collectFn = opts.collectFn ?? collectAdapterOutputs;
-  const ranAt = Date.now();
-  const adapterOutputs = await collectFn(env);
-  const errorsBySource = buildErrorsBySource(adapterOutputs);
+    const trendsPayload = /** @type {{ events?: Array<{ keyword?: string; normalizedValue?: number }> }} */ (
+      unwrapAdapterResult(adapterOutputs.trends)
+    );
+    const topTrend = trendsPayload.events?.[0]?.keyword;
 
-  const trendsPayload = /** @type {{ events?: Array<{ keyword?: string; normalizedValue?: number }> }} */ (
-    unwrapAdapterResult(adapterOutputs.trends)
-  );
-  const topTrend = trendsPayload.events?.[0]?.keyword;
-
-  const payload = buildDigestPushPayload({
-    date: todayDate,
-    ranAt,
-    trends: trendsPayload,
-    newsapi: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.newsapi)),
-    arxiv: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.arxiv)),
-    hackernews: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.hackernews)),
-    github: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.github)),
-    reddit: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.reddit)),
-    rss: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.rss)),
-    producthunt: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.producthunt)),
-    twitter: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.twitter)),
-    bluesky: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.bluesky)),
-    runMeta: {
-      topTrend: topTrend ? String(topTrend) : undefined,
-      focusKeyword: topTrend ? String(topTrend) : undefined,
-    },
-  });
-
-  if (errorsBySource) {
-    payload.run = { ...payload.run, errors_by_source: errorsBySource };
-  }
-
-  if (!Array.isArray(payload.signals) || payload.signals.length === 0) {
-    attachSourceOutcomes(payload, adapterOutputs);
-    await writeDigestPushArtifact({
-      ...env,
-      DIGEST_PUSH_JSON: JSON.stringify(payload),
+    const payload = buildDigestPushPayload({
+      date: todayDate,
+      ranAt,
+      trends: trendsPayload,
+      newsapi: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.newsapi)),
+      arxiv: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.arxiv)),
+      hackernews: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.hackernews)),
+      github: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.github)),
+      reddit: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.reddit)),
+      rss: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.rss)),
+      producthunt: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.producthunt)),
+      twitter: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.twitter)),
+      bluesky: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.bluesky)),
+      runMeta: {
+        topTrend: topTrend ? String(topTrend) : undefined,
+        focusKeyword: topTrend ? String(topTrend) : undefined,
+      },
     });
-    const detail = errorsBySource
-      ? `adapter-refetch-empty ${JSON.stringify(errorsBySource)}`
-      : 'adapter-refetch-empty';
-    await log('completion-no-signals', 0, detail);
-    return { action: 'completion-no-signals', exitCode: 0 };
-  }
 
-  return scoreWriteAndPush(payload, ranAt, env, log, 'completion-backfill-push', adapterOutputs);
+    if (errorsBySource) {
+      payload.run = { ...payload.run, errors_by_source: errorsBySource };
+    }
+
+    if (!Array.isArray(payload.signals) || payload.signals.length === 0) {
+      attachSourceOutcomes(payload, adapterOutputs);
+      await writeDigestPushArtifact({
+        ...env,
+        DIGEST_PUSH_JSON: JSON.stringify(payload),
+      });
+      const detail = errorsBySource
+        ? `adapter-refetch-empty ${JSON.stringify(errorsBySource)}`
+        : 'adapter-refetch-empty';
+      await log('completion-no-signals', 0, detail);
+      result = { action: 'completion-no-signals', exitCode: 0 };
+      return result;
+    }
+
+    result = await scoreWriteAndPush(
+      payload,
+      ranAt,
+      env,
+      log,
+      'completion-backfill-push',
+      adapterOutputs,
+      pushFn,
+      invocation,
+    );
+    return result;
+  } finally {
+    await writeOutcomeFn({
+      env,
+      todayDate,
+      operatorHome,
+      outcomeDir,
+      logPath,
+      invocation,
+      result,
+      fetchFn: opts.fetchFn,
+    });
+  }
 }
 
 async function main() {

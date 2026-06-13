@@ -102,7 +102,7 @@ describe('morning-digest score → push pipeline', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
 
 		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
 		const hnCall = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');

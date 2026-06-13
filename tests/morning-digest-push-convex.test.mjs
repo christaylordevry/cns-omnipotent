@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
 import {
+	countValidSignals,
+	formatPushResult,
 	pushDigestToConvex,
 	readDigestPushPayload,
 	resolveConvexPushEnv,
@@ -140,7 +142,8 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
 		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
 		assert.ok(addCall);
 		assert.equal(addCall.args.signal.section, 'reddit');
@@ -187,7 +190,8 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
 		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
 		assert.ok(addCall);
 		assert.equal(addCall.args.signal.section, 'rss');
@@ -233,7 +237,8 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
 		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
 		assert.ok(addCall);
 		assert.equal(addCall.args.signal.section, 'github');
@@ -261,7 +266,8 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 2);
 		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
 		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
 		assert.ok(scoredSignal, 'expected scored HN signal in addDigestSignal calls');
@@ -363,7 +369,9 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'ok');
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 2);
+		assert.equal(result.exitCode, 0);
 		assert.equal(calls.length, 4);
 		assert.equal(calls[0].path, 'digest:createDigestRun');
 		assert.equal(calls[0].args.run.status, 'started');
@@ -389,11 +397,13 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'skipped');
+		assert.equal(result.ok, false);
+		assert.equal(result.error, 'missing-convex-env');
+		assert.equal(result.exitCode, 0);
 		assert.equal(fetchCalled, false);
 	});
 
-	it('returns failed with exit 0 when add mutation HTTP fails and finalizes run as failed', async () => {
+	it('returns failed with exit 1 when add mutation HTTP fails and finalizes run as failed', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];
 		const result = await pushDigestToConvex({
@@ -411,8 +421,10 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'failed');
-		assert.equal(result.exitCode, 0);
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.match(String(result.error), /mutation failed|Convex HTTP 500/);
 		assert.equal(calls.length, 3);
 		assert.equal(calls[0].path, 'digest:createDigestRun');
 		assert.equal(calls[1].path, 'digest:addDigestSignal');
@@ -420,7 +432,7 @@ describe('push-digest-convex.mjs', () => {
 		assert.deepEqual(calls[2].args, { id: 'run-id-2', status: 'failed' });
 	});
 
-	it('returns failed with exit 0 when create mutation HTTP fails', async () => {
+	it('returns failed with exit 1 when create mutation HTTP fails', async () => {
 		/** @type {string[]} */
 		const paths = [];
 		const result = await pushDigestToConvex({
@@ -432,9 +444,85 @@ describe('push-digest-convex.mjs', () => {
 			},
 		});
 
-		assert.equal(result.status, 'failed');
-		assert.equal(result.exitCode, 0);
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(result.runId, null);
 		assert.deepEqual(paths, ['digest:createDigestRun']);
+	});
+
+	it('returns partial write with exit 1 when add fails mid-loop', async () => {
+		let addCount = 0;
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-partial' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					addCount += 1;
+					if (addCount === 2) {
+						return mockResponse(500, 'add failed mid-loop');
+					}
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 1);
+		assert.equal(result.runId, 'run-id-partial');
+	});
+
+	it('formatPushResult maps invalid input to exit 2', () => {
+		const result = formatPushResult({ status: 'error', reason: 'invalid-input' });
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 2);
+		assert.equal(result.error, 'invalid-input');
+	});
+
+	it('treats zero-signal push as success-with-zero (not partial-write failure)', async () => {
+		assert.equal(countValidSignals([]), 0);
+
+		const formatted = formatPushResult({
+			status: 'ok',
+			digestRunId: 'run-id-zero',
+			signalsWritten: 0,
+			expectedCount: 0,
+		});
+		assert.equal(formatted.ok, true);
+		assert.equal(formatted.exitCode, 0);
+		assert.equal(formatted.signalsWritten, 0);
+		assert.equal(formatted.error, null);
+
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const result = await pushDigestToConvex({
+			env: baseEnv({
+				DIGEST_PUSH_JSON: JSON.stringify({
+					run: { date: '2026-06-11', ranAt: 1749000000000 },
+					signals: [],
+				}),
+			}),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-zero' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.equal(result.exitCode, 0);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(calls.length, 2);
+		assert.equal(calls[0].path, 'digest:createDigestRun');
+		assert.equal(calls[1].path, 'digest:finalizeDigestRun');
+		assert.deepEqual(calls[1].args, { id: 'run-id-zero', status: 'published' });
 	});
 
 	it('resolveConvexPushEnv uses mergeTrendIngestEnv via operator home trend-ingest.env', async () => {

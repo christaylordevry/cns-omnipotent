@@ -13,6 +13,7 @@ import {
   summarizeAdapterCollection,
   unwrapAdapterResult,
 } from '../scripts/run-digest-convex-completion.mjs';
+import { resolveDayOutcomeFilePath } from '../scripts/lib/digest-run-outcome.mjs';
 
 describe('run-digest-convex-completion (Story 68-10)', () => {
   it('formatSydneyDate uses Australia/Sydney by default', () => {
@@ -104,6 +105,10 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
       },
       todayDate: '2026-06-11',
       watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      pushFn: async (payload) => ({
+        ok: true,
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+      }),
       collectFn: async () => ({
         trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
         twitter: {
@@ -190,6 +195,10 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
       },
       todayDate: '2026-06-11',
       forceRescore: true,
+      pushFn: async (payload) => ({
+        ok: true,
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+      }),
       watchdogFn: async () => {
         watchdogCalled = true;
         return { action: 'skipped-already-pushed', exitCode: 0 };
@@ -212,6 +221,7 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     const operatorHome = await mkdtemp(join(tmpdir(), 'completion-hermes-home-'));
     const hermesDir = join(operatorHome, '.hermes');
     await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
     await writeFile(
       join(hermesDir, 'nexus-people.yaml'),
       [
@@ -252,6 +262,10 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
       },
       todayDate: '2026-06-11',
       forceRescore: true,
+      pushFn: async (payload) => ({
+        ok: true,
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+      }),
       watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
       collectFn: async () => {
         throw new Error('collect should not run when artifact rescore succeeds');
@@ -299,5 +313,441 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     );
     assert.match(logRaw, /action=completion-no-signals/);
     assert.match(logRaw, /google_trends/);
+  });
+
+  it('logs completion-convex-push-failed and skips Discord when push fails', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-convex-fail-'));
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500: mutation failed',
+      }),
+    });
+
+    assert.equal(result.action, 'completion-convex-push-failed');
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-convex-push-failed/);
+    assert.doesNotMatch(logRaw, /action=discord-post-ok/);
+    assert.doesNotMatch(logRaw, /action=completion-backfill-push/);
+  });
+
+  it('treats partial Convex push as failure and skips Discord', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-convex-partial-'));
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+        bluesky: {
+          success: true,
+          data: { posts: [{ title: 'Post', url: 'https://bsky.app/profile/a/post/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: true,
+        signalsWritten: 1,
+        error: null,
+      }),
+    });
+
+    assert.equal(result.action, 'completion-convex-push-failed');
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-convex-push-failed/);
+    assert.doesNotMatch(logRaw, /action=completion-backfill-push/);
+  });
+
+  it('bucket 2: mutation push failure retries full pipeline even when artifact exists', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-bucket2-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: { date: '2026-06-11' },
+        signals: [{ title: 'Stale', sourceType: 'hackernews', section: 'HackerNews' }],
+      }),
+    );
+    await writeFile(
+      join(hermesDir, 'logs', 'push-digest-watchdog.log'),
+      `2026-06-11T01:00:00.000Z action=completion-convex-push-failed date=2026-06-11 exit=0 detail=${JSON.stringify({ error: 'Convex HTTP 500', signalsWritten: 0 })}\n`,
+    );
+
+    let collectCalled = false;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      pushFn: async (payload) => ({
+        ok: true,
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+      }),
+      collectFn: async () => {
+        collectCalled = true;
+        return {
+          trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+          twitter: {
+            success: true,
+            data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+          },
+        };
+      },
+    });
+
+    assert.equal(collectCalled, true);
+    assert.equal(result.action, 'completion-backfill-push');
+  });
+
+  it('bucket 3: missing-convex-env retries push-only from artifact without collect', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-bucket3-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: { date: '2026-06-11' },
+        signals: [
+          { title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' },
+          { title: 'Cached 2', sourceType: 'twitter', section: 'Twitter/X' },
+        ],
+      }),
+    );
+    await writeFile(
+      join(hermesDir, 'logs', 'push-digest-watchdog.log'),
+      `2026-06-11T01:00:00.000Z action=completion-convex-push-failed date=2026-06-11 exit=0 detail=${JSON.stringify({ error: 'missing-convex-env', signalsWritten: 0 })}\n`,
+    );
+
+    let collectCalled = false;
+    let pushCalled = false;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'deferred-push-only-artifact', exitCode: 0 }),
+      collectFn: async () => {
+        collectCalled = true;
+        throw new Error('collect should not run for bucket 3');
+      },
+      pushFn: async (payload) => {
+        pushCalled = true;
+        return {
+          ok: true,
+          signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+        };
+      },
+    });
+
+    assert.equal(collectCalled, false);
+    assert.equal(pushCalled, true);
+    assert.equal(result.action, 'completion-backfill-push');
+    const logRaw = await readFile(join(hermesDir, 'logs', 'push-digest-watchdog.log'), 'utf8');
+    assert.match(logRaw, /action=push-only-artifact-recovery/);
+    assert.match(logRaw, /action=completion-backfill-push/);
+  });
+
+  it('bucket 3 without artifact falls through to full pipeline collect', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-bucket3-no-artifact-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await writeFile(
+      join(hermesDir, 'logs', 'push-digest-watchdog.log'),
+      `2026-06-11T01:00:00.000Z action=completion-convex-push-failed date=2026-06-11 exit=0 detail=${JSON.stringify({ error: 'missing-convex-env', signalsWritten: 0 })}\n`,
+    );
+
+    let collectCalled = false;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'deferred-push-only-artifact', exitCode: 0 }),
+      pushFn: async (payload) => ({
+        ok: true,
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+      }),
+      collectFn: async () => {
+        collectCalled = true;
+        return {
+          trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+          twitter: {
+            success: true,
+            data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+          },
+        };
+      },
+    });
+
+    assert.equal(collectCalled, true);
+    assert.equal(result.action, 'completion-backfill-push');
+  });
+
+  it('writes outcome record on completion-convex-push-failed branch', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-outcome-fail-'));
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        DIGEST_TRIGGER: 'cron',
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-13',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500: mutation failed',
+      }),
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => ({ status: 'success', value: [] }),
+        text: async () => JSON.stringify({ status: 'success', value: [] }),
+      }),
+    });
+
+    assert.equal(result.action, 'completion-convex-push-failed');
+    const outcomePath = resolveDayOutcomeFilePath(operatorHome, '2026-06-13');
+    const outcome = JSON.parse(await readFile(outcomePath, 'utf8'));
+    assert.equal(outcome.lastInvocation.action, 'completion-convex-push-failed');
+    assert.equal(outcome.history.at(-1).action, 'completion-convex-push-failed');
+    assert.equal(outcome.history.at(-1).trigger, 'cron');
+    assert.equal(outcome.overall, 'failed');
+    assert.equal(outcome.convex.ok, false);
+    assert.equal(outcome.inProgress, null);
+  });
+});
+
+describe('Story 71-4 discord-only repair from day outcome record', () => {
+  it('artifact present + postDigest ok → no collect, no push, discord-only-repair-ok, overall success', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-discord-only-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await mkdir(join(hermesDir, 'digest-outcomes'), { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: { date: '2026-06-11' },
+        signals: [{ title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' }],
+      }),
+    );
+    await writeFile(
+      resolveDayOutcomeFilePath(operatorHome, '2026-06-11'),
+      JSON.stringify({
+        date: '2026-06-11',
+        convex: { ok: true },
+        discord: { ok: false },
+        overall: 'partial',
+        inProgress: null,
+        history: [],
+      }),
+    );
+
+    let collectCalled = false;
+    let pushCalled = false;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'deferred-discord-only-repair', exitCode: 0 }),
+      collectFn: async () => {
+        collectCalled = true;
+        throw new Error('collect should not run for bucket 4');
+      },
+      pushFn: async () => {
+        pushCalled = true;
+        return { ok: true, signalsWritten: 1 };
+      },
+      postDigestFn: async () => ({ ok: true, messageIds: ['msg-1'], error: null }),
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => ({
+          status: 'success',
+          value: [{ date: '2026-06-11', status: 'published' }],
+        }),
+        text: async () =>
+          JSON.stringify({
+            status: 'success',
+            value: [{ date: '2026-06-11', status: 'published' }],
+          }),
+      }),
+    });
+
+    assert.equal(collectCalled, false);
+    assert.equal(pushCalled, false);
+    assert.equal(result.action, 'discord-only-repair-ok');
+    const logRaw = await readFile(join(hermesDir, 'logs', 'push-digest-watchdog.log'), 'utf8');
+    assert.match(logRaw, /action=discord-only-repair-ok/);
+    const outcome = JSON.parse(await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-06-11'), 'utf8'));
+    assert.equal(outcome.discord.ok, true);
+    assert.equal(outcome.convex.ok, true);
+    assert.equal(outcome.overall, 'success');
+    assert.deepEqual(outcome.history.at(-1).warnings, []);
+    assert.equal(outcome.history.at(-1).convex.ok, true);
+    assert.equal(outcome.history.at(-1).overall, 'success');
+  });
+
+  it('postDigest fails → discord-only-repair-failed, overall stays partial', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-discord-fail-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await mkdir(join(hermesDir, 'digest-outcomes'), { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: { date: '2026-06-11' },
+        signals: [{ title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' }],
+      }),
+    );
+    await writeFile(
+      resolveDayOutcomeFilePath(operatorHome, '2026-06-11'),
+      JSON.stringify({
+        date: '2026-06-11',
+        convex: { ok: true },
+        discord: { ok: false },
+        overall: 'partial',
+        inProgress: null,
+        history: [],
+      }),
+    );
+
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'deferred-discord-only-repair', exitCode: 0 }),
+      postDigestFn: async () => ({ ok: false, messageIds: [], error: 'discord-rate-limit' }),
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => ({ status: 'success', value: [] }),
+        text: async () => JSON.stringify({ status: 'success', value: [] }),
+      }),
+    });
+
+    assert.equal(result.action, 'discord-only-repair-failed');
+    const outcome = JSON.parse(await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-06-11'), 'utf8'));
+    assert.equal(outcome.discord.ok, false);
+    assert.equal(outcome.overall, 'partial');
+    assert.equal(outcome.history.at(-1).action, 'discord-only-repair-failed');
+    assert.deepEqual(outcome.history.at(-1).warnings, []);
+    assert.equal(outcome.history.at(-1).convex.ok, true);
+    assert.equal(outcome.history.at(-1).overall, 'partial');
+  });
+
+  it('missing artifact → discord-only-repair-skipped-no-artifact, no collect, overall partial', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-discord-no-artifact-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await mkdir(join(hermesDir, 'logs'), { recursive: true });
+    await mkdir(join(hermesDir, 'digest-outcomes'), { recursive: true });
+    await writeFile(
+      resolveDayOutcomeFilePath(operatorHome, '2026-06-11'),
+      JSON.stringify({
+        date: '2026-06-11',
+        convex: { ok: true },
+        discord: { ok: false },
+        overall: 'partial',
+        inProgress: null,
+        history: [],
+      }),
+    );
+
+    let collectCalled = false;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      watchdogFn: async () => ({ action: 'deferred-discord-only-repair', exitCode: 0 }),
+      collectFn: async () => {
+        collectCalled = true;
+        throw new Error('collect should not run when artifact missing');
+      },
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => ({ status: 'success', value: [] }),
+        text: async () => JSON.stringify({ status: 'success', value: [] }),
+      }),
+    });
+
+    assert.equal(collectCalled, false);
+    assert.equal(result.action, 'discord-only-repair-skipped-no-artifact');
+    const outcome = JSON.parse(await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-06-11'), 'utf8'));
+    assert.equal(outcome.discord.ok, false);
+    assert.equal(outcome.overall, 'partial');
   });
 });
