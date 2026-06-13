@@ -539,4 +539,4 @@ development_status:
   71-2-pushpayload-result-check-gate-discord-on-convex: done
   71-3-structured-run-outcome-record-observability-gate: done
   71-4-discord-only-repair-from-day-outcome-record: done
-  epic-71-retrospective: optional
+  epic-71-retrospective: done
