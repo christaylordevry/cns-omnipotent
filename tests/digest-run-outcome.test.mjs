@@ -101,7 +101,7 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.google_trends.count, 1);
   });
 
-  it('computeOverall marks convex+discord success with source errors as partial when signals exist', () => {
+  it('computeOverall marks convex+discord success as success even when a source errored', () => {
     const overall = computeOverall({
       convex: { ok: true },
       discord: { ok: true },
@@ -109,7 +109,7 @@ describe('digest-run-outcome (Story 71-3)', () => {
       terminalAction: 'completion-backfill-push',
       signalCount: 4,
     });
-    assert.equal(overall, 'partial');
+    assert.equal(overall, 'success');
   });
 
   it('inferDiscordFromLogActions reads latest discord action', () => {

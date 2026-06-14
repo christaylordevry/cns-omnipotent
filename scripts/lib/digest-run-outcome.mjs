@@ -310,7 +310,7 @@ export function computeOverall(input) {
   const hasSourceError = Object.values(sources).some((row) => row.status === 'error');
   const hasSignals = signalCount > 0;
 
-  if (convex.ok && discord.ok && !hasSourceError) {
+  if (convex.ok && discord.ok) {
     return 'success';
   }
 
@@ -327,10 +327,6 @@ export function computeOverall(input) {
   }
 
   if (terminalAction === 'skipped-already-pushed' && !convex.ok) {
-    return 'partial';
-  }
-
-  if (convex.ok && discord.ok && hasSourceError) {
     return 'partial';
   }
 
