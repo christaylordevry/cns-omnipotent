@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.41 | Last updated: 2026-06-17
+> Version: 2.1.42 | Last updated: 2026-06-17
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -245,6 +245,7 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Firecrawl           | MCP tool (Tier 1)                           | Scrape, crawl, map, or extract web content for research ingestion or source capture                 |
 | Perplexity          | MCP tool (Tier 1, tool: `mcp__perplexity__search`) | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
 | Apify               | MCP tool (Tier 1)                           | Apify Actors, RAG web browser, Apify Store scrapers; runs, datasets, and docs via hosted MCP      |
+| Agent Browser       | WSL shell CLI + skill (`agent-browser`)     | Token-cheap browser smoke checks, QA, form fills, screenshots; not an MCP server; routing rule in Section 9 |
 
 ### How to Load a Module
 
@@ -260,29 +261,20 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ### Project Status
 
-- Epic 54: in progress
-- Epic 55: in progress
-- Epic 56: in progress
-- Epic 60: in progress
-- Epic 61: in progress
-- Epic 64: in progress
-- Epic 65: in progress
-- Epic 66: in progress
-- Epic 67: in progress
-- Epic 68: in progress
-- Epic 69: in progress — 69-1 review, 69-3 ready-for-dev, 69-5 ready-for-dev
+- Epics 1–71: complete (sprint tracker through 2026-06-17)
+- No epics in progress
 
 ### Current Priorities
 
-1. Complete in-progress epics swiftly.
-2. Review and push updates for ready-for-dev stories.
-3. Maintain code and process stability through tests.
+1. Scope next epic from `deferred-work.md` and operator briefs.
+2. Close deferred live-validation gates (67-2 AC6, 68-8 C7/C11).
+3. Tracker and constitution hygiene.
 
 ### Recent Session Context
 
-- Story 69.5: Investigation Workspace — Screen 10 — ready-for-dev
-- Story 69.3: Source Health Panel — ready for dev, under review
-- Story 69.2: People Match Indicator — successfully concluded
+- Tracker: closed epics 54/55/56/60/61/64/65 (all stories done)
+- Story 67-2: Reddit public-JSON adapter — done
+- Epic 71: Digest job-state and watchdog truth — complete
 
 ## 9. Agent Behavior Guidelines
 
@@ -302,6 +294,7 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 - **About mobile access or mobile writes:** Load `AI-Context/modules/mobile-posture.md`.
 - **Context7:** Always invoke the Context7 MCP tools automatically when generating code or answering questions about libraries, APIs, or configuration. Do not wait for the user to type `use context7`.
 - **Perplexity:** Use the Perplexity MCP when the question requires current market data, competitor intelligence, real-time search results, or information that may have changed in the last 30 days. Do not use it for questions answerable from vault content or established technical documentation (use vault search and Context7 or static docs first).
+- **Browser automation:** Prefer the `agent-browser` WSL CLI and skill for token-cheap smoke checks, QA, screenshots, and simple page interaction. Use Playwright MCP when you need deep DOM debugging or MCP-native browser tooling.
 - **About anything else:** Ask the user. One focused question, not a list.
 
 ### Context Isolation (Subagents)
@@ -365,6 +358,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-17 | 2.1.42 | **Section 8:** Regenerated after sprint tracker close-out (epics 54–65, 67–71). **Section 7/9:** Materialized Agent Browser row and browser-automation routing rule (body content for 2.1.41 changelog-only entry). |
 | 2026-06-17 | 2.1.41 | **Section 7:** Added Agent Browser (WSL shell CLI + skill, not an MCP server) row. **Section 9:** Added browser-automation routing rule — prefer `agent-browser` over Playwright MCP for token-cheap smoke checks/QA; Playwright remains fallback for deep DOM debugging. |
 | 2026-06-12 | 2.1.40 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
 | 2026-06-11 | 2.1.39 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
