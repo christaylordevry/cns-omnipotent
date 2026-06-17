@@ -12,6 +12,7 @@ import {
   readNotebooklmDriveDocId,
   readSessionCloseEnvVar,
 } from "./lib/load-session-close-env.mjs";
+import { resolvePaths } from "./lib/paths.mjs";
 
 /**
  * @param {unknown} value
@@ -51,10 +52,40 @@ async function patchCloseReportDriveWrite(reportPath, driveWrite) {
 }
 
 /**
+ * Prefer close-report deterministic.export_path (Phase A) over cwd-relative defaults.
+ *
+ * @param {string} reportPath
+ * @param {string} repoRoot
+ * @returns {Promise<string | null>}
+ */
+async function resolveExportPathFromReport(reportPath, repoRoot) {
+  try {
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    if (!isObject(report)) {
+      return null;
+    }
+    const deterministic = isObject(report.deterministic) ? report.deterministic : null;
+    const fromDeterministic =
+      typeof deterministic?.export_path === "string" ? deterministic.export_path.trim() : "";
+    if (fromDeterministic) {
+      return fromDeterministic;
+    }
+    const fromRepoRoot =
+      typeof report.repo_root === "string" ? report.repo_root.trim() : "";
+    if (fromRepoRoot) {
+      return join(fromRepoRoot, "scripts/output/vault-export-for-notebooklm.md");
+    }
+  } catch {
+    // Caller handles missing/invalid report when patching drive_write.
+  }
+  return join(repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+}
+
+/**
  * @param {string[]} argv
  */
 function parseArgv(argv) {
-  const repoRoot = process.env.OMNIPOTENT_REPO || process.cwd();
+  const { repoRoot, closeReportPath } = resolvePaths();
   const reportIndex = argv.indexOf("--report");
   const exportIndex = argv.indexOf("--export-path");
   const docIndex = argv.indexOf("--doc-id");
@@ -62,20 +93,20 @@ function parseArgv(argv) {
     reportPath:
       reportIndex >= 0 && argv[reportIndex + 1]
         ? argv[reportIndex + 1]
-        : join(repoRoot, ".session-close", "close-report.json"),
+        : closeReportPath,
     exportPath:
-      exportIndex >= 0 && argv[exportIndex + 1]
-        ? argv[exportIndex + 1]
-        : join(repoRoot, "scripts/output/vault-export-for-notebooklm.md"),
+      exportIndex >= 0 && argv[exportIndex + 1] ? argv[exportIndex + 1] : undefined,
     docId: docIndex >= 0 ? argv[docIndex + 1] : undefined,
+    repoRoot,
   };
 }
 
 export async function runWriteVaultExportToDrive(opts = {}) {
-  const reportPath = opts.reportPath ?? join(process.env.OMNIPOTENT_REPO || process.cwd(), ".session-close", "close-report.json");
+  const paths = resolvePaths({ repoRoot: opts.repoRoot });
+  const reportPath =
+    opts.reportPath ?? paths.closeReportPath;
   const exportPath =
-    opts.exportPath ??
-    join(process.env.OMNIPOTENT_REPO || process.cwd(), "scripts/output/vault-export-for-notebooklm.md");
+    opts.exportPath ?? (await resolveExportPathFromReport(reportPath, paths.repoRoot));
   const docId = opts.docId ?? (await readNotebooklmDriveDocId({ env: opts.env }));
 
   if (!docId) {
@@ -109,6 +140,15 @@ export async function runWriteVaultExportToDrive(opts = {}) {
     const driveWrite = { status: "failed", message: `export read failed: ${message}` };
     await patchCloseReportDriveWrite(reportPath, driveWrite);
     return { ok: false, reason: "export-read", message: driveWrite.message };
+  }
+
+  if (typeof markdown !== "string" || markdown.length === 0) {
+    const driveWrite = {
+      status: "failed",
+      message: `export markdown empty at ${exportPath}`,
+    };
+    await patchCloseReportDriveWrite(reportPath, driveWrite);
+    return { ok: false, reason: "export-empty", message: driveWrite.message };
   }
 
   try {

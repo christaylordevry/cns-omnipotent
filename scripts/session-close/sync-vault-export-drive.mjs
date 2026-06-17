@@ -9,6 +9,7 @@ import { readNotebooklmDriveDocId } from "./lib/load-session-close-env.mjs";
 import { matchDriveSourceByDocId } from "./lib/match-drive-source.mjs";
 import { resolveNlmCommand, resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
 import { resolveOperatorHome } from "./lib/operator-home.mjs";
+import { resolvePaths } from "./lib/paths.mjs";
 import { mergeFanoutUpdatesAtPath } from "./merge-notebooklm-fanout.mjs";
 
 const DRIVE_SYNC_LOG_BASENAME = "session-close-drive-sync.log";
@@ -296,13 +297,13 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
  * @param {string[]} argv
  */
 function parseArgv(argv) {
-  const repoRoot = process.env.OMNIPOTENT_REPO || process.cwd();
+  const { closeReportPath } = resolvePaths();
   const reportIndex = argv.indexOf("--report");
   return {
     reportPath:
       reportIndex >= 0 && argv[reportIndex + 1]
         ? argv[reportIndex + 1]
-        : join(repoRoot, ".session-close", "close-report.json"),
+        : closeReportPath,
   };
 }
 

@@ -12,5 +12,5 @@ if ! command -v node &>/dev/null; then
   exit 1
 fi
 
-OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
+export OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
 exec node "$OMNIPOTENT_REPO/scripts/session-close/sync-vault-export-drive.mjs" "$@"

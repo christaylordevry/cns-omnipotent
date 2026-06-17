@@ -18,6 +18,7 @@ const dailyRhythmStaticPath = join(skillDir, "references/daily-rhythm-static-row
 const fanoutDiagnosticsPath = join(skillDir, "references/fanout-diagnostics.md");
 const driveExportSyncPath = join(skillDir, "references/drive-export-sync.md");
 const operatorGuidePath = join(root, "Knowledge-Vault-ACTIVE/03-Resources/CNS-Operator-Guide.md");
+const sessionCloseScriptRoot = "/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close";
 
 
 describe("Story 28.1 Hermes session-close skill mirror", () => {
@@ -44,7 +45,7 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("gate-apply-section8.mjs"));
     assert.ok(body.includes("phase B token check ABORTED"));
     assert.ok(body.includes("phase_b_token_check"));
-    assert.ok(body.includes("relative to `OMNIPOTENT_REPO`"));
+    assert.ok(body.includes("relative to `/home/christ/ai-factory/projects/Omnipotent.md`"));
     assert.ok(
       !body.includes("scripts/session-close/apply-section8.mjs"),
       "Phase B must invoke gate-apply-section8, not apply-section8 directly",
@@ -106,7 +107,7 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(watchdog < reply, "watchdog must run before Discord reply rendering");
     assert.ok(body.includes("best-effort"));
     assert.ok(body.includes("hermes-run-nlm-auth-watchdog.sh"));
-    assert.ok(body.includes("${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}") || body.includes("${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh"));
+    assert.ok(body.includes(`${sessionCloseScriptRoot}/hermes-run-nlm-auth-watchdog.sh`));
     assert.ok(body.includes("--dry-run"));
 
     const template = readFileSync(discordReplyTemplatePath, "utf8");
@@ -140,6 +141,24 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
     assert.ok(body.includes("drive-sync"));
     assert.ok(!body.includes("references/fanout-diagnostics.md"));
     assert.ok(!body.includes("references/drive-export-sync.md"));
+    for (const entrypoint of [
+      "hermes-run-session-close.sh",
+      "gate-apply-section8.mjs",
+      "hermes-run-record-notebooklm-fanout-mode.sh",
+      "hermes-run-write-vault-export-to-drive.sh",
+      "hermes-run-sync-vault-export-drive.sh",
+      "hermes-run-nlm-auth-watchdog.sh",
+      "hermes-run-render-discord-reply.sh",
+    ]) {
+      assert.ok(
+        body.includes(`${sessionCloseScriptRoot}/${entrypoint}`),
+        `${entrypoint} must use the explicit repo path`,
+      );
+    }
+    assert.ok(
+      !body.includes('"${OMNIPOTENT_REPO}/scripts/session-close/'),
+      "session-close terminal entrypoints must not depend on OMNIPOTENT_REPO expansion",
+    );
 
     const diagnostics = readFileSync(fanoutDiagnosticsPath, "utf8");
     assert.ok(diagnostics.includes("merge-notebooklm-fanout"));

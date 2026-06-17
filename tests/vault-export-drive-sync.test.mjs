@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -24,6 +24,7 @@ import {
   runSyncVaultExportDrive,
   syncNotebookDriveSource,
 } from "../scripts/session-close/sync-vault-export-drive.mjs";
+import { runWriteVaultExportToDrive } from "../scripts/session-close/write-vault-export-to-drive.mjs";
 
 const FIXTURE_NOTEBOOK = "981466f0-de1c-4551-93a9-f3bc2a24b184";
 const FIXTURE_DRIVE_DOC = "1AbCdEfGhIjKlMnOpQrStUvWxYz";
@@ -205,6 +206,100 @@ describe("match-drive-source (58-1)", () => {
       url: `https://docs.google.com/document/d/${FIXTURE_DRIVE_DOC}/edit`,
     });
     assert.equal(id, FIXTURE_DRIVE_DOC);
+  });
+});
+
+describe("write-vault-export-to-drive (58-1)", () => {
+  it("runWriteVaultExportToDrive reads export_path from close-report under Hermes cwd", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "write-drive-hermes-cwd-"));
+    const repoRoot = join(dir, "repo");
+    const exportPath = join(repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+    const reportPath = join(repoRoot, ".session-close", "close-report.json");
+    await mkdir(dirname(exportPath), { recursive: true });
+    await mkdir(dirname(reportPath), { recursive: true });
+    await writeFile(exportPath, "# vault export\n", "utf8");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        repo_root: repoRoot,
+        deterministic: { export_path: exportPath, export_bytes: 18 },
+      })}\n`,
+      "utf8",
+    );
+
+    const fetchCalls = [];
+    const fetchFn = async (url) => {
+      fetchCalls.push(String(url));
+      if (String(url).includes("oauth2.googleapis.com/token")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ access_token: "test-token" }),
+        };
+      }
+      if (String(url).includes(":batchUpdate")) {
+        return { ok: true, status: 200, text: async () => "{}" };
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            body: { content: [{ startIndex: 1, endIndex: 2 }] },
+          }),
+      };
+    };
+
+    const result = await runWriteVaultExportToDrive({
+      reportPath,
+      docId: FIXTURE_DRIVE_DOC,
+      env: {
+        HOME: join(dir, ".hermes", "home"),
+        HERMES_HOME: join(dir, ".hermes"),
+        GOOGLE_CLIENT_ID: "id",
+        GOOGLE_CLIENT_SECRET: "secret",
+        GOOGLE_REFRESH_TOKEN: "refresh",
+        NOTEBOOKLM_DRIVE_DOC_ID: FIXTURE_DRIVE_DOC,
+      },
+      fetchFn,
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(fetchCalls.some((url) => url.includes(":batchUpdate")));
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.steps.drive_write.status, "ok");
+  });
+
+  it("runWriteVaultExportToDrive skips empty export with a clear message", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "write-drive-empty-export-"));
+    const repoRoot = join(dir, "repo");
+    const exportPath = join(repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+    const reportPath = join(repoRoot, ".session-close", "close-report.json");
+    await mkdir(dirname(exportPath), { recursive: true });
+    await mkdir(dirname(reportPath), { recursive: true });
+    await writeFile(exportPath, "", "utf8");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        deterministic: { export_path: exportPath, export_bytes: 0 },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runWriteVaultExportToDrive({
+      reportPath,
+      docId: FIXTURE_DRIVE_DOC,
+      env: {
+        GOOGLE_CLIENT_ID: "id",
+        GOOGLE_CLIENT_SECRET: "secret",
+        GOOGLE_REFRESH_TOKEN: "refresh",
+        NOTEBOOKLM_DRIVE_DOC_ID: FIXTURE_DRIVE_DOC,
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "export-empty");
+    assert.match(result.message, /export markdown empty/);
   });
 });
 

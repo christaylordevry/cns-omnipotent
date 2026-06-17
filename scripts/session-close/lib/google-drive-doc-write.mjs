@@ -90,6 +90,10 @@ async function getDocumentEndIndex(accessToken, documentId, fetchFn = globalThis
  * }} input
  */
 export async function overwriteGoogleDocContent(input) {
+  if (typeof input.text !== "string" || input.text.length === 0) {
+    throw new Error("Google Docs overwrite skipped: export markdown is empty");
+  }
+
   const fetchFn = input.fetchFn ?? globalThis.fetch;
   const accessToken = await fetchGoogleAccessToken({
     clientId: input.clientId,

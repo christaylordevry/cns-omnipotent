@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
-version: 1.0.15
+version: 1.0.16
 author: CNS Operator
 license: MIT
 metadata:
@@ -22,8 +22,7 @@ metadata:
 Terminal only. **First action is always:**
 
 ```bash
-OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-/home/christ/ai-factory/projects/Omnipotent.md}"
-"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-session-close.sh"
+/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-session-close.sh
 ```
 
 If Phase A fails, stop and report from `.session-close/close-report.json` (`failure_class`, `steps.*`).
@@ -42,10 +41,10 @@ Write `.session-close/section8-draft.md` (≤1,500 tokens).
 Real close — apply via gate (not `apply-section8.mjs` directly):
 
 ```bash
-/home/christ/.nvm/versions/node/v24.14.0/bin/node "${OMNIPOTENT_REPO}/scripts/session-close/gate-apply-section8.mjs" --draft ".session-close/section8-draft.md"
+/home/christ/.nvm/versions/node/v24.14.0/bin/node /home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/gate-apply-section8.mjs --draft ".session-close/section8-draft.md"
 ```
 
-`--draft` is relative to `OMNIPOTENT_REPO`. If the gate exits **1** with `phase B token check ABORTED`, treat as controlled skip: read `phase_b_token_check` from `close-report.json`, still render Discord reply, surface ABORT in reply.
+`--draft` is relative to `/home/christ/ai-factory/projects/Omnipotent.md`. If the gate exits **1** with `phase B token check ABORTED`, treat as controlled skip: read `phase_b_token_check` from `close-report.json`, still render Discord reply, surface ABORT in reply.
 
 ## Phase C (NotebookLM, real close only)
 
@@ -53,10 +52,10 @@ Dry-run: skip Drive write, sync, and `source_add`; NotebookLM = `skipped in dry-
 
 Run in order (scripts only — do not load fan-out reference markdown):
 
-1. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh"` — read stdout JSON `mode` (`drive-sync` or `legacy-source-add`)
-2. If `drive-sync`: `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-write-vault-export-to-drive.sh"` then `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-sync-vault-export-drive.sh"` (no `source_add`)
+1. `/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-record-notebooklm-fanout-mode.sh` — read stdout JSON `mode` (`drive-sync` or `legacy-source-add`)
+2. If `drive-sync`: `/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-write-vault-export-to-drive.sh` then `/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-sync-vault-export-drive.sh` (no `source_add`)
 3. If `legacy-source-add`: MCP `source_add` per `close-report.json` target + `hermes-run-merge-notebooklm-fanout.sh` after each call
-4. `"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-nlm-auth-watchdog.sh" [--dry-run]`
+4. `/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-nlm-auth-watchdog.sh [--dry-run]`
 
 Fan-out is best-effort; always continue to the watchdog. Never paste tokens, emails, or raw MCP stderr into Discord.
 
@@ -65,7 +64,7 @@ Fan-out is best-effort; always continue to the watchdog. Never paste tokens, ema
 Prefer script output over template load:
 
 ```bash
-"${OMNIPOTENT_REPO}/scripts/session-close/hermes-run-render-discord-reply.sh"
+/home/christ/ai-factory/projects/Omnipotent.md/scripts/session-close/hermes-run-render-discord-reply.sh
 ```
 
 Post stdout as the reply. Fallback only if render fails: `references/discord-reply-template.md`.
