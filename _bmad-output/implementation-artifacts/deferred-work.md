@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 67-2-reddit-public-json-adapter (2026-06-17)
+
+- AC6 live validation (`sources.reddit.status: fired` with ≥1 post) — operator post-merge gate; smoke returned `http-403` in WSL pending `~/.hermes/trend-ingest.env` subreddit config
+
 ## Deferred from: code review of 71-4-discord-only-repair-from-day-outcome-record (2026-06-13)
 
 - `recoveryPath = 'none'` for discord-only-repair orchestrator branch — `DigestRecoveryPath` enum has no `discord-only-repair` variant; history shows `recoveryPath: none` for a real recovery operation. Observability polish only; no correctness impact.

@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-13T08:30:00+10:00
+# last_updated: 2026-06-17T12:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-14T12:00:00+10:00"
+last_updated: "2026-06-17T12:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -478,10 +478,10 @@ development_status:
 
   # Epic 67 — Signal Quality + Source Expansion (prd + architecture 2026-06-09)
   epic-67: done
-  # Gate: 67-1 validates live digest before 67-5 ProductHunt; 67-3/67-4 parallel; 67-2 operator Reddit OAuth; 67-6 needs ≥2 runs
+  # Gate: 67-1 validates live digest before 67-5 ProductHunt; 67-3/67-4 parallel; 67-2 Reddit public-JSON adapter (replaces OAuth); 67-6 needs ≥2 runs
   # Live validation (2026-06-11 kickoff): 07:00 cron = first real test of 67-7 hardening — see deferred-work.md §Session kickoff 2026-06-11
   67-1-live-digest-validation: done
-  67-2-reddit-oauth-retry-live-wiring: backlog
+  67-2-reddit-public-json-adapter: done
   67-3-personal-relevance-v2-nexus-goals: done
   67-4-signal-seeds-chip-inspector: done
   67-5-producthunt-adapter-source-10: done

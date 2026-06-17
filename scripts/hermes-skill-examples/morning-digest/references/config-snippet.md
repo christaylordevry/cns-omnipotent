@@ -159,20 +159,18 @@ Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as Ne
 | `MORNING_DIGEST_GITHUB_ENABLED` | Set `0` or `false` to disable | enabled |
 | `GITHUB_TOKEN` | Optional — raises API rate limits | — |
 
-## Reddit hot listings (Story 65-3)
+## Reddit top listings (Story 67-2)
 
-OAuth credentials required when enabled. Set in `~/.hermes/trend-ingest.env`.
+Public JSON — no OAuth credentials. User-Agent (`CNS-morning-digest/1.0`) is set inside the adapter. Set in `~/.hermes/trend-ingest.env`.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `MORNING_DIGEST_REDDIT_SUBREDDITS` | Comma-separated subreddit names (no `r/` prefix) | required when enabled |
+| `MORNING_DIGEST_REDDIT_SUBREDDITS` | Comma-separated subreddit names (`r/` prefix stripped automatically) | required when enabled |
 | `MORNING_DIGEST_REDDIT_MAX_POSTS` | Total post cap | `5` |
 | `MORNING_DIGEST_REDDIT_PER_SUBREDDIT` | Max posts per subreddit | `3` |
 | `MORNING_DIGEST_REDDIT_ENABLED` | Set `0` or `false` to disable | enabled |
-| `REDDIT_CLIENT_ID` | OAuth app client id | required when enabled |
-| `REDDIT_CLIENT_SECRET` | OAuth app secret | required when enabled |
-| `REDDIT_USERNAME` | Script-app Reddit username | required when enabled |
-| `REDDIT_PASSWORD` | Script-app password | required when enabled |
+
+**Note:** `REDDIT_CLIENT_*` in this file is for Epic 44 trend-ingest (PRAW) only — not morning-digest Source 8.
 
 ## Newsletters / RSS (Story 65-4)
 

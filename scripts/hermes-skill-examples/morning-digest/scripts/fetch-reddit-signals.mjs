@@ -1,4 +1,5 @@
-// fetch-reddit-signals.mjs — Reddit OAuth hot listings for morning-digest Source 8
+// fetch-reddit-signals.mjs — Reddit public-JSON top listings for morning-digest Source 8
+// Reddit public-JSON pattern informed by last30days reference (MIT) — no runtime dependency
 // Usage: node fetch-reddit-signals.mjs
 // stdout: {"posts":[...]} or {"error":"..."}; always exit 0 on fetch/parse failure
 
@@ -9,8 +10,7 @@ import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_POSTS_DEFAULT = 5;
 const PER_SUBREDDIT_DEFAULT = 3;
-const REDDIT_TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
-const REDDIT_OAUTH_BASE = 'https://oauth.reddit.com/r';
+const REDDIT_PUBLIC_BASE = 'https://www.reddit.com/r';
 const REDDIT_SITE_BASE = 'https://www.reddit.com';
 const USER_AGENT = 'CNS-morning-digest/1.0';
 
@@ -33,7 +33,7 @@ export function isRedditEnabled(value) {
 export function parseSubreddits(raw) {
   return String(raw ?? '')
     .split(',')
-    .map((part) => part.trim())
+    .map((part) => part.trim().replace(/^r\//i, ''))
     .filter(Boolean);
 }
 
@@ -44,10 +44,6 @@ export function parseSubreddits(raw) {
  *   subreddits: string[],
  *   maxPosts: number,
  *   perSubreddit: number,
- *   clientId?: string,
- *   clientSecret?: string,
- *   username?: string,
- *   password?: string,
  * }}
  */
 export function loadRedditConfig(env = process.env) {
@@ -58,20 +54,21 @@ export function loadRedditConfig(env = process.env) {
   const maxPosts = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : MAX_POSTS_DEFAULT;
   const perSubreddit =
     Number.isFinite(rawPerSub) && rawPerSub > 0 ? rawPerSub : PER_SUBREDDIT_DEFAULT;
-  const clientId = String(env.REDDIT_CLIENT_ID ?? '').trim() || undefined;
-  const clientSecret = String(env.REDDIT_CLIENT_SECRET ?? '').trim() || undefined;
-  const username = String(env.REDDIT_USERNAME ?? '').trim() || undefined;
-  const password = String(env.REDDIT_PASSWORD ?? '').trim() || undefined;
   return {
     enabled,
     subreddits,
     maxPosts,
     perSubreddit,
-    clientId,
-    clientSecret,
-    username,
-    password,
   };
+}
+
+/**
+ * @param {string} subreddit
+ * @returns {string}
+ */
+export function buildRedditPublicTopUrl(subreddit) {
+  const sub = encodeURIComponent(subreddit);
+  return `${REDDIT_PUBLIC_BASE}/${sub}/top.json?t=day&limit=25&raw_json=1`;
 }
 
 /**
@@ -151,81 +148,21 @@ export function mapRedditListingToPosts(json, cap) {
 }
 
 /**
- * @param {string} clientId
- * @param {string} clientSecret
- * @param {string} username
- * @param {string} password
- * @param {typeof fetch} fetchFn
- * @param {string | undefined} [fixtureToken]
- * @returns {Promise<{ ok: true, token: string } | { ok: false, reason: string }>}
- */
-export async function fetchRedditAppToken(
-  clientId,
-  clientSecret,
-  username,
-  password,
-  fetchFn,
-  fixtureToken,
-) {
-  if (fixtureToken !== undefined) {
-    return { ok: true, token: fixtureToken };
-  }
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  const body = new URLSearchParams({
-    grant_type: 'password',
-    username,
-    password,
-  });
-  try {
-    const res = await fetchFn(REDDIT_TOKEN_URL, {
-      method: 'POST',
-      signal: globalThis.AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': USER_AGENT,
-      },
-      body: body.toString(),
-    });
-    if (!res.ok) {
-      return { ok: false, reason: `http-${res.status}` };
-    }
-    const json = await res.json();
-    const rawToken =
-      json && typeof json === 'object' && 'access_token' in json
-        ? /** @type {{ access_token: unknown }} */ (json).access_token
-        : undefined;
-    const token = typeof rawToken === 'string' ? rawToken.trim() : '';
-    if (!token) {
-      return { ok: false, reason: 'token-error' };
-    }
-    return { ok: true, token };
-  } catch (err) {
-    const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : 'fetch-error';
-    return { ok: false, reason: name };
-  }
-}
-
-/**
  * @param {string} subreddit
- * @param {string} token
  * @param {number} perSubreddit
  * @param {typeof fetch} fetchFn
  * @param {unknown} [fixtureJson]
  * @returns {Promise<{ ok: true, posts: ReturnType<typeof mapRedditListingToPosts> } | { ok: false, reason: string }>}
  */
-export async function fetchRedditOAuthHot(subreddit, token, perSubreddit, fetchFn, fixtureJson) {
+export async function fetchRedditPublicTop(subreddit, perSubreddit, fetchFn, fixtureJson) {
   if (fixtureJson !== undefined) {
     return { ok: true, posts: mapRedditListingToPosts(fixtureJson, perSubreddit) };
   }
-  const url = `${REDDIT_OAUTH_BASE}/${encodeURIComponent(subreddit)}/hot?limit=${perSubreddit}&raw_json=1`;
+  const url = buildRedditPublicTopUrl(subreddit);
   try {
     const res = await fetchFn(url, {
       signal: globalThis.AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'User-Agent': USER_AGENT,
-      },
+      headers: { 'User-Agent': USER_AGENT },
     });
     if (!res.ok) {
       return { ok: false, reason: `http-${res.status}` };
@@ -264,7 +201,6 @@ export function dedupePostsByUrl(batches, maxPosts) {
  * @param {Record<string, string | undefined>} env
  * @param {{
  *   fetch?: typeof fetch,
- *   fixtureToken?: string,
  *   fixtureJson?: unknown,
  *   fixtureJsonBySubreddit?: Record<string, unknown>,
  * }} [options]
@@ -280,21 +216,6 @@ export async function runRedditFetch(env, options = {}) {
   if (config.subreddits.length === 0) {
     return { error: 'missing-subreddits' };
   }
-  if (!config.clientId || !config.clientSecret || !config.username || !config.password) {
-    return { error: 'missing-credentials' };
-  }
-
-  const tokenResult = await fetchRedditAppToken(
-    config.clientId,
-    config.clientSecret,
-    config.username,
-    config.password,
-    fetchFn,
-    options.fixtureToken,
-  );
-  if (!tokenResult.ok) {
-    return { error: tokenResult.reason === 'http-403' ? 'http-403' : 'token-error' };
-  }
 
   /** @type {Array<{ title: string, url: string, upvotes: number, commentCount: number, publishedAt?: string }>} */
   const collected = [];
@@ -304,9 +225,8 @@ export async function runRedditFetch(env, options = {}) {
       (options.fixtureJson !== undefined && config.subreddits.length === 1
         ? options.fixtureJson
         : undefined);
-    const result = await fetchRedditOAuthHot(
+    const result = await fetchRedditPublicTop(
       subreddit,
-      tokenResult.token,
       config.perSubreddit,
       fetchFn,
       fixture,

@@ -7,8 +7,9 @@ import { describe, it } from 'node:test';
 
 import {
   absoluteRedditUrl,
+  buildRedditPublicTopUrl,
   dedupePostsByUrl,
-  fetchRedditAppToken,
+  fetchRedditPublicTop,
   isRedditEnabled,
   loadRedditConfig,
   mapRedditListingToPosts,
@@ -91,7 +92,7 @@ const FIXTURE_LISTING = {
 };
 
 describe('fetch-reddit-signals.mjs parsing', () => {
-  it('maps OAuth listing fields to stdout post shape', () => {
+  it('maps public JSON listing fields to stdout post shape', () => {
     const mapped = mapRedditPostItem(FIXTURE_LISTING.data.children[0].data);
     assert.deepEqual(mapped, {
       title: 'Example ML post',
@@ -128,76 +129,66 @@ describe('fetch-reddit-signals.mjs parsing', () => {
   });
 });
 
-describe('fetch-reddit-signals.mjs fetchRedditAppToken', () => {
-  it('POSTs password grant with Basic auth header', async () => {
+describe('fetch-reddit-signals.mjs buildRedditPublicTopUrl', () => {
+  it('builds top.json URL with t=day, limit=25, and raw_json=1', () => {
+    const url = buildRedditPublicTopUrl('MachineLearning');
+    assert.equal(
+      url,
+      'https://www.reddit.com/r/MachineLearning/top.json?t=day&limit=25&raw_json=1',
+    );
+  });
+});
+
+describe('fetch-reddit-signals.mjs fetchRedditPublicTop', () => {
+  it('sends User-Agent header and no Authorization on public fetch', async () => {
     /** @type {RequestInit | undefined} */
     let capturedInit;
-    const mockFetch = async (_url, init) => {
+    /** @type {string | undefined} */
+    let capturedUrl;
+    const mockFetch = async (url, init) => {
+      capturedUrl = String(url);
       capturedInit = init;
       return {
         ok: true,
         async json() {
-          return { access_token: 'test-token-abc' };
+          return FIXTURE_LISTING;
         },
       };
     };
 
-    const result = await fetchRedditAppToken(
-      'client-id',
-      'client-secret',
-      'reddit-user',
-      'reddit-pass',
-      mockFetch,
-    );
+    const result = await fetchRedditPublicTop('MachineLearning', 3, mockFetch);
 
-    assert.deepEqual(result, { ok: true, token: 'test-token-abc' });
-    assert.equal(capturedInit?.method, 'POST');
+    assert.deepEqual(result.ok, true);
+    assert.equal(
+      capturedUrl,
+      'https://www.reddit.com/r/MachineLearning/top.json?t=day&limit=25&raw_json=1',
+    );
     const headers = /** @type {Record<string, string>} */ (capturedInit?.headers);
-    assert.equal(headers.Authorization, `Basic ${Buffer.from('client-id:client-secret').toString('base64')}`);
     assert.equal(headers['User-Agent'], 'CNS-morning-digest/1.0');
-    const body = String(capturedInit?.body);
-    assert.ok(body.includes('grant_type=password'));
-    assert.ok(body.includes('username=reddit-user'));
-    assert.ok(body.includes('password=reddit-pass'));
+    assert.equal(headers.Authorization, undefined);
   });
 
-  it('uses fixtureToken without network', async () => {
-    const result = await fetchRedditAppToken(
-      'id',
-      'secret',
-      'user',
-      'pass',
+  it('uses fixtureJson without network', async () => {
+    const result = await fetchRedditPublicTop(
+      'MachineLearning',
+      3,
       async () => {
         throw new Error('should not fetch');
       },
-      'fixture-token',
+      FIXTURE_LISTING,
     );
-    assert.deepEqual(result, { ok: true, token: 'fixture-token' });
-  });
-
-  it('returns token-error when access_token is null (not Bearer null)', async () => {
-    const result = await fetchRedditAppToken('id', 'secret', 'user', 'pass', async () => ({
-      ok: true,
-      async json() {
-        return { access_token: null };
-      },
-    }));
-    assert.deepEqual(result, { ok: false, reason: 'token-error' });
+    assert.equal(result.ok, true);
+    assert.equal(result.posts.length, 3);
   });
 });
 
 describe('fetch-reddit-signals.mjs runRedditFetch', () => {
   const baseEnv = {
     MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning',
-    REDDIT_CLIENT_ID: 'id',
-    REDDIT_CLIENT_SECRET: 'secret',
-    REDDIT_USERNAME: 'user',
-    REDDIT_PASSWORD: 'pass',
   };
 
-  it('returns posts from fixture without network', async () => {
+  it('returns posts from fixture without credentials', async () => {
     const payload = await runRedditFetch(baseEnv, {
-      fixtureToken: 'token',
       fixtureJson: FIXTURE_LISTING,
     });
     assert.ok(Array.isArray(payload.posts));
@@ -215,20 +206,8 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
   });
 
   it('returns missing-subreddits when enabled but subreddits unset', async () => {
-    const payload = await runRedditFetch({
-      REDDIT_CLIENT_ID: 'id',
-      REDDIT_CLIENT_SECRET: 'secret',
-      REDDIT_USERNAME: 'user',
-      REDDIT_PASSWORD: 'pass',
-    });
+    const payload = await runRedditFetch({});
     assert.deepEqual(payload, { error: 'missing-subreddits' });
-  });
-
-  it('returns missing-credentials when OAuth vars absent', async () => {
-    const payload = await runRedditFetch({
-      MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning',
-    });
-    assert.deepEqual(payload, { error: 'missing-credentials' });
   });
 
   it('dedupes across multiple subreddits', async () => {
@@ -240,7 +219,6 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
         MORNING_DIGEST_REDDIT_PER_SUBREDDIT: '3',
       },
       {
-        fixtureToken: 'token',
         fixtureJsonBySubreddit: {
           MachineLearning: FIXTURE_LISTING,
           LocalLLaMA: FIXTURE_LISTING,
@@ -250,18 +228,14 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
     assert.equal(payload.posts?.length, 2);
   });
 
-  it('returns error JSON on OAuth hot fetch failure', async () => {
-    const failingFetch = async (url) => {
-      if (String(url).includes('access_token')) {
-        return {
-          ok: true,
-          async json() {
-            return { access_token: 'token' };
-          },
-        };
-      }
-      return { ok: false, status: 403 };
-    };
+  it('returns error JSON on public fetch failure', async () => {
+    const failingFetch = async () => ({ ok: false, status: 429 });
+    const payload = await runRedditFetch(baseEnv, { fetch: failingFetch });
+    assert.deepEqual(payload, { error: 'http-429' });
+  });
+
+  it('returns http-403 on forbidden response', async () => {
+    const failingFetch = async () => ({ ok: false, status: 403 });
     const payload = await runRedditFetch(baseEnv, { fetch: failingFetch });
     assert.deepEqual(payload, { error: 'http-403' });
   });
@@ -277,9 +251,19 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
     assert.deepEqual(cli, { error: 'reddit disabled' });
   });
 
+  it('CLI exits 0 with missing-subreddits when subreddits unset', async () => {
+    const { stdout } = await execFileAsync('node', [fetchScript], {
+      env: {
+        ...process.env,
+        MORNING_DIGEST_REDDIT_SUBREDDITS: '',
+      },
+    });
+    const cli = JSON.parse(stdout.trim());
+    assert.deepEqual(cli, { error: 'missing-subreddits' });
+  });
+
   it('fetch stdout → sourceMetadata assembly → normalizeEngagement round-trip (§6.1)', async () => {
     const payload = await runRedditFetch(baseEnv, {
-      fixtureToken: 'token',
       fixtureJson: FIXTURE_LISTING,
     });
     assert.ok(Array.isArray(payload.posts) && payload.posts.length > 0);
@@ -361,10 +345,6 @@ describe('loadRedditConfig', () => {
   it('defaults maxPosts and perSubreddit when unset or invalid', () => {
     const config = loadRedditConfig({
       MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning, LocalLLaMA',
-      REDDIT_CLIENT_ID: 'id',
-      REDDIT_CLIENT_SECRET: 'secret',
-      REDDIT_USERNAME: 'user',
-      REDDIT_PASSWORD: 'pass',
     });
     assert.equal(config.maxPosts, 5);
     assert.equal(config.perSubreddit, 3);
@@ -377,10 +357,16 @@ describe('loadRedditConfig', () => {
     assert.equal(isRedditEnabled('off'), false);
   });
 
-  it('parseSubreddits trims and drops empty segments', () => {
+  it('parseSubreddits trims, drops empty segments, and strips r/ prefix', () => {
     assert.deepEqual(parseSubreddits(' MachineLearning , , LocalLLaMA '), [
       'MachineLearning',
       'LocalLLaMA',
     ]);
+    assert.deepEqual(parseSubreddits('r/MachineLearning, LocalLLaMA ,r/artificial'), [
+      'MachineLearning',
+      'LocalLLaMA',
+      'artificial',
+    ]);
+    assert.deepEqual(parseSubreddits('R/bar, baz'), ['bar', 'baz']);
   });
 });

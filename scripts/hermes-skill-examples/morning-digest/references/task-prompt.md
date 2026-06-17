@@ -233,7 +233,7 @@ Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
 
 ## Source 8 — Reddit
 
-Call `terminal` exactly once for Reddit hot listings via OAuth. The script reads `MORNING_DIGEST_REDDIT_*` and `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+Call `terminal` exactly once for Reddit top listings via public JSON (no OAuth). The script reads `MORNING_DIGEST_REDDIT_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). User-Agent (`CNS-morning-digest/1.0`) is set inside the script — the operator does not configure it for digest. It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
 
 ```text
 terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)
@@ -253,7 +253,7 @@ Stdout shape (Reddit only — do not confuse with Sources 5, 7, or 9 keys):
 4. Else if `Array.isArray(rd_json.posts) && rd_json.posts.length > 0`:
    - Read **`rd_json.posts`** (`posts[]` stdout array key) only — each item uses `title`, `url`, `upvotes`, `commentCount` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `posts[].upvotes` → `sourceMetadata.upvotes`, `posts[].commentCount` → `sourceMetadata.commentCount` (omit `commentCount` when absent), `posts[].publishedAt` → `sourceMetadata.publishedAt` when present.
-   - Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names **without** `r/` prefix) and OAuth credentials when enabled.
+   - Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names; `r/` prefix is stripped automatically when present).
    - For Discord **Reddit**, list each post as `- <title> — <upvotes> upvotes, <commentCount> comments`.
 5. Else → failure (empty `posts`, invalid shape, or parse error).
 6. On failure: section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 9.
@@ -647,7 +647,7 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 (or - (source unavailable: <short reason>) when Source 7 failed)
 (DO NOT post bare URLs or link previews — use `- owner/repo — N stars, M forks` bullets from `title` only; `url` is for §9 Convex mapping.)
 
-**Reddit** (hot posts)
+**Reddit** (top posts)
 - <title> — <upvotes> upvotes, <commentCount> comments
 - ...
 (or - (source unavailable: <short reason>) when Source 8 failed)
