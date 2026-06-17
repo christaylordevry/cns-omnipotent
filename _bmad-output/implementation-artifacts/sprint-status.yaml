@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-17T12:00:00+10:00
+# last_updated: 2026-06-17T17:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-17T12:00:00+10:00"
+last_updated: "2026-06-17T17:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -374,25 +374,28 @@ development_status:
   53-3-add-reason-field-to-no-route-responses: done
 
   # Epic 54 - Hermes deployment parity & NotebookLM observability
-  epic-54: in-progress
+  epic-54: done
   54-1-skill-install-gate: done
   54-2-notebook-query-convex-log-reliability: done
   54-3-session-close-fan-out-diagnostics: done
   54-4-trigger-contract-audit: done
+  epic-54-retrospective: optional
 
   # Epic 55 — Hermes morning-digest trigger reliability (49-6 deferral)
-  epic-55: in-progress
+  epic-55: done
   55-1-morning-digest-trigger-reliability: done
   55-2-google-trends-normalized-value-fix: done
   55-3-morning-digest-cron-automation: done
+  epic-55-retrospective: optional
 
   # Epic 56 — NotebookLM routing calibration + vault hygiene (operator brief 2026-06-02)
-  epic-56: in-progress
+  epic-56: done
   56-1-notebooklm-routing-threshold-tuning: done
   56-2-vault-lint-remediation: done
   56-3-session-close-fan-out-error-class-dashboard-widget: done
   56-4-morning-digest-signal-scoring-improvements: done
   56-5-notebook-queries-convex-table-dedupe: done
+  epic-56-retrospective: optional
 
   # Epic 57 — Hermes MEMORY.md CNS State freshness (operator brief 2026-06-02)
   epic-57: done
@@ -411,17 +414,19 @@ development_status:
   59-3-fix-nlm-auth-hermes-home-isolation: done
 
   # Epic 60 — Hermes skill mirror hygiene (operator brief 2026-06-04)
-  epic-60: in-progress
+  epic-60: done
   60-1-fix-verify-sh-hermes-skill-parity-gate: done
   60-2-dry-refactor-shared-withsessioncloseenv-isolation-helper: done
+  epic-60-retrospective: optional
 
   # Epic 61 — Morning digest source expansion (operator brief 2026-06-04)
-  epic-61: in-progress
+  epic-61: done
   61-1-morning-digest-arxiv-source: done
   61-2-fix-vault-context-notebook-title-routing: done
   61-3-fix-home-isolation-morning-digest: done
   61-4-morning-digest-hackernews-source: done
   61-5-morning-digest-convex-push: done
+  epic-61-retrospective: optional
 
   # Epic 62 — Signal Seeds (Phase 1 — keyword candidates data layer)
   epic-62: done
@@ -440,7 +445,7 @@ development_status:
   epic-63-retrospective: optional
 
   # Epic 64 — Intelligence Scoring Engine v1 (cross-repo: cns-dashboard schema + Omnipotent.md digest scoring)
-  epic-64: in-progress
+  epic-64: done
   # Stories: 64-1 schema → 64-2 scoring (5 dims incl. personalRelevance) → 64-3 disposition → 64-4 normalization → 64-5 ranked push
   # Parallel: 64-6 NewsAPI tightening, 64-7 arXiv env fix; 64-8 post-retro hotfix (scoring stdout → push threading)
   64-1-digest-signals-schema-extension: done
@@ -454,7 +459,7 @@ development_status:
   epic-64-retrospective: done
 
   # Epic 65 — Native Source Adapter Expansion v1 (reference: last30days codebook only; Omnipotent.md)
-  epic-65: in-progress
+  epic-65: done
   65-1-digest-source-types-github-adapter: done
   65-2-reddit-public-json-spike: done
   65-3-reddit-credential-adapter: done
