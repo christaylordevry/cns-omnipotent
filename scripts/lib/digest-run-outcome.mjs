@@ -6,7 +6,10 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { unwrapAdapterResult } from '../hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
+import {
+  ADAPTER_PAYLOAD_ARRAY_KEYS,
+  unwrapAdapterResult,
+} from '../hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
 import {
   evaluateTodayDigestRuns,
   fetchRecentDigestRuns,
@@ -29,8 +32,6 @@ const VALID_TRIGGERS = new Set([
 const COLLECT_KEY_TO_SOURCE_KEY = {
   trends: 'google_trends',
 };
-
-const ADAPTER_COUNT_KEYS = ['posts', 'events', 'launches', 'headlines', 'papers', 'repos', 'entries', 'items', 'stories'];
 
 export const CONVEX_SUCCESS_TERMINAL_ACTIONS = new Set([
   'completion-backfill-push',
@@ -152,7 +153,7 @@ export function buildSourcesFromAdapterOutputs(adapterOutputs) {
  * @returns {number}
  */
 function countAdapterItems(data) {
-  for (const key of ADAPTER_COUNT_KEYS) {
+  for (const key of ADAPTER_PAYLOAD_ARRAY_KEYS) {
     const value = data[key];
     if (Array.isArray(value)) {
       return value.length;

@@ -550,3 +550,4 @@ development_status:
   # Reddit Source 8 closed platform-side — YouTube API key replaces lost social signal
   epic-72: in-progress
   72-1-youtube-data-api-adapter: done
+  72-2-youtube-outcome-record-investigation: done

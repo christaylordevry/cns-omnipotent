@@ -7,7 +7,8 @@ const COLLECT_KEY_TO_SOURCE_KEY = {
   trends: 'google_trends',
 };
 
-const ADAPTER_DATA_KEYS = new Set([
+/** Adapter stdout JSON array keys — shared by error-classification and outcome counting (72-2 DRY). */
+export const ADAPTER_PAYLOAD_ARRAY_KEYS = Object.freeze([
   'posts',
   'events',
   'launches',
@@ -21,6 +22,8 @@ const ADAPTER_DATA_KEYS = new Set([
   // `{ error, videos: [...] }` is not misclassified as a bare error payload.
   'videos',
 ]);
+
+export const ADAPTER_DATA_KEYS = new Set(ADAPTER_PAYLOAD_ARRAY_KEYS);
 
 /**
  * @param {unknown} parsed

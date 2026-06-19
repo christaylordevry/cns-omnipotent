@@ -1,5 +1,30 @@
 # Deferred work
 
+## Deferred from: code review of 72-2-youtube-outcome-record-investigation (2026-06-19)
+
+- **Cross-repo digest source registry single-source-of-truth** — `DIGEST_SOURCE_SECTION_MAP` (Omnipotent), `DIGEST_SOURCE_HEALTH_REGISTRY` (dashboard), Convex literal unions, and UI badge maps are five+ hand-maintained lists; 72-2 correctly patched all for YouTube but Source 14 will repeat unless a shared contract or structural parity test lands.
+
+## Deferred from: Story 72-2 youtube-outcome-record-investigation (2026-06-19)
+
+- **AC4 live re-validation** — next 07:00 AEST cron (or `DIGEST_TRIGGER=manual` full pipeline) must show `sources.youtube` ok with `count > 0` and Convex youtube signals. Current HEAD validated via local `collectAdapterOutputs` + unit tests only; 2026-06-19 morning miss was pre-72-1 deploy timing.
+- **Orchestrator↔wrapper parity test** — no structural test asserts every `hermes-run-*.sh` under `scripts/session-close/` is referenced in `collectAdapterOutputs` task list; partial guard via `COLLECT_ADAPTER_TASK_KEYS` + `tests/digest-source-registry-parity.test.mjs` (source-key lists + payload keys).
+
+## Closed by: Story 72-2 youtube-outcome-record-investigation (2026-06-19)
+
+**Status:** **Investigation closed; observability gaps patched.**
+
+The 2026-06-19 07:00 AEST outcome record lacked `youtube` because the cron ran **before** commit `0bfb3c6` (72-1) landed (~15h earlier). Convex query on run `md714jkzrbe7fkfr2d41w5a7v588wcmf` confirmed **zero** youtube signals — Hypothesis A (adapter never ran), not Hypothesis B alone.
+
+Secondary fixes shipped so the next run reports correctly: `videos` added to `ADAPTER_COUNT_KEYS`, `youtube` added to `DIGEST_SOURCE_SECTION_MAP` and `DIGEST_SOURCE_HEALTH_REGISTRY` (13th row).
+
+| Symptom | Root cause |
+|---------|------------|
+| `youtube` key missing from outcome JSON | Cron used pre-72-1 orchestrator (no collect task) |
+| Would have shown `empty/0` after deploy | `ADAPTER_COUNT_KEYS` missing `videos` (Fix Path B) |
+| Nexus source health blind to YouTube | Registry stopped at Bluesky |
+
+**Do not reopen** as "YouTube API blocked" — manual `hermes-run-youtube.sh` returns valid `videos[]`; API key live.
+
 ## Deferred from: code review of 72-1-youtube-data-api-adapter (2026-06-19)
 
 - Second `videos.list` batch unreachable at current caps — `MAX_VIDEOS_HARD` (50) equals `VIDEOS_LIST_BATCH_SIZE` (50), so production `runYoutubeFetch` never exercises multi-batch enrich; batching is defensive only until cap rises.

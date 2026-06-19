@@ -108,27 +108,48 @@ async function runWrapper(wrapperName, env, timeoutMs) {
  *   youtube?: unknown;
  * }>}
  */
+/** Collect-task keys wired in the deterministic orchestrator (Story 72-2 parity guard). */
+export const COLLECT_ADAPTER_TASK_KEYS = Object.freeze([
+  'trends',
+  'newsapi',
+  'arxiv',
+  'hackernews',
+  'github',
+  'reddit',
+  'rss',
+  'producthunt',
+  'twitter',
+  'bluesky',
+  'youtube',
+]);
+
+const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
+  trends: ['hermes-run-trend-ingest.sh', 60_000],
+  newsapi: ['hermes-run-newsapi.sh', 45_000],
+  arxiv: ['hermes-run-arxiv.sh', 45_000],
+  hackernews: ['hermes-run-hn.sh', 45_000],
+  github: ['hermes-run-github.sh', 45_000],
+  reddit: ['hermes-run-reddit.sh', 45_000],
+  rss: ['hermes-run-rss.sh', 45_000],
+  producthunt: ['hermes-run-producthunt.sh', 45_000],
+  twitter: ['hermes-run-x.sh', 45_000],
+  bluesky: ['hermes-run-bluesky.sh', 45_000],
+  youtube: ['hermes-run-youtube.sh', 45_000],
+});
+
 export async function collectAdapterOutputs(env) {
   const mergedEnv = await mergeTrendIngestEnv(env);
   const results = {};
 
-  const tasks = [
-    ['trends', () => runWrapper('hermes-run-trend-ingest.sh', mergedEnv, 60_000)],
-    ['newsapi', () => runWrapper('hermes-run-newsapi.sh', mergedEnv, 45_000)],
-    ['arxiv', () => runWrapper('hermes-run-arxiv.sh', mergedEnv, 45_000)],
-    ['hackernews', () => runWrapper('hermes-run-hn.sh', mergedEnv, 45_000)],
-    ['github', () => runWrapper('hermes-run-github.sh', mergedEnv, 45_000)],
-    ['reddit', () => runWrapper('hermes-run-reddit.sh', mergedEnv, 45_000)],
-    ['rss', () => runWrapper('hermes-run-rss.sh', mergedEnv, 45_000)],
-    ['producthunt', () => runWrapper('hermes-run-producthunt.sh', mergedEnv, 45_000)],
-    ['twitter', () => runWrapper('hermes-run-x.sh', mergedEnv, 45_000)],
-    ['bluesky', () => runWrapper('hermes-run-bluesky.sh', mergedEnv, 45_000)],
-    ['youtube', () => runWrapper('hermes-run-youtube.sh', mergedEnv, 45_000)],
-  ];
-
-  for (const [key, runner] of tasks) {
+  for (const key of COLLECT_ADAPTER_TASK_KEYS) {
+    const wrapperSpec = COLLECT_ADAPTER_WRAPPER_BY_KEY[key];
+    if (!wrapperSpec) {
+      results[key] = { success: false, error: 'missing-wrapper-config' };
+      continue;
+    }
+    const [wrapperName, timeoutMs] = wrapperSpec;
     try {
-      const stdout = await runner();
+      const stdout = await runWrapper(wrapperName, mergedEnv, timeoutMs);
       const trimmed = String(stdout ?? '').trim();
       if (!trimmed) {
         results[key] = { success: false, error: 'empty-stdout' };

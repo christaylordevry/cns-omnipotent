@@ -101,6 +101,22 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.google_trends.count, 1);
   });
 
+  it('counts youtube videos[] for outcome sources.youtube (72-2)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      youtube: {
+        success: true,
+        data: {
+          videos: [
+            { title: 'One', url: 'https://www.youtube.com/watch?v=a' },
+            { title: 'Two', url: 'https://www.youtube.com/watch?v=b' },
+          ],
+        },
+      },
+    });
+    assert.equal(sources.youtube.status, 'ok');
+    assert.equal(sources.youtube.count, 2);
+  });
+
   it('computeOverall marks convex+discord success as success even when a source errored', () => {
     const overall = computeOverall({
       convex: { ok: true },
