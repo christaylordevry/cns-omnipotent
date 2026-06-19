@@ -1,8 +1,24 @@
 # Deferred work
 
-## Deferred from: code review of 67-2-reddit-public-json-adapter (2026-06-17)
+## Deferred from: code review of 72-1-youtube-data-api-adapter (2026-06-19)
 
-- AC6 live validation (`sources.reddit.status: fired` with ≥1 post) — operator post-merge gate; smoke returned `http-403` in WSL pending `~/.hermes/trend-ingest.env` subreddit config
+- Second `videos.list` batch unreachable at current caps — `MAX_VIDEOS_HARD` (50) equals `VIDEOS_LIST_BATCH_SIZE` (50), so production `runYoutubeFetch` never exercises multi-batch enrich; batching is defensive only until cap rises.
+
+## Closed by: platform determination — Story 67-2 Reddit Source 8 (2026-06-19)
+
+**Status:** **Fully closed.** Reddit gracefully degraded; no further action available.
+
+Story **67-2** (`reddit-public-json-adapter`) shipped the correct adapter architecture — public JSON, no OAuth, graceful `{ error }` + exit 0 — and observability (71-3) classifies Reddit failures without degrading digest `overall`. Live validation (AC6) and any follow-on credential/OAuth/retry work are **not backlog items**: Reddit corporate has intentionally blocked unattended public JSON access (403/429 at platform policy layer). The digest already shows `(source unavailable: …)` and continues; that is the intended degraded mode.
+
+**Do not reopen:** OAuth app registration, User-Agent tuning spirals, proxy workarounds, or Epic 44 PRAW as a morning-digest substitute. Pursuing live Reddit ingest further is throwing engineering time at a door Reddit closed on purpose.
+
+| Former deferral | Disposition |
+|-----------------|-------------|
+| AC6 live validation (`sources.reddit.status: fired` with ≥1 post) | **Closed** — platform block, not operator config gap |
+| OAuth retry / Reddit app registration (superseded path) | **Closed** — abandoned before 67-2 pivot; remains closed |
+| Subreddit env tuning for live `posts[]` | **Closed** — smoke `http-403` confirmed platform rejection, not missing `MORNING_DIGEST_REDDIT_SUBREDDITS` |
+
+**Class:** (c) Platform-level closure — not Phase 2 backlog.
 
 ## Deferred from: code review of 71-4-discord-only-repair-from-day-outcome-record (2026-06-13)
 
@@ -317,6 +333,7 @@
 | Composio MCP for client delivery | (b) Architecture, High when first client onboarded, Epic 41 |
 | Hermes morning health ping | (b) Ops, Low |
 | Epic 42 tech stack: SvelteKit + Convex | (b) Architecture, Low, Epic 42 |
+| Story 67-2 Reddit Source 8 — live ingest / OAuth / AC6 validation | (c) Platform closure (2026-06-19): Reddit gracefully degraded; no further action |
 | `hermes-url-auto-capture-inbox`: SKILL/config-snippet/capture-prompt still use `/approve`, `/execute-approved` | (c) Closed by 35-1 |
 | `vault-think` SKILL.md Pitfalls section on installed copy only (not repo mirror) | (c) Closed — no drift found in either copy |
 | Symlink / `realpath` on reads | (c) Resolved: Story 4-9 |
@@ -508,6 +525,16 @@ Use SvelteKit + Convex for Epic 42 rather than Next.js + Supabase. Rationale: ag
 ---
 
 ## Closed / resolved (detail)
+
+### Story 67-2 Reddit Source 8 — platform-level closure (2026-06-19)
+
+Morning-digest Source 8 adapter work (**67-2**) is **fully closed**. Implementation is correct: public JSON fetch, graceful degradation, Epic 71 observability shows `sources.reddit.status: error` without blocking digest success when Convex push and Discord post succeed.
+
+**Closure reason:** Reddit has intentionally restricted unattended public JSON access at the platform layer (403/429 policy). This is not an operator misconfiguration (`MORNING_DIGEST_REDDIT_SUBREDDITS`), missing OAuth credentials, or an adapter defect fixable in-repo. The digest's `(source unavailable: …)` path is the correct and final production behavior.
+
+**Not backlog:** AC6 live validation, OAuth app retry, credential provisioning, User-Agent escalation, or engineering workarounds. Pursuing live Reddit signals further wastes time on a door Reddit corporate closed on purpose.
+
+- **Class:** (c) Platform-level closure
 
 ### Strict URL normalization for dedup guard (29-6 deferral)
 

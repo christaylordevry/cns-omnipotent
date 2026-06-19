@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import {
   buildErrorsBySource,
   formatSydneyDate,
+  isAdapterErrorPayload,
   parseAdapterStdout,
   parseCompletionCliArgs,
   runDigestConvexCompletion,
@@ -74,6 +75,33 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
   it('parseAdapterStdout returns null on invalid JSON', () => {
     assert.equal(parseAdapterStdout('not-json'), null);
     assert.deepEqual(parseAdapterStdout('{"ok":true}'), { ok: true });
+  });
+
+  it('classifies YouTube exit-0 quota JSON as adapter error (Epic 70/71 collect path)', () => {
+    const stdout = JSON.stringify({ error: 'quota-exceeded' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:quota-exceeded',
+    });
+    assert.deepEqual(buildErrorsBySource({ youtube: wrapped }), {
+      youtube: 'adapter-error:quota-exceeded',
+    });
+  });
+
+  it('does not classify YouTube success stdout as adapter error', () => {
+    const parsed = parseAdapterStdout(
+      JSON.stringify({
+        videos: [{ title: 'Demo', url: 'https://www.youtube.com/watch?v=abc' }],
+      }),
+    );
+    assert.equal(isAdapterErrorPayload(parsed), false);
   });
 
   it('parseCompletionCliArgs detects --force-rescore', () => {

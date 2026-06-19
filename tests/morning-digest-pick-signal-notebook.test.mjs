@@ -21,6 +21,7 @@ import {
   extractPerplexitySignals,
   extractProductHuntSignals,
   extractBlueskySignals,
+  extractYoutubeSignals,
   extractTwitterSignals,
   extractRedditSignals,
   extractRssSignals,
@@ -326,6 +327,23 @@ describe('buildDigestSignals', () => {
       { title: 'bsky-mid', likes: 40, reposts: 10 },
     ]);
     assert.deepEqual(titles, ['bsky-high', 'bsky-mid']);
+  });
+
+  it('extractYoutubeSignals ranks by viewCount desc and caps at 2', () => {
+    const titles = extractYoutubeSignals([
+      { title: 'yt-low', viewCount: 100, likeCount: 5 },
+      { title: 'yt-high', viewCount: 50000, likeCount: 1000 },
+      { title: 'yt-mid', viewCount: 5000, likeCount: 200 },
+    ]);
+    assert.deepEqual(titles, ['yt-high', 'yt-mid']);
+  });
+
+  it('extractYoutubeSignals falls back to likeCount when viewCount missing', () => {
+    const titles = extractYoutubeSignals([
+      { title: 'yt-likes-high', likeCount: 900 },
+      { title: 'yt-likes-low', likeCount: 10 },
+    ]);
+    assert.deepEqual(titles, ['yt-likes-high', 'yt-likes-low']);
   });
 
   it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {

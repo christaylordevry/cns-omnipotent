@@ -54,6 +54,7 @@ const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 export {
   buildErrorsBySource,
+  isAdapterErrorPayload,
   summarizeAdapterCollection,
   unwrapAdapterResult,
 } from './hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
@@ -104,6 +105,7 @@ async function runWrapper(wrapperName, env, timeoutMs) {
  *   producthunt?: unknown;
  *   twitter?: unknown;
  *   bluesky?: unknown;
+ *   youtube?: unknown;
  * }>}
  */
 export async function collectAdapterOutputs(env) {
@@ -121,6 +123,7 @@ export async function collectAdapterOutputs(env) {
     ['producthunt', () => runWrapper('hermes-run-producthunt.sh', mergedEnv, 45_000)],
     ['twitter', () => runWrapper('hermes-run-x.sh', mergedEnv, 45_000)],
     ['bluesky', () => runWrapper('hermes-run-bluesky.sh', mergedEnv, 45_000)],
+    ['youtube', () => runWrapper('hermes-run-youtube.sh', mergedEnv, 45_000)],
   ];
 
   for (const [key, runner] of tasks) {
@@ -858,6 +861,7 @@ export async function runDigestConvexCompletion(opts = {}) {
       producthunt: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.producthunt)),
       twitter: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.twitter)),
       bluesky: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.bluesky)),
+      youtube: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.youtube)),
       runMeta: {
         topTrend: topTrend ? String(topTrend) : undefined,
         focusKeyword: topTrend ? String(topTrend) : undefined,

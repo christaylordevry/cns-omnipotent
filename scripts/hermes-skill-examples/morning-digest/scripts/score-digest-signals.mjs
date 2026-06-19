@@ -39,6 +39,7 @@ const SOURCE_PRIOR = {
   producthunt: 8,
   twitter: 9,
   bluesky: 7,
+  youtube: 8,
   rss: 5,
 };
 
@@ -53,13 +54,14 @@ const TREND_PROXY_PRIOR = {
   producthunt: 42,
   twitter: 40,
   bluesky: 38,
+  youtube: 40,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -127,6 +129,9 @@ export const BSKY_LIKES_CAP = 20000;
 export const BSKY_REPOSTS_CAP = 5000;
 export const BSKY_REPLIES_CAP = 2000;
 export const BSKY_QUOTES_CAP = 1000;
+export const YT_VIEWS_CAP = 1_000_000;
+export const YT_LIKES_CAP = 50_000;
+export const YT_COMMENTS_CAP = 10_000;
 export const X_LIKES_CAP = 50000;
 export const X_REPOSTS_CAP = 10000;
 export const X_REPLIES_CAP = 5000;
@@ -231,6 +236,22 @@ export function normalizeEngagement(signal) {
           0.3 * logNorm(reposts, BSKY_REPOSTS_CAP) +
           0.2 * logNorm(replies, BSKY_REPLIES_CAP) +
           0.1 * logNorm(quotes, BSKY_QUOTES_CAP),
+      );
+    }
+    case 'youtube': {
+      const views = meta.viewCount;
+      const likes = meta.likes;
+      const comments = meta.commentCount;
+      const hasEngagement = [views, likes, comments].some(
+        (value) => Number.isFinite(value) && Number(value) > 0,
+      );
+      if (!hasEngagement) {
+        return null;
+      }
+      return Math.round(
+        0.6 * logNorm(views, YT_VIEWS_CAP) +
+          0.3 * logNorm(likes, YT_LIKES_CAP) +
+          0.1 * logNorm(comments, YT_COMMENTS_CAP),
       );
     }
     case 'newsapi':

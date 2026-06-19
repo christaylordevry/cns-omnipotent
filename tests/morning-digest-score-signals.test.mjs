@@ -325,12 +325,13 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, youtube, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
     assert.equal(trendProxyForSignal({ title: 'X post', sourceType: 'twitter' }), 40);
     assert.equal(trendProxyForSignal({ title: 'BSKY post', sourceType: 'bluesky' }), 38);
+    assert.equal(trendProxyForSignal({ title: 'YT video', sourceType: 'youtube' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -530,6 +531,28 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
         title: 'BSKY zero post',
         sourceType: 'bluesky',
         sourceMetadata: { likes: 0, reposts: 0, replies: 0, quotes: 0 },
+      }),
+      null,
+    );
+  });
+
+  it('youtube at engagement caps → 100', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'YT viral video',
+        sourceType: 'youtube',
+        sourceMetadata: { viewCount: 1_000_000, likes: 50_000, commentCount: 10_000 },
+      }),
+      100,
+    );
+  });
+
+  it('youtube with all zero engagement → null', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'YT zero video',
+        sourceType: 'youtube',
+        sourceMetadata: { viewCount: 0, likes: 0, commentCount: 0 },
       }),
       null,
     );

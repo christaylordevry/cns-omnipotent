@@ -78,6 +78,7 @@ function omitUndefinedKeys(opts) {
  *   producthunt?: { launches?: Array<{ title?: string; tagline?: string; url?: string; votesCount?: number; createdAt?: string }> };
  *   twitter?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; quotes?: number; authorHandle?: string; publishedAt?: string }> };
  *   bluesky?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; quotes?: number; authorHandle?: string; publishedAt?: string }> };
+ *   youtube?: { videos?: Array<{ title?: string; url?: string; channelTitle?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   runMeta?: {
  *     topTrend?: string;
  *     focusKeyword?: string;
@@ -331,6 +332,32 @@ export function buildDigestPushPayload(sources) {
           quotes: post.quotes,
           authorHandle: post.authorHandle,
           publishedAt: post.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const video of sources.youtube?.videos ?? []) {
+    const title = String(video.title ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(video.url ?? '').trim() || undefined;
+    signals.push(
+      omitUndefinedKeys({
+        section: 'youtube',
+        sourceType: 'youtube',
+        title,
+        summary: truncateSummary(title, 200),
+        url,
+        rank: rank++,
+        externalId: url ? shortSha256(url) : shortSha256(`${title}:${date}`),
+        sourceMetadata: omitUndefinedKeys({
+          viewCount: typeof video.viewCount === 'number' ? video.viewCount : undefined,
+          likes: typeof video.likeCount === 'number' ? video.likeCount : undefined,
+          commentCount: typeof video.commentCount === 'number' ? video.commentCount : undefined,
+          author: video.channelTitle,
+          publishedAt: video.publishedAt,
         }),
       }),
     );

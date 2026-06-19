@@ -27,6 +27,7 @@ const MAX_RSS_SIGNALS = 1;
 const MAX_PRODUCTHUNT_SIGNALS = 2;
 const MAX_TWITTER_SIGNALS = 2;
 const MAX_BLUESKY_SIGNALS = 2;
+const MAX_YOUTUBE_SIGNALS = 2;
 const PERPLEXITY_TRUNCATE_CHARS = 200;
 
 const CNS_REPO_ROOT =
@@ -298,6 +299,38 @@ export function extractBlueskySignals(blueskyList) {
 }
 
 /**
+ * @param {{ viewCount?: number, likeCount?: number }} video
+ * @returns {number}
+ */
+function youtubeEngagementRank(video) {
+  const views = Number(video?.viewCount) || 0;
+  const likes = Number(video?.likeCount) || 0;
+  return views > 0 ? views : likes;
+}
+
+/**
+ * @param {Array<{ title?: string, viewCount?: number, likeCount?: number }>} youtubeList
+ * @returns {string[]}
+ */
+export function extractYoutubeSignals(youtubeList) {
+  if (!Array.isArray(youtubeList)) {
+    return [];
+  }
+  const sorted = [...youtubeList].sort(
+    (a, b) => youtubeEngagementRank(b) - youtubeEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_YOUTUBE_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -345,6 +378,7 @@ export function extractRssSignals(rssList) {
  *   producthunt?: Array<{ title?: string, votesCount?: number }>,
  *   twitter?: Array<{ title?: string, likes?: number, reposts?: number }>,
  *   bluesky?: Array<{ title?: string, likes?: number, reposts?: number }>,
+ *   youtube?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  * }} sources
  * @returns {string[]}
  */
@@ -383,6 +417,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractProductHuntSignals(sources.producthunt));
   ordered.push(...extractTwitterSignals(sources.twitter));
   ordered.push(...extractBlueskySignals(sources.bluesky));
+  ordered.push(...extractYoutubeSignals(sources.youtube));
 
   return dedupeSignals(ordered);
 }
@@ -543,7 +578,8 @@ function signalsFromParsedInput(parsed) {
       'rss' in parsed ||
       'producthunt' in parsed ||
       'twitter' in parsed ||
-      'bluesky' in parsed)
+      'bluesky' in parsed ||
+      'youtube' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

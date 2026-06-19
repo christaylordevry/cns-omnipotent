@@ -17,6 +17,9 @@ const ADAPTER_DATA_KEYS = new Set([
   'entries',
   'items',
   'stories',
+  // Epic 72-1 / Epic 70-71: success payloads use `videos[]`; keep in set so
+  // `{ error, videos: [...] }` is not misclassified as a bare error payload.
+  'videos',
 ]);
 
 /**
