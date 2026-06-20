@@ -43,6 +43,7 @@ const SOURCE_PRIOR = {
   tiktok: 8,
   instagram: 8,
   pinterest: 8,
+  polymarket: 9,
   rss: 5,
 };
 
@@ -61,13 +62,14 @@ const TREND_PROXY_PRIOR = {
   tiktok: 40,
   instagram: 40,
   pinterest: 42,
+  polymarket: 45,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'polymarket' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -216,6 +218,15 @@ export function normalizeEngagement(signal) {
         0.75 * logNorm(meta.upvotes, RD_UPVOTES_CAP) +
           0.25 * logNorm(commentCount, RD_COMMENTS_CAP),
       );
+    }
+    case 'polymarket': {
+      if (Number.isFinite(meta.upvotes) && meta.upvotes > 0) {
+        return Math.round(logNorm(meta.upvotes, RD_UPVOTES_CAP));
+      }
+      if (Number.isFinite(meta.volumeUsd) && meta.volumeUsd > 0) {
+        return Math.round(logNorm(meta.volumeUsd, RD_UPVOTES_CAP));
+      }
+      return null;
     }
     case 'twitter': {
       const likes = meta.likes;

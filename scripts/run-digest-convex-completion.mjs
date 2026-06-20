@@ -109,6 +109,7 @@ async function runWrapper(wrapperName, env, timeoutMs) {
  *   tiktok?: unknown;
  *   instagram?: unknown;
  *   pinterest?: unknown;
+ *   polymarket?: unknown;
  * }>}
  */
 /** Collect-task keys wired in the deterministic orchestrator (Story 72-2 parity guard). */
@@ -127,6 +128,7 @@ export const COLLECT_ADAPTER_TASK_KEYS = Object.freeze([
   'tiktok',
   'instagram',
   'pinterest',
+  'polymarket',
 ]);
 
 const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
@@ -144,6 +146,7 @@ const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
   tiktok: ['hermes-run-tiktok.sh', 45_000],
   instagram: ['hermes-run-instagram.sh', 45_000],
   pinterest: ['hermes-run-pinterest.sh', 45_000],
+  polymarket: ['hermes-run-polymarket.sh', 45_000],
 });
 
 export async function collectAdapterOutputs(env) {
@@ -895,6 +898,7 @@ export async function runDigestConvexCompletion(opts = {}) {
       tiktok: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.tiktok)),
       instagram: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.instagram)),
       pinterest: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.pinterest)),
+      polymarket: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.polymarket)),
       runMeta: {
         topTrend: topTrend ? String(topTrend) : undefined,
         focusKeyword: topTrend ? String(topTrend) : undefined,

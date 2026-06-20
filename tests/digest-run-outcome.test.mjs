@@ -169,6 +169,30 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.pinterest.count, 0);
   });
 
+  it('counts polymarket markets[] for outcome sources (Story 72-6)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      polymarket: {
+        success: true,
+        data: {
+          markets: [
+            { question: 'PM one', url: 'https://polymarket.com/market/one' },
+            { question: 'PM two', url: 'https://polymarket.com/market/two' },
+          ],
+        },
+      },
+    });
+    assert.equal(sources.polymarket.status, 'ok');
+    assert.equal(sources.polymarket.count, 2);
+  });
+
+  it('maps empty polymarket markets[] to sources.polymarket.empty not error (Story 72-6)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      polymarket: { success: true, data: { markets: [] } },
+    });
+    assert.equal(sources.polymarket.status, 'empty');
+    assert.equal(sources.polymarket.count, 0);
+  });
+
   it('maps empty instagram reels[] to sources.instagram.empty not error (Story 72-3)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       instagram: { success: true, data: { reels: [] } },

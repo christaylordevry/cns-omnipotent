@@ -399,6 +399,57 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(addCall?.args.signal.sourceMetadata.upvotes, 4200);
 	});
 
+	it('passes polymarket sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-05',
+				ranAt: 1_749_091_200_000,
+				topTrend: 'AI model',
+				focusKeyword: 'AI model',
+			},
+			signals: [
+				{
+					section: 'polymarket',
+					sourceType: 'polymarket',
+					title: 'Will Google have the best AI model at the end of June 2026?',
+					url: 'https://polymarket.com/market/will-google-have-the-best-ai-model-at-the-end-of-june-2026',
+					rank: 1,
+					externalId: '631139',
+					sourceMetadata: {
+						leadingOutcome: 'No',
+						leadingProbability: 0.58,
+						upvotes: 300444.42,
+						volumeUsd: 15988722.19,
+						liquidityUsd: 70032.71,
+						outcomes: ['Yes', 'No'],
+						outcomePrices: [0.42, 0.58],
+						publishedAt: '2026-06-30T00:00:00.000Z',
+					},
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-polymarket' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
+		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
+		assert.equal(addCall?.args.signal.sourceType, 'polymarket');
+		assert.equal(addCall?.args.signal.sourceMetadata.leadingProbability, 0.58);
+	});
+
 	it('passes scored signal fields through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];

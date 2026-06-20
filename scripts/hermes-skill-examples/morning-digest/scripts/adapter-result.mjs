@@ -23,6 +23,7 @@ export const ADAPTER_PAYLOAD_ARRAY_KEYS = Object.freeze([
   'videos',
   'reels',
   'pins',
+  'markets',
 ]);
 
 export const ADAPTER_DATA_KEYS = new Set(ADAPTER_PAYLOAD_ARRAY_KEYS);

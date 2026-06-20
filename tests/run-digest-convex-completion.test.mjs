@@ -191,6 +191,55 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     );
   });
 
+  it('classifies Polymarket exit-0 missing-watchlist JSON as adapter error (Story 72-6)', () => {
+    const stdout = JSON.stringify({ error: 'missing-watchlist' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:missing-watchlist',
+    });
+    assert.deepEqual(buildErrorsBySource({ polymarket: wrapped }), {
+      polymarket: 'adapter-error:missing-watchlist',
+    });
+  });
+
+  it('classifies Polymarket exit-0 http-429 JSON as adapter error (Story 72-6)', () => {
+    const stdout = JSON.stringify({ error: 'http-429' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.equal(isAdapterErrorPayload(parsed), true);
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:http-429',
+    });
+  });
+
+  it('does not classify Polymarket success stdout as adapter error (Story 72-6)', () => {
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            markets: [
+              {
+                question: 'PM market',
+                url: 'https://polymarket.com/market/pm-one',
+              },
+            ],
+          }),
+        ),
+      ),
+      false,
+    );
+  });
+
   it('parseCompletionCliArgs detects --force-rescore', () => {
     assert.equal(parseCompletionCliArgs(['--force-rescore']).forceRescore, true);
     assert.equal(parseCompletionCliArgs([]).forceRescore, false);

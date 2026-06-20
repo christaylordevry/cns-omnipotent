@@ -82,6 +82,7 @@ function omitUndefinedKeys(opts) {
  *   tiktok?: { videos?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   instagram?: { reels?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   pinterest?: { pins?: Array<{ title?: string; description?: string; url?: string; link?: string; author?: string; pinId?: string; publishedAt?: string; repinCount?: number }> };
+ *   polymarket?: { markets?: Array<{ question?: string; url?: string; marketId?: string; conditionId?: string; slug?: string; outcomes?: string[]; outcomePrices?: number[]; leadingOutcome?: string; leadingProbability?: number; volumeUsd?: number; volume24hrUsd?: number; liquidityUsd?: number; endDate?: string; updatedAt?: string }> };
  *   runMeta?: {
  *     topTrend?: string;
  *     focusKeyword?: string;
@@ -439,6 +440,62 @@ export function buildDigestPushPayload(sources) {
           upvotes: typeof pin.repinCount === 'number' ? pin.repinCount : undefined,
           author: pin.author,
           publishedAt: pin.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const market of sources.polymarket?.markets ?? []) {
+    const title = String(market.question ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(market.url ?? '').trim() || undefined;
+    const leadingOutcome = String(market.leadingOutcome ?? '').trim();
+    const leadingProbability =
+      typeof market.leadingProbability === 'number' ? market.leadingProbability : undefined;
+    const pct =
+      leadingProbability != null ? Math.round(leadingProbability * 1000) / 10 : undefined;
+    const volume24hr =
+      typeof market.volume24hrUsd === 'number' ? market.volume24hrUsd : undefined;
+    const liquidity =
+      typeof market.liquidityUsd === 'number' ? market.liquidityUsd : undefined;
+    const summaryParts = [];
+    if (leadingOutcome && pct != null) {
+      summaryParts.push(`${leadingOutcome} ${pct}%`);
+    }
+    if (volume24hr != null) {
+      summaryParts.push(`vol $${Math.round(volume24hr).toLocaleString('en-US')}`);
+    }
+    if (liquidity != null) {
+      summaryParts.push(`liq $${Math.round(liquidity).toLocaleString('en-US')}`);
+    }
+    const marketId = String(market.marketId ?? '').trim();
+    const conditionId = String(market.conditionId ?? '').trim();
+    signals.push(
+      omitUndefinedKeys({
+        section: 'polymarket',
+        sourceType: 'polymarket',
+        title,
+        summary: truncateSummary(summaryParts.join(' · '), 200),
+        url,
+        rank: rank++,
+        externalId:
+          marketId ||
+          (conditionId
+            ? shortSha256(conditionId).slice(0, 16)
+            : url
+              ? shortSha256(url)
+              : shortSha256(`${title}:${date}`)),
+        sourceMetadata: omitUndefinedKeys({
+          outcomes: Array.isArray(market.outcomes) ? market.outcomes : undefined,
+          outcomePrices: Array.isArray(market.outcomePrices) ? market.outcomePrices : undefined,
+          leadingOutcome: leadingOutcome || undefined,
+          leadingProbability,
+          volumeUsd: typeof market.volumeUsd === 'number' ? market.volumeUsd : undefined,
+          upvotes: volume24hr,
+          liquidityUsd: liquidity,
+          publishedAt: market.endDate ?? market.updatedAt,
         }),
       }),
     );

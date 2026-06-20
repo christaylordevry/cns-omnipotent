@@ -17,6 +17,7 @@ const SOURCE_PRIORITY = {
   tiktok: 4,
   instagram: 4,
   pinterest: 3,
+  polymarket: 4,
   rss: 4,
   reddit: 3,
   github: 2,

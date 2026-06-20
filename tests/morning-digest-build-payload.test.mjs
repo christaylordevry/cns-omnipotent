@@ -12,6 +12,11 @@ import {
   CANONICAL_PINTEREST_PIN,
   PINTEREST_VALIDATOR_METADATA_KEYS,
 } from './fixtures/pinterest-digest-signal.fixture.mjs';
+import {
+  buildCanonicalPolymarketDigestSignal,
+  CANONICAL_POLYMARKET_MARKET,
+  POLYMARKET_VALIDATOR_METADATA_KEYS,
+} from './fixtures/polymarket-digest-signal.fixture.mjs';
 
 describe('build-digest-push-payload (Story 68-10)', () => {
   it('shortSha256 returns 16-char hex', () => {
@@ -115,5 +120,53 @@ describe('build-digest-push-payload (Story 68-10)', () => {
     const signal = buildCanonicalPinterestDigestSignal();
     assert.equal(signal.sourceMetadata?.upvotes, 4200);
     assert.equal(signal.externalId, CANONICAL_PINTEREST_PIN.pinId);
+  });
+
+  it('maps polymarket volume24hrUsd to sourceMetadata.upvotes only (Story 72-6)', () => {
+    const payload = buildDigestPushPayload({
+      date: '2026-06-11',
+      ranAt: 1_781_000_000_000,
+      polymarket: { markets: [CANONICAL_POLYMARKET_MARKET] },
+      runMeta: { topTrend: 'AI model' },
+    });
+
+    const polymarket = payload.signals.find((row) => row.sourceType === 'polymarket');
+    assert.ok(polymarket);
+    assert.equal(polymarket.section, 'polymarket');
+    assert.equal(polymarket.sourceMetadata?.upvotes, CANONICAL_POLYMARKET_MARKET.volume24hrUsd);
+    assert.equal(polymarket.sourceMetadata?.leadingOutcome, 'No');
+    assert.equal(polymarket.sourceMetadata?.leadingProbability, 0.58);
+    assert.equal(polymarket.title, CANONICAL_POLYMARKET_MARKET.question);
+    assert.ok(polymarket.summary?.includes('No'));
+    assert.ok(polymarket.summary?.includes('58%'));
+
+    const metaKeys = Object.keys(polymarket.sourceMetadata ?? {}).sort();
+    assert.deepEqual(metaKeys, [...POLYMARKET_VALIDATOR_METADATA_KEYS].sort());
+    assert.equal('conditionId' in (polymarket.sourceMetadata ?? {}), false);
+    assert.equal('slug' in (polymarket.sourceMetadata ?? {}), false);
+    assert.equal('volume24hrUsd' in (polymarket.sourceMetadata ?? {}), false);
+  });
+
+  it('polymarket externalId uses conditionId hash when marketId absent (AC 5)', () => {
+    const market = {
+      ...CANONICAL_POLYMARKET_MARKET,
+      marketId: '',
+      url: '',
+      slug: '',
+    };
+    const payload = buildDigestPushPayload({
+      date: '2026-06-11',
+      ranAt: 1_781_000_000_000,
+      polymarket: { markets: [market] },
+      runMeta: { topTrend: 'AI' },
+    });
+    const signal = payload.signals.find((row) => row.sourceType === 'polymarket');
+    assert.equal(signal?.externalId, shortSha256(market.conditionId).slice(0, 16));
+  });
+
+  it('canonical polymarket fixture stays aligned with buildDigestPushPayload (anti-drift)', () => {
+    const signal = buildCanonicalPolymarketDigestSignal();
+    assert.equal(signal.sourceMetadata?.upvotes, CANONICAL_POLYMARKET_MARKET.volume24hrUsd);
+    assert.equal(signal.externalId, CANONICAL_POLYMARKET_MARKET.marketId);
   });
 });

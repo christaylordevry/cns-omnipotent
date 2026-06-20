@@ -325,7 +325,7 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, youtube, tiktok, instagram, pinterest, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, youtube, tiktok, instagram, pinterest, polymarket, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
@@ -335,6 +335,7 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
     assert.equal(trendProxyForSignal({ title: 'TT video', sourceType: 'tiktok' }), 40);
     assert.equal(trendProxyForSignal({ title: 'IG reel', sourceType: 'instagram' }), 40);
     assert.equal(trendProxyForSignal({ title: 'PI pin', sourceType: 'pinterest' }), 42);
+    assert.equal(trendProxyForSignal({ title: 'PM market', sourceType: 'polymarket' }), 45);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -598,6 +599,35 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
         title: 'PI empty pin',
         sourceType: 'pinterest',
         sourceMetadata: { upvotes: 0 },
+      }),
+      null,
+    );
+  });
+
+  it('polymarket normalizes volume24hr mapped to upvotes (Story 72-6)', () => {
+    const score = normalizeEngagement({
+      title: 'PM AI market',
+      sourceType: 'polymarket',
+      sourceMetadata: { upvotes: 300444.42 },
+    });
+    assert.ok(typeof score === 'number' && score > 0);
+  });
+
+  it('polymarket falls back to volumeUsd when upvotes missing', () => {
+    const score = normalizeEngagement({
+      title: 'PM macro market',
+      sourceType: 'polymarket',
+      sourceMetadata: { volumeUsd: 1_000_000 },
+    });
+    assert.ok(typeof score === 'number' && score > 0);
+  });
+
+  it('polymarket with zero volume returns null (Path B momentum)', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'PM empty market',
+        sourceType: 'polymarket',
+        sourceMetadata: { upvotes: 0, volumeUsd: 0 },
       }),
       null,
     );

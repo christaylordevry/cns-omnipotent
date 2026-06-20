@@ -407,6 +407,30 @@ export function extractPinterestSignals(pinterestList) {
 }
 
 /**
+ * @param {Array<{ question?: string, volume24hrUsd?: number, volumeUsd?: number }>} polymarketList
+ * @returns {string[]}
+ */
+export function extractPolymarketSignals(polymarketList) {
+  if (!Array.isArray(polymarketList)) {
+    return [];
+  }
+  const sorted = [...polymarketList].sort(
+    (a, b) =>
+      (Number(b?.volume24hrUsd) || Number(b?.volumeUsd) || 0) -
+      (Number(a?.volume24hrUsd) || Number(a?.volumeUsd) || 0),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, 2)) {
+    const question = typeof entry?.question === 'string' ? entry.question.trim() : '';
+    if (question) {
+      out.push(question);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -458,6 +482,7 @@ export function extractRssSignals(rssList) {
  *   tiktok?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  *   instagram?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  *   pinterest?: Array<{ title?: string, repinCount?: number }>,
+ *   polymarket?: Array<{ question?: string, volume24hrUsd?: number, volumeUsd?: number }>,
  * }} sources
  * @returns {string[]}
  */
@@ -500,6 +525,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractTiktokSignals(sources.tiktok));
   ordered.push(...extractInstagramSignals(sources.instagram));
   ordered.push(...extractPinterestSignals(sources.pinterest));
+  ordered.push(...extractPolymarketSignals(sources.polymarket));
 
   return dedupeSignals(ordered);
 }
@@ -664,7 +690,8 @@ function signalsFromParsedInput(parsed) {
       'youtube' in parsed ||
       'tiktok' in parsed ||
       'instagram' in parsed ||
-      'pinterest' in parsed)
+      'pinterest' in parsed ||
+      'polymarket' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }
