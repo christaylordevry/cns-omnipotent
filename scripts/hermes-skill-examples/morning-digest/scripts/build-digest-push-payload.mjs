@@ -84,6 +84,7 @@ function omitUndefinedKeys(opts) {
  *   pinterest?: { pins?: Array<{ title?: string; description?: string; url?: string; link?: string; author?: string; pinId?: string; publishedAt?: string; repinCount?: number }> };
  *   polymarket?: { markets?: Array<{ question?: string; url?: string; marketId?: string; conditionId?: string; slug?: string; outcomes?: string[]; outcomePrices?: number[]; leadingOutcome?: string; leadingProbability?: number; volumeUsd?: number; volume24hrUsd?: number; liquidityUsd?: number; endDate?: string; updatedAt?: string }> };
  *   threads?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; authorHandle?: string; author?: string; publishedAt?: string; postCode?: string; postId?: string }> };
+ *   linkedin?: { posts?: Array<{ title?: string; url?: string; likes?: number; commentCount?: number; authorHandle?: string; author?: string; publishedAt?: string; postId?: string }> };
  *   runMeta?: {
  *     topTrend?: string;
  *     focusKeyword?: string;
@@ -525,6 +526,34 @@ export function buildDigestPushPayload(sources) {
           likes: post.likes,
           reposts: post.reposts,
           replies: post.replies,
+          authorHandle: post.authorHandle,
+          author: post.author,
+          publishedAt: post.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const post of sources.linkedin?.posts ?? []) {
+    const title = String(post.title ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(post.url ?? '').trim() || undefined;
+    const postId = String(post.postId ?? '').trim();
+    signals.push(
+      omitUndefinedKeys({
+        section: 'linkedin',
+        sourceType: 'linkedin',
+        title,
+        summary: truncateSummary(title, 200),
+        url,
+        rank: rank++,
+        externalId:
+          postId || (url ? shortSha256(url).slice(0, 16) : shortSha256(`${title}:${date}`)),
+        sourceMetadata: omitUndefinedKeys({
+          likes: post.likes,
+          commentCount: post.commentCount,
           authorHandle: post.authorHandle,
           author: post.author,
           publishedAt: post.publishedAt,

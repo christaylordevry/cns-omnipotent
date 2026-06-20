@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-20T18:00:00+10:00
+# last_updated: 2026-06-20T12:00:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-20T18:30:00+10:00"
+last_updated: "2026-06-20T12:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -555,3 +555,4 @@ development_status:
   72-5-pinterest-scrapecreators-adapter: done
   72-6-polymarket-gamma-api-adapter: done
   72-7-threads-scrapecreators-adapter: done
+  72-8-linkedin-scrapecreators-adapter: done

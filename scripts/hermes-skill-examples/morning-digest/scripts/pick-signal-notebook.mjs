@@ -429,11 +429,41 @@ export function extractThreadsSignals(threadsList) {
 }
 
 /**
+ * @param {Array<{ title?: string, likes?: number, commentCount?: number }>} linkedinList
+ * @returns {string[]}
+ */
+export function extractLinkedinSignals(linkedinList) {
+  if (!Array.isArray(linkedinList)) {
+    return [];
+  }
+  const sorted = [...linkedinList].sort(
+    (a, b) => linkedinEngagementRank(b) - linkedinEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_TWITTER_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {{ likes?: number, reposts?: number }} post
  * @returns {number}
  */
 function threadsEngagementRank(post) {
   return (Number(post?.likes) || 0) + 2 * (Number(post?.reposts) || 0);
+}
+
+/**
+ * @param {{ likes?: number, commentCount?: number }} post
+ * @returns {number}
+ */
+function linkedinEngagementRank(post) {
+  return (Number(post?.likes) || 0) + 2 * (Number(post?.commentCount) || 0);
 }
 
 /**
@@ -557,6 +587,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractPinterestSignals(sources.pinterest));
   ordered.push(...extractPolymarketSignals(sources.polymarket));
   ordered.push(...extractThreadsSignals(sources.threads));
+  ordered.push(...extractLinkedinSignals(sources.linkedin));
 
   return dedupeSignals(ordered);
 }
@@ -723,7 +754,8 @@ function signalsFromParsedInput(parsed) {
       'instagram' in parsed ||
       'pinterest' in parsed ||
       'polymarket' in parsed ||
-      'threads' in parsed)
+      'threads' in parsed ||
+      'linkedin' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

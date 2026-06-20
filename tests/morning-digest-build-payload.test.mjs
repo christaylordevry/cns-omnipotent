@@ -21,6 +21,11 @@ import {
   buildCanonicalThreadsDigestSignal,
   CANONICAL_THREADS_POST,
 } from './fixtures/threads-digest-signal.fixture.mjs';
+import {
+  buildCanonicalLinkedinDigestSignal,
+  CANONICAL_LINKEDIN_POST,
+  LINKEDIN_VALIDATOR_METADATA_KEYS,
+} from './fixtures/linkedin-digest-signal.fixture.mjs';
 
 describe('build-digest-push-payload (Story 68-10)', () => {
   it('shortSha256 returns 16-char hex', () => {
@@ -192,5 +197,25 @@ describe('build-digest-push-payload (Story 68-10)', () => {
     const canonical = buildCanonicalThreadsDigestSignal();
     assert.equal(canonical.sourceType, threads.sourceType);
     assert.deepEqual(canonical.sourceMetadata, threads.sourceMetadata);
+  });
+
+  it('maps linkedin posts to sourceMetadata social fields (Story 72-8)', () => {
+    const payload = buildDigestPushPayload({
+      date: '2026-06-11',
+      ranAt: 1_781_000_000_000,
+      linkedin: { posts: [CANONICAL_LINKEDIN_POST] },
+      runMeta: { topTrend: 'AI agents' },
+    });
+    const linkedin = payload.signals.find((row) => row.sourceType === 'linkedin');
+    assert.ok(linkedin);
+    assert.equal(linkedin.section, 'linkedin');
+    assert.equal(linkedin.sourceMetadata?.authorHandle, 'openai');
+    assert.equal(linkedin.sourceMetadata?.likes, 420);
+    assert.equal(linkedin.sourceMetadata?.commentCount, 38);
+    const metaKeys = Object.keys(linkedin.sourceMetadata ?? {}).sort();
+    assert.deepEqual(metaKeys, [...LINKEDIN_VALIDATOR_METADATA_KEYS].sort());
+    const canonical = buildCanonicalLinkedinDigestSignal();
+    assert.equal(canonical.sourceType, linkedin.sourceType);
+    assert.deepEqual(canonical.sourceMetadata, linkedin.sourceMetadata);
   });
 });

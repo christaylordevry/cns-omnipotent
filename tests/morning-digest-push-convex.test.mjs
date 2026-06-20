@@ -448,6 +448,54 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(addCall?.args.signal.sourceMetadata.authorHandle, 'karpathy');
 	});
 
+	it('passes linkedin sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-11',
+				ranAt: 1_781_000_000_000,
+				topTrend: 'AI agents',
+				focusKeyword: 'AI agents',
+			},
+			signals: [
+				{
+					section: 'linkedin',
+					sourceType: 'linkedin',
+					title: 'More than 230 million people ask ChatGPT health questions every week.',
+					url: 'https://www.linkedin.com/posts/openai_improving-health-intelligence-activity-7473441251686752257-cfCj',
+					rank: 1,
+					externalId: '7473441251686752257',
+					sourceMetadata: {
+						likes: 420,
+						commentCount: 38,
+						authorHandle: 'openai',
+						author: 'openai',
+						publishedAt: '2026-06-18T18:27:24.206Z',
+					},
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-linkedin' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
+		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
+		assert.equal(addCall?.args.signal.sourceType, 'linkedin');
+		assert.equal(addCall?.args.signal.sourceMetadata.authorHandle, 'openai');
+	});
+
 	it('passes polymarket sourceType through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];

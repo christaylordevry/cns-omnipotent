@@ -217,6 +217,30 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.threads.count, 0);
   });
 
+  it('counts linkedin posts[] for outcome sources (Story 72-8)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      linkedin: {
+        success: true,
+        data: {
+          posts: [
+            { title: 'LI one', url: 'https://www.linkedin.com/posts/openai_one' },
+            { title: 'LI two', url: 'https://www.linkedin.com/posts/emollick_two' },
+          ],
+        },
+      },
+    });
+    assert.equal(sources.linkedin.status, 'ok');
+    assert.equal(sources.linkedin.count, 2);
+  });
+
+  it('maps empty linkedin posts[] to sources.linkedin.empty not error (Story 72-8)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      linkedin: { success: true, data: { posts: [] } },
+    });
+    assert.equal(sources.linkedin.status, 'empty');
+    assert.equal(sources.linkedin.count, 0);
+  });
+
   it('maps empty instagram reels[] to sources.instagram.empty not error (Story 72-3)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       instagram: { success: true, data: { reels: [] } },

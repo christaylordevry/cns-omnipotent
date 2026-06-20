@@ -395,7 +395,7 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(questions, ['pm-high', 'pm-mid']);
   });
 
-  it('buildDigestSignals includes tiktok, instagram, pinterest, polymarket, and threads after youtube', () => {
+  it('buildDigestSignals includes tiktok, instagram, pinterest, polymarket, threads, and linkedin after youtube', () => {
     const signals = buildDigestSignals({
       youtube: [{ title: 'yt-one', viewCount: 100 }],
       tiktok: [{ title: 'tt-one', viewCount: 200 }],
@@ -403,8 +403,9 @@ describe('buildDigestSignals', () => {
       pinterest: [{ title: 'pi-one', repinCount: 400 }],
       polymarket: [{ question: 'pm-one', volume24hrUsd: 500 }],
       threads: [{ title: 'th-one', likes: 1000, reposts: 50 }],
+      linkedin: [{ title: 'li-one', likes: 800, commentCount: 40 }],
     });
-    assert.deepEqual(signals, ['yt-one', 'tt-one', 'ig-one', 'pi-one', 'pm-one', 'th-one']);
+    assert.deepEqual(signals, ['yt-one', 'tt-one', 'ig-one', 'pi-one', 'pm-one', 'th-one', 'li-one']);
   });
 
   it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {

@@ -337,6 +337,7 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
     assert.equal(trendProxyForSignal({ title: 'PI pin', sourceType: 'pinterest' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PM market', sourceType: 'polymarket' }), 45);
     assert.equal(trendProxyForSignal({ title: 'TH post', sourceType: 'threads' }), 44);
+    assert.equal(trendProxyForSignal({ title: 'LI post', sourceType: 'linkedin' }), 45);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -649,6 +650,26 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
         title: 'Threads empty',
         sourceType: 'threads',
         sourceMetadata: { likes: 0, reposts: 0, replies: 0 },
+      }),
+      null,
+    );
+  });
+
+  it('linkedin normalizes likes and commentCount (Story 72-8)', () => {
+    const score = normalizeEngagement({
+      title: 'LinkedIn post',
+      sourceType: 'linkedin',
+      sourceMetadata: { likes: 420, commentCount: 38 },
+    });
+    assert.ok(typeof score === 'number' && score > 0);
+  });
+
+  it('linkedin with zero engagement returns null and ignores absent job-title fields', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'LinkedIn empty',
+        sourceType: 'linkedin',
+        sourceMetadata: { likes: 0, commentCount: 0, jobTitle: 'CEO' },
       }),
       null,
     );

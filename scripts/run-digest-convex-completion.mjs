@@ -130,6 +130,7 @@ export const COLLECT_ADAPTER_TASK_KEYS = Object.freeze([
   'pinterest',
   'polymarket',
   'threads',
+  'linkedin',
 ]);
 
 const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
@@ -149,6 +150,7 @@ const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
   pinterest: ['hermes-run-pinterest.sh', 45_000],
   polymarket: ['hermes-run-polymarket.sh', 45_000],
   threads: ['hermes-run-threads.sh', 45_000],
+  linkedin: ['hermes-run-linkedin.sh', 60_000],
 });
 
 export async function collectAdapterOutputs(env) {
@@ -902,6 +904,7 @@ export async function runDigestConvexCompletion(opts = {}) {
       pinterest: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.pinterest)),
       polymarket: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.polymarket)),
       threads: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.threads)),
+      linkedin: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.linkedin)),
       runMeta: {
         topTrend: topTrend ? String(topTrend) : undefined,
         focusKeyword: topTrend ? String(topTrend) : undefined,

@@ -275,6 +275,41 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     );
   });
 
+  it('classifies LinkedIn exit-0 missing-watchlist JSON as adapter error (Story 72-8)', () => {
+    const stdout = JSON.stringify({ error: 'missing-watchlist' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.equal(isAdapterErrorPayload(parsed), true);
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:missing-watchlist',
+    });
+    assert.deepEqual(buildErrorsBySource({ linkedin: wrapped }), {
+      linkedin: 'adapter-error:missing-watchlist',
+    });
+  });
+
+  it('does not classify LinkedIn success stdout as adapter error (Story 72-8)', () => {
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            posts: [
+              {
+                title: 'LinkedIn post',
+                url: 'https://www.linkedin.com/posts/openai_test-activity-7473441251686752257-cfCj',
+                authorHandle: 'openai',
+              },
+            ],
+          }),
+        ),
+      ),
+      false,
+    );
+  });
+
   it('does not classify Polymarket success stdout as adapter error (Story 72-6)', () => {
     assert.equal(
       isAdapterErrorPayload(

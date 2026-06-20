@@ -39,6 +39,7 @@ export const SECTION_LITERAL_TO_SOURCE_KEY = Object.freeze({
   pinterest: 'pinterest',
   polymarket: 'polymarket',
   threads: 'threads',
+  linkedin: 'linkedin',
 });
 
 /** Badge aliases that are not canonical sourceType keys. */
