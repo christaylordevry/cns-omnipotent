@@ -336,6 +336,7 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
     assert.equal(trendProxyForSignal({ title: 'IG reel', sourceType: 'instagram' }), 40);
     assert.equal(trendProxyForSignal({ title: 'PI pin', sourceType: 'pinterest' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PM market', sourceType: 'polymarket' }), 45);
+    assert.equal(trendProxyForSignal({ title: 'TH post', sourceType: 'threads' }), 44);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -628,6 +629,26 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
         title: 'PM empty market',
         sourceType: 'polymarket',
         sourceMetadata: { upvotes: 0, volumeUsd: 0 },
+      }),
+      null,
+    );
+  });
+
+  it('threads normalizes likes and reposts like X social weights (Story 72-7)', () => {
+    const score = normalizeEngagement({
+      title: 'Threads post',
+      sourceType: 'threads',
+      sourceMetadata: { likes: 4200, reposts: 180, replies: 95 },
+    });
+    assert.ok(typeof score === 'number' && score > 0);
+  });
+
+  it('threads with zero engagement returns null (Path B momentum)', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'Threads empty',
+        sourceType: 'threads',
+        sourceMetadata: { likes: 0, reposts: 0, replies: 0 },
       }),
       null,
     );

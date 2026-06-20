@@ -1,5 +1,13 @@
 # Deferred work
 
+## Deferred from: code review of 72-7-threads-scrapecreators-adapter (2026-06-20)
+
+- **`DEFAULT_THREADS_HANDLES` exported but unused** — AC3 intentionally requires `missing-handles` when env unset; example file documents operator copy workflow instead of code defaults.
+- **Threads scoring reuses X engagement caps** — AC7 allows mirroring X weights; platform-specific calibration deferred until Threads signal volume justifies tuning.
+- **Cross-endpoint dedupe ID shape mismatch** — handle `user/posts` vs keyword `search` may produce different `id` formats for the same post; defer unless duplicate signals observed in prod digest runs.
+
+---
+
 ## Deferred from: code review of 72-5-pinterest-scrapecreators-adapter (2026-06-20)
 
 - **Cross-repo commit** — Pinterest Source 16 implementation ready in working trees; operator commit still pending (fixture drift closed via shared `tests/fixtures/pinterest-digest-signal.fixture.mjs`).

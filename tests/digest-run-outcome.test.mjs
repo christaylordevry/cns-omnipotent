@@ -193,6 +193,30 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.polymarket.count, 0);
   });
 
+  it('counts threads posts[] for outcome sources (Story 72-7)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      threads: {
+        success: true,
+        data: {
+          posts: [
+            { title: 'TH one', url: 'https://www.threads.com/@karpathy/post/one' },
+            { title: 'TH two', url: 'https://www.threads.com/@sama/post/two' },
+          ],
+        },
+      },
+    });
+    assert.equal(sources.threads.status, 'ok');
+    assert.equal(sources.threads.count, 2);
+  });
+
+  it('maps empty threads posts[] to sources.threads.empty not error (Story 72-7)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      threads: { success: true, data: { posts: [] } },
+    });
+    assert.equal(sources.threads.status, 'empty');
+    assert.equal(sources.threads.count, 0);
+  });
+
   it('maps empty instagram reels[] to sources.instagram.empty not error (Story 72-3)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       instagram: { success: true, data: { reels: [] } },

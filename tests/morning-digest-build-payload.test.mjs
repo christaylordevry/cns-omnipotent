@@ -17,6 +17,10 @@ import {
   CANONICAL_POLYMARKET_MARKET,
   POLYMARKET_VALIDATOR_METADATA_KEYS,
 } from './fixtures/polymarket-digest-signal.fixture.mjs';
+import {
+  buildCanonicalThreadsDigestSignal,
+  CANONICAL_THREADS_POST,
+} from './fixtures/threads-digest-signal.fixture.mjs';
 
 describe('build-digest-push-payload (Story 68-10)', () => {
   it('shortSha256 returns 16-char hex', () => {
@@ -168,5 +172,25 @@ describe('build-digest-push-payload (Story 68-10)', () => {
     const signal = buildCanonicalPolymarketDigestSignal();
     assert.equal(signal.sourceMetadata?.upvotes, CANONICAL_POLYMARKET_MARKET.volume24hrUsd);
     assert.equal(signal.externalId, CANONICAL_POLYMARKET_MARKET.marketId);
+  });
+
+  it('maps threads posts to sourceMetadata social fields (Story 72-7)', () => {
+    const payload = buildDigestPushPayload({
+      date: '2026-06-11',
+      ranAt: 1_781_000_000_000,
+      threads: { posts: [CANONICAL_THREADS_POST] },
+      runMeta: { topTrend: 'AI' },
+    });
+    const threads = payload.signals.find((row) => row.sourceType === 'threads');
+    assert.ok(threads);
+    assert.equal(threads.section, 'threads');
+    assert.equal(threads.sourceMetadata?.authorHandle, 'karpathy');
+    assert.equal(threads.sourceMetadata?.likes, 215);
+    assert.equal(threads.sourceMetadata?.reposts, 12);
+    const metaKeys = Object.keys(threads.sourceMetadata ?? {}).sort();
+    assert.deepEqual(metaKeys, ['author', 'authorHandle', 'likes', 'publishedAt', 'replies', 'reposts']);
+    const canonical = buildCanonicalThreadsDigestSignal();
+    assert.equal(canonical.sourceType, threads.sourceType);
+    assert.deepEqual(canonical.sourceMetadata, threads.sourceMetadata);
   });
 });

@@ -33,6 +33,7 @@ const EMPTY_ADAPTER_SUCCESS_DATA = Object.freeze({
   instagram: { reels: [] },
   pinterest: { pins: [] },
   polymarket: { markets: [] },
+  threads: { posts: [] },
 });
 
 function sortedUnique(values) {

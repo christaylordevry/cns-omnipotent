@@ -23,6 +23,7 @@ export const DIGEST_SOURCE_SECTION_MAP = [
 	{ sourceKey: 'instagram', label: 'Instagram', patterns: [/instagram/i] },
 	{ sourceKey: 'pinterest', label: 'Pinterest', patterns: [/pinterest/i] },
 	{ sourceKey: 'polymarket', label: 'Polymarket', patterns: [/polymarket/i] },
+	{ sourceKey: 'threads', label: 'Threads', patterns: [/threads/i] },
 ];
 
 const UNAVAILABLE_LINE_RE = /-\s*\(source unavailable:\s*(.+?)\)/i;

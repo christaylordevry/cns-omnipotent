@@ -44,6 +44,7 @@ const SOURCE_PRIOR = {
   instagram: 8,
   pinterest: 8,
   polymarket: 9,
+  threads: 9,
   rss: 5,
 };
 
@@ -63,13 +64,14 @@ const TREND_PROXY_PRIOR = {
   instagram: 40,
   pinterest: 42,
   polymarket: 45,
+  threads: 44,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'polymarket' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'polymarket' | 'threads' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -262,6 +264,22 @@ export function normalizeEngagement(signal) {
           0.3 * logNorm(reposts, BSKY_REPOSTS_CAP) +
           0.2 * logNorm(replies, BSKY_REPLIES_CAP) +
           0.1 * logNorm(quotes, BSKY_QUOTES_CAP),
+      );
+    }
+    case 'threads': {
+      const likes = meta.likes;
+      const reposts = meta.reposts;
+      const replies = meta.replies;
+      const hasEngagement = [likes, reposts, replies].some(
+        (value) => Number.isFinite(value) && Number(value) > 0,
+      );
+      if (!hasEngagement) {
+        return null;
+      }
+      return Math.round(
+        0.55 * logNorm(likes, X_LIKES_CAP) +
+          0.25 * logNorm(reposts, X_REPOSTS_CAP) +
+          0.15 * logNorm(replies, X_REPLIES_CAP),
       );
     }
     case 'youtube':

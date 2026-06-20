@@ -407,6 +407,36 @@ export function extractPinterestSignals(pinterestList) {
 }
 
 /**
+ * @param {Array<{ title?: string, likes?: number, reposts?: number }>} threadsList
+ * @returns {string[]}
+ */
+export function extractThreadsSignals(threadsList) {
+  if (!Array.isArray(threadsList)) {
+    return [];
+  }
+  const sorted = [...threadsList].sort(
+    (a, b) => threadsEngagementRank(b) - threadsEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_TWITTER_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {{ likes?: number, reposts?: number }} post
+ * @returns {number}
+ */
+function threadsEngagementRank(post) {
+  return (Number(post?.likes) || 0) + 2 * (Number(post?.reposts) || 0);
+}
+
+/**
  * @param {Array<{ question?: string, volume24hrUsd?: number, volumeUsd?: number }>} polymarketList
  * @returns {string[]}
  */
@@ -526,6 +556,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractInstagramSignals(sources.instagram));
   ordered.push(...extractPinterestSignals(sources.pinterest));
   ordered.push(...extractPolymarketSignals(sources.polymarket));
+  ordered.push(...extractThreadsSignals(sources.threads));
 
   return dedupeSignals(ordered);
 }
@@ -691,7 +722,8 @@ function signalsFromParsedInput(parsed) {
       'tiktok' in parsed ||
       'instagram' in parsed ||
       'pinterest' in parsed ||
-      'polymarket' in parsed)
+      'polymarket' in parsed ||
+      'threads' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

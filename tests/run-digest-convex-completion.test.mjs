@@ -222,6 +222,59 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     });
   });
 
+  it('classifies Threads exit-0 missing-handles JSON as adapter error (Story 72-7)', () => {
+    const stdout = JSON.stringify({ error: 'missing-handles' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:missing-handles',
+    });
+    assert.deepEqual(buildErrorsBySource({ threads: wrapped }), {
+      threads: 'adapter-error:missing-handles',
+    });
+  });
+
+  it('classifies Threads exit-0 credit-exhausted JSON as adapter error (Story 72-7)', () => {
+    const stdout = JSON.stringify({ error: 'credit-exhausted' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.equal(isAdapterErrorPayload(parsed), true);
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:credit-exhausted',
+    });
+    assert.deepEqual(buildErrorsBySource({ threads: wrapped }), {
+      threads: 'adapter-error:credit-exhausted',
+    });
+  });
+
+  it('does not classify Threads success stdout as adapter error (Story 72-7)', () => {
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            posts: [
+              {
+                title: 'Threads post',
+                url: 'https://www.threads.com/@karpathy/post/ABC123',
+                authorHandle: 'karpathy',
+              },
+            ],
+          }),
+        ),
+      ),
+      false,
+    );
+  });
+
   it('does not classify Polymarket success stdout as adapter error (Story 72-6)', () => {
     assert.equal(
       isAdapterErrorPayload(

@@ -14,7 +14,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → 3 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → **18** → 3 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
@@ -33,15 +33,16 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 14 | TikTok | `terminal(command="bash scripts/session-close/hermes-run-tiktok.sh", …)` — **MUST fire before Source 15** |
 | 15 | Instagram | `terminal(command="bash scripts/session-close/hermes-run-instagram.sh", …)` — **MUST fire before Source 16** |
 | 16 | Pinterest | `terminal(command="bash scripts/session-close/hermes-run-pinterest.sh", …)` — **MUST fire before Source 17** |
-| 17 | Polymarket | `terminal(command="bash scripts/session-close/hermes-run-polymarket.sh", …)` — **MUST fire before Source 3**; keyword watchlist primary (`MORNING_DIGEST_POLYMARKET_KEYWORDS`) |
-| 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 17, before Source 6**; top keyword from Source 1 only |
-| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, 16, 17, and 3** |
+| 17 | Polymarket | `terminal(command="bash scripts/session-close/hermes-run-polymarket.sh", …)` — **MUST fire before Source 18**; keyword watchlist primary (`MORNING_DIGEST_POLYMARKET_KEYWORDS`) |
+| 18 | Threads | `terminal(command="bash scripts/session-close/hermes-run-threads.sh", …)` — **MUST fire before Source 3**; handle watchlist primary (`MORNING_DIGEST_THREADS_HANDLES`) |
+| 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 18, before Source 6**; top keyword from Source 1 only |
+| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, and 3** |
 
-**Steps 9–17 gate:** Sources 9, 10, 11, 12, 13, **14**, **15**, **16**, and **17** terminals **MUST fire** (and record success or `(source unavailable)`) before Source 3 or Source 6. Skipping any of these terminals invalidates the run.
+**Steps 9–18 gate:** Sources 9, 10, 11, 12, 13, **14**, **15**, **16**, **17**, and **18** terminals **MUST fire** (and record success or `(source unavailable)`) before Source 3 or Source 6. Skipping any of these terminals invalidates the run.
 
-**Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **17** and before Source 6 or Discord post.
+**Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **18** and before Source 6 or Discord post.
 
-**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -129,9 +130,9 @@ On failure (missing key, HTTP error, empty results): `- (source unavailable: <sh
 
 ## Source 3 — Perplexity deep signal
 
-> **Runtime position:** fires **after Source 17 (Polymarket), before Source 6 (Vault context)** — not at position 3 in the collection order. The section number is retained for Output Contract / §9 mapping compatibility.
+> **Runtime position:** fires **after Source 18 (Threads), before Source 6 (Vault context)** — not at position 3 in the collection order. The section number is retained for Output Contract / §9 mapping compatibility.
 
-**Pre-flight gate:** If the `hermes-run-perplexity.sh` terminal has not fired, do not proceed to Source 6. Perplexity **MUST fire after Source 17**.
+**Pre-flight gate:** If the `hermes-run-perplexity.sh` terminal has not fired, do not proceed to Source 6. Perplexity **MUST fire after Source 18**.
 
 Call `terminal` exactly once for Perplexity deep signal when Source 1 produced at least one trend keyword. If Source 1 failed or returned no usable keyword, do **not** invent a fallback keyword from headlines; mark Deep Signal unavailable with the required bullet.
 
@@ -511,7 +512,7 @@ Call `terminal` exactly once for Polymarket Gamma API keyword search (primary). 
 terminal(command="bash scripts/session-close/hermes-run-polymarket.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-**Pre-flight gate:** If the `hermes-run-polymarket.sh` terminal has not fired, do not proceed to Source 3 or Source 6.
+**Pre-flight gate:** If the `hermes-run-polymarket.sh` terminal has not fired, do not proceed to Source 18 or Source 6.
 
 **Watchlist (primary):** `MORNING_DIGEST_POLYMARKET_KEYWORDS` — comma-separated topical keywords (e.g. `AI model,Claude,Bitcoin ETF,Fed rate cut`). **Secondary (optional):** `MORNING_DIGEST_POLYMARKET_TAG_SLUGS` for category slugs — use keywords as the default documented path; tag slugs are optional breadth, not the primary signal focus.
 
@@ -531,18 +532,51 @@ Stdout shape (Polymarket only — do not confuse with Google Trends `events[]`):
    - When building §9 push signals, map `volume24hrUsd` → `sourceMetadata.upvotes` (24h trading volume — scoring analog).
    - For Discord **Polymarket**, list each market as `- <question> — <leadingOutcome> <pct>% · $<volume24hr> 24h vol` (human-readable percent, not raw 0–1).
 5. Else → failure (empty `markets`, invalid shape, or parse error).
-6. On failure: section header **Polymarket** + `- (source unavailable: <short reason>)` and **continue** to Source 3.
+6. On failure: section header **Polymarket** + `- (source unavailable: <short reason>)` and **continue** to Source 18.
 7. **Anti-pattern:** Do not read `events[]` from Polymarket stdout — Polymarket uses `markets[]` only (Google Trends owns `events[]`).
+
+## Source 18 — Threads
+
+Call `terminal` exactly once for ScrapeCreators Threads handle watchlist (primary). The script reads `SCRAPECREATORS_API_KEY` and `MORNING_DIGEST_THREADS_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present. It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-threads.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+**Handle watchlist (primary):** `MORNING_DIGEST_THREADS_HANDLES` — comma-separated Threads usernames (e.g. `sama,karpathy,AnthropicAI,simonw,emollick`). **Optional secondary:** `MORNING_DIGEST_THREADS_KEYWORDS` only when live `/v1/threads/search` is confirmed — supplementary low-trust recall, max 5 keywords.
+
+**Platform limit callout:** `GET /v1/threads/user/posts` returns only the **last 20–30 publicly visible posts** per handle. Sparse results are expected — not an adapter bug.
+
+**Pre-flight gate:** If the `hermes-run-threads.sh` terminal has not fired, do not proceed to Source 3 or Source 6.
+
+Stdout shape (Threads only — same key as X/Bluesky but from a separate adapter process):
+
+```json
+{ "posts": [{ "title": "Caption text trimmed", "url": "https://www.threads.com/@karpathy/post/DIU8naHS6q_", "authorHandle": "karpathy", "author": "karpathy", "publishedAt": "2026-06-19T14:30:00.000Z", "likes": 4200, "reposts": 180, "replies": 95, "postCode": "DIU8naHS6q_", "postId": "1234567890" }] }
+```
+
+**After the Threads terminal returns** (mandatory stdout threading):
+
+1. Let `th_stdout` = Threads terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `th_json = JSON.parse(th_stdout)` inside try/catch or equivalent safe parse.
+3. If `th_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(th_json.posts) && th_json.posts.length > 0`:
+   - Read **`th_json.posts`** only — each item uses `title`, `url`, `authorHandle`, `likes`, `reposts`, `replies` (numbers), optional `publishedAt` (ISO string).
+   - When building §9 push signals, map engagement under `sourceMetadata`: `likes`, `reposts`, `replies`, `authorHandle`, `author`, `publishedAt` (mirror X/Bluesky — **not** `postCode`/`postId`).
+   - For Discord **Threads**, list each post as `- @<authorHandle>: <title> — <likes> likes, <reposts> reposts`.
+5. Else → failure (empty `posts`, invalid shape, or parse error).
+6. On failure: section header **Threads** + `- (source unavailable: <short reason>)` and **continue** to Source 3.
+7. **Anti-pattern:** Do not read `markets[]`, `videos[]`, or `reels[]` from Threads stdout — Threads uses `posts[]` only (same key as X/Bluesky but separate terminal stdout).
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 17 and Source 3 complete. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 18 and Source 3 complete. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
-**Prerequisite:** Terminals for Sources **9**, **10**, **11**, **12**, **13**, **14**, **15**, **16**, **17**, and **3** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all ten terminals complete.
+**Prerequisite:** Terminals for Sources **9**, **10**, **11**, **12**, **13**, **14**, **15**, **16**, **17**, **18**, and **3** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all eleven terminals complete.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 12, Source 13, Source 14, Source 15, Source 16, and Source 17 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 12, Source 13, Source 14, Source 15, Source 16, Source 17, and Source 18 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -561,7 +595,8 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
   "tiktok": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }],
   "instagram": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }],
   "pinterest": [{ "title": "<string>", "url": "<string>", "repinCount": <number> }],
-  "polymarket": [{ "question": "<string>", "url": "<string>", "volume24hrUsd": <number>, "leadingProbability": <number> }]
+  "polymarket": [{ "question": "<string>", "url": "<string>", "volume24hrUsd": <number>, "leadingProbability": <number> }],
+  "threads": [{ "title": "<string>", "url": "<string>", "likes": <number>, "reposts": <number>, "authorHandle": "<string>" }]
 }
 ```
 
@@ -581,8 +616,9 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
 - **instagram:** reel **titles** from Source 15 when available (include `viewCount` and `likeCount` for ranking); omit or `[]` when Instagram is unavailable.
 - **pinterest:** pin **titles** from Source 16 when available (include `repinCount` for ranking); omit or `[]` when Pinterest is unavailable.
 - **polymarket:** market **questions** from Source 17 when available (include `volume24hrUsd` and `leadingProbability` for ranking); omit or `[]` when Polymarket is unavailable.
+- **threads:** post **titles** from Source 18 when available (include `likes`, `reposts`, and `authorHandle` for ranking and peopleMatch); omit or `[]` when Threads is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount) → Pinterest pin titles (up to 2, highest repinCount) → Polymarket questions (up to 2, highest volume24hrUsd), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount) → Pinterest pin titles (up to 2, highest repinCount) → Polymarket questions (up to 2, highest volume24hrUsd) → Threads post titles (up to 2, highest likes + 2×reposts), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -862,6 +898,11 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 - ...
 (or - (source unavailable: <short reason>) when Source 17 failed)
 
+**Threads**
+- @<authorHandle>: <title> — <likes> likes, <reposts> reposts
+- ...
+(or - (source unavailable: <short reason>) when Source 18 failed)
+
 **Vault context** (NotebookLM — <route.title>)
 <answer text, max 500 chars; if longer truncate with … suffix>
 _Matched signal:_ <winning_signal>
@@ -975,6 +1016,7 @@ Run **after** Sources **1–5, 7–15, 3, and 6** were attempted, `digest_source
 | `instagram` | `instagram` | Source 15 `reels[]` | `title` | first 200 chars of `title` | `url` | — | shortcode or url hash |
 | `pinterest` | `pinterest` | Source 16 `pins[]` | `title` | first 200 chars of `description` or `title` | `url` | — | `pinId` or `sha256(url).slice(0,16)` |
 | `polymarket` | `polymarket` | Source 17 `markets[]` | `question` | `<leadingOutcome> <pct>% · vol $<volume24hr> · liq $<liquidity>` (truncate 200) | `url` | — | `marketId` or `sha256(conditionId).slice(0,16)` |
+| `threads` | `threads` | Source 18 `posts[]` | `title` | first 200 chars of `title` | `url` | — | `postId` or `postCode` or `sha256(url).slice(0,16)` |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):

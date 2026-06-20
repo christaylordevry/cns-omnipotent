@@ -399,6 +399,55 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(addCall?.args.signal.sourceMetadata.upvotes, 4200);
 	});
 
+	it('passes threads sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-11',
+				ranAt: 1_781_000_000_000,
+				topTrend: 'AI model',
+				focusKeyword: 'AI model',
+			},
+			signals: [
+				{
+					section: 'threads',
+					sourceType: 'threads',
+					title: 'What does it mean that the state of the art models continue to give this joke.',
+					url: 'https://www.threads.com/@karpathy/post/DV0De6jlB_v',
+					rank: 1,
+					externalId: '3851718899906387951_63491345281',
+					sourceMetadata: {
+						likes: 215,
+						reposts: 12,
+						replies: 8,
+						authorHandle: 'karpathy',
+						author: 'karpathy',
+						publishedAt: '2026-03-13T02:04:55.000Z',
+					},
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-threads' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 1);
+		const addCall = calls.find((call) => call.path === 'digest:addDigestSignal');
+		assert.equal(addCall?.args.signal.sourceType, 'threads');
+		assert.equal(addCall?.args.signal.sourceMetadata.authorHandle, 'karpathy');
+	});
+
 	it('passes polymarket sourceType through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];
