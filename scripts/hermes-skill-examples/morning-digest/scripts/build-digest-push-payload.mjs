@@ -79,6 +79,8 @@ function omitUndefinedKeys(opts) {
  *   twitter?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; quotes?: number; authorHandle?: string; publishedAt?: string }> };
  *   bluesky?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; quotes?: number; authorHandle?: string; publishedAt?: string }> };
  *   youtube?: { videos?: Array<{ title?: string; url?: string; channelTitle?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
+ *   tiktok?: { videos?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
+ *   instagram?: { reels?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   runMeta?: {
  *     topTrend?: string;
  *     focusKeyword?: string;
@@ -358,6 +360,58 @@ export function buildDigestPushPayload(sources) {
           commentCount: typeof video.commentCount === 'number' ? video.commentCount : undefined,
           author: video.channelTitle,
           publishedAt: video.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const video of sources.tiktok?.videos ?? []) {
+    const title = String(video.title ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(video.url ?? '').trim() || undefined;
+    signals.push(
+      omitUndefinedKeys({
+        section: 'tiktok',
+        sourceType: 'tiktok',
+        title,
+        summary: truncateSummary(title, 200),
+        url,
+        rank: rank++,
+        externalId: url ? shortSha256(url) : shortSha256(`${title}:${date}`),
+        sourceMetadata: omitUndefinedKeys({
+          viewCount: typeof video.viewCount === 'number' ? video.viewCount : undefined,
+          likes: typeof video.likeCount === 'number' ? video.likeCount : undefined,
+          commentCount: typeof video.commentCount === 'number' ? video.commentCount : undefined,
+          author: video.author,
+          publishedAt: video.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const reel of sources.instagram?.reels ?? []) {
+    const title = String(reel.title ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(reel.url ?? '').trim() || undefined;
+    signals.push(
+      omitUndefinedKeys({
+        section: 'instagram',
+        sourceType: 'instagram',
+        title,
+        summary: truncateSummary(title, 200),
+        url,
+        rank: rank++,
+        externalId: url ? shortSha256(url) : shortSha256(`${title}:${date}`),
+        sourceMetadata: omitUndefinedKeys({
+          viewCount: typeof reel.viewCount === 'number' ? reel.viewCount : undefined,
+          likes: typeof reel.likeCount === 'number' ? reel.likeCount : undefined,
+          commentCount: typeof reel.commentCount === 'number' ? reel.commentCount : undefined,
+          author: reel.author,
+          publishedAt: reel.publishedAt,
         }),
       }),
     );

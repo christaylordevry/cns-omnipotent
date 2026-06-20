@@ -106,6 +106,8 @@ async function runWrapper(wrapperName, env, timeoutMs) {
  *   twitter?: unknown;
  *   bluesky?: unknown;
  *   youtube?: unknown;
+ *   tiktok?: unknown;
+ *   instagram?: unknown;
  * }>}
  */
 /** Collect-task keys wired in the deterministic orchestrator (Story 72-2 parity guard). */
@@ -121,6 +123,8 @@ export const COLLECT_ADAPTER_TASK_KEYS = Object.freeze([
   'twitter',
   'bluesky',
   'youtube',
+  'tiktok',
+  'instagram',
 ]);
 
 const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
@@ -135,6 +139,8 @@ const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
   twitter: ['hermes-run-x.sh', 45_000],
   bluesky: ['hermes-run-bluesky.sh', 45_000],
   youtube: ['hermes-run-youtube.sh', 45_000],
+  tiktok: ['hermes-run-tiktok.sh', 45_000],
+  instagram: ['hermes-run-instagram.sh', 45_000],
 });
 
 export async function collectAdapterOutputs(env) {
@@ -883,6 +889,8 @@ export async function runDigestConvexCompletion(opts = {}) {
       twitter: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.twitter)),
       bluesky: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.bluesky)),
       youtube: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.youtube)),
+      tiktok: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.tiktok)),
+      instagram: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.instagram)),
       runMeta: {
         topTrend: topTrend ? String(topTrend) : undefined,
         focusKeyword: topTrend ? String(topTrend) : undefined,

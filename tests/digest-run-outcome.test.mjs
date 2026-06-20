@@ -117,6 +117,46 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.youtube.count, 2);
   });
 
+  it('classifies TikTok adapter failure as sources.tiktok.error (Story 72-3)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      tiktok: { success: false, error: 'adapter-error:credit-exhausted' },
+    });
+    assert.equal(sources.tiktok.status, 'error');
+    assert.equal(sources.tiktok.count, 0);
+  });
+
+  it('counts tiktok videos[] and instagram reels[] for outcome sources (Story 72-3)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      tiktok: {
+        success: true,
+        data: {
+          videos: [{ title: 'TT', url: 'https://www.tiktok.com/@a/video/1' }],
+        },
+      },
+      instagram: {
+        success: true,
+        data: {
+          reels: [
+            { title: 'IG one', url: 'https://www.instagram.com/reel/A/' },
+            { title: 'IG two', url: 'https://www.instagram.com/reel/B/' },
+          ],
+        },
+      },
+    });
+    assert.equal(sources.tiktok.status, 'ok');
+    assert.equal(sources.tiktok.count, 1);
+    assert.equal(sources.instagram.status, 'ok');
+    assert.equal(sources.instagram.count, 2);
+  });
+
+  it('maps empty instagram reels[] to sources.instagram.empty not error (Story 72-3)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      instagram: { success: true, data: { reels: [] } },
+    });
+    assert.equal(sources.instagram.status, 'empty');
+    assert.equal(sources.instagram.count, 0);
+  });
+
   it('computeOverall marks convex+discord success as success even when a source errored', () => {
     const overall = computeOverall({
       convex: { ok: true },

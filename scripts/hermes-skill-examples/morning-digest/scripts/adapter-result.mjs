@@ -21,6 +21,7 @@ export const ADAPTER_PAYLOAD_ARRAY_KEYS = Object.freeze([
   // Epic 72-1 / Epic 70-71: success payloads use `videos[]`; keep in set so
   // `{ error, videos: [...] }` is not misclassified as a bare error payload.
   'videos',
+  'reels',
 ]);
 
 export const ADAPTER_DATA_KEYS = new Set(ADAPTER_PAYLOAD_ARRAY_KEYS);

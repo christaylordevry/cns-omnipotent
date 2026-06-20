@@ -19,6 +19,8 @@ export const DIGEST_SOURCE_SECTION_MAP = [
 	{ sourceKey: 'twitter', label: 'X / Twitter', patterns: [/\bx\b/i, /twitter/i] },
 	{ sourceKey: 'bluesky', label: 'Bluesky', patterns: [/bluesky/i] },
 	{ sourceKey: 'youtube', label: 'YouTube', patterns: [/youtube/i] },
+	{ sourceKey: 'tiktok', label: 'TikTok', patterns: [/tiktok/i] },
+	{ sourceKey: 'instagram', label: 'Instagram', patterns: [/instagram/i] },
 ];
 
 const UNAVAILABLE_LINE_RE = /-\s*\(source unavailable:\s*(.+?)\)/i;

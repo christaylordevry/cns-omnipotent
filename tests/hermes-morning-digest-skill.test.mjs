@@ -22,6 +22,8 @@ const producthuntWrapperPath = join(root, "scripts/session-close/hermes-run-prod
 const xWrapperPath = join(root, "scripts/session-close/hermes-run-x.sh");
 const blueskyWrapperPath = join(root, "scripts/session-close/hermes-run-bluesky.sh");
 const youtubeWrapperPath = join(root, "scripts/session-close/hermes-run-youtube.sh");
+const tiktokWrapperPath = join(root, "scripts/session-close/hermes-run-tiktok.sh");
+const instagramWrapperPath = join(root, "scripts/session-close/hermes-run-instagram.sh");
 const fetchArxivScriptPath = join(skillDir, "scripts/fetch-arxiv-rss.mjs");
 const fetchHnScriptPath = join(skillDir, "scripts/fetch-hn-rss.mjs");
 const fetchRssScriptPath = join(skillDir, "scripts/fetch-rss-signals.mjs");
@@ -29,6 +31,8 @@ const fetchProductHuntScriptPath = join(skillDir, "scripts/fetch-producthunt-lau
 const fetchXScriptPath = join(skillDir, "scripts/fetch-x-signals.mjs");
 const fetchBlueskyScriptPath = join(skillDir, "scripts/fetch-bluesky-signals.mjs");
 const fetchYoutubeScriptPath = join(skillDir, "scripts/fetch-youtube-signals.mjs");
+const fetchTiktokScriptPath = join(skillDir, "scripts/fetch-tiktok-signals.mjs");
+const fetchInstagramScriptPath = join(skillDir, "scripts/fetch-instagram-signals.mjs");
 const fetchNewsapiScriptPath = join(skillDir, "scripts/fetch-newsapi-headlines.mjs");
 const pickSignalScriptPath = join(
   skillDir,
@@ -405,15 +409,30 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source12.includes("sourceMetadata.likes"));
     assert.ok(source12.includes("continue** to Source 13"));
 
-    const source13End = taskBody.indexOf("## Source 6");
+    const source13End = taskBody.indexOf("## Source 14");
     const source13 = taskBody.slice(source12End, source13End);
     assert.ok(source13.includes("hermes-run-youtube.sh"));
     assert.ok(source13.includes("**YouTube**"));
     assert.ok(source13.includes("videos[]"));
     assert.ok(source13.includes("sourceMetadata.viewCount"));
-    assert.ok(source13.includes("continue** to Source 3"));
+    assert.ok(source13.includes("continue** to Source 14"));
 
-    const source6 = taskBody.slice(source13End);
+    const source14End = taskBody.indexOf("## Source 15");
+    const source14 = taskBody.slice(source13End, source14End);
+    assert.ok(source14.includes("hermes-run-tiktok.sh"));
+    assert.ok(source14.includes("**TikTok**"));
+    assert.ok(source14.includes("tt_json.videos"));
+    assert.ok(source14.includes("continue** to Source 15"));
+
+    const source15End = taskBody.indexOf("## Source 6");
+    const source15 = taskBody.slice(source14End, source15End);
+    assert.ok(source15.includes("hermes-run-instagram.sh"));
+    assert.ok(source15.includes("**Instagram**"));
+    assert.ok(source15.includes("ig_json.reels"));
+    assert.ok(source15.includes("Google-index-backed"));
+    assert.ok(source15.includes("continue** to Source 3"));
+
+    const source6 = taskBody.slice(source15End);
     assert.ok(source6.includes("DIGEST_SOURCES_JSON=<shellQuote"));
     assert.ok(source6.includes("buildDigestSignals"));
     assert.ok(source6.includes("perplexityText"));
@@ -430,6 +449,10 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source6.includes("Bluesky post titles (up to 2,"));
     assert.ok(source6.includes('"youtube"'));
     assert.ok(source6.includes("YouTube video titles (up to 2,"));
+    assert.ok(source6.includes('"tiktok"'));
+    assert.ok(source6.includes("TikTok video titles (up to 2,"));
+    assert.ok(source6.includes('"instagram"'));
+    assert.ok(source6.includes("Instagram reel titles (up to 2,"));
     assert.ok(source6.includes('"trends"'));
     assert.ok(source6.includes('"headlines"'));
     assert.ok(source6.includes("arXiv titles (up to 3)"));
@@ -564,7 +587,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
 
   it("task-prompt documents imperative YouTube stdout parsing (Story 72-1)", () => {
     const taskBody = readFileSync(taskPromptPath, "utf8");
-    const source13End = taskBody.indexOf("## Source 6");
+    const source13End = taskBody.indexOf("## Source 14");
     const source13 = taskBody.slice(taskBody.indexOf("## Source 13"), source13End);
     assert.ok(source13.includes("videos[]"));
     assert.ok(source13.includes("yt_json") || source13.includes("yt_stdout"));
@@ -573,10 +596,37 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       /anti-pattern|Do not read.*repos/i.test(source13),
       "must anti-pattern wrong keys for YouTube",
     );
-    assert.ok(source13.includes("continue** to Source 3"));
+    assert.ok(source13.includes("continue** to Source 14"));
     const skillBody = readFileSync(skillPath, "utf8");
     assert.ok(skillBody.includes("YouTube stdout threading"));
     assert.ok(skillBody.includes("yt_json.videos"));
+  });
+
+  it("task-prompt documents imperative TikTok stdout parsing (Story 72-3)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source14End = taskBody.indexOf("## Source 15");
+    const source14 = taskBody.slice(taskBody.indexOf("## Source 14"), source14End);
+    assert.ok(source14.includes("videos[]"));
+    assert.ok(source14.includes("tt_json") || source14.includes("tt_stdout"));
+    assert.ok(source14.includes("hermes-run-tiktok.sh"));
+    assert.ok(source14.includes("continue** to Source 15"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("TikTok stdout threading"));
+    assert.ok(skillBody.includes("tt_json.videos"));
+  });
+
+  it("task-prompt documents imperative Instagram stdout parsing (Story 72-3)", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const source15End = taskBody.indexOf("## Source 6");
+    const source15 = taskBody.slice(taskBody.indexOf("## Source 15"), source15End);
+    assert.ok(source15.includes("reels[]"));
+    assert.ok(source15.includes("ig_json") || source15.includes("ig_stdout"));
+    assert.ok(source15.includes("hermes-run-instagram.sh"));
+    assert.ok(source15.includes("Google-index-backed"));
+    assert.ok(source15.includes("continue** to Source 3"));
+    const skillBody = readFileSync(skillPath, "utf8");
+    assert.ok(skillBody.includes("Instagram stdout threading"));
+    assert.ok(skillBody.includes("ig_json.reels"));
   });
 
   it("config-snippet documents RSS env keys (Story 65-4)", () => {
@@ -586,7 +636,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("MORNING_DIGEST_RSS_MAX_TOTAL"));
   });
 
-  it("wrapper scripts include GitHub, Reddit, RSS, Product Hunt, X, Bluesky, and YouTube session-close runners (Story 65-1, 65-3, 65-4, 67-5, 68-5, 68-6, 72-1)", () => {
+  it("wrapper scripts include GitHub, Reddit, RSS, Product Hunt, X, Bluesky, YouTube, TikTok, and Instagram session-close runners (Story 65-1, 65-3, 65-4, 67-5, 68-5, 68-6, 72-1, 72-3)", () => {
     assert.ok(existsSync(githubWrapperPath));
     assert.ok(existsSync(redditWrapperPath));
     assert.ok(existsSync(rssWrapperPath));
@@ -594,16 +644,22 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(existsSync(xWrapperPath));
     assert.ok(existsSync(blueskyWrapperPath));
     assert.ok(existsSync(youtubeWrapperPath));
+    assert.ok(existsSync(tiktokWrapperPath));
+    assert.ok(existsSync(instagramWrapperPath));
     assert.ok(existsSync(fetchRssScriptPath));
     assert.ok(existsSync(fetchProductHuntScriptPath));
     assert.ok(existsSync(fetchXScriptPath));
     assert.ok(existsSync(fetchBlueskyScriptPath));
     assert.ok(existsSync(fetchYoutubeScriptPath));
+    assert.ok(existsSync(fetchTiktokScriptPath));
+    assert.ok(existsSync(fetchInstagramScriptPath));
     assert.ok((statSync(rssWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(producthuntWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(xWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(blueskyWrapperPath).mode & 0o111) !== 0);
     assert.ok((statSync(youtubeWrapperPath).mode & 0o111) !== 0);
+    assert.ok((statSync(tiktokWrapperPath).mode & 0o111) !== 0);
+    assert.ok((statSync(instagramWrapperPath).mode & 0o111) !== 0);
     const rssWrapper = readFileSync(rssWrapperPath, "utf8");
     assert.ok(rssWrapper.includes("fetch-rss-signals.mjs"));
     const producthuntWrapper = readFileSync(producthuntWrapperPath, "utf8");
@@ -618,6 +674,12 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const youtubeWrapper = readFileSync(youtubeWrapperPath, "utf8");
     assert.ok(youtubeWrapper.includes("fetch-youtube-signals.mjs"));
     assert.ok(youtubeWrapper.includes(".hermes/home"));
+    const tiktokWrapper = readFileSync(tiktokWrapperPath, "utf8");
+    assert.ok(tiktokWrapper.includes("fetch-tiktok-signals.mjs"));
+    assert.ok(tiktokWrapper.includes(".hermes/home"));
+    const instagramWrapper = readFileSync(instagramWrapperPath, "utf8");
+    assert.ok(instagramWrapper.includes("fetch-instagram-signals.mjs"));
+    assert.ok(instagramWrapper.includes(".hermes/home"));
   });
 
   it("config-snippet documents arXiv env keys (Story 61-1)", () => {
@@ -868,8 +930,12 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     const source11 = taskBody.slice(taskBody.indexOf("## Source 11"), source11End);
     const source12End = taskBody.indexOf("## Source 13");
     const source12 = taskBody.slice(source11End, source12End);
-    const source13End = taskBody.indexOf("## Source 6");
+    const source13End = taskBody.indexOf("## Source 14");
     const source13 = taskBody.slice(source12End, source13End);
+    const source14End = taskBody.indexOf("## Source 15");
+    const source14 = taskBody.slice(source13End, source14End);
+    const source15End = taskBody.indexOf("## Source 6");
+    const source15 = taskBody.slice(source14End, source15End);
     const source3End = taskBody.indexOf("## Source 4");
     const source3 = taskBody.slice(
       taskBody.indexOf("## Source 3"),
@@ -886,17 +952,19 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(checklist.includes("hermes-run-x.sh"));
     assert.ok(checklist.includes("hermes-run-bluesky.sh"));
     assert.ok(checklist.includes("hermes-run-youtube.sh"));
+    assert.ok(checklist.includes("hermes-run-tiktok.sh"));
+    assert.ok(checklist.includes("hermes-run-instagram.sh"));
     assert.ok(checklist.includes("hermes-run-perplexity.sh"));
     assert.ok(
       (checklist.match(/MUST fire before Source 6/g) ?? []).length >= 3,
       "checklist rows 9, 10, and 11 must require MUST fire before Source 6",
     );
     assert.ok(
-      checklist.includes("MUST fire before Source 3"),
-      "checklist row 13 must gate Source 3 before Source 6",
+      checklist.includes("MUST fire before Source 15"),
+      "checklist row 14 must gate Source 15 before Source 3",
     );
     assert.ok(
-      checklist.includes("Steps 9–13 gate") &&
+      checklist.includes("Steps 9–15 gate") &&
         checklist.includes("invalidates the run"),
     );
     assert.ok(
@@ -917,7 +985,15 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(
       source13.includes("hermes-run-youtube.sh") &&
-        source13.includes("has not fired, do not proceed to Source 3 or Source 6"),
+        source13.includes("has not fired, do not proceed to Source 14 or Source 3"),
+    );
+    assert.ok(
+      source14.includes("hermes-run-tiktok.sh") &&
+        source14.includes("has not fired, do not proceed to Source 15"),
+    );
+    assert.ok(
+      source15.includes("hermes-run-instagram.sh") &&
+        source15.includes("has not fired, do not proceed to Source 3 or Source 6"),
     );
     assert.ok(
       source3.includes("hermes-run-perplexity.sh") &&
@@ -929,7 +1005,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     );
     assert.ok(
       source6Lead.includes("Prerequisite:") &&
-        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all six terminals complete"),
+        source6Lead.includes("Do not run `pick-signal-notebook.mjs` until all eight terminals complete"),
     );
   });
 
@@ -957,9 +1033,11 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
       body.indexOf("For NO_ROUTE"),
     );
 
-    assert.ok(executionRule.includes("1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 3 → 6"));
+    assert.ok(executionRule.includes("1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 3 → 6"));
     assert.ok(body.includes("hermes-run-producthunt.sh"));
     assert.ok(body.includes("hermes-run-youtube.sh"));
+    assert.ok(body.includes("hermes-run-tiktok.sh"));
+    assert.ok(body.includes("hermes-run-instagram.sh"));
     assert.ok(body.includes("hermes-run-x.sh"));
     assert.ok(body.includes("hermes-run-bluesky.sh"));
     assert.ok(body.includes("hermes-run-perplexity.sh"));
@@ -969,7 +1047,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("Product Hunt stdout threading"));
     assert.ok(body.includes("X / Twitter stdout threading"));
     assert.ok(body.includes("Bluesky stdout threading"));
-    assert.ok(body.includes("Sources 9–13 terminal-fire gate"));
+    assert.ok(body.includes("Sources 9–15 terminal-fire gate"));
     assert.ok(body.includes("Source 3 terminal-fire gate"));
     assert.ok(outputTemplate.includes("**GitHub** (trending repos)"));
     assert.ok(outputTemplate.includes("**Reddit** (hot posts)"));
@@ -978,6 +1056,8 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(outputTemplate.includes("**X / Twitter**"));
     assert.ok(outputTemplate.includes("**Bluesky**"));
     assert.ok(outputTemplate.includes("**YouTube**"));
+    assert.ok(outputTemplate.includes("**TikTok**"));
+    assert.ok(outputTemplate.includes("**Instagram**"));
     assert.ok(outputTemplate.includes("- <title> — <viewCount> views, <likeCount> likes"));
     assert.ok(outputTemplate.includes("- <title> — <stars> stars, <forks> forks"));
   });

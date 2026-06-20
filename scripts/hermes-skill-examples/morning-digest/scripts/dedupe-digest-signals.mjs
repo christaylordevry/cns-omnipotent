@@ -14,6 +14,8 @@ const SOURCE_PRIORITY = {
   twitter: 6,
   bluesky: 5,
   youtube: 4,
+  tiktok: 4,
+  instagram: 4,
   rss: 4,
   reddit: 3,
   github: 2,

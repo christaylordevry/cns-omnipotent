@@ -306,6 +306,57 @@ describe('push-digest-convex.mjs', () => {
 		});
 	});
 
+	it('passes tiktok and instagram sourceType through to addDigestSignal unchanged', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = {
+			run: {
+				date: '2026-06-05',
+				ranAt: 1_749_091_200_000,
+				topTrend: 'AI agents',
+				focusKeyword: 'AI agents',
+			},
+			signals: [
+				{
+					section: 'tiktok',
+					sourceType: 'tiktok',
+					title: 'AI agents on TikTok',
+					url: 'https://www.tiktok.com/@aitech/video/123',
+					rank: 1,
+					externalId: 'ttabcdef12345678',
+					sourceMetadata: { viewCount: 125000, likes: 8900, commentCount: 420, author: 'aitech' },
+				},
+				{
+					section: 'instagram',
+					sourceType: 'instagram',
+					title: 'AI reel demo',
+					url: 'https://www.instagram.com/reel/ABC123/',
+					rank: 2,
+					externalId: 'igabcdef12345678',
+					sourceMetadata: { viewCount: 50000, likes: 1200, commentCount: 88, author: 'aitech' },
+				},
+			],
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-shortform' }));
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.equal(result.signalsWritten, 2);
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		assert.equal(addCalls[0].args.signal.sourceType, 'tiktok');
+		assert.equal(addCalls[1].args.signal.sourceType, 'instagram');
+	});
+
 	it('passes scored signal fields through to addDigestSignal unchanged', async () => {
 		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
 		const calls = [];

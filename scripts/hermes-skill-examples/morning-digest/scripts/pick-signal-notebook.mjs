@@ -331,6 +331,60 @@ export function extractYoutubeSignals(youtubeList) {
 }
 
 /**
+ * @param {{ viewCount?: number, likeCount?: number }} reel
+ * @returns {number}
+ */
+function shortFormEngagementRank(reel) {
+  const views = Number(reel?.viewCount) || 0;
+  const likes = Number(reel?.likeCount) || 0;
+  return views > 0 ? views : likes;
+}
+
+/**
+ * @param {Array<{ title?: string, viewCount?: number, likeCount?: number }>} tiktokList
+ * @returns {string[]}
+ */
+export function extractTiktokSignals(tiktokList) {
+  if (!Array.isArray(tiktokList)) {
+    return [];
+  }
+  const sorted = [...tiktokList].sort(
+    (a, b) => shortFormEngagementRank(b) - shortFormEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_YOUTUBE_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {Array<{ title?: string, viewCount?: number, likeCount?: number }>} instagramList
+ * @returns {string[]}
+ */
+export function extractInstagramSignals(instagramList) {
+  if (!Array.isArray(instagramList)) {
+    return [];
+  }
+  const sorted = [...instagramList].sort(
+    (a, b) => shortFormEngagementRank(b) - shortFormEngagementRank(a),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_YOUTUBE_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -379,6 +433,8 @@ export function extractRssSignals(rssList) {
  *   twitter?: Array<{ title?: string, likes?: number, reposts?: number }>,
  *   bluesky?: Array<{ title?: string, likes?: number, reposts?: number }>,
  *   youtube?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
+ *   tiktok?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
+ *   instagram?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  * }} sources
  * @returns {string[]}
  */
@@ -418,6 +474,8 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractTwitterSignals(sources.twitter));
   ordered.push(...extractBlueskySignals(sources.bluesky));
   ordered.push(...extractYoutubeSignals(sources.youtube));
+  ordered.push(...extractTiktokSignals(sources.tiktok));
+  ordered.push(...extractInstagramSignals(sources.instagram));
 
   return dedupeSignals(ordered);
 }
@@ -579,7 +637,9 @@ function signalsFromParsedInput(parsed) {
       'producthunt' in parsed ||
       'twitter' in parsed ||
       'bluesky' in parsed ||
-      'youtube' in parsed)
+      'youtube' in parsed ||
+      'tiktok' in parsed ||
+      'instagram' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

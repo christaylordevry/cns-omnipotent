@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-19T21:45:00+10:00"
+last_updated: "2026-06-20T12:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -551,3 +551,4 @@ development_status:
   epic-72: in-progress
   72-1-youtube-data-api-adapter: done
   72-2-youtube-outcome-record-investigation: done
+  72-3-tiktok-instagram-scrapecreators-adapter: done

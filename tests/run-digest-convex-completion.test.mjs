@@ -104,6 +104,65 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.equal(isAdapterErrorPayload(parsed), false);
   });
 
+  it('classifies TikTok exit-0 credit-exhausted JSON as adapter error (Story 72-3)', () => {
+    const stdout = JSON.stringify({ error: 'credit-exhausted' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:credit-exhausted',
+    });
+    assert.deepEqual(buildErrorsBySource({ tiktok: wrapped }), {
+      tiktok: 'adapter-error:credit-exhausted',
+    });
+  });
+
+  it('classifies Instagram exit-0 missing-api-key JSON as adapter error (Story 72-3)', () => {
+    const stdout = JSON.stringify({ error: 'missing-api-key' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:missing-api-key',
+    });
+    assert.deepEqual(buildErrorsBySource({ instagram: wrapped }), {
+      instagram: 'adapter-error:missing-api-key',
+    });
+  });
+
+  it('does not classify TikTok/Instagram success stdout as adapter error (Story 72-3)', () => {
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            videos: [{ title: 'TT', url: 'https://www.tiktok.com/@a/video/1' }],
+          }),
+        ),
+      ),
+      false,
+    );
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            reels: [{ title: 'IG', url: 'https://www.instagram.com/reel/ABC/' }],
+          }),
+        ),
+      ),
+      false,
+    );
+  });
+
   it('parseCompletionCliArgs detects --force-rescore', () => {
     assert.equal(parseCompletionCliArgs(['--force-rescore']).forceRescore, true);
     assert.equal(parseCompletionCliArgs([]).forceRescore, false);

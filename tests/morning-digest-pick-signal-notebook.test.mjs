@@ -22,6 +22,8 @@ import {
   extractProductHuntSignals,
   extractBlueskySignals,
   extractYoutubeSignals,
+  extractTiktokSignals,
+  extractInstagramSignals,
   extractTwitterSignals,
   extractRedditSignals,
   extractRssSignals,
@@ -344,6 +346,33 @@ describe('buildDigestSignals', () => {
       { title: 'yt-likes-low', likeCount: 10 },
     ]);
     assert.deepEqual(titles, ['yt-likes-high', 'yt-likes-low']);
+  });
+
+  it('extractTiktokSignals ranks by viewCount desc and caps at 2', () => {
+    const titles = extractTiktokSignals([
+      { title: 'tt-low', viewCount: 100 },
+      { title: 'tt-high', viewCount: 50000 },
+      { title: 'tt-mid', viewCount: 5000 },
+    ]);
+    assert.deepEqual(titles, ['tt-high', 'tt-mid']);
+  });
+
+  it('extractInstagramSignals ranks by viewCount desc and caps at 2', () => {
+    const titles = extractInstagramSignals([
+      { title: 'ig-low', viewCount: 100 },
+      { title: 'ig-high', viewCount: 50000 },
+      { title: 'ig-mid', viewCount: 5000 },
+    ]);
+    assert.deepEqual(titles, ['ig-high', 'ig-mid']);
+  });
+
+  it('buildDigestSignals includes tiktok and instagram after youtube', () => {
+    const signals = buildDigestSignals({
+      youtube: [{ title: 'yt-one', viewCount: 100 }],
+      tiktok: [{ title: 'tt-one', viewCount: 200 }],
+      instagram: [{ title: 'ig-one', viewCount: 300 }],
+    });
+    assert.deepEqual(signals, ['yt-one', 'tt-one', 'ig-one']);
   });
 
   it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {

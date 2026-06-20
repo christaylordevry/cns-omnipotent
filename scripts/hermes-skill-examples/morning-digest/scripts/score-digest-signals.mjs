@@ -40,6 +40,8 @@ const SOURCE_PRIOR = {
   twitter: 9,
   bluesky: 7,
   youtube: 8,
+  tiktok: 8,
+  instagram: 8,
   rss: 5,
 };
 
@@ -55,13 +57,15 @@ const TREND_PROXY_PRIOR = {
   twitter: 40,
   bluesky: 38,
   youtube: 40,
+  tiktok: 40,
+  instagram: 40,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -238,7 +242,9 @@ export function normalizeEngagement(signal) {
           0.1 * logNorm(quotes, BSKY_QUOTES_CAP),
       );
     }
-    case 'youtube': {
+    case 'youtube':
+    case 'tiktok':
+    case 'instagram': {
       const views = meta.viewCount;
       const likes = meta.likes;
       const comments = meta.commentCount;
