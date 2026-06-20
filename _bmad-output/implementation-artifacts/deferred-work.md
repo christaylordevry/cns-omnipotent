@@ -1,5 +1,28 @@
 # Deferred work
 
+## Parked architecture decision — LLM Provider Consolidation (2026-06-20)
+
+**Status:** Research started, not scoped. **No implementation changes made.**
+
+Full mindmap: [`docs/llm-provider-mindmap.md`](../../docs/llm-provider-mindmap.md) — maps five LLM touchpoints (Hermes core, run-chain, Nexus Inspector, digest pipeline, Epic 14–15 routing registry), billing-model correction (OpenRouter is metered, not subscription), and a staged consolidation plan.
+
+**Six verification checks (mindmap §4) — read-only, not yet run:**
+
+1. Read `~/.hermes/config.yaml` — live Hermes provider/model
+2. Read `38-2-kimi-k2-6-evaluation-run-chain` story — adopt/defer/reject verdict
+3. Read `scripts/run-chain.ts` — is `callOpenRouterSynthesis()` wired or dead spike code?
+4. Check OpenRouter account balance — unexpected metered spend?
+5. Re-check Codex-on-WSL2/Cloudflare block status
+6. Confirm Epic 14–15 routing registry load-bearing vs dormant
+
+**Policy (binding until scoped):** Do **not** fix run-chain `ANTHROPIC_API_KEY` 401 by minting a fresh Anthropic key. Epic 38-2 may already have a half-built OpenRouter path for Synthesis; verify before any key spend.
+
+- **Class:** (b) Phase 2 backlog / architecture decision
+- **Epic tie-in:** Epic 38 (provider migration, run-chain evaluation)
+- **Handoff:** `docs/HANDOFF-2026-06-20-post-epic72-3-session.md` § Parked decisions
+
+---
+
 ## Deferred from: code review of 72-2-youtube-outcome-record-investigation (2026-06-19)
 
 - **Cross-repo digest source registry single-source-of-truth** — `DIGEST_SOURCE_SECTION_MAP` (Omnipotent), `DIGEST_SOURCE_HEALTH_REGISTRY` (dashboard), Convex literal unions, and UI badge maps are five+ hand-maintained lists; 72-2 correctly patched all for YouTube but Source 14 will repeat unless a shared contract or structural parity test lands.
@@ -339,6 +362,7 @@ Story **67-2** (`reddit-public-json-adapter`) shipped the correct adapter archit
 
 | Item (short) | Class |
 |--------------|-------|
+| LLM Provider Consolidation — research mindmap, §4 verification, no Anthropic key until scoped | (b) Phase 2 / architecture |
 | `vault_move` + Obsidian CLI: after exit 0, assert source gone (`ENOENT`) | (c) Closed (Story 7-1) |
 | Intentional `IO_ERROR` / `CnsError` messages not sanitised (4-8) | (c) Closed (Story 6-4) |
 | `vaultRootFromHost` not wired at stdio (3-1) | (c) Closed (Story 6-5 env-only policy) |
@@ -442,6 +466,17 @@ Identical helper in `audit-logger.ts` and `vault-move.ts`; consolidate in a shar
 ---
 
 ## Phase 2 backlog (detail)
+
+### LLM Provider Consolidation
+
+Multiple LLM provider decisions were made across sessions (Hermes, run-chain, Nexus Inspector, digest, routing registry) without a single consolidation pass. Research compiled 2026-06-20; see `docs/llm-provider-mindmap.md`.
+
+- **Status:** Research only — six §4 verification checks identified, none executed yet
+- **Blocker:** run-chain returns 401 on dead `ANTHROPIC_API_KEY`; do not refresh key until Epic 38-2 OpenRouter path is understood
+- **Next:** Run §4 read-only checks, then scope Stage 2 (run-chain) / Stage 3 (Hermes) from mindmap §5
+
+- **Class:** (b) Architecture decision
+- **Priority:** Medium (blocks run-chain revival, not morning digest)
 
 ### `vault_move` wikilink repair is O(number of `.md` files)
 
