@@ -13,7 +13,27 @@ import {
   SECTION_LITERAL_TO_SOURCE_KEY,
 } from '../scripts/lib/digest-source-registry-parity.mjs';
 import { DIGEST_SOURCE_SECTION_MAP } from '../scripts/hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
+import { buildSourceOutcomesFromPayload } from '../scripts/hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { COLLECT_ADAPTER_TASK_KEYS } from '../scripts/run-digest-convex-completion.mjs';
+
+/** Minimal empty success payloads per collect key for sourceOutcomes parity. */
+const EMPTY_ADAPTER_SUCCESS_DATA = Object.freeze({
+  trends: { events: [] },
+  newsapi: { headlines: [] },
+  arxiv: { papers: [] },
+  hackernews: { stories: [] },
+  github: { repos: [] },
+  reddit: { posts: [] },
+  rss: { entries: [] },
+  producthunt: { launches: [] },
+  twitter: { posts: [] },
+  bluesky: { posts: [] },
+  youtube: { videos: [] },
+  tiktok: { videos: [] },
+  instagram: { reels: [] },
+  pinterest: { pins: [] },
+  polymarket: { markets: [] },
+});
 
 function sortedUnique(values) {
   return [...new Set(values)].sort();
@@ -90,5 +110,36 @@ describe('digest source registry parity (Story 72-2)', () => {
       sortedUnique(Object.keys(SECTION_LITERAL_TO_SOURCE_KEY)),
       `digestSectionValue literal set drift:\n${formatSetDiff(dashboard.sectionLiterals, Object.keys(SECTION_LITERAL_TO_SOURCE_KEY))}`,
     );
+  });
+
+  it('buildSourceOutcomesFromPayload emits metadata rows for every collect adapter on empty success', () => {
+    /** @type {Record<string, { success: true; data: Record<string, unknown[]> }>} */
+    const adapterResults = {};
+    for (const collectKey of COLLECT_ADAPTER_TASK_KEYS) {
+      const data = EMPTY_ADAPTER_SUCCESS_DATA[collectKey];
+      assert.ok(data, `missing EMPTY_ADAPTER_SUCCESS_DATA fixture for ${collectKey}`);
+      adapterResults[collectKey] = { success: true, data };
+    }
+
+    const outcomes = buildSourceOutcomesFromPayload({
+      run: {},
+      signals: [],
+      adapterResults,
+    });
+
+    const expectedSourceKeys = COLLECT_ADAPTER_TASK_KEYS.map(
+      (key) => COLLECT_KEY_TO_SOURCE_KEY[key] ?? key,
+    );
+    const outcomeKeys = outcomes.map((row) => row.sourceKey);
+
+    assert.deepEqual(
+      sortedUnique(outcomeKeys),
+      sortedUnique(expectedSourceKeys),
+      `sourceOutcomes missing collect adapters:\n${formatSetDiff(outcomeKeys, expectedSourceKeys)}`,
+    );
+
+    for (const row of outcomes) {
+      assert.equal(row.status, 'fired', `${row.sourceKey} should be fired on empty success`);
+    }
   });
 });

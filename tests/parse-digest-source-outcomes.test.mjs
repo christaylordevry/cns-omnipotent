@@ -58,6 +58,28 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		assert.equal(twitter?.status, 'error');
 		assert.equal(twitter?.reason, 'invalid-json');
 		assert.equal(twitter?.signalCount, undefined);
+
+		const reddit = outcomes.find((row) => row.sourceKey === 'reddit');
+		assert.equal(reddit?.status, 'fired');
+		assert.equal(reddit?.signalCount, undefined);
+	});
+
+	it('marks successful empty pinterest and polymarket adapter runs as fired (Story 72-5/72-6 health)', () => {
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: {},
+			signals: [],
+			adapterResults: {
+				pinterest: { success: true, data: { pins: [] } },
+				polymarket: { success: true, data: { markets: [] } },
+			},
+		});
+
+		const pinterest = outcomes.find((row) => row.sourceKey === 'pinterest');
+		const polymarket = outcomes.find((row) => row.sourceKey === 'polymarket');
+		assert.equal(pinterest?.status, 'fired');
+		assert.equal(pinterest?.signalCount, undefined);
+		assert.equal(polymarket?.status, 'fired');
+		assert.equal(polymarket?.signalCount, undefined);
 	});
 
 	it('maps trends collect key failures to google_trends error outcomes', () => {

@@ -443,6 +443,10 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
 					reason = String(
 						/** @type {{ error?: unknown }} */ (wrapped.data).error ?? 'adapter error',
 					);
+				} else if (wrapped.success === true && status === null) {
+					// Adapter ran successfully but produced zero signals — still metadata-tracked
+					// so health panel distinguishes "ran, no matches" from "unknown".
+					status = 'fired';
 				}
 			} else if ('error' in adapterPayload) {
 				status = 'error';
