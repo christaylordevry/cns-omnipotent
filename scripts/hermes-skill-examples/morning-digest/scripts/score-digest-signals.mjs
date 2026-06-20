@@ -42,6 +42,7 @@ const SOURCE_PRIOR = {
   youtube: 8,
   tiktok: 8,
   instagram: 8,
+  pinterest: 8,
   rss: 5,
 };
 
@@ -59,13 +60,14 @@ const TREND_PROXY_PRIOR = {
   youtube: 40,
   tiktok: 40,
   instagram: 40,
+  pinterest: 42,
   rss: 30,
 };
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
-/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'rss'} DigestSourceType */
+/** @typedef {'newsapi' | 'hackernews' | 'google_trends' | 'arxiv' | 'deep_signal' | 'github' | 'reddit' | 'producthunt' | 'twitter' | 'bluesky' | 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'rss'} DigestSourceType */
 /**
  * @typedef {{
  *   title: string,
@@ -199,6 +201,15 @@ export function normalizeEngagement(signal) {
     case 'reddit':
     case 'producthunt': {
       if (!Number.isFinite(meta.upvotes)) {
+        return null;
+      }
+      return Math.round(
+        0.75 * logNorm(meta.upvotes, RD_UPVOTES_CAP) +
+          0.25 * logNorm(commentCount, RD_COMMENTS_CAP),
+      );
+    }
+    case 'pinterest': {
+      if (!Number.isFinite(meta.upvotes) || meta.upvotes <= 0) {
         return null;
       }
       return Math.round(

@@ -325,7 +325,7 @@ describe('scoreNovelty normative table', () => {
 describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
   const runAt = Date.parse('2026-06-09T12:00:00Z');
 
-  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, youtube, tiktok, instagram, and rss', () => {
+  it('assigns non-zero trend proxy priors for github, reddit, producthunt, twitter, bluesky, youtube, tiktok, instagram, pinterest, and rss', () => {
     assert.equal(trendProxyForSignal({ title: 'GH repo', sourceType: 'github' }), 40);
     assert.equal(trendProxyForSignal({ title: 'RD post', sourceType: 'reddit' }), 42);
     assert.equal(trendProxyForSignal({ title: 'PH launch', sourceType: 'producthunt' }), 42);
@@ -334,6 +334,7 @@ describe('Epic 65 SOURCE_PRIOR and TREND_PROXY_PRIOR', () => {
     assert.equal(trendProxyForSignal({ title: 'YT video', sourceType: 'youtube' }), 40);
     assert.equal(trendProxyForSignal({ title: 'TT video', sourceType: 'tiktok' }), 40);
     assert.equal(trendProxyForSignal({ title: 'IG reel', sourceType: 'instagram' }), 40);
+    assert.equal(trendProxyForSignal({ title: 'PI pin', sourceType: 'pinterest' }), 42);
     assert.equal(trendProxyForSignal({ title: 'RSS item', sourceType: 'rss' }), 30);
   });
 
@@ -579,6 +580,26 @@ describe('normalizeEngagement cap-saturation fixtures (§6.1)', () => {
         sourceMetadata: { viewCount: 1_000_000, likes: 50_000, commentCount: 10_000 },
       }),
       100,
+    );
+  });
+
+  it('pinterest mirrors producthunt upvotes weights', () => {
+    const score = normalizeEngagement({
+      title: 'PI viral pin',
+      sourceType: 'pinterest',
+      sourceMetadata: { upvotes: 4200 },
+    });
+    assert.ok(typeof score === 'number' && score > 0);
+  });
+
+  it('pinterest with zero repins mapped to upvotes returns null', () => {
+    assert.equal(
+      normalizeEngagement({
+        title: 'PI empty pin',
+        sourceType: 'pinterest',
+        sourceMetadata: { upvotes: 0 },
+      }),
+      null,
     );
   });
 

@@ -31,15 +31,16 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 12 | Bluesky | `terminal(command="bash scripts/session-close/hermes-run-bluesky.sh", …)` — **MUST fire before Source 13** |
 | 13 | YouTube | `terminal(command="bash scripts/session-close/hermes-run-youtube.sh", …)` — **MUST fire before Source 14** |
 | 14 | TikTok | `terminal(command="bash scripts/session-close/hermes-run-tiktok.sh", …)` — **MUST fire before Source 15** |
-| 15 | Instagram | `terminal(command="bash scripts/session-close/hermes-run-instagram.sh", …)` — **MUST fire before Source 3** |
-| 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 15, before Source 6**; top keyword from Source 1 only |
-| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, and 3** |
+| 15 | Instagram | `terminal(command="bash scripts/session-close/hermes-run-instagram.sh", …)` — **MUST fire before Source 16** |
+| 16 | Pinterest | `terminal(command="bash scripts/session-close/hermes-run-pinterest.sh", …)` — **MUST fire before Source 3** |
+| 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 16, before Source 6**; top keyword from Source 1 only |
+| 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, 16, and 3** |
 
-**Steps 9–15 gate:** Sources 9, 10, 11, 12, 13, **14**, and **15** terminals **MUST fire** (and record success or `(source unavailable)`) before Source 3 or Source 6. Skipping any of these terminals invalidates the run.
+**Steps 9–16 gate:** Sources 9, 10, 11, 12, 13, **14**, **15**, and **16** terminals **MUST fire** (and record success or `(source unavailable)`) before Source 3 or Source 6. Skipping any of these terminals invalidates the run.
 
-**Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **15** and before Source 6 or Discord post.
+**Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **16** and before Source 6 or Discord post.
 
-**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -49,7 +50,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 4. **Google Trends**: call the Hermes `terminal` tool with command `bash scripts/session-close/hermes-run-trend-ingest.sh` (wrapper must keep `--dry-run`). Dry-run prints JSON only — **no Convex push**, no norm-cache write.
 5. **Secrets**: never echo `NEWSAPI_API_KEY` in Discord. Load credentials from **`$HOME/.hermes/trend-ingest.env`** only (never cwd-relative `.hermes/` or `./trend-ingest.env`). Under Hermes isolation the wrapper scripts remap `$HOME` back to the operator's real home (Epic 59), so this resolves to the operator's `~/.hermes/trend-ingest.env` and not the isolated `…/.hermes/home/.hermes/...` path.
 6. **Date line**: `YYYY-MM-DD` from **Australia/Sydney** civil date (same as morning-digest / push-watchdog cron `CRON_TZ=Australia/Sydney`). Use the Step 0 terminal below — do not use machine-local OS timezone for digest headers, `digest_push_payload.run.date`, or artifact filenames.
-7. **Cross-source failures**: run Sources **1–5, 7–15, 3, and 6** independently (collection order: 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → 3 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
+7. **Cross-source failures**: run Sources **1–5, 7–16, 3, and 6** independently (collection order: 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → 3 → 6). A failed source must not abort the digest — always post the full contract with `(source unavailable: …)` in the affected section(s).
 8. **Digest wall clock**: record `digest_start_ms = Date.now()` at the start of task execution (before Source 1). Use it for Source 6 `NOTEBOOK_REMAINING_S` (see Source 6).
 9. **Required completion gate (non-negotiable)**: After building and scoring `digest_push_payload`, **persist the digest push artifact** to `~/.hermes/digest-push-<YYYY-MM-DD>.json` **before** posting to `#hermes` (see **Persist digest push artifact**). After the Discord post, invoke **BOTH** `push-digest-convex.mjs` (§9) **AND** `push-keyword-candidates.mjs` (§10) with the same `DIGEST_PUSH_JSON`. The skill is **NOT complete** until the artifact terminal **and both** push terminal calls have fired. Steps 9+10 are a single two-part completion gate — neither push alone is sufficient. This requirement is **non-negotiable even under context compression** — never drop, defer, summarize, or deprioritize the artifact write or either push call. ("fire-and-forget" describes only how each push *result* is handled — exit 0, no Discord warning — it never means either call is skippable.) **§9 digest push:** follow the pinned **DO NOT improvise** block in the post-post digest entity push section — exactly one `terminal` call to `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`; no direct Convex HTTP, MCP, or hand-rolled mutation loops.
 
@@ -451,7 +452,7 @@ terminal(command="bash scripts/session-close/hermes-run-instagram.sh", workdir=r
 
 **Freshness callout:** Instagram hashtag search uses ScrapeCreators' **Google-index-backed** endpoint — results reflect what Google has indexed, **not** a live Instagram-native feed. Sparse or stale results on a given day are **expected behavior**, not adapter bugs.
 
-**Pre-flight gate:** If the `hermes-run-instagram.sh` terminal has not fired, do not proceed to Source 3 or Source 6.
+**Pre-flight gate:** If the `hermes-run-instagram.sh` terminal has not fired, do not proceed to Source 16 or Source 6.
 
 Stdout shape (Instagram only — do not confuse with Bluesky `posts[]` or YouTube `videos[]`):
 
@@ -469,18 +470,47 @@ Stdout shape (Instagram only — do not confuse with Bluesky `posts[]` or YouTub
    - When building §9 push signals, nest engagement under `sourceMetadata` (same mapping as TikTok).
    - For Discord **Instagram**, list each reel as `- <title> — <viewCount> views, <likeCount> likes`.
 5. Else → failure (empty `reels`, invalid shape, or parse error).
-6. On failure: section header **Instagram** + `- (source unavailable: <short reason>)` and **continue** to Source 3.
+6. On failure: section header **Instagram** + `- (source unavailable: <short reason>)` and **continue** to Source 16.
 7. **Anti-pattern:** Do not read `videos[]` or `posts[]` from Instagram stdout — Instagram uses `reels[]` only.
+
+## Source 16 — Pinterest
+
+Call `terminal` exactly once for ScrapeCreators Pinterest keyword search. The script reads `SCRAPECREATORS_API_KEY` and `MORNING_DIGEST_PINTEREST_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present. It prints JSON with either `{"pins":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+
+```text
+terminal(command="bash scripts/session-close/hermes-run-pinterest.sh", workdir=resolved_repo_root, timeout=45)
+```
+
+**Pre-flight gate:** If the `hermes-run-pinterest.sh` terminal has not fired, do not proceed to Source 3 or Source 6.
+
+Stdout shape (Pinterest only — do not confuse with Instagram `reels[]` or TikTok `videos[]`):
+
+```json
+{ "pins": [{ "title": "Pin title trimmed", "description": "Pin description trimmed", "url": "https://www.pinterest.com/pin/123456789/", "link": "https://example.com/outbound-article", "imageUrl": "https://i.pinimg.com/...", "author": "pinner_username", "pinId": "123456789", "repinCount": 4200, "publishedAt": "2026-06-18T10:00:00.000Z" }] }
+```
+
+**After the Pinterest terminal returns** (mandatory stdout threading):
+
+1. Let `pin_stdout` = Pinterest terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `pin_json = JSON.parse(pin_stdout)` inside try/catch or equivalent safe parse.
+3. If `pin_json.error` (string) → treat as failure; reason = that string.
+4. Else if `Array.isArray(pin_json.pins) && pin_json.pins.length > 0`:
+   - Read **`pin_json.pins`** only — each item uses `title`, `url`, `author`, `repinCount` (number), optional `description`, `link`, `imageUrl`, `pinId`, `publishedAt` (ISO string).
+   - When building §9 push signals, map `repinCount` → `sourceMetadata.upvotes` (Product Hunt analog — saves/repins are Pinterest's primary engagement signal).
+   - For Discord **Pinterest**, list each pin as `- <title> — <repinCount> saves`.
+5. Else → failure (empty `pins`, invalid shape, or parse error).
+6. On failure: section header **Pinterest** + `- (source unavailable: <short reason>)` and **continue** to Source 3.
+7. **Anti-pattern:** Do not read `videos[]`, `reels[]`, or `posts[]` from Pinterest stdout — Pinterest uses `pins[]` only.
 
 ## Source 6 — Vault context (NotebookLM)
 
-Run **after** Source 15 and Source 3 complete. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
+Run **after** Source 16 and Source 3 complete. Do **not** use `mcp__notebooklm__notebook_query` — CLI only.
 
-**Prerequisite:** Terminals for Sources **9**, **10**, **11**, **12**, **13**, **14**, **15**, and **3** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all eight terminals complete.
+**Prerequisite:** Terminals for Sources **9**, **10**, **11**, **12**, **13**, **14**, **15**, **16**, and **3** have fired (success or `(source unavailable)` recorded in the Output Contract). Do not run `pick-signal-notebook.mjs` until all nine terminals complete.
 
 ### Build `digest_sources` (for scoring)
 
-After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 12, Source 13, Source 14, and Source 15 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
+After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 12, Source 13, Source 14, Source 15, and Source 16 complete, assemble a JSON object from parsed tool outputs (skip a source that failed with `source unavailable` — use an empty array or omit that field):
 
 ```json
 {
@@ -497,7 +527,8 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
   "bluesky": [{ "title": "<string>", "url": "<string>", "likes": <number>, "reposts": <number> }],
   "youtube": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }],
   "tiktok": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }],
-  "instagram": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }]
+  "instagram": [{ "title": "<string>", "url": "<string>", "viewCount": <number>, "likeCount": <number> }],
+  "pinterest": [{ "title": "<string>", "url": "<string>", "repinCount": <number> }]
 }
 ```
 
@@ -515,8 +546,9 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
 - **youtube:** video **titles** from Source 13 when available (include `viewCount` and `likeCount` for ranking in `buildDigestSignals`); omit or `[]` when YouTube is unavailable.
 - **tiktok:** video **titles** from Source 14 when available (include `viewCount` and `likeCount` for ranking); omit or `[]` when TikTok is unavailable.
 - **instagram:** reel **titles** from Source 15 when available (include `viewCount` and `likeCount` for ranking); omit or `[]` when Instagram is unavailable.
+- **pinterest:** pin **titles** from Source 16 when available (include `repinCount` for ranking); omit or `[]` when Pinterest is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount) → Pinterest pin titles (up to 2, highest repinCount), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -786,6 +818,11 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 - ...
 (or - (source unavailable: <short reason>) when Source 15 failed)
 
+**Pinterest**
+- <title> — <repinCount> saves
+- ...
+(or - (source unavailable: <short reason>) when Source 16 failed)
+
 **Vault context** (NotebookLM — <route.title>)
 <answer text, max 500 chars; if longer truncate with … suffix>
 _Matched signal:_ <winning_signal>
@@ -897,6 +934,7 @@ Run **after** Sources **1–5, 7–15, 3, and 6** were attempted, `digest_source
 | `youtube` | `youtube` | Source 13 `videos[]` | `title` | first 200 chars of `title` | `url` | — | `sha256(url).slice(0,16)` |
 | `tiktok` | `tiktok` | Source 14 `videos[]` | `title` | first 200 chars of `title` | `url` | — | `sha256(url).slice(0,16)` |
 | `instagram` | `instagram` | Source 15 `reels[]` | `title` | first 200 chars of `title` | `url` | — | shortcode or url hash |
+| `pinterest` | `pinterest` | Source 16 `pins[]` | `title` | first 200 chars of `description` or `title` | `url` | — | `pinId` or `sha256(url).slice(0,16)` |
 
 - `rank`: assigned by `scoreDigestSignals` from descending `rankScore` sort (1 = highest `rankScore`). Replaces legacy section-index ordering.
 - `sourceMetadata` engagement fields (all optional — **omit when absent, never `null`**):
@@ -911,6 +949,7 @@ Run **after** Sources **1–5, 7–15, 3, and 6** were attempted, `digest_source
   - YouTube: map `videos[].viewCount` → `sourceMetadata.viewCount` (number); map `videos[].likeCount` → `sourceMetadata.likes` (number); map `videos[].commentCount` → `sourceMetadata.commentCount` (number); map `videos[].channelTitle` → `sourceMetadata.author`; map `videos[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `videos[].title` → `summary`. **Never** leave engagement fields at the signal root — `normalizeEngagement` reads only `sourceMetadata.viewCount`/`likes`/`commentCount`; root-level fields score as null silently.
   - TikTok: map `videos[].viewCount` → `sourceMetadata.viewCount`; map `videos[].likeCount` → `sourceMetadata.likes`; map `videos[].commentCount` → `sourceMetadata.commentCount`; map `videos[].author` → `sourceMetadata.author`; map `videos[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `videos[].title` → `summary`.
   - Instagram: map `reels[].viewCount` → `sourceMetadata.viewCount`; map `reels[].likeCount` → `sourceMetadata.likes`; map `reels[].commentCount` → `sourceMetadata.commentCount`; map `reels[].author` → `sourceMetadata.author`; map `reels[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `reels[].title` → `summary`.
+  - Pinterest: map `pins[].repinCount` → `sourceMetadata.upvotes` (number, **required** for engagement normalization — Product Hunt analog); map `pins[].author` → `sourceMetadata.author`; map `pins[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `pins[].description` or `pins[].title` → `summary`. **Do not** push `imageUrl`, `description`, or `link` as metadata keys. **Never** leave `repinCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`.
 - **Scoring fields (populated by scoring step below):** `scores` (object with all five keys when present: `relevance`, `personalRelevance`, `novelty`, `momentum`, `urgency` — each 0–100), `disposition` (`priority` | `watch` | `ignore` | `escalate`), `normalizedEngagement` (0–100), `rankScore` (0–100). Omit these keys only when the scoring terminal fails (§9 degraded mode).
 - Use Node `crypto.createHash('sha256')` for hashes (built-in only).
 - Empty sections → omit signals (no placeholder rows).
@@ -920,7 +959,7 @@ Run **after** Sources **1–5, 7–15, 3, and 6** were attempted, `digest_source
 The `addDigestSignal` validator is a **strict** object: a missing required key **or** an unexpected/`null` value rejects the whole signal, and the push then finalizes the run as `failed` with **zero** signals stored. Build every signal object exactly to this contract:
 
 - **Required keys on every signal — never omit:** `section`, `sourceType`, `title`, `rank`. Missing `section` is the most common failure — include it on **every** signal, paired with `sourceType` per the table above.
-- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky` | `youtube` | `tiktok` | `instagram`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky` | `youtube` | `tiktok` | `instagram`.
+- **`section`** ∈ `trends` | `headlines` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky` | `youtube` | `tiktok` | `instagram` | `pinterest`. **`sourceType`** ∈ `google_trends` | `newsapi` | `arxiv` | `hackernews` | `deep_signal` | `github` | `reddit` | `rss` | `producthunt` | `twitter` | `bluesky` | `youtube` | `tiktok` | `instagram` | `pinterest`.
 - **Optional keys** (`summary`, `url`, `score`, `externalId`, `sourceMetadata`, `scores`, `disposition`, `normalizedEngagement`, `rankScore`): **OMIT the key entirely** when there is no value. **Never set them to `null`** — Convex rejects `null` for an optional string/number field (`null` is not the same as omitted).
 - **Types:** `rank`, `score`, `normalizedEngagement`, and `rankScore` are **numbers** (not strings); `sourceMetadata.points`, `sourceMetadata.commentCount`, `sourceMetadata.stars`, `sourceMetadata.forks`, `sourceMetadata.upvotes`, and legacy `sourceMetadata.comments` are **numbers**; `sourceMetadata.categories` is an **array of strings**; when `scores` is present it must include all five dimension keys as numbers (0–100 each).
 - Do **not** add any key not listed in the table / this contract.

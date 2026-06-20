@@ -81,6 +81,7 @@ function omitUndefinedKeys(opts) {
  *   youtube?: { videos?: Array<{ title?: string; url?: string; channelTitle?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   tiktok?: { videos?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
  *   instagram?: { reels?: Array<{ title?: string; url?: string; author?: string; publishedAt?: string; viewCount?: number; likeCount?: number; commentCount?: number }> };
+ *   pinterest?: { pins?: Array<{ title?: string; description?: string; url?: string; link?: string; author?: string; pinId?: string; publishedAt?: string; repinCount?: number }> };
  *   runMeta?: {
  *     topTrend?: string;
  *     focusKeyword?: string;
@@ -412,6 +413,32 @@ export function buildDigestPushPayload(sources) {
           commentCount: typeof reel.commentCount === 'number' ? reel.commentCount : undefined,
           author: reel.author,
           publishedAt: reel.publishedAt,
+        }),
+      }),
+    );
+  }
+
+  for (const pin of sources.pinterest?.pins ?? []) {
+    const title = String(pin.title ?? '').trim();
+    if (!title) {
+      continue;
+    }
+    const url = String(pin.url ?? '').trim() || undefined;
+    const summarySource = String(pin.description ?? pin.title ?? '').trim();
+    const pinId = String(pin.pinId ?? '').trim();
+    signals.push(
+      omitUndefinedKeys({
+        section: 'pinterest',
+        sourceType: 'pinterest',
+        title,
+        summary: truncateSummary(summarySource, 200),
+        url,
+        rank: rank++,
+        externalId: pinId || (url ? shortSha256(url) : shortSha256(`${title}:${date}`)),
+        sourceMetadata: omitUndefinedKeys({
+          upvotes: typeof pin.repinCount === 'number' ? pin.repinCount : undefined,
+          author: pin.author,
+          publishedAt: pin.publishedAt,
         }),
       }),
     );

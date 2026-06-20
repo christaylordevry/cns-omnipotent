@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 72-5-pinterest-scrapecreators-adapter (2026-06-20)
+
+- **Cross-repo commit** — Pinterest Source 16 implementation ready in working trees; operator commit still pending (fixture drift closed via shared `tests/fixtures/pinterest-digest-signal.fixture.mjs`).
+
+---
+
 ## Parked architecture decision — LLM Provider Consolidation (2026-06-20)
 
 **Status:** Research started, not scoped. **No implementation changes made.**

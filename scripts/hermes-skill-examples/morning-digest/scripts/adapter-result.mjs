@@ -22,6 +22,7 @@ export const ADAPTER_PAYLOAD_ARRAY_KEYS = Object.freeze([
   // `{ error, videos: [...] }` is not misclassified as a bare error payload.
   'videos',
   'reels',
+  'pins',
 ]);
 
 export const ADAPTER_DATA_KEYS = new Set(ADAPTER_PAYLOAD_ARRAY_KEYS);

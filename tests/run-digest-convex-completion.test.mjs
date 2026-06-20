@@ -140,7 +140,25 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     });
   });
 
-  it('does not classify TikTok/Instagram success stdout as adapter error (Story 72-3)', () => {
+  it('classifies Pinterest exit-0 missing-api-key JSON as adapter error (Story 72-5)', () => {
+    const stdout = JSON.stringify({ error: 'missing-api-key' });
+    const parsed = parseAdapterStdout(stdout);
+    assert.ok(parsed && typeof parsed === 'object');
+    assert.equal(isAdapterErrorPayload(parsed), true);
+
+    const wrapped = isAdapterErrorPayload(parsed)
+      ? { success: false, error: `adapter-error:${String(/** @type {{ error?: unknown }} */ (parsed).error)}` }
+      : { success: true, data: parsed };
+    assert.deepEqual(wrapped, {
+      success: false,
+      error: 'adapter-error:missing-api-key',
+    });
+    assert.deepEqual(buildErrorsBySource({ pinterest: wrapped }), {
+      pinterest: 'adapter-error:missing-api-key',
+    });
+  });
+
+  it('does not classify TikTok/Instagram/Pinterest success stdout as adapter error (Story 72-3/72-5)', () => {
     assert.equal(
       isAdapterErrorPayload(
         parseAdapterStdout(
@@ -156,6 +174,16 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
         parseAdapterStdout(
           JSON.stringify({
             reels: [{ title: 'IG', url: 'https://www.instagram.com/reel/ABC/' }],
+          }),
+        ),
+      ),
+      false,
+    );
+    assert.equal(
+      isAdapterErrorPayload(
+        parseAdapterStdout(
+          JSON.stringify({
+            pins: [{ title: 'PI', url: 'https://www.pinterest.com/pin/123/' }],
           }),
         ),
       ),

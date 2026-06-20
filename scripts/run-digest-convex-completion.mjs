@@ -108,6 +108,7 @@ async function runWrapper(wrapperName, env, timeoutMs) {
  *   youtube?: unknown;
  *   tiktok?: unknown;
  *   instagram?: unknown;
+ *   pinterest?: unknown;
  * }>}
  */
 /** Collect-task keys wired in the deterministic orchestrator (Story 72-2 parity guard). */
@@ -125,6 +126,7 @@ export const COLLECT_ADAPTER_TASK_KEYS = Object.freeze([
   'youtube',
   'tiktok',
   'instagram',
+  'pinterest',
 ]);
 
 const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
@@ -141,6 +143,7 @@ const COLLECT_ADAPTER_WRAPPER_BY_KEY = Object.freeze({
   youtube: ['hermes-run-youtube.sh', 45_000],
   tiktok: ['hermes-run-tiktok.sh', 45_000],
   instagram: ['hermes-run-instagram.sh', 45_000],
+  pinterest: ['hermes-run-pinterest.sh', 45_000],
 });
 
 export async function collectAdapterOutputs(env) {
@@ -891,6 +894,7 @@ export async function runDigestConvexCompletion(opts = {}) {
       youtube: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.youtube)),
       tiktok: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.tiktok)),
       instagram: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.instagram)),
+      pinterest: /** @type {never} */ (unwrapAdapterResult(adapterOutputs.pinterest)),
       runMeta: {
         topTrend: topTrend ? String(topTrend) : undefined,
         focusKeyword: topTrend ? String(topTrend) : undefined,

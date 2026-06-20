@@ -385,6 +385,28 @@ export function extractInstagramSignals(instagramList) {
 }
 
 /**
+ * @param {Array<{ title?: string, repinCount?: number }>} pinterestList
+ * @returns {string[]}
+ */
+export function extractPinterestSignals(pinterestList) {
+  if (!Array.isArray(pinterestList)) {
+    return [];
+  }
+  const sorted = [...pinterestList].sort(
+    (a, b) => (Number(b?.repinCount) || 0) - (Number(a?.repinCount) || 0),
+  );
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of sorted.slice(0, MAX_YOUTUBE_SIGNALS)) {
+    const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+    if (title) {
+      out.push(title);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Array<{ title?: string, publishedAt?: string }>} rssList
  * @returns {string[]}
  */
@@ -435,6 +457,7 @@ export function extractRssSignals(rssList) {
  *   youtube?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  *   tiktok?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
  *   instagram?: Array<{ title?: string, viewCount?: number, likeCount?: number }>,
+ *   pinterest?: Array<{ title?: string, repinCount?: number }>,
  * }} sources
  * @returns {string[]}
  */
@@ -476,6 +499,7 @@ export function buildDigestSignals(sources = {}) {
   ordered.push(...extractYoutubeSignals(sources.youtube));
   ordered.push(...extractTiktokSignals(sources.tiktok));
   ordered.push(...extractInstagramSignals(sources.instagram));
+  ordered.push(...extractPinterestSignals(sources.pinterest));
 
   return dedupeSignals(ordered);
 }
@@ -639,7 +663,8 @@ function signalsFromParsedInput(parsed) {
       'bluesky' in parsed ||
       'youtube' in parsed ||
       'tiktok' in parsed ||
-      'instagram' in parsed)
+      'instagram' in parsed ||
+      'pinterest' in parsed)
   ) {
     return buildDigestSignals(/** @type {Parameters<typeof buildDigestSignals>[0]} */ (parsed));
   }

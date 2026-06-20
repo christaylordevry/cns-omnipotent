@@ -36,6 +36,7 @@ export const SECTION_LITERAL_TO_SOURCE_KEY = Object.freeze({
   youtube: 'youtube',
   tiktok: 'tiktok',
   instagram: 'instagram',
+  pinterest: 'pinterest',
 });
 
 /** Badge aliases that are not canonical sourceType keys. */

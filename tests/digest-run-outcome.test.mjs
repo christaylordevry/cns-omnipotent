@@ -125,7 +125,7 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.tiktok.count, 0);
   });
 
-  it('counts tiktok videos[] and instagram reels[] for outcome sources (Story 72-3)', () => {
+  it('counts tiktok videos[], instagram reels[], and pinterest pins[] for outcome sources (Story 72-3/72-5)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       tiktok: {
         success: true,
@@ -142,11 +142,31 @@ describe('digest-run-outcome (Story 71-3)', () => {
           ],
         },
       },
+      pinterest: {
+        success: true,
+        data: {
+          pins: [
+            { title: 'PI one', url: 'https://www.pinterest.com/pin/1/' },
+            { title: 'PI two', url: 'https://www.pinterest.com/pin/2/' },
+            { title: 'PI three', url: 'https://www.pinterest.com/pin/3/' },
+          ],
+        },
+      },
     });
     assert.equal(sources.tiktok.status, 'ok');
     assert.equal(sources.tiktok.count, 1);
     assert.equal(sources.instagram.status, 'ok');
     assert.equal(sources.instagram.count, 2);
+    assert.equal(sources.pinterest.status, 'ok');
+    assert.equal(sources.pinterest.count, 3);
+  });
+
+  it('maps empty pinterest pins[] to sources.pinterest.empty not error (Story 72-5)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      pinterest: { success: true, data: { pins: [] } },
+    });
+    assert.equal(sources.pinterest.status, 'empty');
+    assert.equal(sources.pinterest.count, 0);
   });
 
   it('maps empty instagram reels[] to sources.instagram.empty not error (Story 72-3)', () => {

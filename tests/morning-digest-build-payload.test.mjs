@@ -7,6 +7,11 @@ import {
   extractHnItemId,
   shortSha256,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
+import {
+  buildCanonicalPinterestDigestSignal,
+  CANONICAL_PINTEREST_PIN,
+  PINTEREST_VALIDATOR_METADATA_KEYS,
+} from './fixtures/pinterest-digest-signal.fixture.mjs';
 
 describe('build-digest-push-payload (Story 68-10)', () => {
   it('shortSha256 returns 16-char hex', () => {
@@ -76,5 +81,39 @@ describe('build-digest-push-payload (Story 68-10)', () => {
         assert.notEqual(signal.summary, null);
       }
     }
+  });
+
+  it('maps pinterest repinCount to sourceMetadata.upvotes only (Story 72-5)', () => {
+    const payload = buildDigestPushPayload({
+      date: '2026-06-11',
+      ranAt: 1_781_000_000_000,
+      pinterest: { pins: [CANONICAL_PINTEREST_PIN] },
+      runMeta: { topTrend: 'AI agents' },
+    });
+
+    const pinterest = payload.signals.find((row) => row.sourceType === 'pinterest');
+    assert.ok(pinterest);
+    assert.equal(pinterest.section, 'pinterest');
+    assert.equal(pinterest.sourceMetadata?.upvotes, CANONICAL_PINTEREST_PIN.repinCount);
+    assert.equal(pinterest.sourceMetadata?.author, CANONICAL_PINTEREST_PIN.author);
+    assert.equal(pinterest.sourceMetadata?.publishedAt, CANONICAL_PINTEREST_PIN.publishedAt);
+    assert.equal(pinterest.title, CANONICAL_PINTEREST_PIN.title);
+    assert.ok(
+      pinterest.summary?.includes('MCP server'),
+      'summary should come from description, not imageUrl/link',
+    );
+
+    const metaKeys = Object.keys(pinterest.sourceMetadata ?? {}).sort();
+    assert.deepEqual(metaKeys, [...PINTEREST_VALIDATOR_METADATA_KEYS].sort());
+    assert.equal('repinCount' in (pinterest ?? {}), false);
+    assert.equal('imageUrl' in (pinterest.sourceMetadata ?? {}), false);
+    assert.equal('link' in (pinterest.sourceMetadata ?? {}), false);
+    assert.equal('description' in (pinterest.sourceMetadata ?? {}), false);
+  });
+
+  it('canonical pinterest fixture stays aligned with buildDigestPushPayload (anti-drift)', () => {
+    const signal = buildCanonicalPinterestDigestSignal();
+    assert.equal(signal.sourceMetadata?.upvotes, 4200);
+    assert.equal(signal.externalId, CANONICAL_PINTEREST_PIN.pinId);
   });
 });

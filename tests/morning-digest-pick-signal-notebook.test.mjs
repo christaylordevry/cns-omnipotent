@@ -24,6 +24,7 @@ import {
   extractYoutubeSignals,
   extractTiktokSignals,
   extractInstagramSignals,
+  extractPinterestSignals,
   extractTwitterSignals,
   extractRedditSignals,
   extractRssSignals,
@@ -366,13 +367,23 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(titles, ['ig-high', 'ig-mid']);
   });
 
-  it('buildDigestSignals includes tiktok and instagram after youtube', () => {
+  it('extractPinterestSignals ranks by repinCount desc and caps at 2', () => {
+    const titles = extractPinterestSignals([
+      { title: 'pi-low', repinCount: 100 },
+      { title: 'pi-high', repinCount: 4200 },
+      { title: 'pi-mid', repinCount: 900 },
+    ]);
+    assert.deepEqual(titles, ['pi-high', 'pi-mid']);
+  });
+
+  it('buildDigestSignals includes tiktok, instagram, and pinterest after youtube', () => {
     const signals = buildDigestSignals({
       youtube: [{ title: 'yt-one', viewCount: 100 }],
       tiktok: [{ title: 'tt-one', viewCount: 200 }],
       instagram: [{ title: 'ig-one', viewCount: 300 }],
+      pinterest: [{ title: 'pi-one', repinCount: 400 }],
     });
-    assert.deepEqual(signals, ['yt-one', 'tt-one', 'ig-one']);
+    assert.deepEqual(signals, ['yt-one', 'tt-one', 'ig-one', 'pi-one']);
   });
 
   it('extractGithubSignals and extractRedditSignals return empty for empty arrays', () => {
