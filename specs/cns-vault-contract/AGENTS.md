@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.42 | Last updated: 2026-06-17
+> Version: 2.1.43 | Last updated: 2026-06-22
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -259,22 +259,26 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ## 8. Current Focus
 
+> Update this section whenever your active priorities shift.
+> This is the "what am I working on right now" that agents check first.
+
 ### Project Status
 
-- Epics 1–71: complete (sprint tracker through 2026-06-17)
-- No epics in progress
+- Epics 1-71: complete. Epics 72 and 73 now in-progress.
+- Epic 72: in-progress (no stories tracked yet)
+- Epic 73: in-progress; story 73-7 (Digest Entity Intelligence Sections) in review
 
 ### Current Priorities
 
-1. Scope next epic from `deferred-work.md` and operator briefs.
-2. Close deferred live-validation gates (67-2 AC6, 68-8 C7/C11).
-3. Tracker and constitution hygiene.
+1. Complete story 73-7 review and merge.
+2. Define and start Epic 72 stories.
+3. Close deferred live-validation gates (67-2 AC6, 68-8 C7/C11).
 
 ### Recent Session Context
 
-- Tracker: closed epics 54/55/56/60/61/64/65 (all stories done)
-- Story 67-2: Reddit public-JSON adapter — done
-- Epic 71: Digest job-state and watchdog truth — complete
+- Story 73-7: Digest Entity Intelligence Sections — in review (baseline a8270ade)
+- Story 73-6: Dashboard Entity Intelligence Modules — done
+- Story 73-5: Get Entity Intelligence Query — done
 
 ## 9. Agent Behavior Guidelines
 
@@ -358,6 +362,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-22 | 2.1.43 | **Section 8:** Regenerated after sprint tracker close-out (epics 54–65, 67–71). **Section 7/9:** Materialized Agent Browser row and browser-automation routing rule (body content for 2.1.41 changelog-only entry). |
 | 2026-06-17 | 2.1.42 | **Section 8:** Regenerated after sprint tracker close-out (epics 54–65, 67–71). **Section 7/9:** Materialized Agent Browser row and browser-automation routing rule (body content for 2.1.41 changelog-only entry). |
 | 2026-06-17 | 2.1.41 | **Section 7:** Added Agent Browser (WSL shell CLI + skill, not an MCP server) row. **Section 9:** Added browser-automation routing rule — prefer `agent-browser` over Playwright MCP for token-cheap smoke checks/QA; Playwright remains fallback for deep DOM debugging. |
 | 2026-06-12 | 2.1.40 | Added Behavioral Integrity subsection to Section 1: anti-confabulation guardrail for Nexus/Discord (no fabricated failure reasons, no user-facing command instructions, no claimed hidden work). |
