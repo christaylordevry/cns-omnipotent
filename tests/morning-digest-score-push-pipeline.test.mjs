@@ -98,6 +98,15 @@ describe('morning-digest score → push pipeline', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-pipeline' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({
+							status: 'success',
+							value: `digestSignals:sig-${String(body.args?.signal?.externalId ?? calls.length)}`,
+						}),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});

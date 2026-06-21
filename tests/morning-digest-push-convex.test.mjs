@@ -138,6 +138,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-reddit' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -186,6 +192,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-rss' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -232,6 +244,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-github' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -286,6 +304,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-youtube' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -346,6 +370,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-shortform' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -387,6 +417,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-pinterest' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -437,6 +473,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-threads' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -484,6 +526,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-linkedin' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -536,6 +584,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-polymarket' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -558,6 +612,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-scored' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -636,6 +696,12 @@ describe('push-digest-convex.mjs', () => {
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-order' }));
 				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
+				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
 		});
@@ -661,6 +727,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-1' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -762,6 +834,10 @@ describe('push-digest-convex.mjs', () => {
 					if (addCount === 2) {
 						return mockResponse(500, 'add failed mid-loop');
 					}
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: 'digestSignals:sig-1' }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},
@@ -808,6 +884,12 @@ describe('push-digest-convex.mjs', () => {
 				calls.push({ path: body.path, args: body.args });
 				if (body.path === 'digest:createDigestRun') {
 					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-zero' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: `digestSignals:sig-${body.args?.signal?.externalId ?? body.args?.signal?.title ?? 'x'}` }),
+					);
 				}
 				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
 			},

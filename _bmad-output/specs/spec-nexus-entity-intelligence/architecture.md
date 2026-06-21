@@ -176,14 +176,15 @@ approved/dismissed suggestion state (FR5). Suggestions remain derived and read-o
 **Consequences:**
 - Confirms the spec's own reasoning: this feature moves from a pure stateless read stage to one with a
   persisted intelligence layer.
-- New schema surface: one table, one input validator, one batched mutation, one
-  `clearEntityMentionsForRun` helper, two read queries (§3, §7).
+- New schema surface: one table, one input validator, atomic `replaceEntityMentionsForRun`, and two
+  read queries (§3, §7).
 - Every field must round-trip through the real `entityMentionInputValidator` via a canonical fixture
   `buildEntityMentionPayload()` (ADR-E73-007).
 
-**Re-analysis idempotency — clear-then-write (locked here, not deferred to dev-story):** when a
+**Re-analysis idempotency — transactional clear-then-write (locked here, not deferred to dev-story):** when a
 `digestRunId` is re-analyzed, the stage **deletes all prior snapshots for that run, then writes the
-freshly built set** (§4.3). A no-op-if-exists strategy is rejected: a re-collect can produce a
+freshly built set in one Convex mutation** (§4.3). The transaction also runs for an empty fresh set,
+and any validation or insert failure rolls the deletion back. A no-op-if-exists strategy is rejected: a re-collect can produce a
 *different* signal set for the same `digestRunId`, so a surviving stale snapshot would silently feed
 wrong mention counts into the baseline/acceleration math that is the entire point of this table.
 Correctness of the persisted intelligence layer outweighs a redundant delete+insert on the common
@@ -410,8 +411,19 @@ export const clearEntityMentionsForRun = mutation({
 });
 ```
 
-Re-analysis is **clear-then-write** (ADR-E73-002, §4.3): the stage calls `clearEntityMentionsForRun`
-then `recordEntityMentions`. This is enforced by the write stage, not inferred inside `recordEntityMentions`.
+```typescript
+export const replaceEntityMentionsForRun = mutation({
+  args: { digestRunId: v.id('digestRuns'), mentions: v.array(entityMentionInputValidator) },
+  returns: v.object({ deleted: v.number(), inserted: v.number() }),
+  handler: async (ctx, { digestRunId, mentions }) => {
+    // validate the full replacement, delete prior rows, then insert in one transaction
+  },
+});
+```
+
+Re-analysis is **transactional clear-then-write** (ADR-E73-002, §4.3): the stage calls
+`replaceEntityMentionsForRun` on every run, including zero-mention replacements. Convex mutation
+atomicity prevents a failed insert from leaving the run with its prior snapshots deleted.
 
 ### 3.3 No changes to `digestSignals` / `digestRuns`
 
@@ -453,13 +465,15 @@ Then `aggregateRunEntities(signals)` groups per `entityKey` for the run:
 - `coMentionedTrackedEntities` = tracked entityKeys appearing in the same run.
 - `signalRefs` = up to 5 highest-`rankScore` signals (evidence cards / source traces).
 
-### 4.3 Idempotency — clear-then-write (locked; see ADR-E73-002)
+### 4.3 Idempotency — transactional clear-then-write (locked; see ADR-E73-002)
 
 The stage keys snapshots to `digestRunId`. Re-analysis of a `digestRunId` is **clear-then-write**: the
-orchestrator first deletes all prior `entityMentions` for that `digestRunId` (internal helper
-`clearEntityMentionsForRun(digestRunId)`), then writes the freshly built snapshots via
-`recordEntityMentions`. A no-op-if-exists strategy is **rejected** (rationale in ADR-E73-002). **No live
-read in the scoring hot path;** this is a one-shot post-push reconciliation, deterministic per run.
+orchestrator calls `replaceEntityMentionsForRun(digestRunId, mentions)` unconditionally. The mutation
+validates the complete replacement, deletes prior rows, and inserts the fresh set atomically. A
+zero-mention replacement still clears stale rows. A no-op-if-exists strategy is **rejected** (rationale
+in ADR-E73-002). Force-rescore must patch and re-analyze the existing `digestRunId` and
+`digestSignalId` values, never create an independent duplicate run. **No live read in the scoring hot
+path;** this is a one-shot post-push reconciliation, deterministic per run.
 
 ---
 
@@ -553,11 +567,11 @@ with one-line reasons. Feature remains useful outside the dashboard.
 
 | Failure | Behavior |
 |---------|----------|
-| Entity stage throws | stderr warning; **exit 0**; digest + dashboard unaffected (run simply has no fresh snapshots) |
-| `recordEntityMentions` validation error | stderr; non-zero from push wrapper; digest post already sent (fire-and-forget) |
+| Entity stage throws | stderr warning; **exit 0**; structured outcome `entity.status=failed`; digest post continues |
+| `replaceEntityMentionsForRun` validation error | transaction rolls back; structured outcome records the failure; digest post continues |
 | No snapshots in window | `getEntityIntelligence` returns empty lanes; surfaces show empty state, not error |
 | Sparse history (early days) | Cold-start path dominates until baselines accrue; acceleration ratio gated by `MIN_ACTIVE` floor |
-| Re-pushed run | Idempotent reconcile per §4.3 (clear-then-write or no-op) |
+| Re-pushed run | Existing run and signal IDs are patched; snapshots reconcile atomically per §4.3 |
 
 ---
 
@@ -580,10 +594,10 @@ with one-line reasons. Feature remains useful outside the dashboard.
 
 | Story | Sections / ADRs | Repo | Key deliverables |
 |-------|-----------------|------|------------------|
-| **73-1** | §3, ADR-E73-002 | cns-dashboard | `entityMentions` table + validators + indexes + `recordEntityMentions` + `clearEntityMentionsForRun`; convex validator test |
+| **73-1** | §3, ADR-E73-002 | cns-dashboard | `entityMentions` table + validators + indexes + atomic `replaceEntityMentionsForRun`; Convex validator test |
 | **73-2** | §4.1–4.2, ADR-E73-001/003 | Omnipotent.md | `extract-entities.mjs` pure functions + unit tests (person/account/org keys) |
 | **73-3** | §3.2, §4.3, §7, ADR-E73-007 | Omnipotent.md | `build-entity-mention-payload.mjs` + `buildEntityMentionPayload()` round-trip fixture test |
-| **73-4** | §4.1, §4.3, ADR-E73-002 | Omnipotent.md | `analyze-entity-intelligence.mjs` orchestrator + wire into `run-digest-convex-completion.mjs`; clear-then-write idempotency |
+| **73-4** | §4.1, §4.3, ADR-E73-002 | Omnipotent.md | `analyze-entity-intelligence.mjs` orchestrator + all push/recovery paths; identity-preserving force-rescore; transactional clear-then-write idempotency |
 | **73-5** | §5, ADR-E73-004/005/006 | cns-dashboard | `getEntityIntelligence` query + thresholds in `constants.ts` + lane/reasons validators + tests |
 | **73-6** | §6.1 | cns-dashboard | Two dashboard modules (read-only evidence cards) |
 | **73-7** | §6.2 | Omnipotent.md | Digest ranked sections consuming `getEntityIntelligence` |

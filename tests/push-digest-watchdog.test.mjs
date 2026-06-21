@@ -418,7 +418,25 @@ describe("Story 67-10 push-digest-watchdog", () => {
       spawnFn: async (_cmd, args, opts) => {
         spawnArgs = args;
         spawnEnv = opts.env;
-        return { exitCode: 0 };
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({
+            ok: true,
+            runId: 'digestRuns:recovered',
+            signalsWritten: 1,
+            error: null,
+            pushedPayload: {
+              run: { digestRunId: 'digestRuns:recovered', ...artifact.run },
+              signals: [
+                {
+                  ...artifact.signals[0],
+                  digestRunId: 'digestRuns:recovered',
+                  digestSignalId: 'digestSignals:recovered',
+                },
+              ],
+            },
+          }),
+        };
       },
       appendFileFn: async () => {},
       mkdirFn: async () => {},
@@ -429,6 +447,11 @@ describe("Story 67-10 push-digest-watchdog", () => {
     assert.ok(Array.isArray(spawnArgs));
     assert.ok(spawnArgs[0]?.endsWith("push-digest-convex.mjs"));
     assert.equal(spawnEnv?.DIGEST_PUSH_JSON, artifactJson);
+    assert.equal(result.pushResult?.runId, 'digestRuns:recovered');
+    assert.equal(
+      result.pushResult?.pushedPayload?.signals?.[0]?.digestSignalId,
+      'digestSignals:recovered',
+    );
   });
 
   it("failed-today triggers recovery when artifact present", async () => {

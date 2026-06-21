@@ -75,6 +75,45 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(outcome.overall, 'success');
   });
 
+  it('surfaces entity analysis failure and downgrades an otherwise successful run', () => {
+    const outcome = computeOutcomeFromInvocation({
+      trigger: 'cron',
+      date: '2026-06-13',
+      terminalAction: 'completion-backfill-push',
+      recoveryPath: 'full-pipeline',
+      pushResult: { ok: true, runId: 'run-entity-failed', signalsWritten: 2 },
+      discordResult: { ok: true },
+      entityResult: { status: 'failed', mentionsWritten: 0, reason: 'validator rejected' },
+      convexRowStatus: 'published',
+      signalCount: 2,
+    });
+
+    assert.deepEqual(outcome.entity, {
+      ok: false,
+      status: 'failed',
+      mentionsWritten: 0,
+      error: 'validator rejected',
+    });
+    assert.equal(outcome.overall, 'partial');
+
+    const { record } = mergeDayOutcomeRecord(null, {
+      date: outcome.date,
+      trigger: outcome.trigger,
+      recoveryPath: outcome.recoveryPath,
+      terminalAction: outcome.terminalAction,
+      timestamp: outcome.timestamp,
+      convex: outcome.convex,
+      discord: outcome.discord,
+      entity: outcome.entity,
+      sources: outcome.sources,
+      overall: outcome.overall,
+      ranAdapters: true,
+      signalCount: 2,
+    });
+    assert.equal(record.entity.status, 'failed');
+    assert.equal(record.history.at(-1).entity.error, 'validator rejected');
+  });
+
   it('skipped-already-pushed with Convex started yields partial overall and convex.ok false', () => {
     const outcome = computeOutcomeFromInvocation({
       trigger: 'watchdog-1300',

@@ -334,15 +334,44 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
   });
 
   it('delegates to watchdog when artifact replay succeeds', async () => {
+    let analyzeCalled = false;
+    const pushedPayload = {
+      run: { digestRunId: 'digestRuns:recovered', date: '2026-06-11', ranAt: 100 },
+      signals: [
+        {
+          digestRunId: 'digestRuns:recovered',
+          digestSignalId: 'digestSignals:recovered',
+          section: 'twitter',
+          sourceType: 'twitter',
+          title: 'Recovered signal',
+          rank: 1,
+        },
+      ],
+    };
     const result = await runDigestConvexCompletion({
       env: { CRON_TZ: 'Australia/Sydney', HOME: join(tmpdir(), 'completion-watchdog') },
       todayDate: '2026-06-11',
-      watchdogFn: async () => ({ action: 'recovered-push', exitCode: 0 }),
+      watchdogFn: async () => ({
+        action: 'recovered-push',
+        exitCode: 0,
+        pushResult: {
+          ok: true,
+          runId: 'digestRuns:recovered',
+          signalsWritten: 1,
+          pushedPayload,
+        },
+      }),
+      analyzeFn: async (payload) => {
+        analyzeCalled = true;
+        assert.equal(payload.run.digestRunId, 'digestRuns:recovered');
+        return { status: 'ok', mentionsWritten: 1, reason: null };
+      },
       collectFn: async () => {
         throw new Error('collect should not run');
       },
     });
     assert.equal(result.action, 'recovered-push');
+    assert.equal(analyzeCalled, true);
   });
 
   it('backfills when watchdog reports skipped-no-artifact', async () => {
@@ -467,6 +496,84 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     const ylecun = updated.signals.find((row) => row.sourceMetadata?.authorHandle === 'ylecun');
     assert.ok(ylecun);
     assert.ok((ylecun.scores?.personalRelevance ?? 0) >= 20);
+  });
+
+  it('force-rescore full path preserves IDs and orders push then analyze then Discord', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-force-rescore-order-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: {
+          digestRunId: 'digestRuns:existing-run',
+          date: '2026-06-11',
+          ranAt: 1_749_657_600_000,
+          status: 'published',
+        },
+        signals: [
+          {
+            digestRunId: 'digestRuns:existing-run',
+            digestSignalId: 'digestSignals:existing-signal',
+            section: 'twitter',
+            sourceType: 'twitter',
+            title: 'Existing signal',
+            url: 'https://x.com/karpathy/status/1',
+            rank: 1,
+            rankScore: 70,
+            sourceMetadata: { authorHandle: 'karpathy' },
+            scores: {
+              personalRelevance: 80,
+              momentum: 20,
+              novelty: 20,
+              relevance: 80,
+              urgency: 20,
+            },
+          },
+        ],
+      }),
+    );
+
+    const order = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+      },
+      todayDate: '2026-06-11',
+      forceRescore: true,
+      pushFn: async (payload) => {
+        order.push('push');
+        assert.equal(payload.run.digestRunId, 'digestRuns:existing-run');
+        assert.equal(payload.signals[0].digestSignalId, 'digestSignals:existing-signal');
+        return {
+          ok: true,
+          runId: 'digestRuns:existing-run',
+          signalsWritten: 1,
+          pushedPayload: payload,
+        };
+      },
+      analyzeFn: async (payload) => {
+        order.push('analyze');
+        assert.equal(payload.run.digestRunId, 'digestRuns:existing-run');
+        assert.equal(payload.signals[0].digestSignalId, 'digestSignals:existing-signal');
+        return { status: 'ok', mentionsWritten: 1, reason: null };
+      },
+      postDigestFn: async () => {
+        order.push('discord');
+        return { ok: true, messageIds: ['discord-1'], error: null };
+      },
+      writeOutcomeFn: async () => {},
+    });
+
+    assert.equal(result.action, 'completion-force-rescore-push');
+    assert.deepEqual(order, ['push', 'analyze', 'discord']);
+    const persisted = JSON.parse(
+      await readFile(join(hermesDir, 'digest-push-2026-06-11.json'), 'utf8'),
+    );
+    assert.equal(persisted.run.digestRunId, 'digestRuns:existing-run');
+    assert.equal(persisted.signals[0].digestSignalId, 'digestSignals:existing-signal');
   });
 
   it('force-rescore applies people bonus when HOME is Hermes profile-isolated', async () => {

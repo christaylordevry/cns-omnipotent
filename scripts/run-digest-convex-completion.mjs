@@ -26,9 +26,11 @@ import {
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 import {
   countValidSignals,
+  pushDigestToConvex,
   readDigestPushPayload,
   resolveConvexPushEnv,
 } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
+import { runAnalyzeEntityIntelligence } from './hermes-skill-examples/morning-digest/scripts/analyze-entity-intelligence.mjs';
 import { postDigestToDiscord } from './hermes-skill-examples/morning-digest/scripts/post-digest-discord.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
 import {
@@ -51,6 +53,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scriptsDir = join(repoRoot, 'scripts/hermes-skill-examples/morning-digest/scripts');
 const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 
+export { invokePostPushEntityStage };
 export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 export {
   buildErrorsBySource,
@@ -311,9 +314,22 @@ function expectedSignalCount(payload) {
  *   runId?: string | null;
  *   signalsWritten?: number;
  *   error?: string | null;
+ *   pushedPayload?: {
+ *     run: { digestRunId: string; ranAt: number; date: string; workspaceId?: string };
+ *     signals: Array<Record<string, unknown>>;
+ *   } | null;
  * }} pushResult
  * @param {number} expectedCount
- * @returns {{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }}
+ * @returns {{
+ *   ok: boolean;
+ *   runId?: string | null;
+ *   signalsWritten: number;
+ *   error?: string;
+ *   pushedPayload?: {
+ *     run: { digestRunId: string; ranAt: number; date: string; workspaceId?: string };
+ *     signals: Array<Record<string, unknown>>;
+ *   } | null;
+ * }}
  */
 function normalizePushResult(pushResult, expectedCount) {
   const signalsWritten = pushResult.signalsWritten ?? 0;
@@ -323,12 +339,14 @@ function normalizePushResult(pushResult, expectedCount) {
       ok: true,
       runId: pushResult.runId ?? null,
       signalsWritten,
+      pushedPayload: pushResult.pushedPayload ?? null,
     };
   }
   return {
     ok: false,
     runId: pushResult.runId ?? null,
     signalsWritten,
+    pushedPayload: null,
     error:
       pushResult.error ??
       (signalsWritten < expectedCount
@@ -338,59 +356,134 @@ function normalizePushResult(pushResult, expectedCount) {
 }
 
 /**
+ * Fire-and-forget entity stage after successful Convex push (Epic 73, ADR-E73-002).
+ *
+ * @param {{
+ *   pushResult: { ok: boolean; pushedPayload?: { run: Record<string, unknown>; signals: Array<Record<string, unknown>> } | null };
+ *   env: Record<string, string | undefined>;
+ *   analyzeFn?: typeof runAnalyzeEntityIntelligence;
+ *   fetchFn?: typeof fetch;
+ * }} ctx
+ */
+async function invokePostPushEntityStage(ctx) {
+  if (!ctx.pushResult.ok) {
+    return { status: 'skipped', mentionsWritten: 0, reason: 'push-failed' };
+  }
+  if (!ctx.pushResult.pushedPayload) {
+    return { status: 'failed', mentionsWritten: 0, reason: 'missing-pushed-payload' };
+  }
+  const analyze = ctx.analyzeFn ?? runAnalyzeEntityIntelligence;
+  try {
+    const result = await analyze(
+      /** @type {{ run: { digestRunId: string; ranAt: number; date: string; workspaceId?: string }; signals: Array<Record<string, unknown>> }} */ (
+        ctx.pushResult.pushedPayload
+      ),
+      ctx.env,
+      { fetchFn: ctx.fetchFn },
+    );
+    if (
+      result &&
+      typeof result === 'object' &&
+      'status' in result &&
+      (result.status === 'ok' || result.status === 'skipped' || result.status === 'failed')
+    ) {
+      return {
+        status: result.status,
+        mentionsWritten:
+          'mentionsWritten' in result && typeof result.mentionsWritten === 'number'
+            ? result.mentionsWritten
+            : 0,
+        reason:
+          'reason' in result && typeof result.reason === 'string' ? result.reason.slice(0, 120) : null,
+      };
+    }
+    return { status: 'ok', mentionsWritten: 0, reason: null };
+  } catch (err) {
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'entity-analysis-threw';
+    console.error(`analyze-entity-intelligence: warning — ${reason}`);
+    return { status: 'failed', mentionsWritten: 0, reason };
+  }
+}
+
+async function recordEntityStageResult(result, invocation, log) {
+  if (invocation) {
+    invocation.entityResult = result;
+  }
+  const detail =
+    result.status === 'ok'
+      ? `mentions=${result.mentionsWritten}`
+      : (result.reason ?? 'unknown');
+  await log(`entity-analysis-${result.status}`, 0, detail);
+}
+
+async function persistPushedPayloadArtifact(pushResult, env, log) {
+  if (!pushResult.pushedPayload) {
+    return false;
+  }
+  const writeResult = await writeDigestPushArtifact({
+    ...env,
+    DIGEST_PUSH_JSON: JSON.stringify(pushResult.pushedPayload),
+  });
+  if (writeResult.status !== 'ok') {
+    await log('completion-pushed-artifact-failed', 0, writeResult.reason);
+    return false;
+  }
+  return true;
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {Record<string, string | undefined>} env
- * @returns {Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>}
+ * @param {{ fetchFn?: typeof fetch }} [opts]
+ * @returns {Promise<{
+ *   ok: boolean;
+ *   runId?: string | null;
+ *   signalsWritten: number;
+ *   error?: string;
+ *   pushedPayload?: {
+ *     run: { digestRunId: string; ranAt: number; date: string; workspaceId?: string };
+ *     signals: Array<Record<string, unknown>>;
+ *   } | null;
+ * }>}
  */
-export async function pushPayload(payload, env) {
+export async function pushPayload(payload, env, opts = {}) {
   const digestPushJson = JSON.stringify(payload);
-  const pushScript = join(scriptsDir, 'push-digest-convex.mjs');
   const candidatesScript = join(scriptsDir, 'push-keyword-candidates.mjs');
   const childEnv = { ...process.env, ...env, DIGEST_PUSH_JSON: digestPushJson };
   const expectedCount = expectedSignalCount(payload);
-
-  /** @type {{ ok: boolean; runId?: string | null; signalsWritten?: number; error?: string | null } | null} */
-  let parsed;
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
 
   try {
-    const { stdout } = await execFileAsync('node', [pushScript], {
+    const result = await pushDigestToConvex({ env: childEnv, fetchFn });
+    const parsed = {
+      ok: result.ok,
+      runId: result.runId,
+      signalsWritten: result.signalsWritten,
+      error: result.error,
+      pushedPayload: result.pushedPayload ?? null,
+    };
+
+    const normalized = normalizePushResult(parsed, expectedCount);
+    if (!normalized.ok) {
+      return normalized;
+    }
+
+    await execFileAsync('node', [candidatesScript], {
       cwd: repoRoot,
       env: childEnv,
       timeout: 45_000,
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024,
     });
-    parsed = parsePushStdout(stdout);
-  } catch (err) {
-    const stdout =
-      err && typeof err === 'object' && 'stdout' in err
-        ? String(/** @type {{ stdout?: unknown }} */ (err).stdout ?? '')
-        : '';
-    parsed = parsePushStdout(stdout);
-    if (!parsed) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
-          : 'push-spawn-failed';
-      return { ok: false, signalsWritten: 0, error: message };
-    }
-  }
-
-  if (!parsed) {
-    return { ok: false, signalsWritten: 0, error: 'invalid-push-stdout' };
-  }
-
-  const normalized = normalizePushResult(parsed, expectedCount);
-  if (!normalized.ok) {
     return normalized;
+  } catch (err) {
+    const message =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
+        : 'push-failed';
+    return { ok: false, signalsWritten: 0, error: message };
   }
-
-  await execFileAsync('node', [candidatesScript], {
-    cwd: repoRoot,
-    env: childEnv,
-    timeout: 45_000,
-  });
-  return normalized;
 }
 
 /**
@@ -438,12 +531,15 @@ function attachSourceOutcomes(payload, adapterResults) {
  * @param {(action: string, exitCode: number, detail?: string) => Promise<void>} log
  * @param {string} successAction
  * @param {Record<string, unknown> | undefined} [adapterResults]
- * @param {(payload: Record<string, unknown>, env: Record<string, string | undefined>) => Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string }>} [pushFn]
+ * @param {(payload: Record<string, unknown>, env: Record<string, string | undefined>) => Promise<{ ok: boolean; runId?: string | null; signalsWritten: number; error?: string; pushedPayload?: { run: Record<string, unknown>; signals: Array<Record<string, unknown>> } | null }>} [pushFn]
  * @param {{
- *   pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string } | null;
+ *   pushResult?: { ok: boolean; runId?: string | null; signalsWritten: number; error?: string; pushedPayload?: { run: Record<string, unknown>; signals: Array<Record<string, unknown>> } | null } | null;
  *   discordResult?: { ok: boolean; error?: string | null } | null;
  *   signalCount?: number;
  * } | null} [invocation]
+ * @param {typeof runAnalyzeEntityIntelligence} [analyzeFn]
+ * @param {typeof fetch} [fetchFn]
+ * @param {typeof postDigestToDiscord} [postDigestFn]
  * @returns {Promise<{ action: string; exitCode: number }>}
  */
 async function scoreWriteAndPush(
@@ -455,6 +551,9 @@ async function scoreWriteAndPush(
   adapterResults,
   pushFn,
   invocation,
+  analyzeFn,
+  fetchFn,
+  postDigestFn,
 ) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
   try {
@@ -503,7 +602,17 @@ async function scoreWriteAndPush(
       return { action: 'completion-convex-push-failed', exitCode: 0 };
     }
 
-    const discordResult = await postDigestToDiscord(payload, env);
+    await persistPushedPayloadArtifact(pushResult, env, log);
+    const entityResult = await invokePostPushEntityStage({
+      pushResult,
+      env,
+      analyzeFn,
+      fetchFn,
+    });
+    await recordEntityStageResult(entityResult, invocation, log);
+
+    const postDigest = postDigestFn ?? postDigestToDiscord;
+    const discordResult = await postDigest(payload, env);
     if (invocation) {
       invocation.pushResult = pushResult;
       invocation.discordResult = discordResult;
@@ -579,7 +688,17 @@ async function pushOnlyFromArtifact(ctx) {
       return { action: 'completion-convex-push-failed', exitCode: 0 };
     }
 
-    const discordResult = await postDigestToDiscord(payload, ctx.env);
+    await persistPushedPayloadArtifact(pushResult, ctx.env, ctx.log);
+    const entityResult = await invokePostPushEntityStage({
+      pushResult,
+      env: ctx.env,
+      analyzeFn: ctx.analyzeFn,
+      fetchFn: ctx.fetchFn,
+    });
+    await recordEntityStageResult(entityResult, ctx.invocation, ctx.log);
+
+    const postDigest = ctx.postDigestFn ?? postDigestToDiscord;
+    const discordResult = await postDigest(payload, ctx.env);
     if (ctx.invocation) {
       ctx.invocation.pushResult = pushResult;
       ctx.invocation.discordResult = discordResult;
@@ -684,7 +803,7 @@ async function tryRescoreFromArtifact(ctx) {
   }
 
   const ranAt = Date.now();
-  payload.run = { ...payload.run, date: ctx.todayDate, ranAt };
+  payload.run = { ...payload.run, date: ctx.todayDate };
   return scoreWriteAndPush(
     payload,
     ranAt,
@@ -694,6 +813,9 @@ async function tryRescoreFromArtifact(ctx) {
     undefined,
     ctx.pushFn,
     ctx.invocation,
+    ctx.analyzeFn,
+    ctx.fetchFn,
+    ctx.postDigestFn,
   );
 }
 
@@ -743,6 +865,7 @@ async function mergeInvocationOutcomeRecord(ctx) {
     recoveryPath: ctx.invocation.recoveryPath,
     pushResult: ctx.invocation.pushResult,
     discordResult: ctx.invocation.discordResult,
+    entityResult: ctx.invocation.entityResult,
     adapterOutputs: ctx.invocation.adapterOutputs ?? undefined,
     convexRowStatus,
     logActions,
@@ -757,6 +880,7 @@ async function mergeInvocationOutcomeRecord(ctx) {
     timestamp: outcome.timestamp,
     convex: outcome.convex,
     discord: outcome.discord,
+    entity: outcome.entity,
     sources: outcome.sources,
     overall: outcome.overall,
     ranAdapters: ctx.invocation.ranAdapters === true,
@@ -773,6 +897,7 @@ async function mergeInvocationOutcomeRecord(ctx) {
  *   watchdogFn?: typeof runPushDigestWatchdog;
  *   pushFn?: typeof pushPayload;
  *   postDigestFn?: typeof postDigestToDiscord;
+ *   analyzeFn?: typeof runAnalyzeEntityIntelligence;
  *   fetchFn?: typeof fetch;
  *   writeOutcomeFn?: typeof mergeInvocationOutcomeRecord;
  * }} [opts]
@@ -788,6 +913,7 @@ export async function runDigestConvexCompletion(opts = {}) {
     logActions: /** @type {string[]} */ ([]),
     pushResult: null,
     discordResult: null,
+    entityResult: null,
     adapterOutputs: null,
     signalCount: 0,
     ranAdapters: false,
@@ -802,6 +928,9 @@ export async function runDigestConvexCompletion(opts = {}) {
 
   const forceRescore = opts.forceRescore ?? false;
   const pushFn = opts.pushFn;
+  const analyzeFn = opts.analyzeFn;
+  const fetchFn = opts.fetchFn;
+  const postDigestFn = opts.postDigestFn;
   const writeOutcomeFn = opts.writeOutcomeFn ?? mergeInvocationOutcomeRecord;
   const outcomeDir = resolveDigestOutcomesRoot(operatorHome);
   const trigger = resolveDigestTrigger(env);
@@ -820,6 +949,9 @@ export async function runDigestConvexCompletion(opts = {}) {
         operatorHome,
         log,
         pushFn,
+        analyzeFn,
+        fetchFn,
+        postDigestFn,
         invocation,
       });
       if (rescoreResult) {
@@ -836,6 +968,33 @@ export async function runDigestConvexCompletion(opts = {}) {
       }
       if (watchdogResult.action === 'recovered-push') {
         invocation.recoveryPath = 'watchdog-recover-artifact';
+        const recoveredPushResult =
+          watchdogResult.pushResult && typeof watchdogResult.pushResult === 'object'
+            ? watchdogResult.pushResult
+            : null;
+        if (recoveredPushResult?.ok === true) {
+          invocation.pushResult = recoveredPushResult;
+          invocation.signalCount = recoveredPushResult.signalsWritten ?? 0;
+          await persistPushedPayloadArtifact(recoveredPushResult, env, log);
+          const entityResult =
+            recoveredPushResult.entityResult &&
+            typeof recoveredPushResult.entityResult === 'object' &&
+            'status' in recoveredPushResult.entityResult
+              ? recoveredPushResult.entityResult
+              : await invokePostPushEntityStage({
+                  pushResult: recoveredPushResult,
+                  env,
+                  analyzeFn,
+                  fetchFn,
+                });
+          await recordEntityStageResult(entityResult, invocation, log);
+        } else {
+          await recordEntityStageResult(
+            { status: 'failed', mentionsWritten: 0, reason: 'missing-recovered-push-result' },
+            invocation,
+            log,
+          );
+        }
         result = watchdogResult;
         return result;
       }
@@ -849,6 +1008,9 @@ export async function runDigestConvexCompletion(opts = {}) {
           operatorHome,
           log,
           pushFn,
+          analyzeFn,
+          fetchFn,
+          postDigestFn,
           invocation,
         });
         if (pushOnlyResult) {
@@ -938,6 +1100,9 @@ export async function runDigestConvexCompletion(opts = {}) {
       adapterOutputs,
       pushFn,
       invocation,
+      analyzeFn,
+      fetchFn,
+      postDigestFn,
     );
     return result;
   } finally {

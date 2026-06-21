@@ -109,6 +109,7 @@ export function createZeroValueDayRecord(date, trigger = 'manual') {
     inProgress: null,
     convex: { ok: false, signalsWritten: 0, runId: null, status: null, error: null },
     discord: { ok: false, error: null },
+    entity: { ok: null, status: 'not-run', mentionsWritten: 0, error: null },
     sources: {},
     overall: 'failed',
     lastInvocation: { timestamp: now, trigger, recoveryPath: null, action: null },
@@ -291,11 +292,12 @@ export function computeDiscordBlock(input) {
  *   sources: Record<string, { status: 'ok' | 'error' | 'empty'; count: number }>;
  *   terminalAction: string;
  *   signalCount?: number;
+ *   entity?: { ok: boolean | null };
  * }} input
  * @returns {DigestOverall}
  */
 export function computeOverall(input) {
-  const { convex, discord, sources, terminalAction, signalCount = 0 } = input;
+  const { convex, discord, sources, terminalAction, signalCount = 0, entity } = input;
 
   if (
     terminalAction === 'completion-no-signals' ||
@@ -312,7 +314,7 @@ export function computeOverall(input) {
   const hasSignals = signalCount > 0;
 
   if (convex.ok && discord.ok) {
-    return 'success';
+    return entity?.ok === false ? 'partial' : 'success';
   }
 
   if (convex.ok && !discord.ok) {
@@ -344,6 +346,7 @@ export function computeOverall(input) {
  *   recoveryPath: DigestRecoveryPath;
  *   pushResult?: { ok?: boolean; runId?: string | null; signalsWritten?: number; error?: string | null } | null;
  *   discordResult?: { ok?: boolean; error?: string | null } | null;
+ *   entityResult?: { status?: string; mentionsWritten?: number; reason?: string | null } | null;
  *   adapterOutputs?: Record<string, unknown>;
  *   convexRowStatus?: string | null;
  *   logActions?: string[];
@@ -375,12 +378,20 @@ export function computeOutcomeFromInvocation(input) {
     status: convexRaw.status,
     error: convexRaw.error,
   };
+  const entityStatus = input.entityResult?.status ?? 'not-run';
+  const entity = {
+    ok: entityStatus === 'not-run' ? null : entityStatus === 'ok',
+    status: entityStatus,
+    mentionsWritten: input.entityResult?.mentionsWritten ?? 0,
+    error: entityStatus === 'ok' || entityStatus === 'not-run' ? null : (input.entityResult?.reason ?? 'unknown'),
+  };
   const overall = computeOverall({
     convex,
     discord,
     sources,
     terminalAction: input.terminalAction,
     signalCount: input.signalCount ?? 0,
+    entity,
   });
 
   return {
@@ -392,6 +403,7 @@ export function computeOutcomeFromInvocation(input) {
     recoveryPath: input.recoveryPath,
     convex,
     discord,
+    entity,
     sources,
     overall,
   };
@@ -487,6 +499,7 @@ export async function markInvocationStarted(dir, date, input, deps = {}) {
  *   timestamp?: string;
  *   convex: { ok: boolean; signalsWritten?: number; runId?: string | null; status?: string | null; error?: string | null };
  *   discord: { ok: boolean; error?: string | null };
+ *   entity?: { ok: boolean | null; status: string; mentionsWritten?: number; error?: string | null };
  *   sources?: Record<string, { status: 'ok' | 'error' | 'empty'; count: number }>;
  *   overall: DigestOverall;
  *   ranAdapters?: boolean;
@@ -557,6 +570,12 @@ export function mergeDayOutcomeRecord(existing, current) {
       : /** @type {Record<string, { status: 'ok' | 'error' | 'empty'; count: number }>} */ (
           base.sources ?? {}
         );
+  const mergedEntity = current.entity ?? {
+    ok: null,
+    status: 'not-run',
+    mentionsWritten: 0,
+    error: null,
+  };
 
   const overall = computeOverall({
     convex: mergedConvex,
@@ -564,6 +583,7 @@ export function mergeDayOutcomeRecord(existing, current) {
     sources: mergedSources,
     terminalAction,
     signalCount: current.signalCount ?? 0,
+    entity: mergedEntity,
   });
 
   const timestamp = current.timestamp ?? new Date().toISOString();
@@ -573,6 +593,7 @@ export function mergeDayOutcomeRecord(existing, current) {
     sources: mergedSources,
     terminalAction,
     signalCount: current.signalCount ?? 0,
+    entity: mergedEntity,
   });
   const historyEntry = {
     timestamp,
@@ -581,6 +602,7 @@ export function mergeDayOutcomeRecord(existing, current) {
     action: terminalAction,
     convex: historyConvex,
     discord: current.discord,
+    entity: mergedEntity,
     overall: historyOverall,
     ranAdapters: current.ranAdapters ?? false,
     warnings: [...stickyWarnings],
@@ -593,6 +615,7 @@ export function mergeDayOutcomeRecord(existing, current) {
     inProgress: null,
     convex: mergedConvex,
     discord: mergedDiscord,
+    entity: mergedEntity,
     sources: mergedSources,
     overall,
     lastInvocation: {

@@ -9,14 +9,18 @@
  */
 
 import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
+import { mergeTrendIngestEnv, resolveOperatorHome } from './fetch-arxiv-rss.mjs';
 
 export const MISSING_CONVEX_ENV_ERROR = 'missing-convex-env';
 
 const CREATE_PATH = 'digest:createDigestRun';
 const ADD_PATH = 'digest:addDigestSignal';
 const FINALIZE_PATH = 'digest:finalizeDigestRun';
+const RESCORE_PATH = 'digest:rescoreDigestRun';
+export const DIGEST_PUSH_TIMEOUT_MS = 45_000;
 
 /**
  * @param {string} convexUrl
@@ -82,14 +86,113 @@ export function countValidSignals(signals) {
 }
 
 /**
+ * @param {Record<string, unknown>} run
+ * @param {string} digestRunId
+ * @param {Array<Record<string, unknown>>} pushedSignals
+ * @returns {{
+ *   run: { digestRunId: string; ranAt: number; date: string; workspaceId?: string };
+ *   signals: Array<Record<string, unknown>>;
+ * }}
+ */
+export function buildPushedScoredPayload(run, digestRunId, pushedSignals) {
+  const ranAt =
+    typeof run?.ranAt === 'number' && Number.isFinite(run.ranAt) ? run.ranAt : Date.now();
+  const date = String(run?.date ?? '').trim();
+  const pushedRun = { ...run, digestRunId, ranAt, date };
+  return { run: pushedRun, signals: pushedSignals };
+}
+
+/**
+ * @param {Record<string, unknown>} input
+ * @param {string[]} keys
+ */
+function omitKeys(input, keys) {
+  const output = { ...input };
+  for (const key of keys) {
+    delete output[key];
+  }
+  return output;
+}
+
+/**
+ * @param {{ run: Record<string, unknown>; signals: unknown[] }} payload
+ * @returns {{ digestRunId: string; signals: Array<Record<string, unknown>> } | null}
+ */
+export function readRescoreIdentity(payload) {
+  const digestRunId = String(payload.run?.digestRunId ?? '').trim();
+  const validSignals = payload.signals.filter(
+    (signal) => signal && typeof signal === 'object' && !Array.isArray(signal),
+  );
+  const signalIds = validSignals.map((signal) =>
+    String(/** @type {Record<string, unknown>} */ (signal).digestSignalId ?? '').trim(),
+  );
+  const hasAnyIdentity = Boolean(digestRunId) || signalIds.some(Boolean);
+  if (!hasAnyIdentity) {
+    return null;
+  }
+  if (!digestRunId || signalIds.some((id) => !id)) {
+    throw new Error('rescore payload requires digestRunId and digestSignalId on every signal');
+  }
+  return {
+    digestRunId,
+    signals: validSignals.map((signal, index) => ({
+      .../** @type {Record<string, unknown>} */ (signal),
+      digestRunId,
+      digestSignalId: signalIds[index],
+    })),
+  };
+}
+
+export async function persistPushedPayloadArtifact(pushedPayload, env = process.env) {
+  const date = String(pushedPayload?.run?.date ?? '').trim();
+  if (!date) {
+    throw new Error('pushed payload artifact requires run.date');
+  }
+  const operatorHome = await resolveOperatorHome(env);
+  const hermesDir = join(operatorHome, '.hermes');
+  const artifactPath = join(hermesDir, `digest-push-${date}.json`);
+  await mkdir(hermesDir, { recursive: true });
+  await writeFile(artifactPath, `${JSON.stringify(pushedPayload, null, 2)}\n`, 'utf8');
+  return artifactPath;
+}
+
+export async function runPushCliEntityStage(result, env = process.env, options = {}) {
+  if (!result.ok || !result.pushedPayload) {
+    return null;
+  }
+  const persist = options.persistFn ?? persistPushedPayloadArtifact;
+  try {
+    await persist(result.pushedPayload, env);
+  } catch (err) {
+    const reason =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 200)
+        : 'artifact-write-failed';
+    console.error(`push-digest-convex: warning — pushed artifact not updated: ${reason}`);
+  }
+  const analyze =
+    options.analyzeFn ??
+    (await import('./analyze-entity-intelligence.mjs')).runAnalyzeEntityIntelligence;
+  return analyze(result.pushedPayload, env);
+}
+
+/**
  * @param {{
  *   status: 'ok' | 'failed' | 'skipped' | 'error';
  *   digestRunId?: string | null;
  *   signalsWritten?: number;
  *   reason?: string;
  *   expectedCount?: number;
+ *   pushedPayload?: { run: Record<string, unknown>; signals: Array<Record<string, unknown>> } | null;
  * }} input
- * @returns {{ ok: boolean; runId: string | null; signalsWritten: number; error: string | null; exitCode: number }}
+ * @returns {{
+ *   ok: boolean;
+ *   runId: string | null;
+ *   signalsWritten: number;
+ *   error: string | null;
+ *   exitCode: number;
+ *   pushedPayload?: { run: Record<string, unknown>; signals: Array<Record<string, unknown>> } | null;
+ * }}
  */
 export function formatPushResult({
   status,
@@ -97,6 +200,7 @@ export function formatPushResult({
   signalsWritten = 0,
   reason,
   expectedCount = 0,
+  pushedPayload = null,
 }) {
   if (status === 'skipped') {
     return {
@@ -105,6 +209,7 @@ export function formatPushResult({
       signalsWritten: 0,
       error: MISSING_CONVEX_ENV_ERROR,
       exitCode: 0,
+      pushedPayload: null,
     };
   }
 
@@ -115,6 +220,7 @@ export function formatPushResult({
       signalsWritten: 0,
       error: reason === 'invalid-input' ? 'invalid-input' : String(reason ?? 'invalid-input'),
       exitCode: 2,
+      pushedPayload: null,
     };
   }
 
@@ -126,6 +232,7 @@ export function formatPushResult({
       signalsWritten,
       error: ok ? null : `partial-write:${signalsWritten}/${expectedCount}`,
       exitCode: ok ? 0 : 1,
+      pushedPayload: ok ? pushedPayload : null,
     };
   }
 
@@ -135,6 +242,7 @@ export function formatPushResult({
     signalsWritten,
     error: reason ? String(reason).slice(0, 200) : 'unexpected error',
     exitCode: 1,
+    pushedPayload: null,
   };
 }
 
@@ -143,9 +251,10 @@ export function formatPushResult({
  * @param {{ convexUrl: string; convexDeployKey: string }} convexEnv
  * @param {string} path
  * @param {Record<string, unknown>} args
+ * @param {{ signal?: AbortSignal }} [options]
  * @returns {Promise<unknown>}
  */
-async function postMutation(fetchFn, convexEnv, path, args) {
+export async function postConvexMutation(fetchFn, convexEnv, path, args, options = {}) {
   const response = await fetchFn(`${normalizeConvexUrl(convexEnv.convexUrl)}/api/mutation`, {
     method: 'POST',
     headers: {
@@ -153,6 +262,7 @@ async function postMutation(fetchFn, convexEnv, path, args) {
       Authorization: `Convex ${convexEnv.convexDeployKey}`,
     },
     body: JSON.stringify({ path, args, format: 'json' }),
+    signal: options.signal,
   });
 
   const bodyText = await response.text().catch(() => '');
@@ -186,6 +296,7 @@ async function postMutation(fetchFn, convexEnv, path, args) {
  * @param {{
  *   env?: Record<string, string | undefined>;
  *   fetchFn?: typeof fetch;
+ *   timeoutMs?: number;
  * }} [opts]
  */
 export async function pushDigestToConvex(opts = {}) {
@@ -204,48 +315,120 @@ export async function pushDigestToConvex(opts = {}) {
   }
 
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const timeoutSignal = globalThis.AbortSignal.timeout(opts.timeoutMs ?? DIGEST_PUSH_TIMEOUT_MS);
   /** @type {string | null} */
   let digestRunId = null;
   let signalsWritten = 0;
+  let createdNewRun = false;
+  /** @type {Array<Record<string, unknown>>} */
+  const pushedSignals = [];
 
   try {
-    const createdId = await postMutation(fetchFn, convexEnv, CREATE_PATH, {
-      run: { ...payload.run, ranAt: payload.run.ranAt ?? Date.now(), status: 'started' },
-    });
+    const rescoreIdentity = readRescoreIdentity(payload);
+    if (rescoreIdentity) {
+      digestRunId = rescoreIdentity.digestRunId;
+      const run = omitKeys(payload.run, ['digestRunId']);
+      const signals = rescoreIdentity.signals.map((signal) => ({
+        digestSignalId: signal.digestSignalId,
+        signal: {
+          ...omitKeys(signal, ['digestSignalId']),
+          digestRunId,
+        },
+      }));
+      const value = await postConvexMutation(
+        fetchFn,
+        convexEnv,
+        RESCORE_PATH,
+        { id: digestRunId, run, signals },
+        { signal: timeoutSignal },
+      );
+      const updated =
+        value && typeof value === 'object' && 'signalsUpdated' in value
+          ? Number(/** @type {{ signalsUpdated: unknown }} */ (value).signalsUpdated)
+          : Number.NaN;
+      if (!Number.isInteger(updated) || updated !== expectedCount) {
+        throw new Error('rescoreDigestRun returned an unexpected signalsUpdated count');
+      }
+      signalsWritten = updated;
+      return formatPushResult({
+        status: 'ok',
+        digestRunId,
+        signalsWritten,
+        expectedCount,
+        pushedPayload: buildPushedScoredPayload(
+          { ...payload.run, status: 'published' },
+          digestRunId,
+          rescoreIdentity.signals,
+        ),
+      });
+    }
 
-    if (typeof createdId !== 'string' || !createdId) {
+    const ranAt =
+      typeof payload.run.ranAt === 'number' && Number.isFinite(payload.run.ranAt)
+        ? payload.run.ranAt
+        : Date.now();
+    const persistedRun = { ...payload.run, ranAt, status: 'started' };
+    const createdId = await postConvexMutation(
+      fetchFn,
+      convexEnv,
+      CREATE_PATH,
+      { run: persistedRun },
+      { signal: timeoutSignal },
+    );
+
+    if (typeof createdId !== 'string' || !createdId.trim()) {
       throw new Error('createDigestRun did not return an id');
     }
-    digestRunId = createdId;
+    digestRunId = createdId.trim();
+    createdNewRun = true;
 
     for (const signal of payload.signals) {
       if (!signal || typeof signal !== 'object') {
         continue;
       }
-      await postMutation(fetchFn, convexEnv, ADD_PATH, {
-        signal: { ...signal, digestRunId },
-      });
+      const signalId = await postConvexMutation(
+        fetchFn,
+        convexEnv,
+        ADD_PATH,
+        { signal: { ...signal, digestRunId } },
+        { signal: timeoutSignal },
+      );
+      if (typeof signalId !== 'string' || !signalId.trim()) {
+        throw new Error('addDigestSignal did not return an id');
+      }
+      pushedSignals.push({ ...signal, digestRunId, digestSignalId: signalId.trim() });
       signalsWritten += 1;
     }
 
-    await postMutation(fetchFn, convexEnv, FINALIZE_PATH, {
-      id: digestRunId,
-      status: 'published',
-    });
+    await postConvexMutation(
+      fetchFn,
+      convexEnv,
+      FINALIZE_PATH,
+      { id: digestRunId, status: 'published' },
+      { signal: timeoutSignal },
+    );
 
     return formatPushResult({
       status: 'ok',
       digestRunId,
       signalsWritten,
       expectedCount,
+      pushedPayload: buildPushedScoredPayload(
+        { ...persistedRun, status: 'published' },
+        digestRunId,
+        pushedSignals,
+      ),
     });
   } catch (err) {
-    if (digestRunId) {
+    if (digestRunId && createdNewRun) {
       try {
-        await postMutation(fetchFn, convexEnv, FINALIZE_PATH, {
-          id: digestRunId,
-          status: 'failed',
-        });
+        await postConvexMutation(
+          fetchFn,
+          convexEnv,
+          FINALIZE_PATH,
+          { id: digestRunId, status: 'failed' },
+          { signal: timeoutSignal },
+        );
       } catch {
         // Best-effort — primary error already captured below.
       }
@@ -267,11 +450,14 @@ export async function pushDigestToConvex(opts = {}) {
 
 async function main() {
   const result = await pushDigestToConvex();
+  const entityResult = await runPushCliEntityStage(result, process.env);
   console.log(JSON.stringify({
     ok: result.ok,
     runId: result.runId,
     signalsWritten: result.signalsWritten,
     error: result.error,
+    pushedPayload: result.pushedPayload ?? null,
+    entityResult,
   }));
   process.exit(result.exitCode);
 }
@@ -293,6 +479,8 @@ if (isMain) {
       runId: result.runId,
       signalsWritten: result.signalsWritten,
       error: result.error,
+      pushedPayload: null,
+      entityResult: null,
     }));
     process.exit(result.exitCode);
   });

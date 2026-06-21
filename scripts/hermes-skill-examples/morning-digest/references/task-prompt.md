@@ -1182,7 +1182,8 @@ build digest_push_payload (unscored signals)
 1. Let `push_script` = `resolved_repo_root + "/scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs"` (fallback only when repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/push-digest-convex.mjs`).
 2. Ensure `digest_push_payload` is **post-scoring** (scoring stdout replacement completed per steps above).
 3. **MUST** invoke the `terminal(...)` block below — no alternative transport.
-4. Let `push_stdout` / exit code be observability only; fire-and-forget **result** handling unchanged.
+4. Let `push_stdout` / exit code be observability only; the script persists assigned IDs and runs the
+   entity snapshot replacement before returning. Fire-and-forget **result** handling is unchanged.
 5. **Anti-pattern:** Do not push digest entities by any path other than `push-digest-convex.mjs` with `DIGEST_PUSH_JSON`.
 
 ### Terminal invocation (REQUIRED — part 1 of 2 completion gate — do not end the task turn here)
@@ -1208,7 +1209,7 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 **After terminal returns**, emit optional stderr JSON for observability:
 
 ```json
-{"digest_convex_push":{"status":"ok|skipped-env|invalid-input|failed","exit_code":0,"reason":"..."}}
+{"digest_convex_push":{"status":"ok|skipped-env|invalid-input|failed","entity_status":"ok|skipped|failed|not-run","exit_code":0,"reason":"..."}}
 ```
 
 | status | When |
@@ -1218,7 +1219,12 @@ Fallback if repo path missing: `$HOME/.hermes/skills/cns/morning-digest/scripts/
 | `invalid-input` | Exit `0` and stderr indicates missing/invalid `DIGEST_PUSH_JSON` (`run.date` required) |
 | `failed` | Exit `0` but stderr contains `push-digest-convex: warning` |
 
-Always `exit_code: 0`. Do **not** post Discord warnings for digest entity push failures. The graceful exit-0 / no-warning behavior governs only the *outcome* — it does **not** make the push optional. The skill is still incomplete after this call — proceed immediately to §10.
+The push CLI writes its ID-bearing `pushedPayload` back to the recovery artifact and invokes
+transactional entity replacement before returning. `entityResult.status` in stdout is the actionable
+machine result; stderr remains a human-readable warning surface. Always `exit_code: 0`. Do **not** post
+Discord warnings for digest or entity-stage failures. The graceful exit-0 / no-warning behavior governs
+only the *outcome* — it does **not** make the push optional. The skill is still incomplete after this
+call — proceed immediately to §10.
 
 ## Post-post — Push keyword candidates to Convex (REQUIRED — all runs)
 

@@ -237,13 +237,22 @@ export function formatWatchdogLogLine(action, fields) {
  * @param {string} scriptPath
  * @param {Record<string, string | undefined>} env
  * @param {string} digestPushJson
- * @param {(cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number }>} spawnFn
- * @returns {Promise<number>}
+ * @param {(cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number; stdout?: string }>} spawnFn
+ * @returns {Promise<{ exitCode: number; pushResult: Record<string, unknown> | null }>}
  */
 async function spawnPushDigest(scriptPath, env, digestPushJson, spawnFn) {
   const childEnv = { ...env, DIGEST_PUSH_JSON: digestPushJson };
   const result = await spawnFn(process.execPath, [scriptPath], { env: childEnv });
-  return result.exitCode ?? 0;
+  let pushResult = null;
+  try {
+    const parsed = JSON.parse(String(result.stdout ?? '').trim());
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      pushResult = parsed;
+    }
+  } catch {
+    pushResult = null;
+  }
+  return { exitCode: result.exitCode ?? 0, pushResult };
 }
 
 /**
@@ -253,7 +262,7 @@ async function spawnPushDigest(scriptPath, env, digestPushJson, spawnFn) {
  *   operatorHome: string;
  *   log: (action: string, exitCode: number, detail?: string) => Promise<void>;
  *   readFileFn: typeof readFile;
- *   spawnFn: (cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number }>;
+ *   spawnFn: (cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number; stdout?: string }>;
  *   recoveryDetail?: string;
  * }} ctx
  * @returns {Promise<{ action: string; exitCode: number }>}
@@ -278,15 +287,16 @@ async function tryRecoverFromArtifact(ctx) {
 
   const pushScript = resolvePushDigestScriptPath(ctx.env);
   try {
-    const pushExitCode = await spawnPushDigest(
+    const spawned = await spawnPushDigest(
       pushScript,
       ctx.env,
       artifactRaw.trim(),
       ctx.spawnFn,
     );
+    const pushExitCode = spawned.exitCode;
     const action = pushExitCode === 0 ? 'recovered-push' : 'recovered-push-failed';
     await ctx.log(action, pushExitCode, ctx.recoveryDetail);
-    return { action, exitCode: 0 };
+    return { action, exitCode: 0, pushResult: spawned.pushResult };
   } catch (err) {
     const spawnDetail =
       err && typeof err === 'object' && 'message' in err
@@ -303,7 +313,7 @@ async function tryRecoverFromArtifact(ctx) {
  *   env?: Record<string, string | undefined>;
  *   fetchFn?: typeof fetch;
  *   readFileFn?: typeof readFile;
- *   spawnFn?: (cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number }>;
+ *   spawnFn?: (cmd: string, args: string[], opts: { env: Record<string, string | undefined> }) => Promise<{ exitCode: number; stdout?: string }>;
  *   appendFileFn?: typeof appendFile;
  *   mkdirFn?: typeof mkdir;
  *   todayDate?: string;
@@ -340,12 +350,17 @@ export async function runPushDigestWatchdog(opts = {}) {
     opts.spawnFn ??
     ((cmd, args, spawnOpts) =>
       new Promise((resolve, reject) => {
+        let stdout = '';
         const child = spawn(cmd, args, {
           env: spawnOpts.env,
-          stdio: ['ignore', 'ignore', 'pipe'],
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        child.stdout?.setEncoding('utf8');
+        child.stdout?.on('data', (chunk) => {
+          stdout += String(chunk);
         });
         child.on('error', reject);
-        child.on('close', (code) => resolve({ exitCode: code ?? 0 }));
+        child.on('close', (code) => resolve({ exitCode: code ?? 0, stdout }));
       }));
 
   const recoveryCtx = {
