@@ -1,6 +1,8 @@
 # Story 73.5: Get Entity Intelligence Query
 
-Status: ready-for-dev
+Status: done
+
+baseline_commit: 6dfc4244061e3a9ee70f58abb0274ec33d6e1f1a
 
 **Epic:** 73 — Nexus Entity Intelligence  
 **Repo boundary:** **cns-dashboard only** (Convex query, constants, validators, tests). No Omnipotent.md changes.  
@@ -107,32 +109,32 @@ so that the dashboard and morning digest share identical lane logic, thresholds 
 
 ### Prerequisite gate
 
-- [ ] **T0 — Dependency check**
-  - [ ] T0.1 Confirm 73-1: `entityMentions` table + validators exist
-  - [ ] T0.2 Seed test data via `recordEntityMentions` in convex-test
+- [x] **T0 — Dependency check**
+  - [x] T0.1 Confirm 73-1: `entityMentions` table + validators exist
+  - [x] T0.2 Seed test data via `recordEntityMentions` in convex-test
 
 ### Constants + validators
 
-- [ ] **T1 — `constants.ts`** (AC: 1)
-  - [ ] T1.1 Add ENTITY_* constants block with `[TUNABLE v1]` comment
+- [x] **T1 — `constants.ts`** (AC: 1)
+  - [x] T1.1 Add ENTITY_* constants block with `[TUNABLE v1]` comment
 
-- [ ] **T2 — Validators** (AC: 2)
-  - [ ] T2.1 `entityReasonValidator`, `entityLaneItemValidator`, `entityIntelligenceResultValidator`
+- [x] **T2 — Validators** (AC: 2)
+  - [x] T2.1 `entityReasonValidator`, `entityLaneItemValidator`, `entityIntelligenceResultValidator`
 
 ### Query implementation
 
-- [ ] **T3 — Lane logic** (AC: 3, 4)
-  - [ ] T3.1 Consider `convex/lib/entity_intelligence.ts` for pure grouping helpers (thin query wrapper)
-  - [ ] T3.2 `getEntityIntelligence` in `entityIntelligence.ts`
-  - [ ] T3.3 `computeBaselineDailyRate`, `computeActiveMetrics`, `buildReasons`, `formatMomentumSummary`
-  - [ ] T3.4 `focusKeyword` theme overlap — reuse `normalizeDigestKeyword` / `keywordsMatch` pattern from `digest.ts` if run-level keyword needed (read `digestRuns` for focusKeyword by ranAt in window OR persist on snapshots — prefer snapshot `maxPersonalRelevance` + optional run join only if required by ADR-E73-004)
+- [x] **T3 — Lane logic** (AC: 3, 4)
+  - [x] T3.1 Consider `convex/lib/entity_intelligence.ts` for pure grouping helpers (thin query wrapper)
+  - [x] T3.2 `getEntityIntelligence` in `entityIntelligence.ts`
+  - [x] T3.3 `computeBaselineDailyRate`, `computeActiveMetrics`, `buildReasons`, `formatMomentumSummary`
+  - [x] T3.4 `focusKeyword` theme overlap — reuse `normalizeDigestKeyword` / `keywordsMatch` pattern from `digest.ts` if run-level keyword needed (read `digestRuns` for focusKeyword by ranAt in window OR persist on snapshots — prefer snapshot `maxPersonalRelevance` + optional run join only if required by ADR-E73-004)
 
 ### Tests
 
-- [ ] **T4 — Convex tests** (AC: 5)
-  - [ ] T4.1 Fixture rows inserted at controlled `ranAt` offsets from `now` arg
-  - [ ] T4.2 Extend `tests/convex/entityIntelligence.test.ts`
-  - [ ] T4.3 `bash scripts/verify.sh`
+- [x] **T4 — Convex tests** (AC: 5)
+  - [x] T4.1 Fixture rows inserted at controlled `ranAt` offsets from `now` arg
+  - [x] T4.2 Extend `tests/convex/entityIntelligence.test.ts`
+  - [x] T4.3 `bash scripts/verify.sh`
 
 ## Dev Notes
 
@@ -211,8 +213,49 @@ cns-dashboard/tests/convex/entityIntelligence.test.ts (extended)
 
 ### Agent Model Used
 
+Claude Sonnet 4.6
+
 ### Debug Log References
+
+- Implemented pure lane math in `convex/lib/entity_intelligence.ts`; thin `getEntityIntelligence` query wrapper reads `by_ranAt` index only.
+- Theme adjacency uses persisted `maxPersonalRelevance` on snapshots per ADR-E73-004 — no LLM, no `digestRuns` join, no free-text matching.
+- Tracked lane does not exclude already-tracked entities; acceleration vs baseline is the gate per PRD correction.
 
 ### Completion Notes List
 
+- Added `[TUNABLE v1]` ENTITY_* thresholds to `constants.ts` (ADR-E73-006).
+- Exported lane validators (`entityReasonValidator`, `entityLaneItemValidator`, `entityIntelligenceResultValidator`) reusing `entityMentionSignalRefValidator`.
+- Shipped `getEntityIntelligence({ now, workspaceId? })` with required client `now`, two-lane detection (tracked acceleration + emerging cold-start/low-baseline), reasons, momentum summaries, ranking, and `ENTITY_LANE_MAX_ITEMS` slice.
+- Extended convex tests: tracked acceleration, cold-start, low-baseline, theme_adjacent, co_mentioned, MIN_ACTIVE edge, lane slice, deterministic `now`.
+- `bash scripts/verify.sh` passes (Omnipotent.md + cns-dashboard).
+
 ### File List
+
+- cns-dashboard/convex/constants.ts (modified)
+- cns-dashboard/convex/validators.ts (modified)
+- cns-dashboard/convex/entityIntelligence.ts (modified)
+- cns-dashboard/convex/lib/entity_intelligence.ts (new)
+- cns-dashboard/tests/convex/entityIntelligence.test.ts (modified)
+
+### Change Log
+
+- 2026-06-21: Story 73-5 — `getEntityIntelligence` derived query, tunable thresholds, lane validators, lane math tests (cns-dashboard only).
+- 2026-06-21: Code review — ADR-E73-004 v1 scope amendment; distinct-signal union fix; 6 test patches applied.
+
+### Review Findings
+
+- [x] [Review][Decision] ADR-E73-004 `focusKeyword` path omitted from `theme_adjacent` — **Resolved:** amended ADR-E73-004 with v1 scope note (personalRelevance-only on read path; focusKeyword deferred to v1.1).
+
+- [x] [Review][Patch] Cold-start `activeDistinctSignals` sums per-run counts instead of unioning signal IDs [`cns-dashboard/convex/lib/entity_intelligence.ts:94`]
+
+- [x] [Review][Patch] No round-trip test from 73-3 `buildEntityMentionPayload()` through `getEntityIntelligence` [`cns-dashboard/tests/convex/entityIntelligence.test.ts`]
+
+- [x] [Review][Patch] Weak validator shape assertion [`cns-dashboard/tests/convex/entityIntelligence.test.ts:328`]
+
+- [x] [Review][Patch] Missing negative test for required `now` arg [`cns-dashboard/convex/entityIntelligence.ts:157`]
+
+- [x] [Review][Patch] No test for `high_priority_source` reason [`cns-dashboard/convex/lib/entity_intelligence.ts:219`]
+
+- [x] [Review][Patch] No test for optional `workspaceId` filter [`cns-dashboard/convex/lib/entity_intelligence.ts:337`]
+
+- [x] [Review][Defer] `ENTITY_HIGH_PRIORITY_RANK_SCORE = 70` is a 9th constant outside ADR-E73-006 eight-row table [`cns-dashboard/convex/constants.ts:25`] — deferred, acceptable v1 companion threshold centralized in constants.ts

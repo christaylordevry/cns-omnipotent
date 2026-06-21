@@ -234,6 +234,13 @@ new scoring, no free text:
 - **Entity adjacency** (co-mentioned with tracked entities) := within the same run, the entity's signals
   co-occur with at least one **tracked** entity (a signal carrying `peopleMatch`). Recorded as
   `coMentionedTrackedEntities[]` on the snapshot.
+
+**v1 implementation scope [TUNABLE v1, 2026-06-21]:** Story 73-5 read path emits `theme_adjacent` from
+persisted snapshot `maxPersonalRelevance` only (no `digestRuns` join, no title-token matching on query).
+Run-level `focusKeyword` overlap remains normative for full ADR-E73-004 compliance and is **deferred to
+v1.1** — either via read-path join to `digestRuns.focusKeyword` or a write-path persisted flag on
+snapshots (73-3/73-4 extension). `co_mentioned` uses `coMentionedTrackedEntities[]` in v1.
+
 **Consequences:**
 - The snapshot persists `maxPersonalRelevance` and `coMentionedTrackedEntities` so the read path emits
   this as an intelligible reason without recomputation.

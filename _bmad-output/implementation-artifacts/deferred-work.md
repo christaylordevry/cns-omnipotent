@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 73-5-get-entity-intelligence-query (2026-06-21)
+
+- **`ENTITY_HIGH_PRIORITY_RANK_SCORE = 70` is a 9th constant outside ADR-E73-006 eight-row table** — acceptable v1 companion threshold; centralized in `constants.ts`; amend ADR table if operator wants spec parity.
+
+---
+
 ## Deferred from: code review of 72-7-threads-scrapecreators-adapter (2026-06-20)
 
 - **`DEFAULT_THREADS_HANDLES` exported but unused** — AC3 intentionally requires `missing-handles` when env unset; example file documents operator copy workflow instead of code defaults.
