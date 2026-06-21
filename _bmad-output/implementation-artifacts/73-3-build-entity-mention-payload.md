@@ -1,6 +1,10 @@
+---
+baseline_commit: 24d9042d7bedc7ac7182d415627024768eb95191
+---
+
 # Story 73.3: Build Entity Mention Payload
 
-Status: ready-for-dev
+Status: done
 
 **Epic:** 73 — Nexus Entity Intelligence  
 **Repo boundary:** **Omnipotent.md only** (canonical payload builder + round-trip test). No cns-dashboard code changes unless validator drift requires sync with 73-1.  
@@ -92,20 +96,27 @@ so that every `entityMentions` field round-trips through the real Convex validat
 
 ### Prerequisite gate
 
-- [ ] **T0 — Dependency check**
-  - [ ] T0.1 Confirm 73-1 merged: `entityMentionInputValidator` exists in cns-dashboard
-  - [ ] T0.2 Confirm 73-2 merged: `extract-entities.mjs` exports `aggregateRunEntities`
+- [x] **T0 — Dependency check**
+  - [x] T0.1 Confirm 73-1 merged: `entityMentionInputValidator` exists in cns-dashboard
+  - [x] T0.2 Confirm 73-2 merged: `extract-entities.mjs` exports `aggregateRunEntities`
 
-- [ ] **T1 — Builder module** (AC: 1, 3)
-  - [ ] T1.1 `buildEntityMentionPayload(run, signals)`
-  - [ ] T1.2 Map aggregates → validator row shape per §3.1
-  - [ ] T1.3 `buildCanonicalEntityMentionFixture()` for shared test anchor
+- [x] **T1 — Builder module** (AC: 1, 3)
+  - [x] T1.1 `buildEntityMentionPayload(run, signals)`
+  - [x] T1.2 Map aggregates → validator row shape per §3.1
+  - [x] T1.3 `buildCanonicalEntityMentionFixture()` for shared test anchor
 
-- [ ] **T2 — Tests** (AC: 2, 4, 5)
-  - [ ] T2.1 `tests/morning-digest-entity-mention-payload.test.mjs`
-  - [ ] T2.2 Mirror `tests/morning-digest-build-payload.test.mjs` structure
-  - [ ] T2.3 Optional: `tests/fixtures/entity-mention.fixture.mjs` for canonical row
-  - [ ] T2.4 `bash scripts/verify.sh`
+- [x] **T2 — Tests** (AC: 2, 4, 5)
+  - [x] T2.1 `tests/morning-digest-entity-mention-payload.test.mjs`
+  - [x] T2.2 Mirror `tests/morning-digest-build-payload.test.mjs` structure
+  - [x] T2.3 Optional: `tests/fixtures/entity-mention.fixture.mjs` for canonical row
+  - [x] T2.4 `bash scripts/verify.sh`
+
+### Review Findings
+
+- [x] [Review][Decision] Decide whether 73-3 must enforce post-push pipeline ordering in code now — resolved by operator decision: leave pipeline ordering enforcement to 73-4, which explicitly owns wiring into `run-digest-convex-completion.mjs`; 73-3 remains scoped to being correct when called with post-push signals.
+- [x] [Review][Patch] Bridge does not exercise Convex field-schema validation [scripts/lib/entity-mention-validator-bridge.mjs:31]
+- [x] [Review][Patch] Add explicit fail-closed tests for bridge process failures [tests/morning-digest-entity-mention-payload.test.mjs:235]
+- [x] [Review][Patch] Preflight all `digestSignalId` values before aggregation for mixed batches [scripts/hermes-skill-examples/morning-digest/scripts/build-entity-mention-payload.mjs:189]
 
 ## Dev Notes
 
@@ -171,8 +182,29 @@ tests/fixtures/entity-mention.fixture.mjs  (optional)
 
 ### Agent Model Used
 
+Composer
+
 ### Debug Log References
+
+- Hermes skill parity gate required syncing `build-entity-mention-payload.mjs` to `~/.hermes/skills/cns/morning-digest/scripts/` before verify passed.
 
 ### Completion Notes List
 
+- Added `build-entity-mention-payload.mjs` with `buildEntityMentionPayload(run, signals)`, `buildCanonicalEntityMentionFixture()`, `assertEntityMentionPayloadRow()`, and `resolveWorkspaceId()`.
+- Builder calls `aggregateRunEntities(signals)` only after validating run metadata; empty signals short-circuit without aggregation. Pre-push signals fail via 73-2 `getSignalRefId` guard.
+- Post-push pipeline ordering (ADR-E73-001, §4.3): orchestrator 73-4 must invoke builder **after** `createDigestRun` + per-signal `addDigestSignal` assign `digestSignalId` to each pushed signal.
+- Validator round-trip: Node tests use `assertEntityMentionRowViaDashboard` (npx tsx → real `cns-dashboard/convex/entityIntelligence.ts`); Convex field validation remains in 73-1 `entityIntelligence.test.ts`.
+- Canonical fixture discipline: `tests/fixtures/entity-mention.fixture.mjs` round-trips through real `buildEntityMentionPayload()` — not hand-rolled doubles.
+- `bash scripts/verify.sh` passes (Omnipotent.md + cns-dashboard).
+
 ### File List
+
+- `scripts/hermes-skill-examples/morning-digest/scripts/build-entity-mention-payload.mjs` (new)
+- `scripts/lib/entity-mention-validator-bridge.mjs` (new)
+- `tests/morning-digest-entity-mention-payload.test.mjs` (new)
+- `tests/fixtures/entity-mention.fixture.mjs` (new)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+
+### Change Log
+
+- 2026-06-21: Story 73-3 — entity mention payload builder, canonical fixture, round-trip tests, validator bridge.
