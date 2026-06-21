@@ -106,6 +106,7 @@ so that entity baselines accrue after each digest without failing the digest, wi
 
 ### Review Findings
 
+- [x] [Review][Patch][Production Regression] Natural-cron then later `--force-rescore` discovers and reuses the published run and complete signal ID set; artifact identity loss fails visibly instead of creating a second run.
 - [x] [Review][Patch] Force-rescore reuses the existing `digestRunId` and complete `digestSignalId` set; partial replay identity fails closed.
 - [x] [Review][Patch] Clear and write now execute inside one Convex `replaceEntityMentionsForRun` transaction, so validation or insertion failure rolls back the replacement.
 - [x] [Review][Patch] Zero-mention runs invoke transactional replacement with an empty set, clearing stale snapshots unconditionally.
@@ -201,6 +202,9 @@ Composer (Cursor)
 
 - push-digest-convex now requires addDigestSignal to return ids; updated push test mocks accordingly
 - Hermes skill parity: synced analyze-entity-intelligence.mjs + push-digest-convex.mjs to ~/.hermes/skills/cns/morning-digest
+- Production regression root cause: the 07:01 artifact predated the 20:49 Story 73-4 deployment and contained no Convex IDs; explicit force mode was not propagated, so the 20:52 replay took `createDigestRun` and then overwrote the artifact with the duplicate IDs.
+- Live proof: two post-fix force-rescores both retained canonical run `md7a9psjv983b21qvgnrdavx4d890y72` with all 85 original signal IDs; immediate recent-run queries created no third run.
+- Production cleanup: exact-ID guarded repair removed duplicate `md7fwn48y8esn64dc5thwahwh5892qc6`, 85 duplicate signals, and 27 duplicate entity mentions; the temporary repair mutation was removed from production immediately afterward.
 
 ### Completion Notes List
 
@@ -211,6 +215,7 @@ Composer (Cursor)
 - Added bounded push/entity timeouts and rejection containment so degraded entity analysis cannot block Discord.
 - Added full-path ordering, repeated-id idempotency, empty-set clearing, transactional rollback, watchdog, outcome, and validation tests.
 - Synced the live Hermes skill mirror and passed `bash scripts/verify.sh` across Omnipotent.md and cns-dashboard.
+- Explicit force mode now propagates through completion, hydrates legacy artifacts by indexed `date + ranAt` lookup and exact `sourceType + externalId` matching, and fails closed before `createDigestRun` on missing or ambiguous identity.
 
 ### File List
 
@@ -228,6 +233,7 @@ Composer (Cursor)
 - tests/push-digest-watchdog.test.mjs (modified)
 - tests/run-digest-convex-completion.test.mjs (modified)
 - ../cns-dashboard/convex/digest.ts (modified)
+- ../cns-dashboard/convex/schema.ts (modified)
 - ../cns-dashboard/convex/entityIntelligence.ts (modified)
 - ../cns-dashboard/tests/convex/digest.test.ts (modified)
 - ../cns-dashboard/tests/convex/entityIntelligence.test.ts (modified)
@@ -237,3 +243,40 @@ Composer (Cursor)
 
 - 2026-06-21: Story 73-4 — post-push entity intelligence orchestrator + completion pipeline wiring (push → analyze → Discord)
 - 2026-06-21: Review closeout — identity-preserving force-rescore, atomic replacement, recovery wiring, structured observability, timeout and full-path regression coverage
+- 2026-06-21: Reopened after live production verification found natural-cron then force-rescore created a duplicate digest run instead of reusing persisted identity.
+- 2026-06-21: Regression closed with explicit force-mode propagation, legacy artifact identity hydration, two-run live production proof, and exact duplicate cleanup.
+
+## Suggested Review Order
+
+**Force-rescore control flow**
+
+- Start here: explicit force intent reaches the push boundary without ambiguity.
+  [`run-digest-convex-completion.mjs:452`](../../scripts/run-digest-convex-completion.mjs#L452)
+
+- The artifact replay path marks only true force-rescores as identity-preserving.
+  [`run-digest-convex-completion.mjs:797`](../../scripts/run-digest-convex-completion.mjs#L797)
+
+**Identity recovery and fail-closed behavior**
+
+- Stable signal matching requires source type plus canonical external ID.
+  [`push-digest-convex.mjs:149`](../../scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs#L149)
+
+- Explicit force mode hydrates legacy identity before any create-run branch.
+  [`push-digest-convex.mjs:390`](../../scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs#L390)
+
+- Convex resolves one published run and its complete signal identity set.
+  [`digest.ts:263`](../../../cns-dashboard/convex/digest.ts#L263)
+
+- Compound indexing makes exact date and timestamp recovery bounded.
+  [`schema.ts:70`](../../../cns-dashboard/convex/schema.ts#L70)
+
+**Regression coverage**
+
+- Node tests prove legacy hydration, no create fallback, and missing-ID rejection.
+  [`analyze-entity-intelligence.test.mjs:251`](../../tests/analyze-entity-intelligence.test.mjs#L251)
+
+- Completion tests prove the force flag reaches injected and real push boundaries.
+  [`run-digest-convex-completion.test.mjs:436`](../../tests/run-digest-convex-completion.test.mjs#L436)
+
+- Convex tests prove unique lookup success and duplicate ambiguity rejection.
+  [`digest.test.ts:1030`](../../../cns-dashboard/tests/convex/digest.test.ts#L1030)

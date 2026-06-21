@@ -476,10 +476,13 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
       },
       todayDate: '2026-06-11',
       forceRescore: true,
-      pushFn: async (payload) => ({
-        ok: true,
-        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
-      }),
+      pushFn: async (payload, _env, pushOptions) => {
+        assert.equal(pushOptions.forceRescore, true);
+        return {
+          ok: true,
+          signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+        };
+      },
       watchdogFn: async () => {
         watchdogCalled = true;
         return { action: 'skipped-already-pushed', exitCode: 0 };

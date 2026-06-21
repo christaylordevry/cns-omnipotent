@@ -248,6 +248,121 @@ describe('analyze-entity-intelligence.mjs (Story 73-4)', () => {
     assert.equal('digestRunId' in calls[0].args.run, false);
   });
 
+  it('force-rescore hydrates legacy artifact identity before mutating', async () => {
+    const calls = [];
+    const payload = {
+      run: { date: '2026-06-11', ranAt: 1_749_657_600_000 },
+      signals: [
+        {
+          section: 'twitter',
+          sourceType: 'twitter',
+          title: 'Existing signal',
+          externalId: 'tweet-1',
+          rank: 1,
+          rankScore: 88,
+        },
+      ],
+    };
+
+    const result = await pushDigestToConvex({
+      env: {
+        DIGEST_PUSH_JSON: JSON.stringify(payload),
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'key',
+      },
+      forceRescore: true,
+      fetchFn: async (url, init) => {
+        const body = JSON.parse(String(init?.body));
+        calls.push({ url: String(url), ...body });
+        if (body.path === 'digest:getDigestRescoreIdentity') {
+          return mockResponse(200, JSON.stringify({
+            status: 'success',
+            value: {
+              digestRunId: 'digestRuns:existing-run',
+              signals: [
+                {
+                  digestSignalId: 'digestSignals:existing-signal',
+                  sourceType: 'twitter',
+                  title: 'Existing signal',
+                  externalId: 'tweet-1',
+                },
+              ],
+            },
+          }));
+        }
+        return mockResponse(200, JSON.stringify({
+          status: 'success',
+          value: { signalsUpdated: 1 },
+        }));
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.runId, 'digestRuns:existing-run');
+    assert.equal(calls[0].url.endsWith('/api/query'), true);
+    assert.deepEqual(calls[0].args, { date: '2026-06-11', ranAt: 1_749_657_600_000 });
+    assert.equal(calls[1].path, 'digest:rescoreDigestRun');
+    assert.equal(calls[1].args.signals[0].digestSignalId, 'digestSignals:existing-signal');
+    assert.equal(calls.some((call) => call.path === 'digest:createDigestRun'), false);
+  });
+
+  it('force-rescore fails closed when legacy artifact identity cannot be recovered', async () => {
+    const calls = [];
+    const result = await pushDigestToConvex({
+      env: {
+        DIGEST_PUSH_JSON: JSON.stringify({
+          run: { date: '2026-06-11', ranAt: 100 },
+          signals: [{ section: 'twitter', sourceType: 'twitter', title: 'Missing run', rank: 1 }],
+        }),
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'key',
+      },
+      forceRescore: true,
+      fetchFn: async (_url, init) => {
+        calls.push(JSON.parse(String(init?.body)));
+        return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /could not find the existing digest run/);
+    assert.deepEqual(calls.map((call) => call.path), ['digest:getDigestRescoreIdentity']);
+  });
+
+  it('force-rescore fails closed when legacy signals lack stable external IDs', async () => {
+    const calls = [];
+    const result = await pushDigestToConvex({
+      env: {
+        DIGEST_PUSH_JSON: JSON.stringify({
+          run: { date: '2026-06-11', ranAt: 100 },
+          signals: [{ section: 'twitter', sourceType: 'twitter', title: 'Mutable title', rank: 1 }],
+        }),
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'key',
+      },
+      forceRescore: true,
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        calls.push(body);
+        return mockResponse(200, JSON.stringify({
+          status: 'success',
+          value: {
+            digestRunId: 'digestRuns:existing-run',
+            signals: [{
+              digestSignalId: 'digestSignals:existing-signal',
+              sourceType: 'twitter',
+              externalId: 'tweet-1',
+            }],
+          },
+        }));
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /requires sourceType and externalId/);
+    assert.deepEqual(calls.map((call) => call.path), ['digest:getDigestRescoreIdentity']);
+  });
+
   it('pushDigestToConvex rejects partial rescore identity instead of creating duplicates', async () => {
     let fetchCalled = false;
     const result = await pushDigestToConvex({

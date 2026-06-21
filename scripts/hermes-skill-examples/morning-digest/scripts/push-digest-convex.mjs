@@ -20,6 +20,7 @@ const CREATE_PATH = 'digest:createDigestRun';
 const ADD_PATH = 'digest:addDigestSignal';
 const FINALIZE_PATH = 'digest:finalizeDigestRun';
 const RESCORE_PATH = 'digest:rescoreDigestRun';
+const RESCORE_IDENTITY_PATH = 'digest:getDigestRescoreIdentity';
 export const DIGEST_PUSH_TIMEOUT_MS = 45_000;
 
 /**
@@ -82,7 +83,9 @@ export function countValidSignals(signals) {
   if (!Array.isArray(signals)) {
     return 0;
   }
-  return signals.filter((signal) => signal && typeof signal === 'object').length;
+  return signals.filter(
+    (signal) => signal && typeof signal === 'object' && !Array.isArray(signal),
+  ).length;
 }
 
 /**
@@ -141,6 +144,57 @@ export function readRescoreIdentity(payload) {
       digestSignalId: signalIds[index],
     })),
   };
+}
+
+function signalIdentityKey(signal) {
+  const sourceType = String(signal.sourceType ?? '').trim();
+  const externalId = String(signal.externalId ?? '').trim();
+  if (!sourceType || !externalId) {
+    throw new Error('rescore identity requires sourceType and externalId');
+  }
+  return `${sourceType}\u0000${externalId}`;
+}
+
+export function hydrateRescoreIdentity(payload, storedIdentity) {
+  if (!storedIdentity || typeof storedIdentity !== 'object' || Array.isArray(storedIdentity)) {
+    throw new Error('force-rescore could not find the existing digest run');
+  }
+  const digestRunId = String(storedIdentity.digestRunId ?? '').trim();
+  const storedSignals = Array.isArray(storedIdentity.signals) ? storedIdentity.signals : [];
+  if (!digestRunId || storedSignals.length !== countValidSignals(payload.signals)) {
+    throw new Error('force-rescore identity does not match the artifact signal set');
+  }
+
+  const idsByKey = new Map();
+  for (const storedSignal of storedSignals) {
+    if (!storedSignal || typeof storedSignal !== 'object' || Array.isArray(storedSignal)) {
+      throw new Error('force-rescore identity contains an invalid signal');
+    }
+    const key = signalIdentityKey(storedSignal);
+    const digestSignalId = String(storedSignal.digestSignalId ?? '').trim();
+    if (!digestSignalId || idsByKey.has(key)) {
+      throw new Error('force-rescore identity signal keys are incomplete or ambiguous');
+    }
+    idsByKey.set(key, digestSignalId);
+  }
+
+  const seenKeys = new Set();
+  const signals = payload.signals
+    .filter((signal) => signal && typeof signal === 'object' && !Array.isArray(signal))
+    .map((signal) => {
+      const key = signalIdentityKey(signal);
+      const digestSignalId = idsByKey.get(key);
+      if (!digestSignalId || seenKeys.has(key)) {
+        throw new Error('force-rescore artifact signals do not uniquely match the existing run');
+      }
+      seenKeys.add(key);
+      return { ...signal, digestRunId, digestSignalId };
+    });
+
+  if (seenKeys.size !== idsByKey.size) {
+    throw new Error('force-rescore identity contains signals absent from the artifact');
+  }
+  return { digestRunId, signals };
 }
 
 export async function persistPushedPayloadArtifact(pushedPayload, env = process.env) {
@@ -292,11 +346,45 @@ export async function postConvexMutation(fetchFn, convexEnv, path, args, options
   return payload;
 }
 
+export async function postConvexQuery(fetchFn, convexEnv, path, args, options = {}) {
+  const response = await fetchFn(`${normalizeConvexUrl(convexEnv.convexUrl)}/api/query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Convex ${convexEnv.convexDeployKey}`,
+    },
+    body: JSON.stringify({ path, args, format: 'json' }),
+    signal: options.signal,
+  });
+
+  const bodyText = await response.text().catch(() => '');
+  if (!response.ok) {
+    throw new Error(`Convex HTTP ${response.status}: ${bodyText.slice(0, 200)}`);
+  }
+  let responsePayload;
+  try {
+    responsePayload = bodyText ? JSON.parse(bodyText) : {};
+  } catch {
+    throw new Error('Convex query response was not valid JSON');
+  }
+  if (responsePayload?.status === 'error') {
+    throw new Error(responsePayload.errorMessage ?? 'Convex query failed');
+  }
+  if (responsePayload?.status && responsePayload.status !== 'success') {
+    throw new Error('Convex query returned unexpected status');
+  }
+  if (responsePayload && typeof responsePayload === 'object' && 'status' in responsePayload) {
+    return responsePayload.value;
+  }
+  return responsePayload;
+}
+
 /**
  * @param {{
  *   env?: Record<string, string | undefined>;
  *   fetchFn?: typeof fetch;
  *   timeoutMs?: number;
+ *   forceRescore?: boolean;
  * }} [opts]
  */
 export async function pushDigestToConvex(opts = {}) {
@@ -324,7 +412,24 @@ export async function pushDigestToConvex(opts = {}) {
   const pushedSignals = [];
 
   try {
-    const rescoreIdentity = readRescoreIdentity(payload);
+    let rescoreIdentity = readRescoreIdentity(payload);
+    if (opts.forceRescore && !rescoreIdentity) {
+      const ranAt = payload.run.ranAt;
+      if (typeof ranAt !== 'number' || !Number.isFinite(ranAt)) {
+        throw new Error('force-rescore artifact requires its original run.ranAt');
+      }
+      const storedIdentity = await postConvexQuery(
+        fetchFn,
+        convexEnv,
+        RESCORE_IDENTITY_PATH,
+        { date: String(payload.run.date), ranAt },
+        { signal: timeoutSignal },
+      );
+      rescoreIdentity = hydrateRescoreIdentity(payload, storedIdentity);
+    }
+    if (opts.forceRescore && !rescoreIdentity) {
+      throw new Error('force-rescore requires existing run and signal identity');
+    }
     if (rescoreIdentity) {
       digestRunId = rescoreIdentity.digestRunId;
       const run = omitKeys(payload.run, ['digestRunId']);

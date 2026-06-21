@@ -437,7 +437,7 @@ async function persistPushedPayloadArtifact(pushResult, env, log) {
 /**
  * @param {Record<string, unknown>} payload
  * @param {Record<string, string | undefined>} env
- * @param {{ fetchFn?: typeof fetch }} [opts]
+ * @param {{ fetchFn?: typeof fetch; forceRescore?: boolean }} [opts]
  * @returns {Promise<{
  *   ok: boolean;
  *   runId?: string | null;
@@ -457,7 +457,11 @@ export async function pushPayload(payload, env, opts = {}) {
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
 
   try {
-    const result = await pushDigestToConvex({ env: childEnv, fetchFn });
+    const result = await pushDigestToConvex({
+      env: childEnv,
+      fetchFn,
+      forceRescore: opts.forceRescore ?? false,
+    });
     const parsed = {
       ok: result.ok,
       runId: result.runId,
@@ -540,6 +544,7 @@ function attachSourceOutcomes(payload, adapterResults) {
  * @param {typeof runAnalyzeEntityIntelligence} [analyzeFn]
  * @param {typeof fetch} [fetchFn]
  * @param {typeof postDigestToDiscord} [postDigestFn]
+ * @param {boolean} [forceRescore]
  * @returns {Promise<{ action: string; exitCode: number }>}
  */
 async function scoreWriteAndPush(
@@ -554,6 +559,7 @@ async function scoreWriteAndPush(
   analyzeFn,
   fetchFn,
   postDigestFn,
+  forceRescore = false,
 ) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
   try {
@@ -585,7 +591,7 @@ async function scoreWriteAndPush(
   const expectedCount = expectedSignalCount(payload);
   try {
     const pushResult = normalizePushResult(
-      await doPush(payload, env),
+      await doPush(payload, env, { forceRescore }),
       expectedCount,
     );
     if (!pushResult.ok) {
@@ -816,6 +822,7 @@ async function tryRescoreFromArtifact(ctx) {
     ctx.analyzeFn,
     ctx.fetchFn,
     ctx.postDigestFn,
+    true,
   );
 }
 
