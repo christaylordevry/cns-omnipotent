@@ -1,6 +1,10 @@
+---
+baseline_commit: 714fb14705bf95f9ab8e5e3bf78325b63782f1fc
+---
+
 # Story 73.2: Extract Entities Pure Functions
 
-Status: ready-for-dev
+Status: done
 
 **Epic:** 73 — Nexus Entity Intelligence  
 **Repo boundary:** **Omnipotent.md only** (Node pure functions + unit tests). No cns-dashboard changes.  
@@ -97,21 +101,28 @@ so that person/account/org keys are computed once in Node with no NLP, no Convex
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — `extract-entities.mjs`** (AC: 1, 2)
-  - [ ] T1.1 `normalizeEntityName(text)` — trim, lowercase, collapse whitespace
-  - [ ] T1.2 `normalizeEntityKey(entityType, platform, raw)` per ADR-E73-003 table
-  - [ ] T1.3 `extractEntitiesFromSignal(signal)` — four branches + multi-emit
-  - [ ] T1.4 GitHub URL regex: `github.com/<owner>/<repo>` owner segment only for org key
+- [x] **T1 — `extract-entities.mjs`** (AC: 1, 2)
+  - [x] T1.1 `normalizeEntityName(text)` — trim, lowercase, collapse whitespace
+  - [x] T1.2 `normalizeEntityKey(entityType, platform, raw)` per ADR-E73-003 table
+  - [x] T1.3 `extractEntitiesFromSignal(signal)` — four branches + multi-emit
+  - [x] T1.4 GitHub URL regex: `github.com/<owner>/<repo>` owner segment only for org key
 
-- [ ] **T2 — Aggregation** (AC: 3)
-  - [ ] T2.1 `aggregateRunEntities(signals)` — group by entityKey
-  - [ ] T2.2 `pickTopSignalRefs(signals, limit=5)` by rankScore
-  - [ ] T2.3 `collectCoMentionedTracked(signals, entityKey)` for run-level co-mentions
+- [x] **T2 — Aggregation** (AC: 3)
+  - [x] T2.1 `aggregateRunEntities(signals)` — group by entityKey
+  - [x] T2.2 `pickTopSignalRefs(signals, limit=5)` by rankScore
+  - [x] T2.3 `collectCoMentionedTracked(signals, entityKey)` for run-level co-mentions
 
-- [ ] **T3 — Tests** (AC: 4, 5)
-  - [ ] T3.1 `tests/morning-digest-extract-entities.test.mjs`
-  - [ ] T3.2 Fixture signals mirroring `build-digest-push-payload` output shape (use existing test fixtures where possible)
-  - [ ] T3.3 `bash scripts/verify.sh`
+- [x] **T3 — Tests** (AC: 4, 5)
+  - [x] T3.1 `tests/morning-digest-extract-entities.test.mjs`
+  - [x] T3.2 Fixture signals mirroring `build-digest-push-payload` output shape (use existing test fixtures where possible)
+  - [x] T3.3 `bash scripts/verify.sh`
+
+### Review Findings
+
+- [x] [Review][Patch] Parse GitHub repository URLs by exact hostname and valid repository path; add malformed, partial, foreign-host, and `/orgs/` rejection fixtures [scripts/hermes-skill-examples/morning-digest/scripts/extract-entities.mjs:49]
+- [x] [Review][Patch] Require Convex-assigned `digestSignalId` for aggregation identity and every `signalRef`; deduplicate capped evidence by that identifier so output is validator-ready for 73-3 [scripts/hermes-skill-examples/morning-digest/scripts/extract-entities.mjs:145]
+- [x] [Review][Patch] Exclude non-finite relevance and rank scores from aggregate maxima and treat them as zero for evidence sorting to preserve the 73-1 validator contract [scripts/hermes-skill-examples/morning-digest/scripts/extract-entities.mjs:261]
+- [x] [Review][Patch] Remove the discarded per-entity full-run co-mention rescan and use the already computed tracked-key set once [scripts/hermes-skill-examples/morning-digest/scripts/extract-entities.mjs:357]
 
 ## Dev Notes
 
@@ -168,8 +179,27 @@ tests/morning-digest-extract-entities.test.mjs
 
 ### Agent Model Used
 
+Claude Sonnet 4.6
+
 ### Debug Log References
+
+- Hermes skill install gate required `bash scripts/install-hermes-skill-morning-digest.sh` after adding `extract-entities.mjs` to morning-digest scripts tree.
 
 ### Completion Notes List
 
+- Added `extract-entities.mjs` with pure exports: `normalizeEntityName`, `normalizeEntityKey`, `extractEntitiesFromSignal`, `aggregateRunEntities`, plus helpers `pickTopSignalRefs`, `collectCoMentionedTracked`, `parseGithubRepoUrl`, `getSignalRefId`, `toSignalRef`.
+- Extraction follows ADR-E73-003 structured-field branches only; `peopleMatch` takes precedence over `authorHandle`; GitHub org is additive (person + org on same signal).
+- `author` branch limited to rss/youtube/tiktok/instagram/pinterest per architecture §4.2; GitHub `/orgs/` paths rejected as non-repo URLs.
+- `aggregateRunEntities` returns plain object keyed by `entityKey` with run-level fields matching §4.2 / `entityMentionInputValidator` inputs for 73-3.
+- 22 unit tests in `tests/morning-digest-extract-entities.test.mjs`; `bash scripts/verify.sh` passed.
+
 ### File List
+
+- `scripts/hermes-skill-examples/morning-digest/scripts/extract-entities.mjs` (new)
+- `tests/morning-digest-extract-entities.test.mjs` (new)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status update)
+
+### Change Log
+
+- 2026-06-21: Story 73-2 — entity extraction pure functions + unit tests (Epic 73).
+- 2026-06-21: Code review patches applied; strict GitHub URL parsing, post-push signal identity contract, finite score handling, and co-mention aggregation cleanup.
