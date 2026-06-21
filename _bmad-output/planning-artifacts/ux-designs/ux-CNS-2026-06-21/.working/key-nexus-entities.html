@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key screen — /nexus/entities (Epic 73)</title>
+<!--
+  Spine governance:
+  - DESIGN.md: Components (EntityModulePanel, EntityCard, MomentumLine, ReasonChipRow, EntityLaneActions)
+  - EXPERIENCE.md: IA (/nexus/entities), Component Patterns, State Patterns (default loaded state)
+  - Flow 1 (tracked accel) + Flow 2 (emerging cold-start) sample content
+-->
+<style>
+  /* Nexus tokens — mirrors cns-dashboard/src/routes/nexus/nexus-theme.css */
+  :root {
+    --nx-font-body: "Source Sans 3", Inter, system-ui, sans-serif;
+    --nx-font-mono: "DM Mono", ui-monospace, monospace;
+    --nx-surface-0: #161616;
+    --nx-surface-1: #1e1e1e;
+    --nx-surface-2: #262626;
+    --nx-surface-3: #303030;
+    --nx-surface-sidebar-end: #1a1a1a;
+    --nx-text-0: #f0f0f0;
+    --nx-text-1: #b8b8b8;
+    --nx-text-2: #888888;
+    --nx-accent-primary: #00c8aa;
+    --nx-accent-secondary: #60a5fa;
+    --nx-accent-warning: #fbbf24;
+    --nx-accent-danger: #fb7185;
+    --nx-border: #383838;
+    --nx-sidebar-width: 240px;
+    --nx-topnav-height: 48px;
+    --nx-panel-gap: 12px;
+    --nx-panel-padding: 16px;
+    --nx-radius-md: 6px;
+    --nx-radius-lg: 8px;
+    --nx-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --nx-tracked: #00d4aa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--nx-font-body);
+    background: #0a0a0a;
+    color: var(--nx-text-0);
+    min-height: 100vh;
+  }
+  .frame-label {
+    font-family: var(--nx-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--nx-text-2);
+    padding: 12px 16px;
+    background: #0a0a0a;
+  }
+  .browser-frame {
+    max-width: 1280px;
+    margin: 0 auto 24px;
+    border: 1px solid #333;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--nx-surface-0);
+  }
+  .nx-shell {
+    display: grid;
+    grid-template-columns: var(--nx-sidebar-width) minmax(0, 1fr);
+    min-height: 720px;
+  }
+  .nx-sidebar {
+    background: linear-gradient(180deg, var(--nx-surface-1) 0%, var(--nx-surface-sidebar-end) 100%);
+    border-right: 1px solid var(--nx-border);
+  }
+  .nx-sidebar-brand {
+    height: var(--nx-topnav-height);
+    padding: 0 var(--nx-panel-padding);
+    display: flex;
+    align-items: center;
+    font-family: var(--nx-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--nx-text-2);
+    border-bottom: 1px solid var(--nx-border);
+  }
+  .nx-sidebar-nav { padding: 8px; }
+  .nx-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--nx-radius-md);
+    color: var(--nx-text-1);
+    font-size: 0.9375rem;
+    text-decoration: none;
+    margin-bottom: 2px;
+  }
+  .nx-sidebar-link-active {
+    color: var(--nx-text-0);
+    background: var(--nx-surface-3);
+    border: 1px solid color-mix(in oklab, var(--nx-accent-primary) 35%, var(--nx-border));
+  }
+  .nx-sidebar-link-muted { opacity: 0.45; }
+  .nx-content { display: flex; flex-direction: column; min-width: 0; }
+  .nx-topnav {
+    height: var(--nx-topnav-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--nx-panel-padding);
+    border-bottom: 1px solid var(--nx-border);
+    background: var(--nx-surface-1);
+  }
+  .nx-topnav-wordmark {
+    font-family: var(--nx-font-mono);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+  }
+  .nx-topnav-sync {
+    font-family: var(--nx-font-mono);
+    font-size: 11px;
+    color: var(--nx-text-2);
+  }
+  .nx-main {
+    padding: var(--nx-panel-gap);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nx-panel-gap);
+    max-width: 900px;
+  }
+  .nx-panel {
+    background: var(--nx-surface-2);
+    border: 1px solid var(--nx-border);
+    border-radius: var(--nx-radius-lg);
+    box-shadow: var(--nx-panel-shadow);
+  }
+  .nx-panel-tracked { border-top: 2px solid var(--nx-accent-primary); }
+  .nx-panel-emerging { border-top: 2px solid var(--nx-accent-secondary); }
+  .nx-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 0;
+  }
+  .nx-panel-title {
+    font-family: var(--nx-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--nx-text-2);
+    margin: 0;
+  }
+  .nx-panel-meta {
+    font-family: var(--nx-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--nx-text-2);
+  }
+  .nx-entity-card {
+    width: calc(100% - 24px);
+    margin: 6px 12px;
+    border-radius: var(--nx-radius-lg);
+    border: 1px solid var(--nx-border);
+    background: var(--nx-surface-1);
+    overflow: hidden;
+  }
+  .nx-entity-card-priority { border-left: 3px solid var(--nx-accent-primary); }
+  .nx-entity-card-emerging { border-left: 3px solid var(--nx-accent-warning); }
+  .nx-entity-card-main {
+    padding: 14px 16px 10px;
+    cursor: pointer;
+  }
+  .nx-entity-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .nx-entity-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .nx-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--nx-font-mono);
+    font-size: 0.625rem;
+    color: var(--nx-text-2);
+  }
+  .nx-type-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .nx-type-dot-person { background: var(--nx-accent-primary); }
+  .nx-type-dot-org { background: var(--nx-accent-secondary); }
+  .nx-entity-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--nx-text-0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nx-tracked-pill {
+    font-family: var(--nx-font-mono);
+    font-size: 0.625rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--nx-tracked);
+    color: var(--nx-tracked);
+    background: rgba(0, 212, 170, 0.08);
+    flex-shrink: 0;
+  }
+  .nx-active-count {
+    font-family: var(--nx-font-mono);
+    font-size: 0.6875rem;
+    color: var(--nx-text-2);
+    flex-shrink: 0;
+  }
+  .nx-momentum {
+    font-family: var(--nx-font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .nx-momentum-up { color: var(--nx-accent-primary); }
+  .nx-momentum-review { color: var(--nx-accent-warning); }
+  .nx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .nx-chip {
+    font-family: var(--nx-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .nx-chip-teal {
+    color: var(--nx-accent-primary);
+    background: rgba(0, 200, 170, 0.15);
+    border-color: rgba(0, 200, 170, 0.3);
+  }
+  .nx-chip-amber {
+    color: var(--nx-accent-warning);
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  .nx-chip-blue {
+    color: var(--nx-accent-secondary);
+    background: rgba(96, 165, 250, 0.15);
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+  .nx-chip-muted {
+    color: var(--nx-text-1);
+    background: var(--nx-surface-3);
+    border-color: var(--nx-border);
+  }
+  .nx-evidence-toggle {
+    font-size: 0.75rem;
+    color: var(--nx-text-2);
+    font-family: var(--nx-font-mono);
+    margin-bottom: 4px;
+  }
+  .nx-entity-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 16px 12px;
+    align-items: center;
+  }
+  .nx-btn-ghost {
+    border: 1px solid var(--nx-border);
+    border-radius: var(--nx-radius-md);
+    background: transparent;
+    color: var(--nx-text-2);
+    font-family: var(--nx-font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .nx-btn-ghost:hover { color: var(--nx-accent-primary); border-color: color-mix(in oklab, var(--nx-accent-primary) 40%, var(--nx-border)); }
+  .nx-btn-link {
+    font-size: 0.75rem;
+    color: var(--nx-accent-primary);
+    text-decoration: none;
+  }
+  .nx-health-footnote {
+    margin: 0;
+    padding: 12px 16px 16px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--nx-text-2);
+  }
+  .alt-states {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px 48px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .alt-states h3 {
+    font-family: var(--nx-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--nx-text-2);
+    margin: 0 0 8px;
+  }
+  .nx-panel-status {
+    padding: 16px 20px;
+    color: var(--nx-text-2);
+    font-size: 1rem;
+  }
+  .nx-skeleton {
+    height: 72px;
+    margin: 6px 12px;
+    border-radius: var(--nx-radius-lg);
+    background: linear-gradient(90deg, var(--nx-surface-1) 0%, var(--nx-surface-3) 50%, var(--nx-surface-1) 100%);
+    background-size: 200% 100%;
+  }
+</style>
+</head>
+<body>
+<p class="frame-label">Key screen mock — /nexus/entities · both lanes · default loaded state · offline HTML</p>
+
+<div class="browser-frame">
+  <div class="nx-shell">
+    <aside class="nx-sidebar" aria-label="Nexus navigation">
+      <div class="nx-sidebar-brand">Nexus</div>
+      <nav class="nx-sidebar-nav">
+        <a class="nx-sidebar-link nx-sidebar-link-muted" href="#">Intelligence</a>
+        <a class="nx-sidebar-link nx-sidebar-link-muted" href="#">Signals</a>
+        <a class="nx-sidebar-link nx-sidebar-link-active" href="#" aria-current="page">Entities</a>
+        <a class="nx-sidebar-link nx-sidebar-link-muted" href="#">Anomalies</a>
+        <a class="nx-sidebar-link nx-sidebar-link-muted" href="#">Sources</a>
+      </nav>
+    </aside>
+    <div class="nx-content">
+      <header class="nx-topnav">
+        <span class="nx-topnav-wordmark">NEXUS</span>
+        <span class="nx-topnav-sync">Synced 06:14 · 2026-06-21</span>
+      </header>
+      <main class="nx-main">
+        <!-- Tracked Entities in Motion -->
+        <section class="nx-panel nx-panel-tracked" aria-labelledby="tracked-title">
+          <header class="nx-panel-header">
+            <h2 id="tracked-title" class="nx-panel-title">Tracked entities in motion</h2>
+            <span class="nx-panel-meta">3 · 2026-06-21</span>
+          </header>
+          <article class="nx-entity-card nx-entity-card-priority">
+            <div class="nx-entity-card-main" role="button" tabindex="0" aria-label="Inspect Andrej Karpathy">
+              <div class="nx-entity-card-top">
+                <div class="nx-entity-name-row">
+                  <span class="nx-type-badge"><span class="nx-type-dot nx-type-dot-person" aria-hidden="true"></span>PE</span>
+                  <span class="nx-entity-name">Andrej Karpathy</span>
+                </div>
+                <span class="nx-tracked-pill">TRACKED</span>
+              </div>
+              <p class="nx-momentum nx-momentum-up">18 mentions / 7d vs 4.1/wk baseline (≈4×)</p>
+              <div class="nx-chips" role="list" aria-label="Why this entity is here">
+                <span class="nx-chip nx-chip-teal" role="listitem" title="Active rate 4× baseline daily rate over 7-day window">ACCEL ≈4×</span>
+                <span class="nx-chip nx-chip-blue" role="listitem" title="Present on twitter, youtube, github">3 SOURCES</span>
+                <span class="nx-chip nx-chip-teal" role="listitem" title="First YouTube appearance vs 30-day baseline">NEW: youtube</span>
+              </div>
+              <div class="nx-evidence-toggle">5 source traces ▸</div>
+            </div>
+            <footer class="nx-entity-footer">
+              <button type="button" class="nx-btn-ghost">Inspect</button>
+              <button type="button" class="nx-btn-ghost">Save</button>
+            </footer>
+          </article>
+          <article class="nx-entity-card">
+            <div class="nx-entity-card-main">
+              <div class="nx-entity-card-top">
+                <div class="nx-entity-name-row">
+                  <span class="nx-type-badge"><span class="nx-type-dot nx-type-dot-person"></span>PE</span>
+                  <span class="nx-entity-name">Yann LeCun</span>
+                </div>
+                <span class="nx-active-count">7 active</span>
+              </div>
+              <p class="nx-momentum nx-momentum-up">7 mentions / 7d vs 2.0/wk baseline (≈2.5×)</p>
+              <div class="nx-chips">
+                <span class="nx-chip nx-chip-teal">ACCEL ≈2.5×</span>
+                <span class="nx-chip nx-chip-muted">THEME</span>
+              </div>
+              <div class="nx-evidence-toggle">3 source traces ▸</div>
+            </div>
+            <footer class="nx-entity-footer">
+              <button type="button" class="nx-btn-ghost">Inspect</button>
+              <button type="button" class="nx-btn-ghost">Save</button>
+            </footer>
+          </article>
+        </section>
+
+        <!-- Emerging Entities to Review -->
+        <section class="nx-panel nx-panel-emerging" aria-labelledby="emerging-title">
+          <header class="nx-panel-header">
+            <h2 id="emerging-title" class="nx-panel-title">Emerging entities to review</h2>
+            <span class="nx-panel-meta">2 · 2026-06-21</span>
+          </header>
+          <article class="nx-entity-card nx-entity-card-emerging">
+            <div class="nx-entity-card-main">
+              <div class="nx-entity-card-top">
+                <div class="nx-entity-name-row">
+                  <span class="nx-type-badge"><span class="nx-type-dot nx-type-dot-org"></span>OG</span>
+                  <span class="nx-entity-name">ggml-org/llama.cpp</span>
+                </div>
+                <span class="nx-active-count">5 active</span>
+              </div>
+              <p class="nx-momentum nx-momentum-review">5 mentions / 7d · new (no baseline)</p>
+              <div class="nx-chips">
+                <span class="nx-chip nx-chip-amber">COLD START</span>
+                <span class="nx-chip nx-chip-blue">2 SOURCES</span>
+                <span class="nx-chip nx-chip-muted">THEME</span>
+              </div>
+              <div class="nx-evidence-toggle">4 source traces ▸</div>
+            </div>
+            <footer class="nx-entity-footer">
+              <button type="button" class="nx-btn-ghost">Inspect</button>
+              <button type="button" class="nx-btn-ghost">Save</button>
+              <a class="nx-btn-link" href="#" title="Opens where the people watchlist lives — no automatic changes">Manually track →</a>
+            </footer>
+          </article>
+          <article class="nx-entity-card">
+            <div class="nx-entity-card-main">
+              <div class="nx-entity-card-top">
+                <div class="nx-entity-name-row">
+                  <span class="nx-type-badge"><span class="nx-type-dot nx-type-dot-person"></span>AC</span>
+                  <span class="nx-entity-name">@karpathy.bsky.social</span>
+                </div>
+                <span class="nx-active-count">3 active</span>
+              </div>
+              <p class="nx-momentum nx-momentum-review">3 mentions / 7d · new (no baseline)</p>
+              <div class="nx-chips">
+                <span class="nx-chip nx-chip-amber">COLD START</span>
+                <span class="nx-chip nx-chip-blue">CO-MENTIONED</span>
+              </div>
+              <div class="nx-evidence-toggle">2 source traces ▸</div>
+            </div>
+            <footer class="nx-entity-footer">
+              <button type="button" class="nx-btn-ghost">Inspect</button>
+              <button type="button" class="nx-btn-ghost">Save</button>
+              <a class="nx-btn-link" href="#">Manually track →</a>
+            </footer>
+          </article>
+          <p class="nx-health-footnote" role="note">Entity stage ran 06:14 · 142 snapshots · 3 tracked / 2 emerging</p>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<div class="alt-states">
+  <div>
+    <h3>Alternate — tracked lane empty</h3>
+    <section class="nx-panel nx-panel-tracked" style="max-width: 480px;">
+      <header class="nx-panel-header">
+        <h2 class="nx-panel-title">Tracked entities in motion</h2>
+        <span class="nx-panel-meta">0</span>
+      </header>
+      <p class="nx-panel-status" role="status">No tracked entities are accelerating right now.</p>
+    </section>
+  </div>
+  <div>
+    <h3>Alternate — loading</h3>
+    <section class="nx-panel" style="max-width: 480px;">
+      <header class="nx-panel-header">
+        <h2 class="nx-panel-title">Emerging entities to review</h2>
+      </header>
+      <div class="nx-skeleton"></div>
+      <div class="nx-skeleton"></div>
+      <p class="nx-panel-status" style="font-size:0.75rem;padding-top:0">Loading entities…</p>
+    </section>
+  </div>
+</div>
+</body>
+</html>
