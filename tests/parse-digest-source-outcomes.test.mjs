@@ -255,6 +255,23 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		);
 	});
 
+	it('resolveDigestMarkdownFromPayload appends entityDigestMarkdown when present (Story 73-7)', () => {
+		const markdown = resolveDigestMarkdownFromPayload({
+			digestMarkdown: '## Morning digest\n- signal',
+			entityDigestMarkdown: '## Tracked entities accelerating now\n• **Yann LeCun** (person) — ≈2.5× vs baseline · theme',
+		});
+		assert.match(markdown, /^## Morning digest/);
+		assert.match(markdown, /## Tracked entities accelerating now/);
+		assert.match(markdown, /Yann LeCun/);
+	});
+
+	it('resolveDigestMarkdownFromPayload unchanged when entityDigestMarkdown absent', () => {
+		assert.equal(
+			resolveDigestMarkdownFromPayload({ digestMarkdown: '## Morning digest\n- signal' }),
+			'## Morning digest\n- signal',
+		);
+	});
+
 	it('renders ranked source-grouped markdown from Node payloads', () => {
 		const markdown = resolveDigestMarkdownFromPayload({
 			run: { date: '2026-06-12', topTrend: 'AI agents' },

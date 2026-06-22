@@ -4,6 +4,10 @@
 
 import { URL } from 'node:url';
 
+import {
+	trimEntityBlockForDigestAppend,
+} from './render-digest-entity-section.mjs';
+
 /** Canonical registry order — addendum A1. */
 export const DIGEST_SOURCE_SECTION_MAP = [
 	{ sourceKey: 'google_trends', label: 'Google Trends', patterns: [/google trends/i, /^trends\b/i] },
@@ -28,7 +32,7 @@ export const DIGEST_SOURCE_SECTION_MAP = [
 ];
 
 const UNAVAILABLE_LINE_RE = /-\s*\(source unavailable:\s*(.+?)\)/i;
-const MAX_SELECTED_MARKDOWN_LENGTH = 3400;
+export const MAX_SELECTED_MARKDOWN_LENGTH = 3400;
 const MAX_DIGEST_DATE_LENGTH = 32;
 const MAX_TOP_TREND_LENGTH = 160;
 const MAX_SIGNAL_TITLE_LENGTH = 160;
@@ -548,12 +552,32 @@ export function resolveDigestMarkdownFromPayload(payload) {
 		payload.run && typeof payload.run === 'object' ? payload.run.digestMarkdown : undefined,
 		payload.run && typeof payload.run === 'object' ? payload.run.outputContract : undefined,
 	];
+	let base = '';
 	for (const value of candidates) {
 		if (typeof value === 'string' && value.trim()) {
-			return value.trim();
+			base = value.trim();
+			break;
 		}
 	}
-	return renderDigestMarkdownFromPayload(payload);
+	if (!base) {
+		base = renderDigestMarkdownFromPayload(payload);
+	}
+
+	const entityBlock =
+		typeof payload.entityDigestMarkdown === 'string' ? payload.entityDigestMarkdown.trim() : '';
+	if (!entityBlock) {
+		return base;
+	}
+
+	const trimmedEntityBlock = trimEntityBlockForDigestAppend(
+		entityBlock,
+		base.length,
+		MAX_SELECTED_MARKDOWN_LENGTH,
+	);
+	if (!trimmedEntityBlock) {
+		return base;
+	}
+	return `${base}\n\n${trimmedEntityBlock}`;
 }
 
 /**

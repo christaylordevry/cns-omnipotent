@@ -543,9 +543,26 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
         CRON_TZ: 'Australia/Sydney',
         HOME: operatorHome,
         CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
       },
       todayDate: '2026-06-11',
       forceRescore: true,
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        if (body.path === 'entityIntelligence:getEntityIntelligence') {
+          order.push('entity-fetch');
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              status: 'success',
+              value: { trackedInMotion: [], emergingToReview: [] },
+            }),
+        };
+      },
       pushFn: async (payload) => {
         order.push('push');
         assert.equal(payload.run.digestRunId, 'digestRuns:existing-run');
@@ -563,20 +580,106 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
         assert.equal(payload.signals[0].digestSignalId, 'digestSignals:existing-signal');
         return { status: 'ok', mentionsWritten: 1, reason: null };
       },
-      postDigestFn: async () => {
+      postDigestFn: async (payload) => {
         order.push('discord');
+        assert.equal(typeof payload.entityDigestMarkdown, 'undefined');
         return { ok: true, messageIds: ['discord-1'], error: null };
       },
       writeOutcomeFn: async () => {},
     });
 
     assert.equal(result.action, 'completion-force-rescore-push');
-    assert.deepEqual(order, ['push', 'analyze', 'discord']);
+    assert.deepEqual(order, ['push', 'analyze', 'entity-fetch', 'discord']);
     const persisted = JSON.parse(
       await readFile(join(hermesDir, 'digest-push-2026-06-11.json'), 'utf8'),
     );
     assert.equal(persisted.run.digestRunId, 'digestRuns:existing-run');
     assert.equal(persisted.signals[0].digestSignalId, 'digestSignals:existing-signal');
+  });
+
+  it('entity digest markdown attached to Discord payload when query returns lanes (Story 73-7)', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-entity-digest-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: {
+          digestRunId: 'digestRuns:entity-run',
+          date: '2026-06-11',
+          ranAt: 1_749_657_600_000,
+        },
+        signals: [
+          {
+            digestRunId: 'digestRuns:entity-run',
+            digestSignalId: 'digestSignals:entity-signal',
+            sourceType: 'twitter',
+            title: 'Signal',
+            rank: 1,
+          },
+        ],
+        digestMarkdown: '## Morning digest\n- headline',
+      }),
+    );
+
+    /** @type {Record<string, unknown> | null} */
+    let discordPayload = null;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      forceRescore: true,
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        if (body.path !== 'entityIntelligence:getEntityIntelligence') {
+          throw new Error(`unexpected query path: ${body.path}`);
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              status: 'success',
+              value: {
+                trackedInMotion: [
+                  {
+                    entityType: 'person',
+                    displayName: 'Ethan Mollick',
+                    momentumSummary: '14 mentions / 7d vs 3.2/wk baseline (≈4.1×)',
+                    reasons: [
+                      { code: 'acceleration', detail: '≈4.1×' },
+                      { code: 'cross_source', detail: 'Present across 3 sources: twitter, linkedin' },
+                    ],
+                  },
+                ],
+                emergingToReview: [],
+              },
+            }),
+        };
+      },
+      pushFn: async (payload) => ({
+        ok: true,
+        runId: payload.run.digestRunId,
+        signalsWritten: 1,
+        pushedPayload: payload,
+      }),
+      analyzeFn: async () => ({ status: 'ok', mentionsWritten: 1, reason: null }),
+      postDigestFn: async (payload) => {
+        discordPayload = payload;
+        return { ok: true, messageIds: ['discord-entity'], error: null };
+      },
+      writeOutcomeFn: async () => {},
+    });
+
+    assert.equal(result.action, 'completion-force-rescore-push');
+    assert.ok(discordPayload);
+    assert.match(String(discordPayload.entityDigestMarkdown), /Ethan Mollick/);
+    assert.match(String(discordPayload.entityDigestMarkdown), /Tracked entities accelerating now/);
   });
 
   it('force-rescore applies people bonus when HOME is Hermes profile-isolated', async () => {
@@ -800,7 +903,7 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.equal(result.action, 'completion-backfill-push');
   });
 
-  it('bucket 3: missing-convex-env retries push-only from artifact without collect', async () => {
+  it('bucket 3: push-only artifact enforces push, analyze, entity-fetch, Discord order', async () => {
     const operatorHome = await mkdtemp(join(tmpdir(), 'completion-bucket3-'));
     const hermesDir = join(operatorHome, '.hermes');
     await mkdir(hermesDir, { recursive: true });
@@ -808,7 +911,7 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     await writeFile(
       join(hermesDir, 'digest-push-2026-06-11.json'),
       JSON.stringify({
-        run: { date: '2026-06-11' },
+        run: { date: '2026-06-11', ranAt: 1_749_657_600_000 },
         signals: [
           { title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' },
           { title: 'Cached 2', sourceType: 'twitter', section: 'Twitter/X' },
@@ -822,6 +925,7 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
 
     let collectCalled = false;
     let pushCalled = false;
+    const order = [];
     const result = await runDigestConvexCompletion({
       env: {
         CRON_TZ: 'Australia/Sydney',
@@ -838,19 +942,112 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
       },
       pushFn: async (payload) => {
         pushCalled = true;
+        order.push('push');
+        const pushedPayload = {
+          run: { ...payload.run, digestRunId: 'digestRuns:push-only' },
+          signals: payload.signals.map((signal, index) => ({
+            ...signal,
+            digestRunId: 'digestRuns:push-only',
+            digestSignalId: `digestSignals:push-only-${index}`,
+          })),
+        };
         return {
           ok: true,
           signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+          pushedPayload,
         };
       },
+      analyzeFn: async () => {
+        order.push('analyze');
+        return { status: 'ok', mentionsWritten: 2, reason: null };
+      },
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        if (body.path === 'entityIntelligence:getEntityIntelligence') {
+          order.push('entity-fetch');
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              status: 'success',
+              value: { trackedInMotion: [], emergingToReview: [] },
+            }),
+        };
+      },
+      postDigestFn: async () => {
+        order.push('discord');
+        return { ok: true, messageIds: ['push-only-discord'], error: null };
+      },
+      writeOutcomeFn: async () => {},
     });
 
     assert.equal(collectCalled, false);
     assert.equal(pushCalled, true);
+    assert.deepEqual(order, ['push', 'analyze', 'entity-fetch', 'discord']);
     assert.equal(result.action, 'completion-backfill-push');
     const logRaw = await readFile(join(hermesDir, 'logs', 'push-digest-watchdog.log'), 'utf8');
     assert.match(logRaw, /action=push-only-artifact-recovery/);
     assert.match(logRaw, /action=completion-backfill-push/);
+  });
+
+  it('records entity-fetch failure in the structured day outcome', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'completion-entity-fetch-fail-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(hermesDir, { recursive: true });
+    await writeFile(
+      join(hermesDir, 'digest-push-2026-06-11.json'),
+      JSON.stringify({
+        run: {
+          digestRunId: 'digestRuns:fetch-fail',
+          date: '2026-06-11',
+          ranAt: 1_749_657_600_000,
+        },
+        signals: [
+          {
+            digestRunId: 'digestRuns:fetch-fail',
+            digestSignalId: 'digestSignals:fetch-fail',
+            title: 'Cached',
+            sourceType: 'hackernews',
+            section: 'HackerNews',
+          },
+        ],
+      }),
+    );
+
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-11',
+      forceRescore: true,
+      pushFn: async (payload) => ({
+        ok: true,
+        runId: payload.run.digestRunId,
+        signalsWritten: 1,
+        pushedPayload: payload,
+      }),
+      analyzeFn: async () => ({ status: 'ok', mentionsWritten: 1, reason: null }),
+      fetchFn: async () => ({
+        ok: false,
+        status: 503,
+        text: async () => 'entity query unavailable',
+      }),
+      postDigestFn: async () => ({ ok: true, messageIds: ['fetch-fail-discord'], error: null }),
+    });
+
+    assert.equal(result.action, 'completion-force-rescore-push');
+    const outcome = JSON.parse(
+      await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-06-11'), 'utf8'),
+    );
+    assert.equal(outcome.entity.status, 'failed');
+    assert.match(outcome.entity.error, /^digest-fetch:Convex HTTP 503/);
+    assert.equal(outcome.overall, 'partial');
   });
 
   it('bucket 3 without artifact falls through to full pipeline collect', async () => {
@@ -948,8 +1145,20 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
     await writeFile(
       join(hermesDir, 'digest-push-2026-06-11.json'),
       JSON.stringify({
-        run: { date: '2026-06-11' },
-        signals: [{ title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' }],
+        run: {
+          digestRunId: 'digestRuns:discord-only',
+          date: '2026-06-11',
+          ranAt: 1_749_657_600_000,
+        },
+        signals: [
+          {
+            digestRunId: 'digestRuns:discord-only',
+            digestSignalId: 'digestSignals:discord-only',
+            title: 'Cached',
+            sourceType: 'hackernews',
+            section: 'HackerNews',
+          },
+        ],
       }),
     );
     await writeFile(
@@ -966,6 +1175,7 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
 
     let collectCalled = false;
     let pushCalled = false;
+    const order = [];
     const result = await runDigestConvexCompletion({
       env: {
         CRON_TZ: 'Australia/Sydney',
@@ -984,23 +1194,45 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
         pushCalled = true;
         return { ok: true, signalsWritten: 1 };
       },
-      postDigestFn: async () => ({ ok: true, messageIds: ['msg-1'], error: null }),
-      fetchFn: async () => ({
-        ok: true,
-        json: async () => ({
-          status: 'success',
-          value: [{ date: '2026-06-11', status: 'published' }],
-        }),
-        text: async () =>
-          JSON.stringify({
+      analyzeFn: async () => {
+        order.push('analyze');
+        return { status: 'ok', mentionsWritten: 1, reason: null };
+      },
+      postDigestFn: async () => {
+        order.push('discord');
+        return { ok: true, messageIds: ['msg-1'], error: null };
+      },
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        if (body.path === 'entityIntelligence:getEntityIntelligence') {
+          order.push('entity-fetch');
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                status: 'success',
+                value: { trackedInMotion: [], emergingToReview: [] },
+              }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
             status: 'success',
             value: [{ date: '2026-06-11', status: 'published' }],
           }),
-      }),
+          text: async () =>
+            JSON.stringify({
+              status: 'success',
+              value: [{ date: '2026-06-11', status: 'published' }],
+            }),
+        };
+      },
     });
 
     assert.equal(collectCalled, false);
     assert.equal(pushCalled, false);
+    assert.deepEqual(order, ['analyze', 'entity-fetch', 'discord']);
     assert.equal(result.action, 'discord-only-repair-ok');
     const logRaw = await readFile(join(hermesDir, 'logs', 'push-digest-watchdog.log'), 'utf8');
     assert.match(logRaw, /action=discord-only-repair-ok/);
@@ -1022,8 +1254,20 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
     await writeFile(
       join(hermesDir, 'digest-push-2026-06-11.json'),
       JSON.stringify({
-        run: { date: '2026-06-11' },
-        signals: [{ title: 'Cached', sourceType: 'hackernews', section: 'HackerNews' }],
+        run: {
+          digestRunId: 'digestRuns:discord-fail',
+          date: '2026-06-11',
+          ranAt: 1_749_657_600_000,
+        },
+        signals: [
+          {
+            digestRunId: 'digestRuns:discord-fail',
+            digestSignalId: 'digestSignals:discord-fail',
+            title: 'Cached',
+            sourceType: 'hackernews',
+            section: 'HackerNews',
+          },
+        ],
       }),
     );
     await writeFile(
@@ -1048,6 +1292,7 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
       },
       todayDate: '2026-06-11',
       watchdogFn: async () => ({ action: 'deferred-discord-only-repair', exitCode: 0 }),
+      analyzeFn: async () => ({ status: 'ok', mentionsWritten: 1, reason: null }),
       postDigestFn: async () => ({ ok: false, messageIds: [], error: 'discord-rate-limit' }),
       fetchFn: async () => ({
         ok: true,

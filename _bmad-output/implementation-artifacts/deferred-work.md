@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 73-7-digest-entity-sections (2026-06-22)
+
+- Full verify gate fails seven unrelated session-close Section 8 tests because the changed draft validator rejects existing fixtures that do not start with `###`; Story 73.7 focused tests pass 66 of 66.
+
 ## Deferred from: code review of 73-5-get-entity-intelligence-query (2026-06-21)
 
 - **`ENTITY_HIGH_PRIORITY_RANK_SCORE = 70` is a 9th constant outside ADR-E73-006 eight-row table** — acceptable v1 companion threshold; centralized in `constants.ts`; amend ADR table if operator wants spec parity.

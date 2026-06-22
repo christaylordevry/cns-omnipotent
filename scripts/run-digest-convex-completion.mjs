@@ -31,6 +31,7 @@ import {
   resolveConvexPushEnv,
 } from './hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 import { runAnalyzeEntityIntelligence } from './hermes-skill-examples/morning-digest/scripts/analyze-entity-intelligence.mjs';
+import { enrichPayloadWithEntityDigest } from './hermes-skill-examples/morning-digest/scripts/render-digest-entity-section.mjs';
 import { postDigestToDiscord } from './hermes-skill-examples/morning-digest/scripts/post-digest-discord.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
 import {
@@ -54,6 +55,7 @@ const scriptsDir = join(repoRoot, 'scripts/hermes-skill-examples/morning-digest/
 const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 
 export { invokePostPushEntityStage };
+export { enrichPayloadWithEntityDigest } from './hermes-skill-examples/morning-digest/scripts/render-digest-entity-section.mjs';
 export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 export {
   buildErrorsBySource,
@@ -419,6 +421,30 @@ async function recordEntityStageResult(result, invocation, log) {
   await log(`entity-analysis-${result.status}`, 0, detail);
 }
 
+async function recordEntityDigestResult(result, invocation, log) {
+  if (result.status === 'failed' && invocation) {
+    const prior = invocation.entityResult;
+    const priorReason =
+      prior && typeof prior === 'object' && prior.status === 'failed' && typeof prior.reason === 'string'
+        ? `${prior.reason};`
+        : '';
+    const mentionsWritten =
+      prior && typeof prior === 'object' && typeof prior.mentionsWritten === 'number'
+        ? prior.mentionsWritten
+        : 0;
+    invocation.entityResult = {
+      status: 'failed',
+      mentionsWritten,
+      reason: `${priorReason}digest-fetch:${result.reason ?? 'unknown'}`.slice(0, 120),
+    };
+  }
+  const detail =
+    result.status === 'failed'
+      ? (result.reason ?? 'unknown')
+      : `lines=${result.linesRendered}`;
+  await log(`entity-digest-${result.status}`, 0, detail);
+}
+
 async function persistPushedPayloadArtifact(pushResult, env, log) {
   if (!pushResult.pushedPayload) {
     return false;
@@ -618,7 +644,9 @@ async function scoreWriteAndPush(
     await recordEntityStageResult(entityResult, invocation, log);
 
     const postDigest = postDigestFn ?? postDigestToDiscord;
-    const discordResult = await postDigest(payload, env);
+    const enrichment = await enrichPayloadWithEntityDigest(payload, env, { fetchFn });
+    await recordEntityDigestResult(enrichment.entityDigestResult, invocation, log);
+    const discordResult = await postDigest(enrichment.payload, env);
     if (invocation) {
       invocation.pushResult = pushResult;
       invocation.discordResult = discordResult;
@@ -704,7 +732,11 @@ async function pushOnlyFromArtifact(ctx) {
     await recordEntityStageResult(entityResult, ctx.invocation, ctx.log);
 
     const postDigest = ctx.postDigestFn ?? postDigestToDiscord;
-    const discordResult = await postDigest(payload, ctx.env);
+    const enrichment = await enrichPayloadWithEntityDigest(payload, ctx.env, {
+      fetchFn: ctx.fetchFn,
+    });
+    await recordEntityDigestResult(enrichment.entityDigestResult, ctx.invocation, ctx.log);
+    const discordResult = await postDigest(enrichment.payload, ctx.env);
     if (ctx.invocation) {
       ctx.invocation.pushResult = pushResult;
       ctx.invocation.discordResult = discordResult;
@@ -750,7 +782,19 @@ async function discordOnlyFromArtifact(ctx) {
   const postDigest = ctx.postDigestFn ?? postDigestToDiscord;
   const expectedCount = expectedSignalCount(payload);
   try {
-    const discordResult = await postDigest(payload, ctx.env);
+    const entityResult = await invokePostPushEntityStage({
+      pushResult: { ok: true, pushedPayload: payload },
+      env: ctx.env,
+      analyzeFn: ctx.analyzeFn,
+      fetchFn: ctx.fetchFn,
+    });
+    await recordEntityStageResult(entityResult, ctx.invocation, ctx.log);
+
+    const enrichment = await enrichPayloadWithEntityDigest(payload, ctx.env, {
+      fetchFn: ctx.fetchFn,
+    });
+    await recordEntityDigestResult(enrichment.entityDigestResult, ctx.invocation, ctx.log);
+    const discordResult = await postDigest(enrichment.payload, ctx.env);
     if (ctx.invocation) {
       ctx.invocation.discordResult = discordResult;
       ctx.invocation.signalCount = expectedCount;
@@ -1032,6 +1076,8 @@ export async function runDigestConvexCompletion(opts = {}) {
           operatorHome,
           log,
           postDigestFn: opts.postDigestFn,
+          analyzeFn,
+          fetchFn,
           invocation,
         });
         return result;

@@ -51,9 +51,10 @@ export function formatTodayLocalDate(envTz, now = new Date()) {
  * @param {{ convexUrl: string; convexDeployKey: string }} convexEnv
  * @param {string} path
  * @param {Record<string, unknown>} args
+ * @param {{ signal?: AbortSignal }} [options]
  * @returns {Promise<unknown>}
  */
-export async function postQuery(fetchFn, convexEnv, path, args) {
+export async function postQuery(fetchFn, convexEnv, path, args, options = {}) {
   const response = await fetchFn(`${normalizeConvexUrl(convexEnv.convexUrl)}/api/query`, {
     method: 'POST',
     headers: {
@@ -61,6 +62,7 @@ export async function postQuery(fetchFn, convexEnv, path, args) {
       Authorization: `Convex ${convexEnv.convexDeployKey}`,
     },
     body: JSON.stringify({ path, args, format: 'json' }),
+    signal: options.signal,
   });
 
   const bodyText = await response.text().catch(() => '');
