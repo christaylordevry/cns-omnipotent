@@ -66,7 +66,16 @@ export async function runGateApplySection8(opts) {
     throw new Error(message, { cause: err });
   }
 
-  const check = evaluatePhaseBDraftTokens(draftRaw);
+  // Guard: reject draft that is not a markdown fragment (catches raw JSON or synthesis prompt)
+  const draftTrimmed = draftRaw.trimStart();
+  if (!draftTrimmed.startsWith('###')) {
+    const preview = draftTrimmed.slice(0, 120).replace(/\n/g, '\\n');
+    throw new Error(
+      `section8-draft.md content validation failed: expected markdown fragment starting with "###", got: ${preview}`
+    );
+  }
+
+    const check = evaluatePhaseBDraftTokens(draftRaw);
   await recordPhaseBTokenCheck(closeReportPath, check);
 
   if (check.status === "ABORTED") {
