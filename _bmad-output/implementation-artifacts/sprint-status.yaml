@@ -624,7 +624,7 @@ development_status:
   epic-76: in-progress
   76-1-session-close-orientation-artifact-refresh: done # absorbs deferred Pre-2; story file story-76-1-session-close-refresh.md
   76-2-both-project-context-md-files-synced: done
-  76-3-fast-scan-index-and-inbox-triage-plan: backlog
+  76-3-fast-scan-index-and-inbox-triage-plan: ready-for-dev
   76-4-missing-governance-files-mobile-posture-and-personas: backlog
   76-5-two-bot-vault-boundary-documentation: backlog
   76-6-memory-pillars-and-honcho-verification: backlog
