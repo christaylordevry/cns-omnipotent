@@ -4,7 +4,7 @@ baseline_commit: d71ad8a16ab756ecc9747738d692d3efa8fec99b
 
 # Story 76.2: Both project-context.md files synced
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created -->
 <!-- Sprint key: 76-2-both-project-context-md-files-synced | Branch: hermes-consolidation -->
@@ -109,7 +109,7 @@ so that **AI agents see accurate stack, epic status, and cross-repo rules (FR17)
   - [x] `bash scripts/verify.sh` from Omnipotent.md
   - [x] Optional: `bash scripts/verify.sh` from cns-dashboard if separate commit
   - [x] Two-repo commit strategy: one commit per repo (markdown-only) OR single Omnipotent commit if dashboard edited via sibling path — operator preference: **two small commits** (one per repo)
-  - [ ] Update story File List and mark sprint-status `76-2-both-project-context-md-files-synced: done` after code review
+  - [x] Update story File List and mark sprint-status `76-2-both-project-context-md-files-synced: done` after code review
 
 ## Dev Notes
 
@@ -311,8 +311,8 @@ model:
 
 ## Story Completion Status
 
-- **Status:** review
-- **Completion note:** Both `project-context.md` files synced to Hermes Consolidation phase; verify gate passed; two-repo commits pending operator review before sprint `done`.
+- **Status:** done
+- **Completion note:** Code review passed; both project-context.md files synced; sprint closed.
 
 ## Dev Agent Record
 
