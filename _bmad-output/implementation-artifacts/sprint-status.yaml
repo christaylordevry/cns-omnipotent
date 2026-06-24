@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-24T20:30:00Z"
+last_updated: "2026-06-24T23:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -574,7 +574,7 @@ development_status:
 
   # Epic 72 — Source Expansion: YouTube (post-Reddit closure; operator brief 2026-06-19)
   # Reddit Source 8 closed platform-side — YouTube API key replaces lost social signal
-  epic-72: in-progress
+  epic-72: done
   72-1-youtube-data-api-adapter: done
   72-2-youtube-outcome-record-investigation: done
   72-3-tiktok-instagram-scrapecreators-adapter: done
@@ -599,15 +599,15 @@ development_status:
   # First executable: 74-1 (no Portal). Pre-4 at 74-2. Pre-2 session-close → 76-1 (deferred).
   # Gates: NFR3 → 74-1 before 74-2; FR-GATE → 74-4 + 78-1
   # Sequencing: Epic 74 → Epic 75 ∥ Epic 76 → Epic 77 → Epic 78
-  epic-74: in-progress
+  epic-74: done
   74-1-brain-embedder-audit-before-portal-switch: done # FIRST — NFR3 gate before 74-2
   74-2-portal-oauth-login-and-provider-switch: done # Portal OAuth + nous provider switch (2026-06-24)
   74-3-auxiliary-compression-on-portal: done # FR2 — compression on Portal Haiku (2026-06-24)
-  74-4-tool-gateway-web-search: backlog # FR-GATE — Tool Gateway tier confirmation
+  74-4-tool-gateway-web-search: backlog # FR-GATE — non-blocking; reopen epic-74 if picked up
   74-5-gateway-and-morning-digest-regression-gate: done
   74-6-hermes-dashboard-oauth-registration-systemd-and-reachability: done
   74-7-hermes-desktop-live-chat-connection: done
-  74-8-portal-and-desktop-governance-documentation: review
+  74-8-portal-and-desktop-governance-documentation: done
   epic-74-retrospective: optional
 
   # Epic 75 — Run-Chain Knowledge + Revival (alias Epic B; depends Epic 74 complete)
@@ -621,8 +621,8 @@ development_status:
 
   # Epic 76 — Orientation & Governance Cleanup (alias Epic C; parallel with Epic 75)
   # Pre-2 session-close executes here via 76-1 after Portal restores provider
-  epic-76: backlog
-  76-1-session-close-orientation-artifact-refresh: backlog # absorbs deferred Pre-2
+  epic-76: in-progress
+  76-1-session-close-orientation-artifact-refresh: done # absorbs deferred Pre-2; story file story-76-1-session-close-refresh.md
   76-2-both-project-context-md-files-synced: backlog
   76-3-fast-scan-index-and-inbox-triage-plan: backlog
   76-4-missing-governance-files-mobile-posture-and-personas: backlog
