@@ -17,6 +17,7 @@ export const TRIGGER_CONTRACT_SKILLS = [
   "vault-graduate",
   "morning-digest",
   "session-close",
+  "run-chain",
 ];
 
 const MATCH_TRIGGER_HEADING = /^#+\s*.*Match trigger\s*$/m;
