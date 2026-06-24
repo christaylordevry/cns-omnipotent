@@ -35,11 +35,37 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-22T18:56:38+10:00"
+last_updated: "2026-06-24T09:55:01+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
+
+# Pre-Implementation Checklist — Hermes Consolidation (Epics 74–78)
+# NOT stories — ops/checklist only (epics-hermes-consolidation.md 2026-06-24)
+# Sequencing: Pre-1 → Pre-3 → 74-1 (first executable; no Portal) → Pre-4 at 74-2 → Epic 74 → 75 ∥ 76 → 77 → 78
+pre_implementation_checklist:
+  pre-1-fixture-fix:
+    status: done
+    owner: dev
+    note: Fixed tests/fixtures/session-close/section8-draft-fragment.md blockquote preamble and oversized draft test inputs
+  pre-2-session-close:
+    status: deferred
+    owner: operator
+    deferred_to: 76-1-session-close-orientation-artifact-refresh
+    note: Hermes provider resolves to none until Portal — not a pre-Epic-74 gate
+  pre-3-static-body-fix:
+    status: optional
+    owner: dev
+    note: CNS-Daily-Rhythm.md static body rows (Web App Vision Epic 42 DONE, stack, URL)
+  pre-4-portal-subscribe-fr-gate:
+    status: gated
+    owner: operator
+    gate_at_stories:
+      - 74-2-portal-oauth-login-and-provider-switch
+      - 74-4-tool-gateway-web-search
+      - 78-1-portal-tts-and-push-to-talk-on-desktop
+    note: Upgrade paid Portal tier the day 74-2 starts — not before (FR-GATE)
 
 development_status:
   epic-1: done
@@ -568,3 +594,57 @@ development_status:
   73-6-dashboard-entity-intelligence-modules: done
   73-7-digest-entity-sections: in-progress
   73-8-entity-intelligence-health-live-prod: backlog
+
+  # Epic 74 — Hermes on Portal + Desktop (alias Epic A; prd + architecture 2026-06-24)
+  # First executable: 74-1 (no Portal). Pre-4 at 74-2. Pre-2 session-close → 76-1 (deferred).
+  # Gates: NFR3 → 74-1 before 74-2; FR-GATE → 74-4 + 78-1
+  # Sequencing: Epic 74 → Epic 75 ∥ Epic 76 → Epic 77 → Epic 78
+  epic-74: in-progress
+  74-1-brain-embedder-audit-before-portal-switch: done # FIRST — NFR3 gate before 74-2
+  74-2-portal-oauth-login-and-provider-switch: backlog # Pre-4 operator gate — Portal paid tier
+  74-3-auxiliary-compression-on-portal: backlog
+  74-4-tool-gateway-web-search: backlog # FR-GATE — Tool Gateway tier confirmation
+  74-5-gateway-and-morning-digest-regression-gate: backlog
+  74-6-hermes-dashboard-oauth-registration-systemd-and-reachability: backlog
+  74-7-hermes-desktop-live-chat-connection: backlog
+  74-8-portal-and-desktop-governance-documentation: backlog
+  epic-74-retrospective: optional
+
+  # Epic 75 — Run-Chain Knowledge + Revival (alias Epic B; depends Epic 74 complete)
+  epic-75: backlog
+  75-1-hermes-test-domain-and-vitest-include: backlog
+  75-2-run-chain-governance-module-and-project-folder: backlog
+  75-3-hermes-run-chain-trigger-skill: backlog
+  75-4-anthropic-key-validate-script-and-fr11-a-smoke: backlog
+  75-5-run-chain-end-to-end-revival-verification: backlog
+  epic-75-retrospective: optional
+
+  # Epic 76 — Orientation & Governance Cleanup (alias Epic C; parallel with Epic 75)
+  # Pre-2 session-close executes here via 76-1 after Portal restores provider
+  epic-76: backlog
+  76-1-session-close-orientation-artifact-refresh: backlog # absorbs deferred Pre-2
+  76-2-both-project-context-md-files-synced: backlog
+  76-3-fast-scan-index-and-inbox-triage-plan: backlog
+  76-4-missing-governance-files-mobile-posture-and-personas: backlog
+  76-5-two-bot-vault-boundary-documentation: backlog
+  76-6-memory-pillars-and-honcho-verification: backlog
+  epic-76-retrospective: optional
+
+  # Epic 77 — JARVIS Awareness in Nexus (alias Epic D1; cross-repo cns-dashboard + Omnipotent.md)
+  # Gate: 77-1 before 77-5; depends Epic 74
+  epic-77: backlog
+  77-1-convex-hermes-awareness-snapshot-http-endpoint: backlog # gates 77-5
+  77-2-hermes-awareness-pull-client-and-cron-cache: backlog
+  77-3-convex-webhook-push-for-high-signal-events: backlog
+  77-4-awareness-sync-hermes-skill: backlog
+  77-5-nexus-awareness-panels-ui: backlog # depends 77-1
+  77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
+  77-7-dashboard-sync-retention-decision: backlog
+  epic-77-retrospective: optional
+
+  # Epic 78 — JARVIS Voice + Model Routing (alias Epic D2; depends Epic 74; FR-GATE for TTS)
+  epic-78: backlog
+  78-1-portal-tts-and-push-to-talk-on-desktop: backlog # FR-GATE — TTS tier confirmation
+  78-2-per-skill-hermes-model-routing-activation: backlog
+  78-3-voice-and-routing-operator-guide-section: backlog
+  epic-78-retrospective: optional

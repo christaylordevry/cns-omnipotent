@@ -1,5 +1,25 @@
 # Deferred work
 
+## Parked initiative — CNS/Nexus Dashboard UX Redesign (2026-06-24)
+
+**Status:** Intentionally deferred. **Not in Hermes Consolidation scope (Epics 74–78).**
+
+Operator wants a full redesign of how the cns-dashboard / Nexus cockpit **looks and operates**. Deliberately kept OUT of the Hermes Consolidation overhaul to avoid scope blow-up and to protect the "nothing breaks" goal (G2) while the backend is being stabilized.
+
+**Why deferred to its own epic (not folded into 74–78):**
+- The conversational JARVIS lives on Desktop/Discord (ADR-HERMES-001 topology a), not the cockpit — a redesign does not advance the JARVIS goal.
+- A better redesign is possible *after* Epic 77 (D1 awareness): design against real, working JARVIS data flows rather than a system that doesn't exist yet.
+- Epic 77's new UI (awareness panels + async ask box) is scoped minimal + theme-consistent (UX-DR1–5, reusing `nexus-theme.css`), so it moves with any future redesign — not throwaway.
+- Adding a live-dashboard redesign mid-overhaul fights the stabilization goal.
+
+**Recommended path when picked up:**
+1. Run `bmad-ux` / UX designer agent (Sally) as a **planning-only** track to capture the redesign vision (can happen anytime; does not block 74–78).
+2. Build as a **dedicated epic after the Hermes Consolidation overhaul lands** (ideally post-Epic 77).
+
+**Reference:** `prd-hermes-consolidation.md`, `architecture-hermes-consolidation.md` (topology a, cockpit = awareness surface), `ux-designs/ux-CNS-2026-06-21/` (current Nexus UX baseline).
+
+---
+
 ## Deferred from: code review of 73-7-digest-entity-sections (2026-06-22)
 
 - Full verify gate fails seven unrelated session-close Section 8 tests because the changed draft validator rejects existing fixtures that do not start with `###`; Story 73.7 focused tests pass 66 of 66.
