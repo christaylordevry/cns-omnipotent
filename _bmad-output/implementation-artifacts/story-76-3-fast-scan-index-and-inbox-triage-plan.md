@@ -1,6 +1,8 @@
 # Story 76.3: Fast-scan index and inbox triage plan
 
-Status: ready-for-dev
+Status: review
+
+baseline_commit: b8d2f1cfa621e365b243ead67d934dedfe1cb91f
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created -->
 <!-- Sprint key: 76-3-fast-scan-index-and-inbox-triage-plan | Branch: hermes-consolidation -->
@@ -66,29 +68,29 @@ so that **orientation layer is actionable not stale (FR17)**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — Baseline inventory** (AC: #3)
-  - [ ] Confirm canonical vault mount: `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE`
-  - [ ] Run `find …/00-Inbox -name '*.md'` → expect **103** paths; save list to working notes
-  - [ ] Read current `AI-Context/vault-fast-scan-index.md` (canonical + repo fixture); note row counts and stale hotspots
-  - [ ] Read `scripts/generate-vault-fast-scan-index.mjs` and Story 29-9 normative format (do not change format without new story)
+- [x] **T1 — Baseline inventory** (AC: #3)
+  - [x] Confirm canonical vault mount: `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE`
+  - [x] Run `find …/00-Inbox -name '*.md'` → expect **103** paths; save list to working notes
+  - [x] Read current `AI-Context/vault-fast-scan-index.md` (canonical + repo fixture); note row counts and stale hotspots
+  - [x] Read `scripts/generate-vault-fast-scan-index.mjs` and Story 29-9 normative format (do not change format without new story)
 
-- [ ] **T2 — Regenerate fast-scan index** (AC: #1, #2, #5)
-  - [ ] `CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" npm run vault:fast-scan`
-  - [ ] `npm run vault:fast-scan` (repo fixture default)
-  - [ ] Verify token budget: `node -e "const fs=require('fs');const t=fs.readFileSync('Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md','utf8');console.log('tokens',Math.ceil(t.length/4))"`
-  - [ ] Spot-check top 10 rows for Hermes Consolidation relevance (Operator Guide, CNS/Hermes project paths)
+- [x] **T2 — Regenerate fast-scan index** (AC: #1, #2, #5)
+  - [x] `CNS_VAULT_ROOT="/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE" npm run vault:fast-scan`
+  - [x] `npm run vault:fast-scan` (repo fixture default)
+  - [x] Verify token budget: `node -e "const fs=require('fs');const t=fs.readFileSync('Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md','utf8');console.log('tokens',Math.ceil(t.length/4))"`
+  - [x] Spot-check top 10 rows for Hermes Consolidation relevance (Operator Guide, CNS/Hermes project paths)
 
-- [ ] **T3 — Author inbox triage plan** (AC: #3, #4, #5)
-  - [ ] Draft `AI-Context/inbox-triage-plan.md` on canonical vault (operator FS)
-  - [ ] Categorize all 103 paths into act-now / defer / archive-candidate tables
-  - [ ] Add execution footer: `/triage`, `/triage-approve`, `/triage-execute` references (Operator Guide §15.3)
-  - [ ] Copy plan to repo `Knowledge-Vault-ACTIVE/AI-Context/inbox-triage-plan.md` for fixture parity (recommended)
-  - [ ] **Do not** run triage-execute or bulk vault_move — plan document only
+- [x] **T3 — Author inbox triage plan** (AC: #3, #4, #5)
+  - [x] Draft `AI-Context/inbox-triage-plan.md` on canonical vault (operator FS)
+  - [x] Categorize all 103 paths into act-now / defer / archive-candidate tables
+  - [x] Add execution footer: `/triage`, `/triage-approve`, `/triage-execute` references (Operator Guide §15.3)
+  - [x] Copy plan to repo `Knowledge-Vault-ACTIVE/AI-Context/inbox-triage-plan.md` for fixture parity (recommended)
+  - [x] **Do not** run triage-execute or bulk vault_move — plan document only
 
-- [ ] **T4 — Verify and close** (AC: #6)
-  - [ ] `bash scripts/verify.sh`
-  - [ ] Grep: no protect-list diffs; no AGENTS.md edits
-  - [ ] Update story File List; mark sprint-status after code review
+- [x] **T4 — Verify and close** (AC: #6)
+  - [x] `bash scripts/verify.sh`
+  - [x] Grep: no protect-list diffs; no AGENTS.md edits
+  - [x] Update story File List; mark sprint-status after code review
 
 ## Dev Notes
 
@@ -300,19 +302,42 @@ Pattern: orientation stories are markdown + vault FS writes; small commits; veri
 
 ## Story Completion Status
 
-- **Status:** ready-for-dev
-- **Completion note:** Ultimate context engine analysis completed — comprehensive developer guide created
+- **Status:** review
+- **Completion note:** Fast-scan index refreshed on canonical + fixture vaults; inbox triage plan authored for all 103 inbox items; verify gate passed
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.6 (Cursor)
 
 ### Debug Log References
 
+- Inbox inventory: 103 `.md` files under canonical `00-Inbox/` (verified via `find`)
+- Canonical fast-scan pre-story: ~55 data rows; repo fixture pre-story: 7 rows (stale)
+- Canonical fast-scan post-regen: 55 rows, est. 1954 tokens; top rows include `CNS-Operator-Guide.md` and `01-Projects/Brain - Central Nervous System Build/Hermes/*`
+
 ### Completion Notes List
+
+- Regenerated `vault-fast-scan-index.md` on canonical vault and repo fixture via `npm run vault:fast-scan` (operator FS; no Vault IO mutators)
+- Authored `AI-Context/inbox-triage-plan.md` on canonical vault (41 act now / 52 defer / 10 archive candidate); all 103 inbox paths listed exactly once
+- Mirrored triage plan to repo fixture `Knowledge-Vault-ACTIVE/AI-Context/inbox-triage-plan.md`
+- Added `scripts/generate-inbox-triage-plan.mjs` helper for reproducible plan regeneration from inbox inventory
+- `bash scripts/verify.sh` exit 0; no protect-list or AGENTS.md diffs; no `vault_move` executed
 
 ### File List
 
+- `Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md` (regenerated)
+- `Knowledge-Vault-ACTIVE/AI-Context/inbox-triage-plan.md` (created)
+- `scripts/generate-inbox-triage-plan.mjs` (created)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status update)
+- `_bmad-output/implementation-artifacts/story-76-3-fast-scan-index-and-inbox-triage-plan.md` (story tracking)
+
+**Canonical vault (operator FS, not in git):**
+
+- `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md` (regenerated)
+- `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/inbox-triage-plan.md` (created)
+
 ## Change Log
+
+- 2026-06-24: Story 76-3 — fast-scan index refresh + inbox triage plan (FR17 orientation); plan-only, no inbox moves
