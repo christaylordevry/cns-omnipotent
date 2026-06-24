@@ -13,6 +13,7 @@ export const TRIGGER_CONTRACT_SKILLS = [
   "triage",
   "vault-think",
   "investigate-trend",
+  "awareness-sync",
   "vault-lint",
   "vault-graduate",
   "morning-digest",
