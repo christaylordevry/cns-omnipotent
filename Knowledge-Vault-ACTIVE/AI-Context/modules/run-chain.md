@@ -145,6 +145,18 @@ Exit code: `0` when read-back validation and PAKE validation pass; `1` otherwise
 - **Zero** edits to protect-list adapter files in Epic 75 unless operator explicitly authorizes FR11-B.
 - Portal `nous` OAuth replaces Hermes **inference** only — **not** run-chain LLM calls.
 
+### Key validation and rotation
+
+Use this procedure when `ANTHROPIC_API_KEY` returns HTTP **401**, before attempting run-chain (Story **75-5**).
+
+1. **Validate (smoke):** From the Omnipotent.md repo root, run `npx tsx scripts/validate-anthropic-key.ts`. Exit **0** is required before run-chain. The script loads `ANTHROPIC_API_KEY` from `.env.live-chain` (or respects an already-exported env var), POSTs a minimal Messages API ping (`claude-haiku-4-5`, `max_tokens: 1`), and prints only a masked key prefix — never the full secret.
+2. **Obtain a new key:** Anthropic Console → API Keys → create key ([https://console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)).
+3. **Update local env:** Edit gitignored `.env.live-chain` at repo root — replace the `ANTHROPIC_API_KEY=…` line only. Never commit `.env.*`.
+4. **Operator approval:** FR11-A revival is operator-approved (architecture gate 2026-06-24). Do not mint or rotate keys ad hoc without explicit approval; see `_bmad-output/implementation-artifacts/deferred-work.md` § LLM provider consolidation.
+5. **Revoke old key:** After validate exits 0, revoke the previous key at the provider.
+6. **Post-incident hygiene:** If a key was exposed (chat, logs, screenshot, or commit), follow `specs/cns-vault-contract/modules/mcp-operator-runbook.md` § Key rotation hygiene.
+7. **Next step:** Story **75-5** — E2E revival via Hermes `run-chain` skill after validate passes.
+
 ## Forbidden edits (protect-list / NFR2)
 
 | Path | Reason |
