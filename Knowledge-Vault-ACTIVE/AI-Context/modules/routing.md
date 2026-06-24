@@ -15,6 +15,7 @@ CNS routing is the model-selection control plane. It covers three agent surfaces
 | Role | Provider | Default model | Config path |
 |------|----------|---------------|-------------|
 | Hermes gateway / Discord / Desktop chat | `nous` (Nous Portal OAuth) | `anthropic/claude-sonnet-4.6` | `~/.hermes/config.yaml` → `model.*` |
+| Context compression | `nous` (Portal OAuth) | `anthropic/claude-haiku-4.5` | `~/.hermes/config.yaml` → `auxiliary.compression.*` |
 | Last-resort fallback | `openai-codex` | `gpt-5.4-mini` (pinned — may drift) | Hermes provider fallback chain; **not primary** |
 
 **Portal login:** `hermes auth add nous --type oauth --manual-paste` · **Inspect:** `hermes portal info`
@@ -29,5 +30,13 @@ hermes gateway restart   # or watchdog cycle
 ```
 
 Verify: `hermes portal info` may still show Portal logged in — openai-codex uses separate device_code creds in `auth.json`.
+
+**Compression rollback (reversible — only if Portal compression fails):**
+
+```bash
+hermes config set auxiliary.compression.provider openrouter
+hermes config set auxiliary.compression.model openai/gpt-4o-mini
+# Only if OpenRouter credits restored — prefer fixing Portal path first
+```
 
 **Fragility note:** openai-codex relies on undocumented Cloudflare allowlisting; residential IP only. See `docs/CNSHermes New Big Plan/05-openai-codex-assessment.md`. Full Portal governance: story **74-8**.
