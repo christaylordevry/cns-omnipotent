@@ -637,7 +637,7 @@ development_status:
   77-2-hermes-awareness-pull-client-and-cron-cache: done # Omnipotent.md commit 7b0077a
   77-3-convex-webhook-push-for-high-signal-events: ready-for-dev
   77-4-awareness-sync-hermes-skill: review # skill mirror + install + contract tests
-  77-5-nexus-awareness-panels-ui: ready-for-dev # depends 77-1 ✓
+  77-5-nexus-awareness-panels-ui: done # cns-dashboard commit 1118ee4; Vercel live
   77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
   77-7-dashboard-sync-retention-decision: backlog
   epic-77-retrospective: optional

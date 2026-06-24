@@ -1,5 +1,22 @@
 # Deferred work
 
+## cns-dashboard CI failure — @esbuild/aix-ppc64 platform mismatch (2026-06-25)
+
+GitHub CI fails on `npm ci` with `EBADPLATFORM @esbuild/aix-ppc64 — wanted aix/ppc64, runner is linux/x64`. Stray platform-specific optional dep in `package-lock.json`. Vercel builds fine. Fix: `package-lock.json` cleanup to remove stray platform entries. Not blocking any Epic 77 story.
+
+---
+
+## Ops health items — surfaced by awareness-sync live smoke (2026-06-25)
+
+Observed from `awareness-sync` Discord response during Epic 77 Story 77-4 validation:
+
+- **Run-chain dormant 25 days** — last run was Story 52.1 (Morning Digest NotebookLM Synthesis). Trigger a manual chain run when ready; skill + endpoint are live.
+- **Inbox 23** — triage backlog from 76-3 plan still pending execution. Run `/triage` family via Hermes when ready.
+- **MCPs 2/7 healthy** — vault-io stale; context7, discord, firecrawl, playwright all unknown status. Run an MCP health check and resolve stale/unknown statuses.
+- **8 investigations, all in triage** — nothing active or progressing. Review investigation board when ops window allows.
+
+---
+
 ## Deferred from: code review of 75-5-run-chain-end-to-end-revival-verification (2026-06-25)
 
 - **Dashboard `RUN_CHAIN_STORY_KEY` still 38-2** — `scripts/dashboard-sync.ts:112` points at Epic 38 story; dashboard shows dormant after 75-5 Revived docs until key updated or status derived from `run-chain.md`.
