@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-24T09:55:01+10:00"
+last_updated: "2026-06-24T12:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -59,13 +59,13 @@ pre_implementation_checklist:
     owner: dev
     note: CNS-Daily-Rhythm.md static body rows (Web App Vision Epic 42 DONE, stack, URL)
   pre-4-portal-subscribe-fr-gate:
-    status: gated
+    status: done
     owner: operator
     gate_at_stories:
       - 74-2-portal-oauth-login-and-provider-switch
       - 74-4-tool-gateway-web-search
       - 78-1-portal-tts-and-push-to-talk-on-desktop
-    note: Upgrade paid Portal tier the day 74-2 starts — not before (FR-GATE)
+    note: $30 paid tier confirmed 2026-06-24 at 74-2; Tool Gateway active
 
 development_status:
   epic-1: done
@@ -601,7 +601,7 @@ development_status:
   # Sequencing: Epic 74 → Epic 75 ∥ Epic 76 → Epic 77 → Epic 78
   epic-74: in-progress
   74-1-brain-embedder-audit-before-portal-switch: done # FIRST — NFR3 gate before 74-2
-  74-2-portal-oauth-login-and-provider-switch: backlog # Pre-4 operator gate — Portal paid tier
+  74-2-portal-oauth-login-and-provider-switch: done # Portal OAuth + nous provider switch (2026-06-24)
   74-3-auxiliary-compression-on-portal: backlog
   74-4-tool-gateway-web-search: backlog # FR-GATE — Tool Gateway tier confirmation
   74-5-gateway-and-morning-digest-regression-gate: backlog
