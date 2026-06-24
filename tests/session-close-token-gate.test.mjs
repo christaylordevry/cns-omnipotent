@@ -146,7 +146,7 @@ describe("session-close phase B token gate", () => {
   });
 
   it("evaluatePhaseBDraftTokens ABORTED over limit", () => {
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     const result = evaluatePhaseBDraftTokens(huge);
     assert.equal(result.status, "ABORTED");
     assert.equal(result.reason, PHASE_B_ABORT_REASON);
@@ -297,7 +297,7 @@ describe("session-close phase B token gate", () => {
     const vault = join(fixtureRoot, "vault");
     await seedPhaseAArtifacts(fixtureRoot, vault);
     await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     await writeFile(join(fixtureRoot, ".session-close", "section8-draft.md"), huge, "utf8");
 
     const gateScript = join(
@@ -366,7 +366,7 @@ describe("session-close phase B token gate", () => {
     const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
     await seedPhaseAArtifacts(fixtureRoot, vault);
     await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     await writeFile(draftPath, huge, "utf8");
 
     const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
