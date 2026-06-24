@@ -10,7 +10,7 @@ Phase 6 complete. Epics 1–37 done. Epics 38 + 43 in progress. Epic 73 in-progr
 - Gateway: WSL `@reboot` cron runs `scripts/hermes-gateway-start.sh` (idempotent; logs `~/.hermes/logs/gateway-cron.log`, reboot wrapper `gateway-reboot-cron.log`)
 - SOUL.md: remove after every hermes version/gateway start
 - Vault: /mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/
-- Run-chain SSOT: AI-Context/modules/run-chain.md (Epic 75 revival; dormant engine)
+- Run-chain SSOT: AI-Context/modules/run-chain.md (revived; 75-5 E2E PASS 2026-06-24)
 
 ## Next Session
 Complete story 73-7 review and merge.

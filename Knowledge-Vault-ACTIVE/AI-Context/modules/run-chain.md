@@ -4,7 +4,9 @@ Governance for the CNS research chain: **Research → Synthesis → Hook → Bos
 
 ## Status
 
-**Dormant** — `ANTHROPIC_API_KEY` returning HTTP 401 since ~2026-05-24 until Story **75-4** validates/rotates the key. Hermes Portal OAuth inference is separate and does **not** replace run-chain LLM calls (ADR-HERMES-004 / FR11 Option A).
+**Revived** — E2E proof via Hermes `run-chain` skill command path (Story **75-5**, 2026-06-24). Evidence: `_bmad-output/implementation-artifacts/75-5-run-chain-e2e-revival-evidence.md`.
+
+Hermes Portal OAuth inference remains separate from run-chain LLM calls (ADR-HERMES-004 / FR11 Option A).
 
 ## What it does
 
@@ -136,7 +138,7 @@ Exit code: `0` when read-back validation and PAKE validation pass; `1` otherwise
 | Invalid brief JSON | `Expected ResearchBrief JSON shape: …` | Fix `--brief-file` or CLI topic/query args |
 | Fatal uncaught error | Compact fatal evidence markdown to stderr | Read evidence file; check brief shape and env |
 
-**Current production blocker:** `ANTHROPIC_API_KEY` **401 dead** since ~2026-05-24 — chain dormant until **75-4**.
+**Historical (75-4 / 75-5):** `ANTHROPIC_API_KEY` HTTP **401** (~2026-05-24) was resolved in Story **75-4**; chain revived in **75-5** (2026-06-24). On new **401**, re-run `npx tsx scripts/validate-anthropic-key.ts` and rotate per § Key validation and rotation below — do **not** edit adapters.
 
 ## FR11 Option A / credential posture (ADR-HERMES-004)
 
@@ -155,7 +157,7 @@ Use this procedure when `ANTHROPIC_API_KEY` returns HTTP **401**, before attempt
 4. **Operator approval:** FR11-A revival is operator-approved (architecture gate 2026-06-24). Do not mint or rotate keys ad hoc without explicit approval; see `_bmad-output/implementation-artifacts/deferred-work.md` § LLM provider consolidation.
 5. **Revoke old key:** After validate exits 0, revoke the previous key at the provider.
 6. **Post-incident hygiene:** If a key was exposed (chat, logs, screenshot, or commit), follow `specs/cns-vault-contract/modules/mcp-operator-runbook.md` § Key rotation hygiene.
-7. **Next step:** Story **75-5** — E2E revival via Hermes `run-chain` skill after validate passes.
+7. **After revival:** Chain is **Revived** (Story **75-5**, 2026-06-24). On subsequent **401**, repeat steps 1–6; add `run-chain` to `#hermes` `channel_skill_bindings` per skill `config-snippet.md` if Discord trigger is required.
 
 ## Forbidden edits (protect-list / NFR2)
 

@@ -18,7 +18,7 @@ Phase 6 complete. Epics 1–37 done. Epics 38 + 43 in progress.
 - Cursor: primary model Claude Sonnet 4.6
 - NotebookLM: live (4 notebooks, fan-out via session-close)
 - CNS-Daily-Rhythm.md: live (AUTO blocks refreshed by session-close Step 6.7)
-- run-chain: dormant (adapters use Anthropic API directly — Epic 38-2 deferred)
+- run-chain: revived (75-5 E2E PASS 2026-06-24; adapters use Anthropic API via `.env.live-chain`)
 
 ---
 

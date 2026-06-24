@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 75-5-run-chain-end-to-end-revival-verification (2026-06-25)
+
+- **Dashboard `RUN_CHAIN_STORY_KEY` still 38-2** — `scripts/dashboard-sync.ts:112` points at Epic 38 story; dashboard shows dormant after 75-5 Revived docs until key updated or status derived from `run-chain.md`.
+- **`parseEnvFile` edge cases (EXPORT casing, CRLF, duplicates)** — incremental hardening on `validate-anthropic-key.ts` optional; land via 75-4 patch if `.env.live-chain` uses `export` lines (75-5 review decision 2B reverted in-story fix).
+- **Skill mirror stale dormant messaging** — `trigger-pattern.md` / `task-prompt.md` still reference dormant/75-4 gate; update when `#hermes` binding follow-up lands or via 75-3 review patch.
+- **`AGENTS.md` Run-chain module row (WriteGate)** — Session 4 housekeeping: add Run-chain row to §7 module table via `/session-close` in `#hermes`; sync `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` + `specs/cns-vault-contract/AGENTS.md` + canonical vault in one operation. Reverted from 75-5 working tree (WriteGate).
+
 ## Parked initiative — CNS/Nexus Dashboard UX Redesign (2026-06-24)
 
 **Status:** Intentionally deferred. **Not in Hermes Consolidation scope (Epics 74–78).**
