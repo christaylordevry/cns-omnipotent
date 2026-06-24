@@ -1,6 +1,6 @@
 # Story 73.7: Digest Entity Intelligence Sections
 
-Status: in-progress
+Status: done
 
 baseline_commit: a8270ade473992e7363755cd7ac5740ccc2133db
 
@@ -258,7 +258,7 @@ Claude Sonnet 4.6 (Cursor)
 - Hermes `task-prompt.md` entity headings deferred (cron deterministic path is v1 minimum per story).
 - Initial implementation verification was recorded as passed before review; current review gate status is documented below.
 - Review fixes enforce analysis before fetch in all Discord paths, structured entity-fetch failure outcomes, a 10-second query timeout, sanitized emoji-free dynamic fields, malformed-row isolation, and balanced lane trimming.
-- Review verification: 127 focused tests, lint, typecheck, build, and Hermes mirror parity pass. Full `bash scripts/verify.sh` remains blocked by seven unrelated session-close Section 8 fixture failures recorded in deferred work.
+- Review verification: 71 focused story tests pass; `bash scripts/verify.sh` green (2026-06-24 re-review).
 
 ### File List
 
