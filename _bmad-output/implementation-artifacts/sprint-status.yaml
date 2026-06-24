@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-24T21:30:00Z
+# last_updated: 2026-06-25T05:35:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-25T18:00:00Z"
+last_updated: "2026-06-25T12:00:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -593,7 +593,7 @@ development_status:
   73-5-get-entity-intelligence-query: done
   73-6-dashboard-entity-intelligence-modules: done
   73-7-digest-entity-sections: done
-  73-8-entity-intelligence-health-live-prod: backlog
+  73-8-entity-intelligence-health-live-prod: ready-for-dev
 
   # Epic 74 — Hermes on Portal + Desktop (alias Epic A; prd + architecture 2026-06-24)
   # First executable: 74-1 (no Portal). Pre-4 at 74-2. Pre-2 session-close → 76-1 (deferred).
@@ -632,12 +632,12 @@ development_status:
 
   # Epic 77 — JARVIS Awareness in Nexus (alias Epic D1; cross-repo cns-dashboard + Omnipotent.md)
   # Gate: 77-1 before 77-5; depends Epic 74
-  epic-77: backlog
-  77-1-convex-hermes-awareness-snapshot-http-endpoint: backlog # gates 77-5
-  77-2-hermes-awareness-pull-client-and-cron-cache: backlog
-  77-3-convex-webhook-push-for-high-signal-events: backlog
-  77-4-awareness-sync-hermes-skill: backlog
-  77-5-nexus-awareness-panels-ui: backlog # depends 77-1
+  epic-77: in-progress
+  77-1-convex-hermes-awareness-snapshot-http-endpoint: done # cns-dashboard commit 6299704; gates 77-5
+  77-2-hermes-awareness-pull-client-and-cron-cache: review
+  77-3-convex-webhook-push-for-high-signal-events: ready-for-dev
+  77-4-awareness-sync-hermes-skill: backlog # depends 77-2
+  77-5-nexus-awareness-panels-ui: ready-for-dev # depends 77-1 ✓
   77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
   77-7-dashboard-sync-retention-decision: backlog
   epic-77-retrospective: optional
