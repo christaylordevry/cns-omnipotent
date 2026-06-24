@@ -1,6 +1,9 @@
 # Hermes Desktop Connection Architecture
 _As of 2026-06-23 | Sourced from Prompt B (Context7 + live system inspection)_
 
+> [!warning] **Superseded for operations**
+> **Superseded for operations by `AI-Context/modules/hermes-desktop.md` (Story 74-8)** — OAuth-primary, browser UI at `:9119` (Hermes v0.17), **not** basic-auth-first and **not** Electron-first. Retained below as historical research only.
+
 ---
 
 ## Critical conceptual clarification

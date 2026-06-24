@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-24T16:00:00Z"
+last_updated: "2026-06-24T20:30:00Z"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -607,7 +607,7 @@ development_status:
   74-5-gateway-and-morning-digest-regression-gate: done
   74-6-hermes-dashboard-oauth-registration-systemd-and-reachability: done
   74-7-hermes-desktop-live-chat-connection: done
-  74-8-portal-and-desktop-governance-documentation: backlog
+  74-8-portal-and-desktop-governance-documentation: review
   epic-74-retrospective: optional
 
   # Epic 75 — Run-Chain Knowledge + Revival (alias Epic B; depends Epic 74 complete)

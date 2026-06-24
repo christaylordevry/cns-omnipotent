@@ -12,13 +12,15 @@ CNS routing is the model-selection control plane. It covers three agent surfaces
 
 ## Hermes agent surface (Epic 74 — Portal primary)
 
-| Role | Provider | Default model | Config path |
-|------|----------|---------------|-------------|
-| Hermes gateway / Discord / Desktop chat | `nous` (Nous Portal OAuth) | `anthropic/claude-sonnet-4.6` | `~/.hermes/config.yaml` → `model.*` |
-| Context compression | `nous` (Portal OAuth) | `anthropic/claude-haiku-4.5` | `~/.hermes/config.yaml` → `auxiliary.compression.*` |
-| Last-resort fallback | `openai-codex` | `gpt-5.4-mini` (pinned — may drift) | Hermes provider fallback chain; **not primary** |
+| Role | Provider | Model | Config path |
+|------|----------|-------|-------------|
+| Gateway / Discord / browser chat | `nous` | `anthropic/claude-sonnet-4.6` | `~/.hermes/config.yaml` → `model.*` |
+| Context compression | `nous` | `anthropic/claude-haiku-4.5` | `~/.hermes/config.yaml` → `auxiliary.compression.*` |
+| Last-resort fallback | `openai-codex` | `gpt-5.4-mini` (pinned — may drift) | fallback chain; **not primary** |
+| Web search (Tool Gateway) | `nous` / Nous Subscription | — | `hermes portal info` → Web tools via Nous Portal; formal Hermes web-search config **pending-74-4** (FR-GATE tier confirmed Pre-4) |
 
-**Portal login:** `hermes auth add nous --type oauth --manual-paste` · **Inspect:** `hermes portal info`
+**Portal login:** `hermes auth add nous --type oauth --manual-paste` · **Inspect:** `hermes portal info`  
+**Desktop / browser chat:** `http://localhost:9119` — see `AI-Context/modules/hermes-desktop.md`
 
 **Rollback to openai-codex primary (reversible):**
 
@@ -39,4 +41,6 @@ hermes config set auxiliary.compression.model openai/gpt-4o-mini
 # Only if OpenRouter credits restored — prefer fixing Portal path first
 ```
 
-**Fragility note:** openai-codex relies on undocumented Cloudflare allowlisting; residential IP only. See `docs/CNSHermes New Big Plan/05-openai-codex-assessment.md`. Full Portal governance: story **74-8**.
+**Fragility note:** openai-codex relies on undocumented Cloudflare allowlisting; residential IP only. See `docs/CNSHermes New Big Plan/05-openai-codex-assessment.md`. Full Portal + Desktop governance: `AI-Context/modules/hermes-desktop.md` (Story 74-8).
+
+**Reconciled:** 2026-06-24 — Hermes v0.17.0 (2026.6.19) — Story 74-8 — matches live `~/.hermes/config.yaml` (`grep` model + auxiliary.compression; `hermes config show` compression provider nous / Haiku 4.5).
