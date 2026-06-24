@@ -7,6 +7,7 @@ export default defineConfig({
       "tests/verification/**/*.test.ts",
       "tests/brain/**/*.test.ts",
       "tests/model-routing/**/*.test.ts",
+      "tests/hermes/**/*.test.ts",
     ],
   },
 });
