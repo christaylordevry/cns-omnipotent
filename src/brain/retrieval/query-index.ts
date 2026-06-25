@@ -74,6 +74,8 @@ export type QueryBrainIndexParams = {
   minScore?: number;
   /** Default: true. When false, ranking is pure cosine similarity. */
   qualityWeighting?: boolean;
+  /** Default: 0.85. Applied to manifest stale-sample records when quality weighting is enabled. */
+  staleSamplePenaltyFactor?: number;
   includeScores?: boolean;
   explain?: boolean;
   includeEmbedderMetadata?: boolean;
@@ -283,6 +285,10 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   const includeEmbedderMetadata = params.includeEmbedderMetadata ?? true;
   const minScore = typeof params.minScore === "number" && Number.isFinite(params.minScore) ? params.minScore : undefined;
   const qualityWeighting = params.qualityWeighting ?? true;
+  const staleSamplePenaltyFactor =
+    typeof params.staleSamplePenaltyFactor === "number" && Number.isFinite(params.staleSamplePenaltyFactor)
+      ? Math.max(0, Math.min(1, params.staleSamplePenaltyFactor))
+      : FRESHNESS_STALE_SAMPLE_PENALTY;
 
   const warnings: QueryBrainIndexWarning[] = [];
 
@@ -350,7 +356,7 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
           multiplier: 1,
         };
     const staleSampleMatch = qualityWeighting && staleSamplePaths.has(normalizedPath);
-    const freshnessPenalty = staleSampleMatch ? FRESHNESS_STALE_SAMPLE_PENALTY : 1;
+    const freshnessPenalty = staleSampleMatch ? staleSamplePenaltyFactor : 1;
     const finalScore = sim.score * quality.multiplier * freshnessPenalty;
     if (minScore !== undefined && finalScore < minScore) {
       continue;

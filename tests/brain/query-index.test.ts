@@ -178,6 +178,45 @@ describe("queryBrainIndex", () => {
     expect(codes).toContain("FRESHNESS_PENALTY_APPLIED");
   });
 
+  it("uses caller-provided stale-sample freshness penalty", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-fresh-cfg-"));
+    const quality = {
+      status: "reviewed",
+      confidence_score: 1,
+      verification_status: "verified",
+      pake_type: "SourceNote",
+    };
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        { path: "notes/a-stale.md", embedding: [1, 0], quality },
+        { path: "notes/z-fresh.md", embedding: [0.95, 0.05], quality },
+      ],
+    });
+    await writeManifest({
+      dir,
+      outcome: "success",
+      last_build_utc: "2026-04-14T00:00:00.000Z",
+      estimated_stale_count: 1,
+      estimated_stale_sample: ["notes/a-stale.md"],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      staleSamplePenaltyFactor: 0.5,
+    });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/z-fresh.md", "notes/a-stale.md"]);
+    expect(out.results[1]?.components).toBeUndefined();
+  });
+
   it("does not apply manifest stale-sample freshness penalty when quality weighting is disabled", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-fresh-off-"));
     const quality = {

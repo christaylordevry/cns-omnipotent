@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "policy_version": "0.1.0",
+  "policy_notes": "Tunable placeholders — calibrate via Story 79-4 golden-set harness. Roll back by reverting policy_version in git.",
+  "inject_blocked_paths": [
+    "AI-Context/AGENTS.md",
+    "_meta/logs/**"
+  ],
+  "channels": {
+    "voice_pane": {
+      "max_top_k_fetch": 5,
+      "min_score_threshold": 0.35,
+      "max_injection_tokens": 800,
+      "max_chunks": 2
+    },
+    "standard_text": {
+      "max_top_k_fetch": 8,
+      "min_score_threshold": 0.25,
+      "max_injection_tokens": 1500,
+      "max_chunks": 4
+    },
+    "yapped_text": {
+      "max_top_k_fetch": 12,
+      "min_score_threshold": 0.2,
+      "max_injection_tokens": 3000,
+      "max_chunks": 6
+    }
+  },
+  "yapped_text_min_chars": 400,
+  "index": {
+    "incremental_cron_minutes": 20,
+    "stale_penalty_factor": 0.85,
+    "max_staleness_minutes": 180
+  },
+  "shadow_mode": false
+}
