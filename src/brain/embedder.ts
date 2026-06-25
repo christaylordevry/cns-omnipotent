@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 export type EmbedderMetadata = {
   providerId: string;
   modelId: string;
+  vectorDimension?: number;
 };
 
 /**
@@ -15,7 +16,7 @@ export type Embedder = {
 
 /** Deterministic offline stub: 8 floats derived from SHA-256 of UTF-8 input. */
 export class StubEmbedder implements Embedder {
-  readonly metadata: EmbedderMetadata = { providerId: "stub", modelId: "stub-v1" };
+  readonly metadata: EmbedderMetadata = { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 };
 
   async embed(noteTextForEmbedding: string): Promise<number[]> {
     const h = createHash("sha256").update(noteTextForEmbedding, "utf8").digest();

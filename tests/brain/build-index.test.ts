@@ -11,6 +11,7 @@ import {
   writeBuildIndexArtifact,
 } from "../../src/brain/build-index.js";
 import { StubEmbedder } from "../../src/brain/embedder.js";
+import type { Embedder } from "../../src/brain/embedder.js";
 import { effectiveCorpusRoots, loadBrainCorpusAllowlistFromVault } from "../../src/brain/load-corpus-allowlist.js";
 import { parseBrainCorpusAllowlistUnknown } from "../../src/brain/corpus-allowlist.js";
 import { CnsError } from "../../src/errors.js";
@@ -215,6 +216,61 @@ ok`,
     const run = await runBuildIndex(vaultRoot, al.value, new StubEmbedder());
     expect(run.result.records.map((r) => r.path)).toEqual(["notes/good.md"]);
     expect(run.result.exclusions.some((e) => e.path === "notes/bad.md" && e.reasonCode === "FRONTMATTER_PARSE")).toBe(true);
+  });
+
+  it("isolates per-note embedding failures without aborting the whole build", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "notes", "bad.md"), "---\ntitle: bad\n---\nbad", "utf8");
+    await writeFile(path.join(vaultRoot, "notes", "good.md"), "---\ntitle: good\n---\ngood", "utf8");
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "flaky" },
+      embed: async (text) => {
+        if (text.includes("bad")) {
+          throw new CnsError("IO_ERROR", "upstream rejected note");
+        }
+        return [1, 0];
+      },
+    };
+
+    const run = await runBuildIndex(vaultRoot, al.value, embedder);
+    expect(run.result.records.map((r) => r.path)).toEqual(["notes/good.md"]);
+    expect(run.result.exclusions).toEqual([
+      { path: "notes/bad.md", reasonCode: "EMBEDDING_ERROR", detail: { code: "IO_ERROR" } },
+    ]);
+    expect(run.result.embedder).toEqual({ providerId: "test", modelId: "flaky", vectorDimension: 2 });
+  });
+
+  it("excludes mixed-dimension embeddings and records the accepted vector dimension", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "notes", "a.md"), "---\ntitle: a\n---\na", "utf8");
+    await writeFile(path.join(vaultRoot, "notes", "b.md"), "---\ntitle: b\n---\nb", "utf8");
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "mixed" },
+      embed: async (text) => (text.includes("a") ? [1, 0] : [1, 0, 0]),
+    };
+
+    const run = await runBuildIndex(vaultRoot, al.value, embedder);
+    expect(run.result.records.map((r) => r.path)).toEqual(["notes/a.md"]);
+    expect(run.result.exclusions).toEqual([
+      { path: "notes/b.md", reasonCode: "DIMENSION_MISMATCH", detail: { code: "DIMENSION_MISMATCH" } },
+    ]);
+    expect(run.result.embedder).toEqual({ providerId: "test", modelId: "mixed", vectorDimension: 2 });
   });
 
   it("excludes secret matches without echoing material in serialized exclusions", async () => {
@@ -439,7 +495,7 @@ describe("serializeBrainIndexManifest", () => {
       outcome: "success",
       build_timestamp_utc: "2026-01-01T00:00:00.000Z",
       allowlist_snapshot: { subtrees: ["notes"], inbox: { enabled: false } },
-      embedder: { providerId: "stub", modelId: "stub-v1" },
+      embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
       counts: { candidates_discovered: 1, embedded: 1, excluded: 0, failed: 0 },
       exclusion_reason_breakdown: {},
       failures,
@@ -521,6 +577,7 @@ ok`,
     expect(manifestText).toMatch(/"outcome": "success"/);
     expect(manifestText).toMatch(/"providerId": "stub"/);
     expect(manifestText).toMatch(/"modelId": "stub-v1"/);
+    expect(manifestText).toMatch(/"vectorDimension": 8/);
     expect(manifestText).not.toContain(secret);
     expect(manifestText).not.toContain("AKIA");
   });

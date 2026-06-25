@@ -194,7 +194,12 @@ export async function computeVaultSnapshotAndFreshness(
 }
 
 function isPerFileFailure(ex: BuildIndexExclusion): boolean {
-  return ex.reasonCode === "IO_ERROR" || ex.reasonCode === "FRONTMATTER_PARSE";
+  return (
+    ex.reasonCode === "IO_ERROR" ||
+    ex.reasonCode === "FRONTMATTER_PARSE" ||
+    ex.reasonCode === "EMBEDDING_ERROR" ||
+    ex.reasonCode === "DIMENSION_MISMATCH"
+  );
 }
 
 export function buildExclusionReasonBreakdown(
@@ -348,4 +353,3 @@ export async function writeBrainIndexManifest(
   await rename(tmpPath, outPath);
   return outPath;
 }
-

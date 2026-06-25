@@ -214,6 +214,7 @@ export async function runBuildIndex(
 ): Promise<RunBuildIndexResult> {
   const records: BuildIndexRecord[] = [];
   const exclusions: BuildIndexExclusion[] = [];
+  let vectorDimension: number | undefined = embedder.metadata.vectorDimension;
 
   const discovered = await discoverMarkdownCandidates(vaultRoot, allowlist);
   const candidates = discovered.candidates;
@@ -292,13 +293,33 @@ export async function runBuildIndex(
       textForEmbed = matter.stringify(strippedBody, parsed.frontmatter);
     }
 
-    const embedding = await embedder.embed(textForEmbed);
+    let embedding: number[];
+    try {
+      embedding = await embedder.embed(textForEmbed);
+    } catch (err) {
+      exclusions.push({
+        path: vaultRel,
+        reasonCode: "EMBEDDING_ERROR",
+        detail: { code: err instanceof CnsError ? err.code : "IO_ERROR" },
+      });
+      continue;
+    }
+    if (vectorDimension === undefined) {
+      vectorDimension = embedding.length;
+    } else if (embedding.length !== vectorDimension) {
+      exclusions.push({
+        path: vaultRel,
+        reasonCode: "DIMENSION_MISMATCH",
+        detail: { code: "DIMENSION_MISMATCH" },
+      });
+      continue;
+    }
     records.push({ path: vaultRel, embedding, ...(quality ? { quality } : {}) });
   }
 
   return {
     result: {
-      embedder: embedder.metadata,
+      embedder: { ...embedder.metadata, ...(vectorDimension !== undefined ? { vectorDimension } : {}) },
       records,
       exclusions: exclusions.sort((a, b) => a.path.localeCompare(b.path, "en")),
     },

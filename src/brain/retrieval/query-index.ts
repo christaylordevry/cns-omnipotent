@@ -14,6 +14,7 @@ const IndexArtifactSchema = z.object({
   embedder: z.object({
     providerId: z.string(),
     modelId: z.string(),
+    vectorDimension: z.number().int().positive().optional(),
   }),
   records: z.array(
     z.object({
@@ -263,6 +264,17 @@ function buildOutput(
   };
 }
 
+function assertCompatibleEmbedder(index: IndexArtifact, embedder: Embedder): void {
+  const selected = embedder.metadata;
+  if (selected.providerId !== index.embedder.providerId || selected.modelId !== index.embedder.modelId) {
+    throw new CnsError(
+      "SCHEMA_INVALID",
+      `Query embedder ${selected.providerId}/${selected.modelId} does not match index embedder ${index.embedder.providerId}/${index.embedder.modelId}.`,
+      { code: "INDEX_EMBEDDER_MISMATCH" },
+    );
+  }
+}
+
 export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<QueryBrainIndexOutput> {
   const rawTopK = params.topK ?? 10;
   const topK = Math.max(0, Math.min(MAX_TOPK, Math.floor(rawTopK)));
@@ -282,6 +294,7 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   }
 
   const index = await loadIndexArtifact(params.indexPath);
+  assertCompatibleEmbedder(index, params.embedder);
 
   const manifest = await tryLoadSiblingManifest(params.indexPath);
   const provenance: NonNullable<QueryBrainIndexOutput["provenance"]> = {};
@@ -289,6 +302,13 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   const staleSamplePaths = staleSamplePathsFromManifest(manifest);
 
   const queryVec = await params.embedder.embed(params.query);
+  if (index.embedder.vectorDimension !== undefined && queryVec.length !== index.embedder.vectorDimension) {
+    throw new CnsError(
+      "SCHEMA_INVALID",
+      `Query embedding dimension ${queryVec.length} does not match index dimension ${index.embedder.vectorDimension}.`,
+      { code: "INDEX_EMBEDDER_DIMENSION_MISMATCH" },
+    );
+  }
   const queryNorm = cosineSimilarity(queryVec, queryVec);
   if (!queryNorm.ok) {
     warnings.push({

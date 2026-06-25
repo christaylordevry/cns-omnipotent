@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-25T20:55:49Z"
+last_updated: "2026-06-26T07:07:13+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -652,7 +652,7 @@ development_status:
   # Epic 79 — Felt Recall — Semantic Brain + Cited Auto-Injection (hermes-omniscient)
   epic-79: in-progress
   79-1-a4-0-inject-probe: done
-  79-2-portalembedder-production-brain-index: review
+  79-2-portalembedder-production-brain-index: done
   79-3-recall-policy-config-recall-inject: backlog
   79-4-golden-set-calibration-gate: backlog
   79-5-production-cns-brain-recall-plugin-prefetch-cli: backlog

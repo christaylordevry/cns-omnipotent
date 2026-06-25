@@ -8,7 +8,7 @@ import { queryBrainIndex } from "../../src/brain/retrieval/query-index.js";
 
 async function writeIndex(params: {
   dir: string;
-  embedder?: { providerId: string; modelId: string };
+  embedder?: { providerId: string; modelId: string; vectorDimension?: number };
   records: Array<{
     path: string;
     embedding: number[];
@@ -23,7 +23,7 @@ async function writeIndex(params: {
   const indexPath = path.join(params.dir, "brain-index.json");
   const obj = {
     schema_version: 1,
-    embedder: params.embedder ?? { providerId: "stub", modelId: "stub-v1" },
+    embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
     records: params.records,
     exclusions: [],
   };
@@ -346,6 +346,7 @@ describe("queryBrainIndex", () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-zv-"));
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "test", modelId: "zero" },
       records: [{ path: "notes/a.md", embedding: [1, 0] }],
     });
 
@@ -406,6 +407,7 @@ describe("queryBrainIndex", () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-zvman-"));
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "test", modelId: "zero" },
       records: [{ path: "notes/a.md", embedding: [1, 0] }],
     });
     await writeManifest({
@@ -466,6 +468,44 @@ describe("queryBrainIndex", () => {
     const codes = (out.warnings ?? []).map((w) => w.code);
     expect(codes).toContain("DIMENSION_MISMATCH");
   });
+
+  it("fails fast when query embedder does not match the index embedder", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-em-"));
+    const indexPath = await writeIndex({
+      dir,
+      embedder: { providerId: "portal", modelId: "portal-model" },
+      records: [{ path: "notes/a.md", embedding: [1, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "stub", modelId: "stub-v1" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 10, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_EMBEDDER_MISMATCH" },
+    });
+  });
+
+  it("fails fast when query embedding dimension does not match index metadata", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-edim-"));
+    const indexPath = await writeIndex({
+      dir,
+      embedder: { providerId: "test", modelId: "fixed", vectorDimension: 3 },
+      records: [{ path: "notes/a.md", embedding: [1, 0, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 10, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_EMBEDDER_DIMENSION_MISMATCH" },
+    });
+  });
 });
 
 describe("query-index CLI", () => {
@@ -477,6 +517,7 @@ describe("query-index CLI", () => {
     await writeFile(path.join(dir, "body.md"), marker, "utf8");
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
       records: [
         { path: "notes/a.md", embedding: [1, 0, 0, 0, 0, 0, 0, 0] },
         { path: "notes/b.md", embedding: [0, 1, 0, 0, 0, 0, 0, 0] },

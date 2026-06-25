@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { CnsError } from "../errors.js";
-import { StubEmbedder } from "./embedder.js";
+import { resolveBrainEmbedder } from "./resolve-embedder.js";
 import { queryBrainIndex } from "./retrieval/query-index.js";
 
 function safeSingleLine(s: string): string {
@@ -36,6 +36,7 @@ async function main(): Promise<void> {
         "Notes:",
         "- Reads only brain-index.json (and sibling brain-index-manifest.json if present).",
         "- Does not read vault note bodies; returns vault-relative paths plus optional numeric score components.",
+        "- Embedder: CNS_BRAIN_EMBEDDER=stub|portal (default stub); must match index build embedder.",
         "",
       ].join("\n"),
     );
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
     includeScores,
     explain: values.explain === true,
     includeEmbedderMetadata,
-    embedder: new StubEmbedder(),
+    embedder: resolveBrainEmbedder(),
   });
 
   process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
