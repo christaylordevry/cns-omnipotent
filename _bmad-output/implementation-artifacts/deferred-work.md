@@ -1,5 +1,25 @@
 # Deferred work
 
+## Hermes Desktop Electron build — AC#4 voice E2E blocker (2026-06-25)
+
+**Surfaced by:** Story 78-1 operator assessment.
+
+**Problem:** Story 78-1 voice config on WSL is correct (`auto_tts: true`, `tts.use_gateway: true`, `stt.use_gateway: true`, whisper-1). AC#4 Desktop E2E cannot run:
+
+1. **No packaged native Desktop app** — Windows Store search finds nothing; `install.ps1` updates CLI/upstream but does not produce a Desktop `.exe`.
+2. **Electron source only** — `apps/desktop` present in hermes-agent repo after pull; requires build/packaging step (out of 78-1 scope).
+3. **Browser UI voice fallback blocked** — WSL sounddevice / audio device limitation for mic capture at `http://localhost:9119`.
+
+**Operator action when ready:**
+
+- Build/package Hermes Desktop from `apps/desktop` (Electron) per upstream docs, or install when Nous ships a packaged Windows Desktop release.
+- Re-run AC#4: remote gateway `http://localhost:9119`, OAuth, Ctrl+B push-to-talk, streaming TTS confirmation.
+- Update `78-1-voice-e2e-evidence.md` §AC #4 from PARTIAL → PASS; move story 78-1 to `review`.
+
+**Unblocked:** Story **78-2** (per-skill Hermes model routing) — pure config, no Desktop dependency.
+
+---
+
 ## cns-dashboard CI failure — @esbuild/aix-ppc64 platform mismatch (2026-06-25)
 
 GitHub CI fails on `npm ci` with `EBADPLATFORM @esbuild/aix-ppc64 — wanted aix/ppc64, runner is linux/x64`. Stray platform-specific optional dep in `package-lock.json`. Vercel builds fine. Fix: `package-lock.json` cleanup to remove stray platform entries. Not blocking any Epic 77 story.
@@ -590,9 +610,11 @@ Repeated runs of the same research prompt can yield **different source URLs** fr
 
 ### Per-skill Hermes model routing
 
-Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain. Blocked on Hermes native per-skill model API. Policy documented in MEMORY.md.
+**Status (2026-06-25, Story 78-2):** Config **activated** — `~/.hermes/config.yaml` → `smart_model_routing` tier + skill map; governance in `AI-Context/modules/routing.md`. Hermes **v0.17.0** stores the block via deep-merge but **does not consume it at gateway runtime** (consumer-pending — only `AGENTS.md` references the key; no `DEFAULT_CONFIG` / `gateway/` reader). Runtime two-tier smoke (triage Haiku vs vault-think Sonnet) blocked until upstream ships router.
 
-- **Class:** (b) Phase 2 backlog
+- **Class:** (b) Phase 2 backlog — **consumer follow-up** when Hermes reads `smart_model_routing`
+- **Policy:** Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain (see `routing.md` §Epic 78)
+- **Rollback:** `smart_model_routing.enabled: false` or remove block; global Sonnet default unchanged
 
 ### `vault-lint-remediate-34-2.ts` `--verify-only`
 
