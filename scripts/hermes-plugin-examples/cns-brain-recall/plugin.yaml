@@ -1,5 +1,5 @@
 name: cns-brain-recall
-version: 0.1.0
-description: "CNS Brain recall — pre_llm_call context injection (A4-0 probe stub)"
+version: 0.2.0
+description: "CNS Brain recall — pre_llm_call cited vault recall via brain-recall-prefetch.mjs (Story 79-5)"
 hooks:
   - pre_llm_call

@@ -32,5 +32,9 @@
     "stale_penalty_factor": 0.85,
     "max_staleness_minutes": 180
   },
-  "shadow_mode": false
+  "prefetch": {
+    "timeout_seconds": 5,
+    "voice_pane_timeout_seconds": 3
+  },
+  "shadow_mode": true
 }

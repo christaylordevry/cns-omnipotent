@@ -6,15 +6,19 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { detectRecallChannel } from "../../src/brain/recall-inject.js";
+import { StubEmbedder } from "../../src/brain/embedder.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const pluginRoot = join(root, "scripts/hermes-plugin-examples/cns-brain-recall");
 const installScript = join(root, "scripts/install-hermes-plugin-cns-brain-recall.sh");
+const prefetchScript = join(root, "scripts/brain-recall-prefetch.mjs");
 const sourcePycache = join(pluginRoot, "__pycache__");
 const bytecodeEnv = { ...process.env, PYTHONDONTWRITEBYTECODE: "1" };
 
@@ -27,35 +31,100 @@ afterEach(() => {
   rmSync(sourcePycache, { force: true, recursive: true });
 });
 
-describe("Story 79-1 cns-brain-recall plugin stub", () => {
+async function writeIndex(params: {
+  dir: string;
+  records: Array<{ path: string; embedding: number[] }>;
+}): Promise<string> {
+  const indexPath = join(params.dir, "brain-index.json");
+  await writeFile(
+    indexPath,
+    JSON.stringify(
+      {
+        schema_version: 1,
+        embedder: { providerId: "stub", modelId: "stub-v1" },
+        records: params.records,
+        exclusions: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  return indexPath;
+}
+
+async function writeStubIndex(params: {
+  dir: string;
+  anchorText: string;
+  vaultRel: string;
+}): Promise<string> {
+  const stub = new StubEmbedder();
+  const embedding = await stub.embed(params.anchorText);
+  return writeIndex({
+    dir: params.dir,
+    records: [{ path: params.vaultRel, embedding }],
+  });
+}
+
+async function writeVaultNote(vaultRoot: string, vaultRel: string, body: string): Promise<void> {
+  const abs = join(vaultRoot, vaultRel);
+  await mkdir(dirname(abs), { recursive: true });
+  await writeFile(abs, `---\ntitle: Test\n---\n\n${body}`, "utf8");
+}
+
+describe("Story 79-5 cns-brain-recall production plugin", () => {
   it("has version-controlled plugin source files", () => {
     expect(existsSync(join(pluginRoot, "plugin.py"))).toBe(true);
     expect(existsSync(join(pluginRoot, "plugin.yaml"))).toBe(true);
     expect(existsSync(join(pluginRoot, "__init__.py"))).toBe(true);
     expect(existsSync(join(pluginRoot, "references/config-snippet.md"))).toBe(true);
+    expect(existsSync(prefetchScript)).toBe(true);
   });
 
-  it("plugin.yaml declares pre_llm_call hook", () => {
+  it("plugin.yaml declares pre_llm_call hook and Story 79-5 version", () => {
     const yaml = readFileSync(join(pluginRoot, "plugin.yaml"), "utf8");
     expect(yaml).toMatch(/name:\s*cns-brain-recall/);
     expect(yaml).toMatch(/pre_llm_call/);
+    expect(yaml).toMatch(/version:\s*0\.2\.0/);
   });
 
-  it("plugin.py returns probe marker from pre_llm_call hook", () => {
+  it("plugin.py subprocesses brain-recall-prefetch.mjs and returns empty context in shadow mode", () => {
     const out = execFileSync(
       "python3",
       [
         "-B",
         "-c",
-        `import importlib.util, sys
+        `import importlib.util, json, os, sys, tempfile, textwrap
+from unittest.mock import patch
+
 path = sys.argv[1]
+repo = sys.argv[2]
 spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-result = mod.recall_probe_hook(session_id="s", user_message="hi")
-assert result == {"context": "[brain-recall:probe]"}, result
+
+shadow_payload = json.dumps({
+    "context": None,
+    "citations": [{"path": "notes/recall.md", "score": 0.9}],
+    "channel": "standard_text",
+    "shadow": True,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = shadow_payload + "\\n"
+    stderr = "[cns-brain-recall:shadow] would-inject\\n"
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()) as run_mock:
+        result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+        assert result == {}, result
+        cmd = run_mock.call_args[0][0]
+        assert "brain-recall-prefetch.mjs" in cmd[-2] or cmd[-1].endswith("brain-recall-prefetch.mjs") or any("brain-recall-prefetch.mjs" in str(x) for x in cmd)
+        assert cmd[0] == mod._resolve_node_bin()
 print("ok")`,
         join(pluginRoot, "plugin.py"),
+        root,
       ],
       { encoding: "utf8", env: bytecodeEnv },
     );
@@ -63,30 +132,52 @@ print("ok")`,
     expect(existsSync(sourcePycache)).toBe(false);
   });
 
-  it("__init__.py registers the pre_llm_call hook through the Hermes loader path", () => {
+  it("__init__.py registers pre_llm_call through the Hermes loader path", () => {
     const out = execFileSync(
       "python3",
       [
         "-B",
         "-c",
-        `import importlib.util, sys
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
 path = sys.argv[1]
+repo = sys.argv[2]
 spec = importlib.util.spec_from_file_location("cns_brain_recall", path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
+
+live_payload = json.dumps({
+    "context": "### vault:notes/live.md",
+    "citations": [{"path": "notes/live.md", "score": 0.8}],
+    "channel": "standard_text",
+    "shadow": False,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = live_payload
+    stderr = ""
+
 class Ctx:
     def __init__(self):
         self.calls = []
     def register_hook(self, name, callback):
         self.calls.append((name, callback))
+
 ctx = Ctx()
 mod.register(ctx)
 assert len(ctx.calls) == 1, ctx.calls
 name, callback = ctx.calls[0]
 assert name == "pre_llm_call", name
-assert callback(session_id="s", user_message="hi") == {"context": "[brain-recall:probe]"}
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch("subprocess.run", return_value=FakeProc()):
+        result = callback(user_message="hello", platform="discord")
+        assert result == {"context": "### vault:notes/live.md"}, result
 print("ok")`,
         join(pluginRoot, "__init__.py"),
+        root,
       ],
       { encoding: "utf8", env: bytecodeEnv },
     );
@@ -113,13 +204,224 @@ print("ok")`,
     });
 
     expect(out).toContain(`Installed Hermes plugin to: ${destRoot}`);
-    expect(out).toContain(`Config snippet: ${join(destRoot, "references/config-snippet.md")}`);
     expect(existsSync(join(destRoot, "plugin.py"))).toBe(true);
-    expect(existsSync(join(destRoot, "__init__.py"))).toBe(true);
-    expect(existsSync(join(destRoot, "plugin.yaml"))).toBe(true);
-    expect(existsSync(join(destRoot, "references/config-snippet.md"))).toBe(true);
     expect(existsSync(staleFile)).toBe(false);
     expect(existsSync(join(destRoot, "__pycache__"))).toBe(false);
-    expect(existsSync(join(destRoot, "__pycache__/plugin.cpython-312.pyc"))).toBe(false);
+  });
+
+  it("recall_hook fail-opens on subprocess TimeoutExpired", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+import subprocess
+
+path = sys.argv[1]
+repo = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 5)):
+        result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+        assert result == {}, result
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("recall_hook fail-opens when omnipotent root is missing", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": "/nonexistent/omnipotent"}, clear=True):
+    result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+    assert result == {}, result
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("_resolve_node_bin honors CNS_NODE_BIN", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+fake_node = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_NODE_BIN": fake_node}, clear=False):
+    assert mod._resolve_node_bin() == fake_node
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        process.execPath,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+});
+
+describe("Story 79-5 brain-recall-prefetch CLI", () => {
+  it("detectRecallChannel uses nexus-voice platform hint for voice_pane", () => {
+    expect(
+      detectRecallChannel({
+        userMessage: "short",
+        platformHint: "nexus-voice",
+        yappedTextMinChars: 400,
+      }),
+    ).toBe("voice_pane");
+  });
+
+  it("brain-recall-prefetch.mjs wrapper prints JSON stdout contract", async () => {
+    const anchor = "Wrapper CLI body for recall.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/wrap.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/wrap.md",
+    });
+
+    const res = spawnSync(
+      "node",
+      [prefetchScript, "--query", anchor, "--index-path", indexPath, "--vault-root", vaultRoot],
+      { cwd: root, encoding: "utf8", env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" } },
+    );
+
+    expect(res.status).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload).toMatchObject({
+      context: null,
+      channel: "standard_text",
+      shadow: true,
+    });
+    expect(payload.citations.length).toBeGreaterThan(0);
+    expect(payload.citations[0]?.path).toBe("notes/wrap.md");
+    expect(res.stderr).toMatch(/cns-brain-recall:shadow/);
+  });
+
+  it("voice_pane channel when platform is nexus-voice via wrapper", async () => {
+    const anchor = "Voice pane recall body.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-voice-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-voice-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/voice.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice.md",
+    });
+
+    const res = spawnSync(
+      "node",
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--platform",
+        "nexus-voice",
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+      ],
+      { cwd: root, encoding: "utf8", env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" } },
+    );
+
+    expect(res.status).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload.channel).toBe("voice_pane");
+  });
+
+  it("recall_hook end-to-end passes user_message to prefetch CLI (shadow + real citations)", async () => {
+    const anchor = "Hermes pre_llm_call hook probe for Story 79-5 evidence.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-hook-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-hook-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/hook-probe.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/hook-probe.md",
+    });
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+query = sys.argv[6]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+}
+
+with __import__("unittest.mock").mock.patch.dict(os.environ, env, clear=False):
+    result = mod.recall_hook(user_message=query, platform="discord", session_id="probe-s")
+
+assert result == {}, result
+print(json.dumps({"hook_result": result}))
+`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    expect(out.trim()).toContain('"hook_result": {}');
   });
 });

@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 79-5-production-cns-brain-recall-plugin-prefetch-cli (2026-06-26)
+
+- **Per-turn recall latency (cold-start + index load + Portal embed)** — measure p95 at Story 79-4 live cutover (`shadow_mode: false`); if over budget, consider persistent prefetch helper instead of per-turn `npx tsx` subprocess. Forward flag only; not blocking shadow wiring.
+
+---
+
 ## Hermes Desktop Electron build — AC#4 voice E2E blocker (2026-06-25)
 
 **Surfaced by:** Story 78-1 operator assessment.

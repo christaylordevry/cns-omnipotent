@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-26T08:20:00Z
+# last_updated: 2026-06-26T09:05:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-26T08:40:00+10:00"
+last_updated: "2026-06-26T09:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -655,5 +655,5 @@ development_status:
   79-2-portalembedder-production-brain-index: done
   79-3-recall-policy-config-recall-inject: done
   79-4-golden-set-calibration-gate: done
-  79-5-production-cns-brain-recall-plugin-prefetch-cli: backlog
+  79-5-production-cns-brain-recall-plugin-prefetch-cli: done
   epic-79-retrospective: optional
