@@ -35,11 +35,14 @@ export type RecallInjectionCitation = {
 
 export type RecallInjectionResult = {
   context: string | null;
+  /** Full cited block that would inject when shadow_mode is false (FR19 shadow logging). */
+  wouldInjectContext: string | null;
   citations: RecallInjectionCitation[];
   channel: RecallChannel;
   shadow: boolean;
   policyVersion: string;
-  tokensUsed: number;
+  /** Hot-path budget trim uses chars/4 estimate — not for calibration reporting. */
+  tokensUsedEstimate: number;
   dropped: RecallInjectionDroppedChunk[];
 };
 
@@ -260,13 +263,15 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
   });
 
   const shadow = params.policy.shadow_mode === true;
+  const wouldInjectContext = contextBlock.length > 0 ? contextBlock : null;
   return {
-    context: shadow ? null : contextBlock.length > 0 ? contextBlock : null,
+    context: shadow ? null : wouldInjectContext,
+    wouldInjectContext,
     citations,
     channel: params.channel,
     shadow,
     policyVersion: params.policy.policy_version,
-    tokensUsed,
+    tokensUsedEstimate: tokensUsed,
     dropped,
   };
 }

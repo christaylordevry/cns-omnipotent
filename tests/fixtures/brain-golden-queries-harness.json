@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "curated_by": "harness-fixture",
+  "curated_at": "2026-06-26",
+  "queries": [
+    {
+      "id": "q-alpha",
+      "prompt": "alpha topic",
+      "expected_paths": ["notes/alpha.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-beta",
+      "prompt": "beta topic",
+      "expected_paths": ["notes/beta.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-gamma",
+      "prompt": "gamma topic",
+      "expected_paths": ["notes/gamma.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-delta",
+      "prompt": "delta topic",
+      "expected_paths": ["notes/delta.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-epsilon",
+      "prompt": "epsilon topic",
+      "expected_paths": ["notes/epsilon.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-zeta",
+      "prompt": "zeta topic",
+      "expected_paths": ["notes/zeta.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-eta",
+      "prompt": "eta topic",
+      "expected_paths": ["notes/eta.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-theta",
+      "prompt": "theta topic",
+      "expected_paths": ["notes/theta.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-iota",
+      "prompt": "iota topic",
+      "expected_paths": ["notes/iota.md"],
+      "provenance": "fixture"
+    },
+    {
+      "id": "q-kappa",
+      "prompt": "kappa topic",
+      "expected_paths": ["notes/kappa.md"],
+      "provenance": "fixture"
+    }
+  ]
+}

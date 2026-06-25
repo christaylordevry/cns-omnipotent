@@ -1060,3 +1060,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 60-2-dry-refactor-shared-withsessioncloseenv-isolation-helper (2026-06-04)
 
 - Optional direct unit tests for `tests/helpers/hermes-env-isolation.mjs` (save/restore ordering, nested-call safety); integration coverage via three migrated suites is sufficient for now.
+
+## Deferred from: code review of 79-4-golden-set-calibration-gate (2026-06-26)
+
+- `precision@k` metric is expected-recall-in-top-k (|expected ∩ topK| / |expected|), not classic IR precision — documented in harness; acceptable for SM-1 bar if operator agrees.
+- Operator live calibration not run — golden paths verified in vault (including `AI-Context/modules/run-chain.md`); `operator_signoff: pending` until Chris runs Portal index calibrate.

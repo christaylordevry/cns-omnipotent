@@ -191,8 +191,8 @@ describe("buildRecallInjection", () => {
     expect(out.citations.map((c) => c.path)).toEqual(["notes/alpha.md", "notes/beta.md"]);
     expect(out.context).toContain("vault:notes/alpha.md");
     expect(out.context).toContain("vault:notes/beta.md");
-    expect(out.tokensUsed).toBeGreaterThan(0);
-    expect(out.tokensUsed).toBeLessThanOrEqual(FIXTURE_POLICY.channels.standard_text.max_injection_tokens);
+    expect(out.tokensUsedEstimate).toBeGreaterThan(0);
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(FIXTURE_POLICY.channels.standard_text.max_injection_tokens);
   });
 
   it("drops chunks without resolvable vault paths", async () => {
@@ -284,7 +284,7 @@ describe("buildRecallInjection", () => {
       embedder,
     });
 
-    expect(out.tokensUsed).toBeLessThanOrEqual(60);
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(60);
     expect(out.context).toContain("vault:notes/long-a.md");
     expect(out.citations.length).toBeGreaterThan(0);
     expect(out.citations.length).toBeLessThan(3);
@@ -414,6 +414,7 @@ describe("buildRecallInjection", () => {
 
     expect(out.shadow).toBe(true);
     expect(out.context).toBeNull();
+    expect(out.wouldInjectContext).toContain("vault:notes/shadow.md");
     expect(out.citations).toHaveLength(1);
   });
 });
