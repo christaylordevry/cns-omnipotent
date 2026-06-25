@@ -1,0 +1,5 @@
+name: cns-brain-recall
+version: 0.1.0
+description: "CNS Brain recall — pre_llm_call context injection (A4-0 probe stub)"
+hooks:
+  - pre_llm_call
