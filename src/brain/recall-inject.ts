@@ -1,9 +1,4 @@
-import matter from "gray-matter";
 import type { Embedder } from "./embedder.js";
-import {
-  isDailyNotesVaultPath,
-  stripAgentLogSectionFromMarkdown,
-} from "./brain-path-utils.js";
 import {
   evaluateNoteForEmbeddingSecretGate,
   INDEXING_SECRET_EXCLUSION_REASON,
@@ -127,26 +122,9 @@ export function formatRecallContextBlock(params: {
   return [header, ...params.chunks].join("\n\n");
 }
 
-function excerptFromRawNote(
-  vaultRelPath: string,
-  raw: string,
-  maxChars: number,
-): string {
-  const parsed = matter(raw);
-  let body = parsed.content;
-  if (isDailyNotesVaultPath(vaultRelPath)) {
-    body = stripAgentLogSectionFromMarkdown(body);
-  }
-  const trimmed = body.trim();
-  if (trimmed.length <= maxChars) {
-    return trimmed;
-  }
-  return trimmed.slice(0, maxChars);
-}
-
 function fitRecallChunkToBudget(params: {
   path: string;
-  rawText: string;
+  passageText: string;
   score: number;
   remainingTokens: number;
 }): { chunk: string; tokens: number } | null {
@@ -156,11 +134,12 @@ function fitRecallChunkToBudget(params: {
     return null;
   }
   let maxChars = (params.remainingTokens - headerTokens) * 4;
+  const passage = params.passageText.trim();
   while (maxChars > 0) {
-    const excerpt = excerptFromRawNote(params.path, params.rawText, maxChars);
-    if (excerpt.length === 0) {
+    if (passage.length === 0) {
       return null;
     }
+    const excerpt = passage.length <= maxChars ? passage : passage.slice(0, maxChars);
     const chunk = formatRecallChunk(params.path, excerpt, params.score);
     const tokens = estimateInjectionTokens(chunk);
     if (tokens <= params.remainingTokens) {
@@ -172,7 +151,7 @@ function fitRecallChunkToBudget(params: {
 }
 
 /**
- * Query Brain index, load vault excerpts, trim to per-channel budget, emit cited context block.
+ * Query Brain index, inject winning chunk passages from index hits, trim to per-channel budget.
  */
 export async function buildRecallInjection(params: BuildRecallInjectionParams): Promise<RecallInjectionResult> {
   const channelPolicy = channelPolicyFor(params.policy, params.channel);
@@ -194,6 +173,7 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
   let tokensUsed = 0;
   const maxTokens = channelPolicy.max_injection_tokens;
   const maxChunks = channelPolicy.max_chunks;
+  const secretGateCache = new Map<string, Awaited<ReturnType<typeof evaluateNoteForEmbeddingSecretGate>>>();
 
   for (const hit of queryOut.results) {
     if (chunks.length >= maxChunks) {
@@ -201,26 +181,34 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
     }
     const vaultPath = hit.path;
     const score = hit.score ?? 0;
+    const passageText = hit.text?.trim() ?? "";
+
+    if (passageText.length === 0) {
+      dropped.push({ path: vaultPath, reason: "NOT_FOUND" });
+      continue;
+    }
 
     if (isRecallInjectionPathBlocked(vaultPath, params.policy.inject_blocked_paths)) {
       dropped.push({ path: vaultPath, reason: "PATH_BLOCKED" });
       continue;
     }
 
-    let rawText: string | null;
-    try {
-      rawText = await vaultReadFile(params.vaultRoot, vaultPath);
-    } catch {
-      dropped.push({ path: vaultPath, reason: "NOT_FOUND" });
-      continue;
-    }
-
-    let secretGate: Awaited<ReturnType<typeof evaluateNoteForEmbeddingSecretGate>>;
-    try {
-      secretGate = await evaluateNoteForEmbeddingSecretGate(params.vaultRoot, rawText);
-    } catch {
-      dropped.push({ path: vaultPath, reason: "SECRET_GATE" });
-      continue;
+    let secretGate = secretGateCache.get(vaultPath);
+    if (secretGate === undefined) {
+      let rawText: string | null;
+      try {
+        rawText = await vaultReadFile(params.vaultRoot, vaultPath);
+      } catch {
+        dropped.push({ path: vaultPath, reason: "NOT_FOUND" });
+        continue;
+      }
+      try {
+        secretGate = await evaluateNoteForEmbeddingSecretGate(params.vaultRoot, rawText);
+      } catch {
+        dropped.push({ path: vaultPath, reason: "SECRET_GATE" });
+        continue;
+      }
+      secretGateCache.set(vaultPath, secretGate);
     }
     if (!secretGate.eligible) {
       dropped.push({
@@ -234,15 +222,10 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
     if (remainingTokens <= 0) {
       break;
     }
-    const excerpt = excerptFromRawNote(vaultPath, rawText, remainingTokens * 4);
-    if (excerpt.length === 0) {
-      dropped.push({ path: vaultPath, reason: "NOT_FOUND" });
-      continue;
-    }
 
     const fitted = fitRecallChunkToBudget({
       path: vaultPath,
-      rawText,
+      passageText,
       score,
       remainingTokens,
     });

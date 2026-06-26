@@ -42,16 +42,29 @@ const FIXTURE_POLICY = {
 
 async function writeIndex(params: {
   dir: string;
-  records: Array<{ path: string; embedding: number[] }>;
+  records: Array<{ path: string; embedding: number[]; text?: string; chunk_index?: number }>;
 }): Promise<string> {
   const indexPath = path.join(params.dir, "brain-index.json");
   await writeFile(
     indexPath,
     JSON.stringify(
       {
-        schema_version: 1,
+        schema_version: 2,
         embedder: { providerId: "test", modelId: "fixed" },
-        records: params.records,
+        chunking: {
+          target_tokens: 768,
+          overlap_tokens: 64,
+          tokenizer_encoding: "cl100k_base",
+          tokenizer_package: "gpt-tokenizer@3.4.0",
+        },
+        records: params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: r.chunk_index ?? i,
+          char_start: 0,
+          char_end: (r.text ?? `body for ${r.path}`).length,
+          text: r.text ?? `body for ${r.path}`,
+          embedding: r.embedding,
+        })),
         exclusions: [],
       },
       null,
@@ -174,8 +187,8 @@ describe("buildRecallInjection", () => {
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
-        { path: "notes/alpha.md", embedding: [1, 0] },
-        { path: "notes/beta.md", embedding: [0.9, 0.1] },
+        { path: "notes/alpha.md", embedding: [1, 0], text: "Alpha recall body for injection." },
+        { path: "notes/beta.md", embedding: [0.9, 0.1], text: "Beta secondary body." },
       ],
     });
 
@@ -193,6 +206,30 @@ describe("buildRecallInjection", () => {
     expect(out.context).toContain("vault:notes/beta.md");
     expect(out.tokensUsedEstimate).toBeGreaterThan(0);
     expect(out.tokensUsedEstimate).toBeLessThanOrEqual(FIXTURE_POLICY.channels.standard_text.max_injection_tokens);
+  });
+
+  it("injects indexed chunk passage text rather than whole-note head", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-79-6-chunk-"));
+    const indexDir = await mkdtemp(path.join(os.tmpdir(), "cns-79-6-chunk-idx-"));
+    const wholeNotePadding = "IGNORED WHOLE NOTE PADDING ".repeat(20);
+    await writeVaultNote(vaultRoot, "notes/passage.md", `${wholeNotePadding}WINNING_PASSAGE_ONLY`);
+    const indexPath = await writeIndex({
+      dir: indexDir,
+      records: [{ path: "notes/passage.md", embedding: [1, 0], text: "WINNING_PASSAGE_ONLY" }],
+    });
+
+    const out = await buildRecallInjection({
+      vaultRoot,
+      indexPath,
+      query: "passage",
+      channel: "standard_text",
+      policy: FIXTURE_POLICY,
+      embedder,
+    });
+
+    expect(out.context).toContain("WINNING_PASSAGE_ONLY");
+    expect(out.context).not.toContain("IGNORED WHOLE NOTE PADDING");
+    expect(out.context).toContain("vault:notes/passage.md");
   });
 
   it("drops chunks without resolvable vault paths", async () => {
@@ -257,9 +294,9 @@ describe("buildRecallInjection", () => {
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
-        { path: "notes/long-a.md", embedding: [1, 0] },
-        { path: "notes/long-b.md", embedding: [0.95, 0.05] },
-        { path: "notes/long-c.md", embedding: [0.9, 0.1] },
+        { path: "notes/long-a.md", embedding: [1, 0], text: longBody },
+        { path: "notes/long-b.md", embedding: [0.95, 0.05], text: longBody },
+        { path: "notes/long-c.md", embedding: [0.9, 0.1], text: longBody },
       ],
     });
 
@@ -299,8 +336,8 @@ describe("buildRecallInjection", () => {
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
-        { path: tooLongName, embedding: [1, 0] },
-        { path: "notes/z-short.md", embedding: [0.99, 0.01] },
+        { path: tooLongName, embedding: [1, 0], text: "Large path body." },
+        { path: "notes/z-short.md", embedding: [0.99, 0.01], text: "Short body." },
       ],
     });
 
@@ -338,8 +375,8 @@ describe("buildRecallInjection", () => {
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
-        { path: "notes/a-stale.md", embedding: [1, 0] },
-        { path: "notes/z-fresh.md", embedding: [0.95, 0.05] },
+        { path: "notes/a-stale.md", embedding: [1, 0], text: "Stale body." },
+        { path: "notes/z-fresh.md", embedding: [0.95, 0.05], text: "Fresh body." },
       ],
     });
     await writeFile(
@@ -379,7 +416,11 @@ describe("buildRecallInjection", () => {
     }
     const indexPath = await writeIndex({
       dir: indexDir,
-      records: ["a", "b", "c", "d"].map((n) => ({ path: `notes/${n}.md`, embedding: [1, 0] })),
+      records: ["a", "b", "c", "d"].map((n) => ({
+        path: `notes/${n}.md`,
+        embedding: [1, 0],
+        text: `Body ${n}`,
+      })),
     });
 
     const out = await buildRecallInjection({
@@ -400,7 +441,7 @@ describe("buildRecallInjection", () => {
     await writeVaultNote(vaultRoot, "notes/shadow.md", "Shadow mode body.");
     const indexPath = await writeIndex({
       dir: indexDir,
-      records: [{ path: "notes/shadow.md", embedding: [1, 0] }],
+      records: [{ path: "notes/shadow.md", embedding: [1, 0], text: "Shadow mode body." }],
     });
 
     const out = await buildRecallInjection({

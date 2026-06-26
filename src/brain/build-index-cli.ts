@@ -36,7 +36,7 @@ function buildFailedManifest(params: {
     build_timestamp_utc: new Date(params.buildTimestampMs).toISOString(),
     allowlist_snapshot: params.allowlistSnapshot,
     embedder: params.embedder,
-    counts: { candidates_discovered: 0, embedded: 0, excluded: 0, failed: 0 },
+    counts: { candidates_discovered: 0, embedded: 0, notes_embedded: 0, excluded: 0, failed: 0 },
     exclusion_reason_breakdown: {},
     failures: [],
     vault_snapshot: params.drift.vault_snapshot,
@@ -116,7 +116,13 @@ async function main(): Promise<void> {
 
     const drift = await computeVaultSnapshotAndFreshness(vaultRoot, run.candidates, buildTimestampMs);
     const breakdown = buildExclusionReasonBreakdown(run.result.exclusions, run.hardExcludedMetaLogsCount);
-    const counts = buildCounts(run.candidates.length, run.result.records.length, run.result.exclusions);
+    const notesEmbedded = new Set(run.result.records.map((r) => r.path)).size;
+    const counts = buildCounts(
+      run.candidates.length,
+      run.result.records.length,
+      notesEmbedded,
+      run.result.exclusions,
+    );
     const failures = buildBoundedFailureSummaries(run.result.exclusions);
 
     const manifest: BrainIndexManifest = {
@@ -125,6 +131,7 @@ async function main(): Promise<void> {
       build_timestamp_utc: new Date(buildTimestampMs).toISOString(),
       allowlist_snapshot: allowlistToSnapshot(loaded.value),
       embedder: run.result.embedder,
+      chunking: run.result.chunking,
       counts,
       exclusion_reason_breakdown: breakdown,
       failures,

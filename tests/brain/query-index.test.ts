@@ -8,9 +8,14 @@ import { queryBrainIndex } from "../../src/brain/retrieval/query-index.js";
 
 async function writeIndex(params: {
   dir: string;
+  schemaVersion?: 1 | 2;
   embedder?: { providerId: string; modelId: string; vectorDimension?: number };
   records: Array<{
     path: string;
+    chunk_index?: number;
+    char_start?: number;
+    char_end?: number;
+    text?: string;
     embedding: number[];
     quality?: {
       status?: string;
@@ -21,12 +26,39 @@ async function writeIndex(params: {
   }>;
 }): Promise<string> {
   const indexPath = path.join(params.dir, "brain-index.json");
-  const obj = {
-    schema_version: 1,
-    embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
-    records: params.records,
-    exclusions: [],
-  };
+  const schemaVersion = params.schemaVersion ?? 2;
+  const records =
+    schemaVersion === 2
+      ? params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: r.chunk_index ?? i,
+          char_start: r.char_start ?? 0,
+          char_end: r.char_end ?? (r.text?.length ?? 0),
+          text: r.text ?? `chunk for ${r.path}`,
+          embedding: r.embedding,
+          ...(r.quality ? { quality: r.quality } : {}),
+        }))
+      : params.records;
+  const obj =
+    schemaVersion === 2
+      ? {
+          schema_version: 2,
+          embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
+          chunking: {
+            target_tokens: 768,
+            overlap_tokens: 64,
+            tokenizer_encoding: "cl100k_base",
+            tokenizer_package: "gpt-tokenizer@3.4.0",
+          },
+          records,
+          exclusions: [],
+        }
+      : {
+          schema_version: 1,
+          embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
+          records,
+          exclusions: [],
+        };
   await writeFile(indexPath, `${JSON.stringify(obj, null, 2)}\n`, "utf8");
   return indexPath;
 }
@@ -45,7 +77,7 @@ async function writeManifest(params: {
     build_timestamp_utc: params.last_build_utc,
     allowlist_snapshot: { subtrees: [], inbox: { enabled: false } },
     embedder: { providerId: "stub", modelId: "stub-v1" },
-    counts: { candidates_discovered: 0, embedded: 0, excluded: 0, failed: 0 },
+    counts: { candidates_discovered: 0, embedded: 0, notes_embedded: 0, excluded: 0, failed: 0 },
     exclusion_reason_breakdown: {},
     failures: [],
     vault_snapshot: {
@@ -525,6 +557,63 @@ describe("queryBrainIndex", () => {
       code: "SCHEMA_INVALID",
       details: { code: "INDEX_EMBEDDER_MISMATCH" },
     });
+  });
+
+  it("rejects schema v1 indexes with INDEX_SCHEMA_STALE", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-v1-"));
+    const indexPath = await writeIndex({
+      dir,
+      schemaVersion: 1,
+      records: [{ path: "notes/a.md", embedding: [1, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 5, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_SCHEMA_STALE" },
+    });
+  });
+
+  it("collapses multiple high-scoring chunks per parent before top-k so co-relevant notes remain", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-collapse-"));
+    const noteA = "notes/guide-a.md";
+    const noteB = "notes/guide-b.md";
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        ...Array.from({ length: 5 }, (_, i) => ({
+          path: noteA,
+          chunk_index: i,
+          text: `guide-a chunk ${i}`,
+          embedding: [1, 0],
+        })),
+        {
+          path: noteB,
+          chunk_index: 0,
+          text: "guide-b sole chunk",
+          embedding: [0.95, 0.05],
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 5, embedder, qualityWeighting: false });
+    const paths = out.results.map((r) => r.path);
+    expect(paths).toHaveLength(2);
+    expect(paths).toContain(noteA);
+    expect(paths).toContain(noteB);
+    expect(new Set(paths).size).toBe(2);
+    expect(out.results[0]?.path).toBe(noteA);
+    expect(out.results[0]?.chunk_index).toBe(0);
+    expect(out.results[0]?.text).toBe("guide-a chunk 0");
   });
 
   it("fails fast when query embedding dimension does not match index metadata", async () => {

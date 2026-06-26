@@ -1,6 +1,5 @@
 import { mkdir, readdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import matter from "gray-matter";
 import { CnsError } from "../errors.js";
 import { resolveVaultPath } from "../paths.js";
 import { getRealVaultRoot, resolveReadTargetCanonical } from "../read-boundary.js";
@@ -15,7 +14,14 @@ import type { Embedder, EmbedderMetadata } from "./embedder.js";
 import type { QualityMetadata } from "./quality.js";
 import { effectiveCorpusRoots } from "./load-corpus-allowlist.js";
 import { evaluateNoteForEmbeddingSecretGate } from "./indexing-secret-gate.js";
+import {
+  brainIndexChunkingMetadata,
+  chunkNoteText,
+  type BrainIndexChunkingMetadata,
+} from "./note-chunker.js";
 import { PAKE_TYPE_VALUES } from "../pake/schemas.js";
+
+export const BUILD_INDEX_SCHEMA_VERSION = 2 as const;
 
 export type BuildIndexExclusion = {
   path: string;
@@ -30,12 +36,17 @@ export type DiscoverMarkdownCandidatesResult = {
 
 export type BuildIndexRecord = {
   path: string;
+  chunk_index: number;
+  char_start: number;
+  char_end: number;
+  text: string;
   embedding: number[];
   quality?: QualityMetadata;
 };
 
 export type BuildIndexResult = {
   embedder: EmbedderMetadata;
+  chunking: BrainIndexChunkingMetadata;
   records: BuildIndexRecord[];
   exclusions: BuildIndexExclusion[];
 };
@@ -287,40 +298,65 @@ export async function runBuildIndex(
 
     const quality = extractQualityMetadata(parsed.frontmatter);
 
-    let textForEmbed = raw;
+    let bodyForChunk = parsed.body;
     if (isDailyNotesVaultPath(vaultRel)) {
-      const strippedBody = stripAgentLogSectionFromMarkdown(parsed.body);
-      textForEmbed = matter.stringify(strippedBody, parsed.frontmatter);
+      bodyForChunk = stripAgentLogSectionFromMarkdown(bodyForChunk);
     }
 
-    let embedding: number[];
-    try {
-      embedding = await embedder.embed(textForEmbed);
-    } catch (err) {
+    if (bodyForChunk.trim().length === 0) {
       exclusions.push({
         path: vaultRel,
-        reasonCode: "EMBEDDING_ERROR",
-        detail: { code: err instanceof CnsError ? err.code : "IO_ERROR" },
+        reasonCode: "EMPTY_NOTE",
+        detail: { code: "EMPTY_NOTE" },
       });
       continue;
     }
-    if (vectorDimension === undefined) {
-      vectorDimension = embedding.length;
-    } else if (embedding.length !== vectorDimension) {
-      exclusions.push({
+
+    const chunks = chunkNoteText(bodyForChunk);
+
+    for (const chunk of chunks) {
+      let embedding: number[];
+      try {
+        embedding = await embedder.embed(chunk.text);
+      } catch (err) {
+        exclusions.push({
+          path: vaultRel,
+          reasonCode: "EMBEDDING_ERROR",
+          detail: { code: err instanceof CnsError ? err.code : "IO_ERROR" },
+        });
+        break;
+      }
+      if (vectorDimension === undefined) {
+        vectorDimension = embedding.length;
+      } else if (embedding.length !== vectorDimension) {
+        exclusions.push({
+          path: vaultRel,
+          reasonCode: "DIMENSION_MISMATCH",
+          detail: { code: "DIMENSION_MISMATCH" },
+        });
+        break;
+      }
+      records.push({
         path: vaultRel,
-        reasonCode: "DIMENSION_MISMATCH",
-        detail: { code: "DIMENSION_MISMATCH" },
+        chunk_index: chunk.chunk_index,
+        char_start: chunk.char_start,
+        char_end: chunk.char_end,
+        text: chunk.text,
+        embedding,
+        ...(quality ? { quality } : {}),
       });
-      continue;
     }
-    records.push({ path: vaultRel, embedding, ...(quality ? { quality } : {}) });
   }
+
+  const sortedRecords = [...records].sort(
+    (a, b) => a.path.localeCompare(b.path, "en") || a.chunk_index - b.chunk_index,
+  );
 
   return {
     result: {
       embedder: { ...embedder.metadata, ...(vectorDimension !== undefined ? { vectorDimension } : {}) },
-      records,
+      chunking: brainIndexChunkingMetadata(),
+      records: sortedRecords,
       exclusions: exclusions.sort((a, b) => a.path.localeCompare(b.path, "en")),
     },
     candidates,
@@ -330,11 +366,14 @@ export async function runBuildIndex(
 
 /** Stable JSON artifact: deterministic field order, sorted arrays; no timestamps. */
 export function serializeBuildIndexArtifact(result: BuildIndexResult): string {
-  const sortedRecords = [...result.records].sort((a, b) => a.path.localeCompare(b.path, "en"));
+  const sortedRecords = [...result.records].sort(
+    (a, b) => a.path.localeCompare(b.path, "en") || a.chunk_index - b.chunk_index,
+  );
   const sortedExclusions = [...result.exclusions].sort((a, b) => a.path.localeCompare(b.path, "en"));
   const obj = {
-    schema_version: 1,
+    schema_version: BUILD_INDEX_SCHEMA_VERSION,
     embedder: result.embedder,
+    chunking: result.chunking,
     records: sortedRecords,
     exclusions: sortedExclusions,
   };

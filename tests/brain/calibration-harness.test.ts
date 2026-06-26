@@ -43,16 +43,29 @@ const FIXTURE_POLICY = {
 
 async function writeIndex(params: {
   dir: string;
-  records: Array<{ path: string; embedding: number[] }>;
+  records: Array<{ path: string; embedding: number[]; text?: string }>;
 }): Promise<string> {
   const indexPath = path.join(params.dir, "brain-index.json");
   await writeFile(
     indexPath,
     JSON.stringify(
       {
-        schema_version: 1,
+        schema_version: 2,
         embedder: { providerId: "test", modelId: "fixed" },
-        records: params.records,
+        chunking: {
+          target_tokens: 768,
+          overlap_tokens: 64,
+          tokenizer_encoding: "cl100k_base",
+          tokenizer_package: "gpt-tokenizer@3.4.0",
+        },
+        records: params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: i,
+          char_start: 0,
+          char_end: (r.text ?? `Body for ${r.path}`).length,
+          text: r.text ?? `Body for ${r.path}`,
+          embedding: r.embedding,
+        })),
         exclusions: [],
       },
       null,
@@ -135,7 +148,11 @@ describe("runCalibrationHarness", () => {
 
     const indexPath = await writeIndex({
       dir: indexDir,
-      records: notes.map((n) => ({ path: `notes/${n.id}.md`, embedding: n.vec })),
+      records: notes.map((n) => ({
+        path: `notes/${n.id}.md`,
+        embedding: n.vec,
+        text: `Body for ${n.id} topic with unique ${n.id} content.`,
+      })),
     });
 
     const embedder: Embedder = {
@@ -222,8 +239,8 @@ describe("runCalibrationHarness", () => {
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
-        { path: "notes/good.md", embedding: [1, 0, 0] },
-        { path: "AI-Context/AGENTS.md", embedding: [0.99, 0.01, 0] },
+        { path: "notes/good.md", embedding: [1, 0, 0], text: "Good topic body." },
+        { path: "AI-Context/AGENTS.md", embedding: [0.99, 0.01, 0], text: "Constitution body." },
       ],
     });
 
@@ -271,7 +288,7 @@ describe("runCalibrationHarness", () => {
     await writeVaultNote(vaultRoot, "notes/alpha.md", "Alpha body.");
     const indexPath = await writeIndex({
       dir: indexDir,
-      records: [{ path: "notes/alpha.md", embedding: [1, 0, 0] }],
+      records: [{ path: "notes/alpha.md", embedding: [1, 0, 0], text: "Alpha body." }],
     });
 
     const embedder: Embedder = {
@@ -311,7 +328,7 @@ describe("runCalibrationHarness", () => {
     await writeVaultNote(vaultRoot, "notes/alpha.md", "Alpha shadow body.");
     const indexPath = await writeIndex({
       dir: indexDir,
-      records: [{ path: "notes/alpha.md", embedding: [1, 0, 0] }],
+      records: [{ path: "notes/alpha.md", embedding: [1, 0, 0], text: "Alpha body." }],
     });
 
     const embedder: Embedder = {

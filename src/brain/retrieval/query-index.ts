@@ -9,31 +9,43 @@ import { computeQualityMultiplierComponents, type QualityMultiplierComponents } 
 const MAX_TOPK = 50;
 const FRESHNESS_STALE_SAMPLE_PENALTY = 0.85;
 
-const IndexArtifactSchema = z.object({
-  schema_version: z.literal(1),
+const IndexRecordSchema = z.object({
+  path: z.string(),
+  chunk_index: z.number().int().nonnegative(),
+  char_start: z.number().int().nonnegative(),
+  char_end: z.number().int().nonnegative(),
+  text: z.string(),
+  embedding: z.array(z.number()),
+  quality: z
+    .object({
+      status: z.enum(["draft", "in-progress", "reviewed", "archived"]).optional(),
+      confidence_score: z.number().min(0).max(1).optional(),
+      verification_status: z.enum(["pending", "verified", "disputed"]).optional(),
+      pake_type: z.string().optional(),
+    })
+    .optional(),
+});
+
+const IndexArtifactSchemaV2 = z.object({
+  schema_version: z.literal(2),
   embedder: z.object({
     providerId: z.string(),
     modelId: z.string(),
     vectorDimension: z.number().int().positive().optional(),
   }),
-  records: z.array(
-    z.object({
-      path: z.string(),
-      embedding: z.array(z.number()),
-      quality: z
-        .object({
-          status: z.enum(["draft", "in-progress", "reviewed", "archived"]).optional(),
-          confidence_score: z.number().min(0).max(1).optional(),
-          verification_status: z.enum(["pending", "verified", "disputed"]).optional(),
-          pake_type: z.string().optional(),
-        })
-        .optional(),
-    }),
-  ),
+  chunking: z
+    .object({
+      target_tokens: z.number().int().positive(),
+      overlap_tokens: z.number().int().nonnegative(),
+      tokenizer_encoding: z.string(),
+      tokenizer_package: z.string(),
+    })
+    .optional(),
+  records: z.array(IndexRecordSchema),
   exclusions: z.array(z.unknown()).optional(),
 });
 
-type IndexArtifact = z.infer<typeof IndexArtifactSchema>;
+type IndexArtifact = z.infer<typeof IndexArtifactSchemaV2>;
 
 const SiblingManifestSchema = z.object({
   schema_version: z.number().optional(),
@@ -94,6 +106,10 @@ export type QueryBrainIndexScoreComponents = {
 
 export type QueryBrainIndexResultItem = {
   path: string;
+  chunk_index: number;
+  text: string;
+  char_start?: number;
+  char_end?: number;
   score?: number;
   components?: QueryBrainIndexScoreComponents;
 };
@@ -160,8 +176,40 @@ function cosineSimilarity(
   return { ok: true, score };
 }
 
-function stableSortByScoreThenPath<T extends { path: string; score: number }>(items: T[]): T[] {
-  return items.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path, "en"));
+type ScoredChunk = {
+  path: string;
+  chunk_index: number;
+  text: string;
+  char_start: number;
+  char_end: number;
+  score: number;
+  components: QueryBrainIndexScoreComponents;
+};
+
+function stableSortByScoreThenPathChunk<T extends { path: string; chunk_index: number; score: number }>(
+  items: T[],
+): T[] {
+  return items.sort(
+    (a, b) => b.score - a.score || a.path.localeCompare(b.path, "en") || a.chunk_index - b.chunk_index,
+  );
+}
+
+function collapseToBestChunkPerParent(scored: ScoredChunk[]): ScoredChunk[] {
+  const bestByPath = new Map<string, ScoredChunk>();
+  for (const item of scored) {
+    const existing = bestByPath.get(item.path);
+    if (existing === undefined) {
+      bestByPath.set(item.path, item);
+      continue;
+    }
+    const keepCurrent =
+      item.score > existing.score ||
+      (item.score === existing.score && item.chunk_index < existing.chunk_index);
+    if (keepCurrent) {
+      bestByPath.set(item.path, item);
+    }
+  }
+  return stableSortByScoreThenPathChunk([...bestByPath.values()]);
 }
 
 function staleSamplePathsFromManifest(manifest: Awaited<ReturnType<typeof tryLoadSiblingManifest>>): Set<string> {
@@ -187,7 +235,20 @@ async function loadIndexArtifact(indexPath: string): Promise<IndexArtifact> {
     throw new CnsError("SCHEMA_INVALID", "Index artifact is not valid JSON.", { code: "INDEX_JSON_INVALID" });
   }
 
-  const r = IndexArtifactSchema.safeParse(parsed);
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    "schema_version" in parsed &&
+    (parsed as { schema_version: unknown }).schema_version === 1
+  ) {
+    throw new CnsError(
+      "SCHEMA_INVALID",
+      "Index schema v1 is stale; full rebuild required for chunked schema v2.",
+      { code: "INDEX_SCHEMA_STALE" },
+    );
+  }
+
+  const r = IndexArtifactSchemaV2.safeParse(parsed);
   if (!r.success) {
     throw new CnsError("SCHEMA_INVALID", "Index artifact schema is invalid.", { code: "INDEX_SCHEMA_INVALID" });
   }
@@ -324,7 +385,7 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
     return buildOutput(index, [], warnings, provenance, includeEmbedderMetadata);
   }
 
-  const scored: Array<{ path: string; score: number; components: QueryBrainIndexScoreComponents }> = [];
+  const scored: ScoredChunk[] = [];
   let zeroRecordCount = 0;
   let dimensionMismatchCount = 0;
   let freshnessPenaltyCount = 0;
@@ -366,6 +427,10 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
     }
     scored.push({
       path: normalizedPath,
+      chunk_index: rec.chunk_index,
+      text: rec.text,
+      char_start: rec.char_start,
+      char_end: rec.char_end,
       score: finalScore,
       components: {
         rawSimilarity: sim.score,
@@ -403,9 +468,14 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
     });
   }
 
-  const ordered = stableSortByScoreThenPath(scored).slice(0, topK);
+  const collapsed = collapseToBestChunkPerParent(scored);
+  const ordered = collapsed.slice(0, topK);
   const results: QueryBrainIndexResultItem[] = ordered.map((r) => ({
     path: r.path,
+    chunk_index: r.chunk_index,
+    text: r.text,
+    char_start: r.char_start,
+    char_end: r.char_end,
     ...(includeScores ? { score: r.score } : {}),
     ...(explain ? { components: r.components } : {}),
   }));
