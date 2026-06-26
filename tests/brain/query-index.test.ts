@@ -171,8 +171,74 @@ describe("queryBrainIndex", () => {
       embed: async () => [1, 0],
     };
 
-    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
+    const out = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 1,
+    });
     expect(out.results.map((r) => r.path)).toEqual(["notes/z-source.md", "notes/a-workflow.md"]);
+  });
+
+  it("honours qualityWeightStrength in finalScore (α=0 cosine order, α=1 quality order, α=0.3 intermediate)", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-alpha-"));
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        {
+          path: "notes/high-quality.md",
+          embedding: [0.9, 0.1],
+          quality: { status: "reviewed", confidence_score: 1.0, verification_status: "verified", pake_type: "SourceNote" },
+        },
+        {
+          path: "notes/high-cosine.md",
+          embedding: [1, 0],
+          quality: { status: "draft", confidence_score: 0.1, verification_status: "pending" },
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const alphaZero = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 0,
+      explain: true,
+    });
+    expect(alphaZero.results[0]?.path).toBe("notes/high-cosine.md");
+    expect(alphaZero.results[0]?.components?.effectiveQualityMultiplier).toBeCloseTo(1);
+
+    const alphaOne = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 1,
+      explain: true,
+    });
+    expect(alphaOne.results[0]?.path).toBe("notes/high-quality.md");
+    expect(alphaOne.results[0]?.components?.qualityMultiplier).toBeCloseTo(1);
+    expect(alphaOne.results[0]?.components?.effectiveQualityMultiplier).toBeCloseTo(1);
+
+    const alphaMid = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 0.3,
+      explain: true,
+    });
+    expect(alphaMid.results[0]?.components?.qualityWeightStrength).toBeCloseTo(0.3);
+    expect(alphaMid.results[0]?.components?.effectiveQualityMultiplier).toBeGreaterThan(
+      alphaMid.results[1]?.components?.effectiveQualityMultiplier ?? 0,
+    );
   });
 
   it("applies manifest stale-sample freshness penalty when quality weighting is enabled", async () => {
@@ -312,6 +378,7 @@ describe("queryBrainIndex", () => {
     const first = out.results[0];
     expect(first?.components?.rawSimilarity).toBeCloseTo(1);
     expect(first?.components?.qualityMultiplier).toBeCloseTo(0.9);
+    expect(first?.components?.effectiveQualityMultiplier).toBeCloseTo(0.97);
     expect(first?.components?.quality.typeWeight).toBeCloseTo(1);
     expect(first?.components?.freshnessPenalty).toBe(1);
     expect(first?.components?.finalScore).toBeCloseTo(first?.score ?? 0);

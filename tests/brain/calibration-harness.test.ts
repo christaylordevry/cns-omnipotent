@@ -38,6 +38,9 @@ const FIXTURE_POLICY = {
     },
   },
   yapped_text_min_chars: 50,
+  index: {
+    quality_weight_strength: 0.3,
+  },
   shadow_mode: false,
 };
 

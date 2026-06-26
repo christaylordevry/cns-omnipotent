@@ -31,6 +31,8 @@ const brainRecallPolicySchema = z.object({
       incremental_cron_minutes: z.number().int().positive().optional(),
       stale_penalty_factor: z.number().min(0).max(1).optional(),
       max_staleness_minutes: z.number().int().positive().optional(),
+      /** Blend strength α for quality weighting; 0 = off, 1 = full product penalty (Story 79-7). */
+      quality_weight_strength: z.number().min(0).max(1).optional(),
     })
     .optional(),
   shadow_mode: z.boolean(),

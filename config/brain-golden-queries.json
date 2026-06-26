@@ -1,21 +1,10 @@
 {
   "schema_version": 1,
-  "curated_by": "dev-agent (pending operator validation)",
+  "curated_by": "verifier-corrected against cal1 ranked results (2026-06-26, post-79-6 chunked index)",
   "curated_at": "2026-06-26",
-  "curation_notes": "Real vague-question patterns from Hermes Omniscient brief workshop (2026-06-25), PRD UJ-1, and recent ops threads — NOT synthetic toy prompts. Expected paths validated against Knowledge-Vault-ACTIVE allowlist subtrees. Re-validate after major corpus ingest or embedder model change.",
+  "curation_notes": "Real vague-question patterns from Hermes Omniscient brief workshop. Expected paths CORRECTED 2026-06-26 against actual ranked retrieval (calib-cal1, quality-off purest-relevance view): notebooklm-routing now targets the real routing doc (notebooklm-workflow.md, not project-map which never ranks); deferred-run-chain and hermes-voice-blocker dropped the diluted deferred-work.md catch-all in favour of the dedicated notes that rank #1. Dropped 'youtube-bar' (requires intention inference, out of v1 scope per locked decision #8) and 'brain-recall-status' (asks for project status that lives in _bmad-output, not the indexed vault corpus). 10 queries remain, all with expected paths that demonstrably rank. Re-validate after major corpus ingest or embedder model change.",
   "operator_signoff": "pending",
   "queries": [
-    {
-      "id": "youtube-bar",
-      "prompt": "what was I supposed to do about that YouTube thing?",
-      "expected_paths": [
-        "03-Resources/CNS-Operator-Guide.md",
-        "01-Projects/CNS-Phase-1/deferred-work.md"
-      ],
-      "forbidden_paths": ["AI-Context/AGENTS.md"],
-      "provenance": "PRD UJ-1 + brief workshop 2026-06-25 (canonical vague-question bar)",
-      "notes": "Digest/YouTube ops context — operator to tighten expected_paths after Portal index rebuild if ranking shifts."
-    },
     {
       "id": "sprint-continuity",
       "prompt": "where did we leave off on the sprint?",
@@ -27,10 +16,9 @@
       "id": "deferred-run-chain",
       "prompt": "what's still deferred about run-chain?",
       "expected_paths": [
-        "01-Projects/CNS-Phase-1/deferred-work.md",
         "AI-Context/modules/run-chain.md"
       ],
-      "provenance": "deferred-work.md awareness-sync smoke 2026-06-25"
+      "provenance": "deferred-work.md awareness-sync smoke 2026-06-25 (expected corrected 2026-06-26: dedicated run-chain.md ranks #1; deferred-work.md catch-all does not rank)"
     },
     {
       "id": "morning-digest-time",
@@ -50,26 +38,16 @@
     {
       "id": "notebooklm-routing",
       "prompt": "which notebook should CNS research go to?",
-      "expected_paths": ["03-Resources/notebooklm-project-map.md"],
-      "provenance": "NotebookLM fan-out operator question (Epic 56 calibration thread)"
+      "expected_paths": ["AI-Context/modules/notebooklm-workflow.md"],
+      "provenance": "NotebookLM fan-out operator question (Epic 56 calibration thread); expected corrected 2026-06-26: notebooklm-workflow.md is the routing doc and ranks #1, project-map.md never ranks"
     },
     {
       "id": "hermes-voice-blocker",
       "prompt": "why isn't desktop voice working yet?",
       "expected_paths": [
-        "01-Projects/Brain - Central Nervous System Build/Hermes/Hermes-Desktop-App-Research-and-Setup-Guide-2026-06-07.md",
-        "01-Projects/CNS-Phase-1/deferred-work.md"
+        "01-Projects/Brain - Central Nervous System Build/Hermes/Hermes-Desktop-App-Research-and-Setup-Guide-2026-06-07.md"
       ],
-      "provenance": "Story 78-1 operator assessment + deferred-work § Desktop Electron"
-    },
-    {
-      "id": "brain-recall-status",
-      "prompt": "what's the status on brain recall / semantic search?",
-      "expected_paths": [
-        "03-Resources/AI-Native-Infrastructure/loop-engineering-anthropic-cns-gap-analysis.md",
-        "01-Projects/Brain - Central Nervous System Build/001 Central Nervous System.md"
-      ],
-      "provenance": "Omniscient brief — stub embedder gap + recall spine"
+      "provenance": "Story 78-1 operator assessment (expected corrected 2026-06-26: Hermes-Desktop guide ranks #1; deferred-work.md catch-all does not rank)"
     },
     {
       "id": "vault-fast-scan",

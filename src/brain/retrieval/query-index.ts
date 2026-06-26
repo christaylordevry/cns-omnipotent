@@ -4,7 +4,7 @@ import { z } from "zod";
 import { CnsError } from "../../errors.js";
 import type { Embedder, EmbedderMetadata } from "../embedder.js";
 import type { QualityMetadata } from "../quality.js";
-import { computeQualityMultiplierComponents, type QualityMultiplierComponents } from "./quality-weighting.js";
+import { computeQualityMultiplierComponents, type QualityMultiplierComponents, applyQualityWeightStrength, DEFAULT_QUALITY_WEIGHT_STRENGTH } from "./quality-weighting.js";
 
 const MAX_TOPK = 50;
 const FRESHNESS_STALE_SAMPLE_PENALTY = 0.85;
@@ -84,8 +84,10 @@ export type QueryBrainIndexParams = {
   query: string;
   topK?: number;
   minScore?: number;
-  /** Default: true. When false, ranking is pure cosine similarity. */
+  /** Default: true. When false, ranking is pure cosine similarity (α treated as 0). */
   qualityWeighting?: boolean;
+  /** Blend strength α in [0, 1] when qualityWeighting is true. Default 0.3. */
+  qualityWeightStrength?: number;
   /** Default: 0.85. Applied to manifest stale-sample records when quality weighting is enabled. */
   staleSamplePenaltyFactor?: number;
   includeScores?: boolean;
@@ -97,8 +99,13 @@ export type QueryBrainIndexParams = {
 
 export type QueryBrainIndexScoreComponents = {
   rawSimilarity: number;
+  /** Raw product multiplier from PAKE quality signals (pre-α). */
   qualityMultiplier: number;
   quality: QualityMultiplierComponents;
+  /** α-blended multiplier applied to finalScore when quality weighting is enabled. */
+  effectiveQualityMultiplier: number;
+  /** α used for blending; omitted when quality weighting is disabled. */
+  qualityWeightStrength?: number;
   freshnessPenalty: number;
   staleSampleMatch: boolean;
   finalScore: number;
@@ -346,6 +353,10 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
   const includeEmbedderMetadata = params.includeEmbedderMetadata ?? true;
   const minScore = typeof params.minScore === "number" && Number.isFinite(params.minScore) ? params.minScore : undefined;
   const qualityWeighting = params.qualityWeighting ?? true;
+  const qualityWeightStrength =
+    typeof params.qualityWeightStrength === "number" && Number.isFinite(params.qualityWeightStrength)
+      ? Math.max(0, Math.min(1, params.qualityWeightStrength))
+      : DEFAULT_QUALITY_WEIGHT_STRENGTH;
   const staleSamplePenaltyFactor =
     typeof params.staleSamplePenaltyFactor === "number" && Number.isFinite(params.staleSamplePenaltyFactor)
       ? Math.max(0, Math.min(1, params.staleSamplePenaltyFactor))
@@ -416,9 +427,12 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
           flatPenaltyApplied: false,
           multiplier: 1,
         };
+    const effectiveQualityMultiplier = qualityWeighting
+      ? applyQualityWeightStrength(quality.multiplier, qualityWeightStrength)
+      : 1;
     const staleSampleMatch = qualityWeighting && staleSamplePaths.has(normalizedPath);
     const freshnessPenalty = staleSampleMatch ? staleSamplePenaltyFactor : 1;
-    const finalScore = sim.score * quality.multiplier * freshnessPenalty;
+    const finalScore = sim.score * effectiveQualityMultiplier * freshnessPenalty;
     if (minScore !== undefined && finalScore < minScore) {
       continue;
     }
@@ -436,6 +450,8 @@ export async function queryBrainIndex(params: QueryBrainIndexParams): Promise<Qu
         rawSimilarity: sim.score,
         qualityMultiplier: quality.multiplier,
         quality,
+        effectiveQualityMultiplier,
+        ...(qualityWeighting ? { qualityWeightStrength } : {}),
         freshnessPenalty,
         staleSampleMatch,
         finalScore,

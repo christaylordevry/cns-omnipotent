@@ -161,6 +161,7 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
     topK: channelPolicy.max_top_k_fetch,
     minScore: channelPolicy.min_score_threshold,
     qualityWeighting: channelPolicy.quality_weighting ?? true,
+    qualityWeightStrength: params.policy.index?.quality_weight_strength,
     staleSamplePenaltyFactor: params.policy.index?.stale_penalty_factor,
     includeScores: true,
     includeEmbedderMetadata: false,

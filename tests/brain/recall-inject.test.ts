@@ -37,6 +37,9 @@ const FIXTURE_POLICY = {
     },
   },
   yapped_text_min_chars: 50,
+  index: {
+    quality_weight_strength: 0.3,
+  },
   shadow_mode: false,
 };
 
@@ -94,6 +97,16 @@ describe("recall policy parser", () => {
     expect(parsed.value.channels.standard_text.max_injection_tokens).toBeLessThan(
       parsed.value.channels.yapped_text.max_injection_tokens,
     );
+  });
+
+  it("rejects quality_weight_strength outside [0, 1]", () => {
+    const bad = parseBrainRecallPolicy(
+      JSON.stringify({
+        ...FIXTURE_POLICY,
+        index: { quality_weight_strength: 1.5 },
+      }),
+    );
+    expect(bad.ok).toBe(false);
   });
 
   it("rejects policy when token budgets violate voice < standard < yapped", () => {
