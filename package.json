@@ -20,6 +20,8 @@
     "chain": "tsx scripts/run-chain.ts",
     "brain:index": "tsx src/brain/build-index-cli.ts",
     "brain:query": "tsx src/brain/query-index-cli.ts",
+    "brain:calibrate": "tsx src/brain/calibration-cli.ts",
+    "brain:recall-prefetch": "node scripts/brain-recall-prefetch.mjs",
     "archive:sources": "tsx scripts/archive-source-notes.ts",
     "vault:fast-scan": "node scripts/generate-vault-fast-scan-index.mjs",
     "sync-notebooks": "node scripts/session-close/sync-notebooks.mjs"
@@ -29,6 +31,7 @@
     "gray-matter": "^4.0.3",
     "ignore": "^7.0.5",
     "rss-parser": "^3.13.0",
+    "gpt-tokenizer": "^3.4.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

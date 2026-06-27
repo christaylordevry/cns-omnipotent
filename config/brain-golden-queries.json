@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "curated_by": "verifier-corrected against cal1 ranked results (2026-06-26, post-79-6 chunked index)",
+  "curated_at": "2026-06-26",
+  "curation_notes": "Real vague-question patterns from Hermes Omniscient brief workshop. Expected paths CORRECTED 2026-06-26 against actual ranked retrieval (calib-cal1, quality-off purest-relevance view): notebooklm-routing now targets the real routing doc (notebooklm-workflow.md, not project-map which never ranks); deferred-run-chain and hermes-voice-blocker dropped the diluted deferred-work.md catch-all in favour of the dedicated notes that rank #1. Dropped 'youtube-bar' (requires intention inference, out of v1 scope per locked decision #8) and 'brain-recall-status' (asks for project status that lives in _bmad-output, not the indexed vault corpus). 10 queries remain, all with expected paths that demonstrably rank. Re-validate after major corpus ingest or embedder model change.",
+  "operator_signoff": "pending",
+  "queries": [
+    {
+      "id": "sprint-continuity",
+      "prompt": "where did we leave off on the sprint?",
+      "expected_paths": ["AI-Context/CNS-Daily-Rhythm.md"],
+      "forbidden_paths": ["AI-Context/AGENTS.md"],
+      "provenance": "Operator mid-day continuity question (Epic 79 SM-1 bar)"
+    },
+    {
+      "id": "deferred-run-chain",
+      "prompt": "what's still deferred about run-chain?",
+      "expected_paths": [
+        "AI-Context/modules/run-chain.md"
+      ],
+      "provenance": "deferred-work.md awareness-sync smoke 2026-06-25 (expected corrected 2026-06-26: dedicated run-chain.md ranks #1; deferred-work.md catch-all does not rank)"
+    },
+    {
+      "id": "morning-digest-time",
+      "prompt": "what time does the morning digest cron run?",
+      "expected_paths": ["03-Resources/CNS-Operator-Guide.md"],
+      "provenance": "Operator ops question — digest schedule in Operator Guide §15"
+    },
+    {
+      "id": "session-close-how",
+      "prompt": "how do I close a session again?",
+      "expected_paths": [
+        "03-Resources/CNS-Operator-Guide.md",
+        "AI-Context/CNS-Daily-Rhythm.md"
+      ],
+      "provenance": "Recurring operator workflow question"
+    },
+    {
+      "id": "notebooklm-routing",
+      "prompt": "which notebook should CNS research go to?",
+      "expected_paths": ["AI-Context/modules/notebooklm-workflow.md"],
+      "provenance": "NotebookLM fan-out operator question (Epic 56 calibration thread); expected corrected 2026-06-26: notebooklm-workflow.md is the routing doc and ranks #1, project-map.md never ranks"
+    },
+    {
+      "id": "hermes-voice-blocker",
+      "prompt": "why isn't desktop voice working yet?",
+      "expected_paths": [
+        "01-Projects/Brain - Central Nervous System Build/Hermes/Hermes-Desktop-App-Research-and-Setup-Guide-2026-06-07.md"
+      ],
+      "provenance": "Story 78-1 operator assessment (expected corrected 2026-06-26: Hermes-Desktop guide ranks #1; deferred-work.md catch-all does not rank)"
+    },
+    {
+      "id": "vault-fast-scan",
+      "prompt": "where's the fast scan index thing?",
+      "expected_paths": ["AI-Context/vault-fast-scan-index.md"],
+      "provenance": "Story 76-3 inbox triage plan operator reference"
+    },
+    {
+      "id": "operator-profile",
+      "prompt": "what does my operator profile say about how I work?",
+      "expected_paths": ["03-Resources/Operator-Profile.md"],
+      "provenance": "Intention / learns-me bar — operator context recall"
+    },
+    {
+      "id": "hooks-run-chain-smoke",
+      "prompt": "what was that run-chain revival smoke about?",
+      "expected_paths": ["03-Resources/hooks-cns-run-chain-revival-smoke-2026-06-2026-06-24.md"],
+      "provenance": "Recent hook-set note — vague reference without path"
+    },
+    {
+      "id": "nexus-bridge",
+      "prompt": "how does discord talk to obsidian again?",
+      "expected_paths": ["03-Resources/Nexus-Discord-Obsidian-Bridge-Operator-Guide.md"],
+      "provenance": "Operator bridge workflow — path-forgetting vague question"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import {
   writeBuildIndexArtifact,
 } from "../../src/brain/build-index.js";
 import { StubEmbedder } from "../../src/brain/embedder.js";
+import type { Embedder } from "../../src/brain/embedder.js";
 import { effectiveCorpusRoots, loadBrainCorpusAllowlistFromVault } from "../../src/brain/load-corpus-allowlist.js";
 import { parseBrainCorpusAllowlistUnknown } from "../../src/brain/corpus-allowlist.js";
 import { CnsError } from "../../src/errors.js";
@@ -217,6 +218,61 @@ ok`,
     expect(run.result.exclusions.some((e) => e.path === "notes/bad.md" && e.reasonCode === "FRONTMATTER_PARSE")).toBe(true);
   });
 
+  it("isolates per-note embedding failures without aborting the whole build", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "notes", "bad.md"), "---\ntitle: bad\n---\nbad", "utf8");
+    await writeFile(path.join(vaultRoot, "notes", "good.md"), "---\ntitle: good\n---\ngood", "utf8");
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "flaky" },
+      embed: async (text) => {
+        if (text.includes("bad")) {
+          throw new CnsError("IO_ERROR", "upstream rejected note");
+        }
+        return [1, 0];
+      },
+    };
+
+    const run = await runBuildIndex(vaultRoot, al.value, embedder);
+    expect(run.result.records.map((r) => r.path)).toEqual(["notes/good.md"]);
+    expect(run.result.exclusions).toEqual([
+      { path: "notes/bad.md", reasonCode: "EMBEDDING_ERROR", detail: { code: "IO_ERROR" } },
+    ]);
+    expect(run.result.embedder).toEqual({ providerId: "test", modelId: "flaky", vectorDimension: 2 });
+  });
+
+  it("excludes mixed-dimension embeddings and records the accepted vector dimension", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "notes", "a.md"), "---\ntitle: a\n---\na", "utf8");
+    await writeFile(path.join(vaultRoot, "notes", "b.md"), "---\ntitle: b\n---\nb", "utf8");
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "mixed" },
+      embed: async (text) => (text.includes("a") ? [1, 0] : [1, 0, 0]),
+    };
+
+    const run = await runBuildIndex(vaultRoot, al.value, embedder);
+    expect(run.result.records.map((r) => r.path)).toEqual(["notes/a.md"]);
+    expect(run.result.exclusions).toEqual([
+      { path: "notes/b.md", reasonCode: "DIMENSION_MISMATCH", detail: { code: "DIMENSION_MISMATCH" } },
+    ]);
+    expect(run.result.embedder).toEqual({ providerId: "test", modelId: "mixed", vectorDimension: 2 });
+  });
+
   it("excludes secret matches without echoing material in serialized exclusions", async () => {
     await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
     await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
@@ -315,7 +371,54 @@ tail
     const arg = embedSpy.mock.calls[0]?.[0];
     expect(typeof arg).toBe("string");
     expect(arg).not.toContain("DROP_ME_UNIQUE_999");
+    expect(arg).not.toContain("pake_id:");
+    expect(arg).toContain("keep");
     embedSpy.mockRestore();
+  });
+
+  it("excludes notes with empty embeddable body as EMPTY_NOTE", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "notes", "empty.md"), "---\ntitle: empty\n---\n", "utf8");
+    await writeFile(path.join(vaultRoot, "notes", "good.md"), "---\ntitle: good\n---\nbody", "utf8");
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const run = await runBuildIndex(vaultRoot, al.value, new StubEmbedder());
+    expect(run.result.records.map((r) => r.path)).toEqual(["notes/good.md"]);
+    expect(run.result.exclusions).toEqual([
+      { path: "notes/empty.md", reasonCode: "EMPTY_NOTE", detail: { code: "EMPTY_NOTE" } },
+    ]);
+  });
+
+  it("embeds body-only chunks with v2 record shape", async () => {
+    await writeAllowlist(vaultRoot, { subtrees: ["notes"] });
+    await mkdir(path.join(vaultRoot, "notes"), { recursive: true });
+    await writeFile(
+      path.join(vaultRoot, "notes", "chunked.md"),
+      "---\ntitle: chunked\nstatus: reviewed\n---\n\nPassage body for chunking.",
+      "utf8",
+    );
+
+    const al = parseBrainCorpusAllowlistUnknown({ schema_version: 1, subtrees: ["notes"] });
+    expect(al.ok).toBe(true);
+    if (!al.ok) {
+      return;
+    }
+
+    const run = await runBuildIndex(vaultRoot, al.value, new StubEmbedder());
+    expect(run.result.records).toHaveLength(1);
+    const rec = run.result.records[0]!;
+    expect(rec.path).toBe("notes/chunked.md");
+    expect(rec.chunk_index).toBe(0);
+    expect(rec.text.trim()).toBe("Passage body for chunking.");
+    expect(rec.char_start).toBe(0);
+    expect(rec.embedding.length).toBeGreaterThan(0);
+    expect(serializeBuildIndexArtifact(run.result)).toMatch(/"schema_version": 2/);
   });
 
   it("produces deterministic ordering and serialization for unchanged inputs", async () => {
@@ -376,7 +479,22 @@ describe("writeBuildIndexArtifact", () => {
     const out = await mkdtemp(path.join(os.tmpdir(), "cns-brain-art-"));
     const result = {
       embedder: { providerId: "stub", modelId: "stub-v1" },
-      records: [{ path: "a/b.md", embedding: [0.1] }],
+      chunking: {
+        target_tokens: 768,
+        overlap_tokens: 64,
+        tokenizer_encoding: "cl100k_base",
+        tokenizer_package: "gpt-tokenizer@3.4.0",
+      },
+      records: [
+        {
+          path: "a/b.md",
+          chunk_index: 0,
+          char_start: 0,
+          char_end: 4,
+          text: "body",
+          embedding: [0.1],
+        },
+      ],
       exclusions: [],
     };
     const p = await writeBuildIndexArtifact(vaultRoot, out, result);
@@ -390,7 +508,22 @@ describe("writeBuildIndexArtifact", () => {
     const inside = path.join(vaultRoot, "out");
     const result = {
       embedder: { providerId: "stub", modelId: "stub-v1" },
-      records: [{ path: "a/b.md", embedding: [0.1] }],
+      chunking: {
+        target_tokens: 768,
+        overlap_tokens: 64,
+        tokenizer_encoding: "cl100k_base",
+        tokenizer_package: "gpt-tokenizer@3.4.0",
+      },
+      records: [
+        {
+          path: "a/b.md",
+          chunk_index: 0,
+          char_start: 0,
+          char_end: 4,
+          text: "body",
+          embedding: [0.1],
+        },
+      ],
       exclusions: [],
     };
 
@@ -404,7 +537,22 @@ describe("writeBuildIndexArtifact", () => {
     const outsideArtifactPath = path.join(out, "brain-index.json");
     const result = {
       embedder: { providerId: "stub", modelId: "stub-v1" },
-      records: [{ path: "a/b.md", embedding: [0.1] }],
+      chunking: {
+        target_tokens: 768,
+        overlap_tokens: 64,
+        tokenizer_encoding: "cl100k_base",
+        tokenizer_package: "gpt-tokenizer@3.4.0",
+      },
+      records: [
+        {
+          path: "a/b.md",
+          chunk_index: 0,
+          char_start: 0,
+          char_end: 4,
+          text: "body",
+          embedding: [0.1],
+        },
+      ],
       exclusions: [],
     };
 
@@ -439,8 +587,8 @@ describe("serializeBrainIndexManifest", () => {
       outcome: "success",
       build_timestamp_utc: "2026-01-01T00:00:00.000Z",
       allowlist_snapshot: { subtrees: ["notes"], inbox: { enabled: false } },
-      embedder: { providerId: "stub", modelId: "stub-v1" },
-      counts: { candidates_discovered: 1, embedded: 1, excluded: 0, failed: 0 },
+      embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
+      counts: { candidates_discovered: 1, embedded: 1, notes_embedded: 1, excluded: 0, failed: 0 },
       exclusion_reason_breakdown: {},
       failures,
       vault_snapshot: {
@@ -516,11 +664,14 @@ ok`,
 
     const indexText = await readFile(path.join(out, "brain-index.json"), "utf8");
     const manifestText = await readFile(path.join(out, "brain-index-manifest.json"), "utf8");
-    expect(indexText).toMatch(/"schema_version": 1/);
+    expect(indexText).toMatch(/"schema_version": 2/);
     expect(manifestText).toMatch(/"schema_version": 1/);
+    expect(manifestText).toMatch(/"notes_embedded": 1/);
+    expect(manifestText).toMatch(/"tokenizer_encoding": "cl100k_base"/);
     expect(manifestText).toMatch(/"outcome": "success"/);
     expect(manifestText).toMatch(/"providerId": "stub"/);
     expect(manifestText).toMatch(/"modelId": "stub-v1"/);
+    expect(manifestText).toMatch(/"vectorDimension": 8/);
     expect(manifestText).not.toContain(secret);
     expect(manifestText).not.toContain("AKIA");
   });

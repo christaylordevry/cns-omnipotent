@@ -441,6 +441,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-06-02 | 1.37.0 | **Morning digest cron automation (55-3):** §15.11 one-command install via `install-morning-digest-cron.sh`, default **07:00 Australia/Sydney**, log + schedule overrides; §15.2 legacy line stays commented | 55-3-morning-digest-cron-automation |
 | 2026-06-03 | 1.38.0 | Session close **Story 59-1:** total Hermes session input target **<20k**; LLM reads `section8-input.json` only; deterministic Discord reply via `hermes-run-render-discord-reply.sh`; bump skill `version`, reinstall, restart gateway after deploy | 59-1-session-close-context-reduction |
 | 2026-06-11 | 1.38.1 | **Morning digest X/Twitter (Story 68-7):** §15.11.1 session-cookie setup, `--check` health probe, rotation runbook; optional Source 11 when cookies configured | 68-7-x-integration-env-docs |
+| 2026-06-24 | 1.39.0 | **Portal + Desktop (Epic 74):** §15.13 browser UI at `:9119`, OAuth-primary; pointers to `hermes-desktop.md` runbook and `routing.md` Hermes surface | 74-8-portal-and-desktop-governance-documentation |
 
 ---
 
@@ -1023,6 +1024,23 @@ After installing skills that affect Discord routing, restart the gateway if beha
 **Emergency local override:** `HERMES_SKIP_SKILL_INSTALL_GATE=1 bash scripts/verify.sh` — use only when debugging; do not commit with this set.
 
 **Environment:** `HERMES_HOME` (default `~/.hermes`), optional `OMNIPOTENT_REPO` if the checkout path differs from the script-relative repo root.
+
+### 15.13 Portal + Desktop (Epic 74)
+
+Hermes on Nous Portal uses a **browser-based** JARVIS chat UI at **`http://localhost:9119`** (WSL `hermes-dashboard.service` backend, OAuth via Nous Research). This is the primary conversational surface (ADR-HERMES-001); Discord `#hermes` gateway remains a separate process. Production **`auth_path: oauth`** (dashboard client `quiet_ibex`).
+
+| Resource | Path |
+|----------|------|
+| **SSOT runbook** | `AI-Context/modules/hermes-desktop.md` |
+| **Model aliases + rollback** | `AI-Context/modules/routing.md` (Hermes agent surface) |
+
+Quick health check:
+
+```bash
+systemctl --user is-active hermes-dashboard.service
+curl -s http://127.0.0.1:9119/api/status | jq '.auth_required, .auth_providers'
+hermes portal info
+```
 
 ---
 
