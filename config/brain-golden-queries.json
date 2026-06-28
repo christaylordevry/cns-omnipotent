@@ -3,7 +3,7 @@
   "curated_by": "verifier-corrected against cal1 ranked results (2026-06-26, post-79-6 chunked index)",
   "curated_at": "2026-06-26",
   "curation_notes": "Real vague-question patterns from Hermes Omniscient brief workshop. Expected paths CORRECTED 2026-06-26 against actual ranked retrieval (calib-cal1, quality-off purest-relevance view): notebooklm-routing now targets the real routing doc (notebooklm-workflow.md, not project-map which never ranks); deferred-run-chain and hermes-voice-blocker dropped the diluted deferred-work.md catch-all in favour of the dedicated notes that rank #1. Dropped 'youtube-bar' (requires intention inference, out of v1 scope per locked decision #8) and 'brain-recall-status' (asks for project status that lives in _bmad-output, not the indexed vault corpus). 10 queries remain, all with expected paths that demonstrably rank. Re-validate after major corpus ingest or embedder model change.",
-  "operator_signoff": "pending",
+  "operator_signoff": "confirmed",
   "queries": [
     {
       "id": "sprint-continuity",

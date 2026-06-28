@@ -37,5 +37,5 @@
     "timeout_seconds": 5,
     "voice_pane_timeout_seconds": 3
   },
-  "shadow_mode": true
+  "shadow_mode": false
 }
