@@ -33,16 +33,29 @@ afterEach(() => {
 
 async function writeIndex(params: {
   dir: string;
-  records: Array<{ path: string; embedding: number[] }>;
+  records: Array<{ path: string; embedding: number[]; text?: string }>;
 }): Promise<string> {
   const indexPath = join(params.dir, "brain-index.json");
   await writeFile(
     indexPath,
     JSON.stringify(
       {
-        schema_version: 1,
-        embedder: { providerId: "stub", modelId: "stub-v1" },
-        records: params.records,
+        schema_version: 2,
+        embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
+        chunking: {
+          target_tokens: 768,
+          overlap_tokens: 64,
+          tokenizer_encoding: "cl100k_base",
+          tokenizer_package: "gpt-tokenizer@3.4.0",
+        },
+        records: params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: i,
+          char_start: 0,
+          char_end: (r.text ?? "fixture chunk").length,
+          text: r.text ?? "fixture chunk",
+          embedding: r.embedding,
+        })),
         exclusions: [],
       },
       null,
@@ -62,7 +75,7 @@ async function writeStubIndex(params: {
   const embedding = await stub.embed(params.anchorText);
   return writeIndex({
     dir: params.dir,
-    records: [{ path: params.vaultRel, embedding }],
+    records: [{ path: params.vaultRel, embedding, text: params.anchorText }],
   });
 }
 
@@ -314,9 +327,32 @@ describe("Story 79-5 brain-recall-prefetch CLI", () => {
       vaultRel: "notes/wrap.md",
     });
 
+    // Isolate shadow_mode from the live committed config (go-live sets it to
+    // false); this test asserts the shadow=true contract deterministically.
+    const shadowRepo = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-repo-"));
+    tempRoots.push(shadowRepo);
+    await mkdir(join(shadowRepo, "config"), { recursive: true });
+    const livePolicyWrap = JSON.parse(
+      readFileSync(join(root, "config/brain-recall-policy.json"), "utf8"),
+    );
+    await writeFile(
+      join(shadowRepo, "config/brain-recall-policy.json"),
+      JSON.stringify({ ...livePolicyWrap, shadow_mode: true }),
+    );
+
     const res = spawnSync(
       "node",
-      [prefetchScript, "--query", anchor, "--index-path", indexPath, "--vault-root", vaultRoot],
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+        "--repo-root",
+        shadowRepo,
+      ],
       { cwd: root, encoding: "utf8", env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" } },
     );
 
@@ -366,7 +402,7 @@ describe("Story 79-5 brain-recall-prefetch CLI", () => {
     expect(payload.channel).toBe("voice_pane");
   });
 
-  it("recall_hook end-to-end passes user_message to prefetch CLI (shadow + real citations)", async () => {
+  it("recall_hook end-to-end passes user_message to prefetch CLI (live inject + real citations)", async () => {
     const anchor = "Hermes pre_llm_call hook probe for Story 79-5 evidence.";
     const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-hook-v-"));
     tempRoots.push(vaultRoot);
@@ -409,8 +445,11 @@ env = {
 with __import__("unittest.mock").mock.patch.dict(os.environ, env, clear=False):
     result = mod.recall_hook(user_message=query, platform="discord", session_id="probe-s")
 
-assert result == {}, result
-print(json.dumps({"hook_result": result}))
+# Post go-live (shadow_mode:false in the committed policy), the hook injects real
+# cited context instead of returning empty. Assert the live-inject contract.
+ctx = result.get("context")
+assert isinstance(ctx, str) and "notes/hook-probe.md" in ctx, result
+print(json.dumps({"hook_injected": True}))
 `,
         join(pluginRoot, "plugin.py"),
         root,
@@ -422,6 +461,6 @@ print(json.dumps({"hook_result": result}))
       { encoding: "utf8", env: bytecodeEnv },
     );
 
-    expect(out.trim()).toContain('"hook_result": {}');
+    expect(out.trim()).toContain('"hook_injected": true');
   });
 });
