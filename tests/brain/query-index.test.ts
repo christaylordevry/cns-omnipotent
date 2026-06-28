@@ -721,7 +721,7 @@ describe("query-index CLI", () => {
 
     const res = spawnSync("npx", ["tsx", entry, "--index-path", indexPath, "--query", "q", "--top-k", "2", "--explain"], {
       encoding: "utf8",
-      env: { ...process.env },
+      env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" },
     });
     expect(res.status).toBe(0);
     expect(res.stdout.trim().startsWith("{")).toBe(true);

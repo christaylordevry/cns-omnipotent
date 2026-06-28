@@ -658,7 +658,7 @@ ok`,
 
     const res = spawnSync("npx", ["tsx", entry, "--output-dir", out], {
       encoding: "utf8",
-      env: { ...process.env, CNS_VAULT_ROOT: vaultRoot },
+      env: { ...process.env, CNS_VAULT_ROOT: vaultRoot, CNS_BRAIN_EMBEDDER: "stub" },
     });
     expect(res.status).toBe(0);
 
@@ -685,7 +685,7 @@ ok`,
 
     const res = spawnSync("npx", ["tsx", entry, "--output-dir", out], {
       encoding: "utf8",
-      env: { ...process.env, CNS_VAULT_ROOT: vaultRoot },
+      env: { ...process.env, CNS_VAULT_ROOT: vaultRoot, CNS_BRAIN_EMBEDDER: "stub" },
     });
     expect(res.status).not.toBe(0);
 
