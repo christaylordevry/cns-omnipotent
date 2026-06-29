@@ -1,5 +1,15 @@
 # Deferred work
 
+## Deferred from: code review of 82-2-spike-omni-002-voice-channel (2026-06-28)
+
+- **`profile_home` vs launch `HERMES_HOME` state.db split** — Plugin reads only `{HERMES_HOME}/state.db`; remote-profile sessions persist elsewhere. Channel Resolution Contract flags for 82-3 VoiceDrawer.
+
+- **Per-turn sqlite open on discord/text hot path** — `_session_source_from_db` runs on every hook call. Acceptable for spike; revisit if voice prefetch p95 exceeds budget.
+
+- **Spike log PII on disk** — `CNS_BRAIN_RECALL_SPIKE_LOG=1` writes truncated `user_message` to `~/.hermes/logs/`. Env-gated spike tooling; tighten if promoted to production observability.
+
+---
+
 ## Deferred from: code review of 79-5-production-cns-brain-recall-plugin-prefetch-cli (2026-06-26)
 
 - **Per-turn recall latency (cold-start + index load + Portal embed)** — measure p95 at Story 79-4 live cutover (`shadow_mode: false`); if over budget, consider persistent prefetch helper instead of per-turn `npx tsx` subprocess. Forward flag only; not blocking shadow wiring.

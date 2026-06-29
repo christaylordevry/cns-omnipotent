@@ -664,5 +664,5 @@ development_status:
   epic-82: in-progress
   82-1-spike-omni-001-ws-proxy: done # cns-dashboard story file; findings → Omnipotent.md
   82-2-spike-omni-002-voice-channel: done
-  82-3-voice-drawer: backlog # gated: 79-4 calibration or operator waiver
+  82-3-voice-drawer: done # smoke-verified live 2026-06-29
   epic-82-retrospective: optional
