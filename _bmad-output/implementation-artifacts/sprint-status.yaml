@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-26T12:00:00Z
+# last_updated: 2026-06-28T20:55:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-26T14:30:00+10:00"
+last_updated: "2026-06-28T12:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -659,3 +659,10 @@ development_status:
   79-6-chunked-brain-index-chunk-aware-recall: review
   79-7-recall-calibration-soften-quality-weighting: review
   epic-79-retrospective: optional
+
+  # Epic 82 — Local Nexus JARVIS Voice (hermes-omniscient Phase D; cns-dashboard)
+  epic-82: in-progress
+  82-1-spike-omni-001-ws-proxy: done # cns-dashboard story file; findings → Omnipotent.md
+  82-2-spike-omni-002-voice-channel: done
+  82-3-voice-drawer: backlog # gated: 79-4 calibration or operator waiver
+  epic-82-retrospective: optional

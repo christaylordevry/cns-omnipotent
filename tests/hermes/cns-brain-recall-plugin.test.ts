@@ -98,7 +98,7 @@ describe("Story 79-5 cns-brain-recall production plugin", () => {
     const yaml = readFileSync(join(pluginRoot, "plugin.yaml"), "utf8");
     expect(yaml).toMatch(/name:\s*cns-brain-recall/);
     expect(yaml).toMatch(/pre_llm_call/);
-    expect(yaml).toMatch(/version:\s*0\.2\.0/);
+    expect(yaml).toMatch(/version:\s*0\.2\.1/);
   });
 
   it("plugin.py subprocesses brain-recall-prefetch.mjs and returns empty context in shadow mode", () => {
@@ -462,5 +462,328 @@ print(json.dumps({"hook_injected": True}))
     );
 
     expect(out.trim()).toContain('"hook_injected": true');
+  });
+});
+
+describe("Story 82-2 SPIKE-OMNI-002 voice_pane channel (Path C + Path A fallback)", () => {
+  it("Path C: session.source nexus-voice in state.db yields voice_pane via --recall-channel", async () => {
+    const anchor = "Voice pane Path C recall probe.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-2-voice-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-2-voice-i-"));
+    tempRoots.push(indexDir);
+    const hermesHome = await mkdtemp(join(tmpdir(), "cns-82-2-hermes-"));
+    tempRoots.push(hermesHome);
+    await writeVaultNote(vaultRoot, "notes/voice-path-c.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice-path-c.md",
+    });
+
+    const sessionKey = "20260628_200000_spike82";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "nexus-voice"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+hermes_home = sys.argv[6]
+session_key = sys.argv[7]
+query = sys.argv[8]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+    "HERMES_HOME": hermes_home,
+}
+
+with __import__("unittest.mock").mock.patch.dict(os.environ, env, clear=False):
+    payload = mod._run_prefetch(
+        user_message=query,
+        platform="tui",
+        recall_channel="voice_pane",
+    )
+print(json.dumps(payload))`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        hermesHome,
+        sessionKey,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const payload = JSON.parse(out.trim());
+    expect(payload.channel).toBe("voice_pane");
+  });
+
+  it("Path C: recall_hook resolves voice_pane from state.db without mutating user_message", async () => {
+    const anchor = "Plain voice turn without prefix.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-2-hook-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-2-hook-i-"));
+    tempRoots.push(indexDir);
+    const hermesHome = await mkdtemp(join(tmpdir(), "cns-82-2-hook-hermes-"));
+    tempRoots.push(hermesHome);
+    await writeVaultNote(vaultRoot, "notes/voice-hook.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice-hook.md",
+    });
+
+    const sessionKey = "20260628_200001_spike82";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "nexus-voice"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+hermes_home = sys.argv[6]
+session_key = sys.argv[7]
+query = sys.argv[8]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "voice_pane", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(
+            session_id=session_key,
+            user_message=query,
+            platform="tui",
+            task_id="task-uuid",
+            turn_id=f"{session_key}:task-uuid:abc12345",
+            sender_id="",
+            is_first_turn=True,
+            model="anthropic/claude-sonnet-4.6",
+        )
+
+cmd = calls[0]
+assert "--recall-channel" in cmd and "voice_pane" in cmd, cmd
+assert query in cmd, cmd
+assert "[cns-recall:" not in " ".join(cmd), cmd
+print(json.dumps({"argv_ok": True, "platform_passed": "tui" in cmd}))`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        hermesHome,
+        sessionKey,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    expect(JSON.parse(out.trim())).toEqual({ argv_ok: true, platform_passed: true });
+  });
+
+  it("Path A fallback: prefix stripped for prefetch --query only", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-2-path-a-hermes-"));
+    tempRoots.push(hermesHome);
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "voice_pane", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(
+            user_message="[cns-recall:voice_pane] hello voice",
+            platform="tui",
+            session_id="",
+        )
+
+cmd = calls[0]
+q_idx = cmd.index("--query")
+assert cmd[q_idx + 1] == "hello voice", cmd
+assert "--recall-channel" in cmd and "voice_pane" in cmd, cmd
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("regression: discord platform unchanged (no --recall-channel for standard text)", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-2-discord-hermes-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260628_124027_89e373ac";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "discord"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "standard_text", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(user_message="hello", platform="discord", session_id=session_key)
+
+cmd = calls[0]
+assert "--recall-channel" not in cmd, cmd
+assert cmd[cmd.index("--platform") + 1] == "discord", cmd
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
   });
 });

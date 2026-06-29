@@ -9,11 +9,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
+import sqlite3
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger("cns-brain-recall")
+
+RECALL_PREFIX_RE = re.compile(r"^\[cns-recall:voice_pane\]\s*", re.I)
+VOICE_SESSION_SOURCE = "nexus-voice"
+SPIKE_LOG_ENV = "CNS_BRAIN_RECALL_SPIKE_LOG"
 
 PREFETCH_SCRIPT = "scripts/brain-recall-prefetch.mjs"
 DEFAULT_PREFETCH_TIMEOUT_S = 5.0
@@ -99,11 +106,71 @@ def _load_prefetch_timeouts() -> tuple[float, float]:
     return std, voice
 
 
-def _prefetch_timeout_s(platform: str | None) -> float:
+def _resolve_state_db_path() -> Path:
+    hermes_home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")).expanduser()
+    return (hermes_home / "state.db").resolve()
+
+
+def _session_source_from_db(session_id: str) -> str | None:
+    """Read-only lookup: sessions.id → sessions.source (Path C, SPIKE-OMNI-002)."""
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+    db_path = _resolve_state_db_path()
+    if not db_path.is_file():
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            cur = conn.execute("SELECT source FROM sessions WHERE id = ? LIMIT 1", (sid,))
+            row = cur.fetchone()
+            if not row or row[0] is None:
+                return None
+            source = str(row[0]).strip()
+            return source or None
+        finally:
+            conn.close()
+    except Exception:
+        logger.debug("cns-brain-recall: session source lookup failed", exc_info=True)
+        return None
+
+
+def _resolve_recall_channel(*, user_message: str, session_id: str) -> tuple[str, str | None]:
+    """Return (prefetch_query, recall_channel_hint). Path C preferred; Path A prefix fallback."""
+    query = (user_message or "").strip()
+    source = _session_source_from_db(session_id)
+    if source == VOICE_SESSION_SOURCE:
+        return query, "voice_pane"
+    match = RECALL_PREFIX_RE.match(query)
+    if match:
+        return query[match.end() :].strip(), "voice_pane"
+    return query, None
+
+
+def _prefetch_timeout_s(platform: str | None, recall_channel: str | None = None) -> float:
     std, voice = _load_prefetch_timeouts()
+    if recall_channel == "voice_pane":
+        return voice
     if platform and platform.strip().lower() == "nexus-voice":
         return voice
     return std
+
+
+def _log_spike_kwargs(**fields) -> None:
+    """Structured spike observer when CNS_BRAIN_RECALL_SPIKE_LOG=1 (SPIKE-OMNI-002)."""
+    redacted = {
+        k: (v[:80] + "…" if isinstance(v, str) and len(v) > 80 else v)
+        for k, v in fields.items()
+    }
+    logger.info("cns-brain-recall spike pre_llm_call kwargs: %s", json.dumps(redacted, default=str))
+    try:
+        log_dir = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        path = log_dir / f"cns-brain-recall-spike-{stamp}.json"
+        path.write_text(json.dumps(redacted, indent=2, default=str) + "\n", encoding="utf-8")
+    except Exception:
+        logger.debug("cns-brain-recall: spike log write failed", exc_info=True)
 
 
 def _prefetch_script_path() -> Path:
@@ -114,27 +181,36 @@ def _prefetch_script_path() -> Path:
     return script
 
 
-def _run_prefetch(*, user_message: str, platform: str | None) -> dict:
+def _run_prefetch(
+    *,
+    user_message: str,
+    platform: str | None,
+    recall_channel: str | None = None,
+) -> dict:
     script = _prefetch_script_path()
     node_bin = _resolve_node_bin()
     cmd = [node_bin, str(script), "--query", user_message]
     if platform:
         cmd.extend(["--platform", platform])
+    if recall_channel:
+        cmd.extend(["--recall-channel", recall_channel])
 
+    timeout_s = _prefetch_timeout_s(platform, recall_channel)
     try:
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=_prefetch_timeout_s(platform),
+            timeout=timeout_s,
             env=os.environ.copy(),
             check=False,
         )
     except subprocess.TimeoutExpired:
         logger.warning(
-            "brain-recall-prefetch timed out after %.1fs (platform=%s)",
-            _prefetch_timeout_s(platform),
+            "brain-recall-prefetch timed out after %.1fs (platform=%s recall_channel=%s)",
+            timeout_s,
             platform or "default",
+            recall_channel or "none",
         )
         return {}
     except OSError as exc:
@@ -172,14 +248,31 @@ def recall_hook(
 ):
     """pre_llm_call hook — subprocess prefetch CLI, inject cited recall or shadow-empty."""
     try:
-        del session_id, kwargs  # reserved for future observability
+        if os.environ.get(SPIKE_LOG_ENV) == "1":
+            _log_spike_kwargs(
+                session_id=session_id,
+                platform=platform,
+                user_message=user_message,
+                task_id=kwargs.get("task_id"),
+                turn_id=kwargs.get("turn_id"),
+                sender_id=kwargs.get("sender_id"),
+                is_first_turn=kwargs.get("is_first_turn"),
+                model=kwargs.get("model"),
+            )
 
-        query = (user_message or "").strip()
+        query, recall_channel = _resolve_recall_channel(
+            user_message=user_message,
+            session_id=session_id,
+        )
         if not query:
             return {}
 
         platform_hint = (platform or "").strip() or None
-        payload = _run_prefetch(user_message=query, platform=platform_hint)
+        payload = _run_prefetch(
+            user_message=query,
+            platform=platform_hint,
+            recall_channel=recall_channel,
+        )
 
         shadow = bool(payload.get("shadow"))
         context = payload.get("context")
