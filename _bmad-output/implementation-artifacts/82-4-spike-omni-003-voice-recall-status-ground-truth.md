@@ -4,7 +4,7 @@ baseline_commit: 2e4e056
 
 # Story 82.4: SPIKE-OMNI-003 — Voice recall-status ground truth (degraded-chip fix)
 
-Status: review
+Status: done
 
 **Spike ID:** SPIKE-OMNI-003  
 **Epic:** 82 — Local Nexus JARVIS Voice (Hermes Omniscient Phase D)  
@@ -168,6 +168,14 @@ Reference: `HANDOFF-2026-06-29-session9-hermes-consolidation.md` §6; Story 82-3
   - [x] Live smoke: voice turn where heuristic would say `degraded` but sidecar says `voice_pane` + `injected: true`
   - [x] `bash scripts/verify.sh` + `npm test`
   - [x] Update Dev Agent Record + File List
+
+### Review Findings
+
+- [x] [Review][Patch] Shared recall-status temp file is not safe for same-session concurrent writes [`scripts/hermes-plugin-examples/cns-brain-recall/plugin.py:297`]
+- [x] [Review][Patch] Recall-status endpoint returns 200 when proxy is disabled despite AC2/AC4 requiring 503 [`src/routes/api/nexus/hermes/recall-status/+server.ts:14`]
+- [x] [Review][Patch] Recall-status reader returns unvalidated raw sidecar JSON to the browser [`src/lib/server/hermes-recall-status.ts:56`]
+- [x] [Review][Patch] VoiceDrawer recall-status fetch can apply an older turn result after a newer completion [`src/lib/components/nexus/VoiceDrawer.svelte:174`]
+- [x] [Review][Patch] Required Context7 Hermes hook evidence is missing from the story record [`_bmad-output/implementation-artifacts/82-4-spike-omni-003-voice-recall-status-ground-truth.md:130`]
 
 ## Dev Notes
 
@@ -394,6 +402,7 @@ Claude Sonnet 4.6 (dev-story)
 ### Debug Log References
 
 - AC0 spike: temp `HERMES_HOME` atomic write/read validated in WSL before feature code
+- Context7 `/nousresearch/hermes-agent`: `pre_llm_call` callback includes `session_id`, `user_message`, `platform`, `**kwargs`; return `{"context": "..."}` injects context and `None` / no return skips injection
 - `verify.sh`: story tests pass; gate exits 1 on pre-existing `session-close` skill parity drift (unrelated)
 - `npm test` cns-dashboard: 663/663 pass including new recall-status tests
 
@@ -404,6 +413,7 @@ Claude Sonnet 4.6 (dev-story)
 - AC2: `GET /api/nexus/hermes/recall-status?session_id=` with auth + 5min staleness TTL
 - AC3: VoiceDrawer fetches sidecar on `message.complete`; heuristic fallback on 404; DEV diagnostics show sidecar fields
 - Unit tests prove long uncited reply + `injected:true` sidecar → `voice_pane` chip (heuristic would say `degraded`)
+- Review patches: sidecar temp files now use per-write unique names; dashboard rejects disabled proxy as 503; sidecar reader/client validate payload shape and session match; VoiceDrawer ignores stale fetch completions; Context7 hook evidence recorded.
 
 ### File List
 

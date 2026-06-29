@@ -13,6 +13,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -296,7 +297,7 @@ def _write_recall_status_sidecar(
             del payload["turn_id"]
         status_dir = _recall_status_dir()
         final_path = status_dir / f"{sid}.json"
-        tmp_path = status_dir / f"{sid}.json.tmp"
+        tmp_path = status_dir / f"{sid}.{os.getpid()}.{uuid.uuid4().hex}.json.tmp"
         tmp_path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
         os.replace(tmp_path, final_path)
     except Exception:
