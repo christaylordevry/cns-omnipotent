@@ -98,7 +98,7 @@ describe("Story 79-5 cns-brain-recall production plugin", () => {
     const yaml = readFileSync(join(pluginRoot, "plugin.yaml"), "utf8");
     expect(yaml).toMatch(/name:\s*cns-brain-recall/);
     expect(yaml).toMatch(/pre_llm_call/);
-    expect(yaml).toMatch(/version:\s*0\.2\.1/);
+    expect(yaml).toMatch(/version:\s*0\.2\.2/);
   });
 
   it("plugin.py subprocesses brain-recall-prefetch.mjs and returns empty context in shadow mode", () => {
@@ -776,6 +776,145 @@ with patch.dict(os.environ, env, clear=False):
 cmd = calls[0]
 assert "--recall-channel" not in cmd, cmd
 assert cmd[cmd.index("--platform") + 1] == "discord", cmd
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("writes atomic recall-status sidecar after prefetch with injected ground truth", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-4-sidecar-hermes-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260629_101522_ec20fc";
+    const turnId = `${sessionKey}:task-uuid:abc12345`;
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from pathlib import Path
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+turn_id = sys.argv[5]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+inject_payload = json.dumps({
+    "context": "[[notes/recall.md]] vault context",
+    "citations": [{"path": "notes/recall.md", "score": 0.91}],
+    "channel": "voice_pane",
+    "shadow": False,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = inject_payload + "\\n"
+    stderr = ""
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()):
+        result = mod.recall_hook(
+            session_id=session_key,
+            user_message="What is CNS?",
+            platform="tui",
+            turn_id=turn_id,
+        )
+
+assert result == {"context": "[[notes/recall.md]] vault context"}, result
+sidecar_path = Path(hermes_home) / "recall-status" / f"{session_key}.json"
+assert sidecar_path.is_file(), sidecar_path
+sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+assert sidecar["session_id"] == session_key
+assert sidecar["turn_id"] == turn_id
+assert sidecar["channel"] == "voice_pane"
+assert sidecar["injected"] is True
+assert sidecar["shadow"] is False
+assert sidecar["citations"] == ["notes/recall.md"]
+assert sidecar["ts"].endswith("Z")
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+        turnId,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("sidecar records injected=false for shadow prefetch without failing hook", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-4-shadow-sidecar-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260629_120000_shadow1";
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from pathlib import Path
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+shadow_payload = json.dumps({
+    "context": None,
+    "citations": [{"path": "notes/shadow.md", "score": 0.5}],
+    "channel": "voice_pane",
+    "shadow": True,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = shadow_payload + "\\n"
+    stderr = ""
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()):
+        result = mod.recall_hook(
+            session_id=session_key,
+            user_message="voice question",
+            platform="tui",
+        )
+
+assert result == {}, result
+sidecar = json.loads((Path(hermes_home) / "recall-status" / f"{session_key}.json").read_text(encoding="utf-8"))
+assert sidecar["injected"] is False
+assert sidecar["shadow"] is True
 print("ok")`,
         join(pluginRoot, "plugin.py"),
         root,

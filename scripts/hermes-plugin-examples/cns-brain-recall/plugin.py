@@ -15,6 +15,7 @@ import sqlite3
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("cns-brain-recall")
 
@@ -240,6 +241,68 @@ def _run_prefetch(
     return payload
 
 
+def _recall_status_dir() -> Path:
+    hermes_home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")).expanduser()
+    d = hermes_home / "recall-status"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _safe_session_id(session_id: str) -> str | None:
+    sid = (session_id or "").strip()
+    if not sid or "/" in sid or "\\" in sid or ".." in sid:
+        return None
+    return sid
+
+
+def _normalize_citation_paths(citations: Any) -> list[str]:
+    if not isinstance(citations, list):
+        return []
+    paths: list[str] = []
+    for item in citations:
+        if isinstance(item, str) and item.strip():
+            paths.append(item.strip())
+        elif isinstance(item, dict):
+            raw = item.get("path")
+            if isinstance(raw, str) and raw.strip():
+                paths.append(raw.strip())
+    return paths
+
+
+def _write_recall_status_sidecar(
+    *,
+    session_id: str,
+    turn_id: Any,
+    channel: str,
+    citations: list[str],
+    shadow: bool,
+    injected: bool,
+) -> None:
+    """Atomic JSON sidecar for VoiceDrawer ground truth (SPIKE-OMNI-003). Fail-open."""
+    sid = _safe_session_id(session_id)
+    if not sid:
+        return
+    try:
+        payload = {
+            "session_id": sid,
+            "turn_id": str(turn_id).strip() if turn_id is not None and str(turn_id).strip() else None,
+            "channel": channel or "unknown",
+            "citations": citations,
+            "injected": bool(injected),
+            "shadow": bool(shadow),
+            "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+        }
+        if payload["turn_id"] is None:
+            del payload["turn_id"]
+        status_dir = _recall_status_dir()
+        final_path = status_dir / f"{sid}.json"
+        tmp_path = status_dir / f"{sid}.json.tmp"
+        tmp_path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(tmp_path, final_path)
+    except Exception:
+        logger.debug("cns-brain-recall: recall-status sidecar write failed", exc_info=True)
+
+
 def recall_hook(
     session_id: str = "",
     user_message: str = "",
@@ -277,7 +340,20 @@ def recall_hook(
         shadow = bool(payload.get("shadow"))
         context = payload.get("context")
         channel = payload.get("channel", "unknown")
-        citations = payload.get("citations") or []
+        citations = _normalize_citation_paths(payload.get("citations"))
+        injected = (
+            not shadow
+            and isinstance(context, str)
+            and bool(context.strip())
+        )
+        _write_recall_status_sidecar(
+            session_id=session_id,
+            turn_id=kwargs.get("turn_id"),
+            channel=str(channel),
+            citations=citations,
+            shadow=shadow,
+            injected=injected,
+        )
 
         if shadow:
             logger.info(
