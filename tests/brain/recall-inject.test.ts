@@ -337,7 +337,9 @@ describe("buildRecallInjection", () => {
     expect(out.tokensUsedEstimate).toBeLessThanOrEqual(60);
     expect(out.context).toContain("vault:notes/long-a.md");
     expect(out.citations.length).toBeGreaterThan(0);
-    expect(out.citations.length).toBeLessThan(3);
+    // Equal split lets multiple long notes share the ceiling (floor(60/n) per slot).
+    expect(out.citations.length).toBeLessThanOrEqual(3);
+    expect(out.tokensUsedEstimate).toBeGreaterThan(0);
   });
 
   it("continues to later hits when an oversized citation path cannot fit", async () => {
@@ -419,6 +421,138 @@ describe("buildRecallInjection", () => {
     });
 
     expect(out.citations.map((c) => c.path)).toEqual(["notes/z-fresh.md", "notes/a-stale.md"]);
+  });
+
+  it("splits voice_pane budget equally across two injectable notes", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-split-"));
+    const indexDir = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-split-idx-"));
+    const longBodyA = "alpha-content ".repeat(120);
+    const longBodyB = "beta-content ".repeat(120);
+    await writeVaultNote(vaultRoot, "notes/guide-a.md", longBodyA);
+    await writeVaultNote(vaultRoot, "notes/guide-b.md", longBodyB);
+    const indexPath = await writeIndex({
+      dir: indexDir,
+      records: [
+        { path: "notes/guide-a.md", embedding: [1, 0], text: longBodyA },
+        { path: "notes/guide-b.md", embedding: [0.95, 0.05], text: longBodyB },
+      ],
+    });
+
+    const voicePolicy = {
+      ...FIXTURE_POLICY,
+      channels: {
+        ...FIXTURE_POLICY.channels,
+        voice_pane: {
+          ...FIXTURE_POLICY.channels.voice_pane,
+          max_injection_tokens: 800,
+          max_chunks: 2,
+        },
+      },
+    };
+
+    const out = await buildRecallInjection({
+      vaultRoot,
+      indexPath,
+      query: "guide",
+      channel: "voice_pane",
+      policy: voicePolicy,
+      embedder,
+    });
+
+    expect(out.citations).toHaveLength(2);
+    expect(out.citations.map((c) => c.path)).toEqual(["notes/guide-a.md", "notes/guide-b.md"]);
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(800);
+    const perChunkCap = Math.floor(800 / 2);
+    for (const citedPath of ["notes/guide-a.md", "notes/guide-b.md"]) {
+      const escaped = citedPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const chunkMatch = out.context?.match(
+        new RegExp(`### vault:${escaped}[\\s\\S]*?(?=### vault:|$)`),
+      );
+      expect(chunkMatch).toBeTruthy();
+      const excerpt = chunkMatch![0].split("\n\n").slice(1).join("\n\n");
+      expect(excerpt.length).toBeLessThan(longBodyA.length);
+      expect(estimateInjectionTokens(chunkMatch![0])).toBeLessThanOrEqual(perChunkCap + 1);
+    }
+    expect(out.tokensUsedEstimate).toBeGreaterThan(perChunkCap);
+  });
+
+  it("allows a lone injectable note to use the full channel budget", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-single-"));
+    const indexDir = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-single-idx-"));
+    const longBody = "solo-note ".repeat(200);
+    await writeVaultNote(vaultRoot, "notes/solo.md", longBody);
+    const indexPath = await writeIndex({
+      dir: indexDir,
+      records: [{ path: "notes/solo.md", embedding: [1, 0], text: longBody }],
+    });
+
+    const voicePolicy = {
+      ...FIXTURE_POLICY,
+      channels: {
+        ...FIXTURE_POLICY.channels,
+        voice_pane: {
+          ...FIXTURE_POLICY.channels.voice_pane,
+          max_injection_tokens: 800,
+          max_chunks: 2,
+        },
+      },
+    };
+
+    const out = await buildRecallInjection({
+      vaultRoot,
+      indexPath,
+      query: "solo",
+      channel: "voice_pane",
+      policy: voicePolicy,
+      embedder,
+    });
+
+    expect(out.citations).toHaveLength(1);
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(800);
+    expect(out.tokensUsedEstimate).toBeGreaterThan(Math.floor(800 / 2));
+    expect(out.context).toContain("vault:notes/solo.md");
+  });
+
+  it("still injects later notes when an earlier candidate drops at fit time", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-budget-drop-"));
+    const indexDir = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-budget-drop-idx-"));
+    const tooLongName = `notes/${"x".repeat(180)}.md`;
+    const longBody = "second-note-body ".repeat(80);
+    await writeVaultNote(vaultRoot, tooLongName, "Oversized path header body.");
+    await writeVaultNote(vaultRoot, "notes/second.md", longBody);
+    const indexPath = await writeIndex({
+      dir: indexDir,
+      records: [
+        { path: tooLongName, embedding: [1, 0], text: "Oversized path header body." },
+        { path: "notes/second.md", embedding: [0.99, 0.01], text: longBody },
+      ],
+    });
+
+    const voicePolicy = {
+      ...FIXTURE_POLICY,
+      channels: {
+        ...FIXTURE_POLICY.channels,
+        voice_pane: {
+          ...FIXTURE_POLICY.channels.voice_pane,
+          max_injection_tokens: 50,
+          max_chunks: 2,
+        },
+      },
+    };
+
+    const out = await buildRecallInjection({
+      vaultRoot,
+      indexPath,
+      query: "second",
+      channel: "voice_pane",
+      policy: voicePolicy,
+      embedder,
+    });
+
+    expect(out.citations.map((c) => c.path)).toEqual(["notes/second.md"]);
+    expect(out.dropped).toContainEqual({ path: tooLongName, reason: "BUDGET" });
+    expect(out.context).toContain("vault:notes/second.md");
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(50);
   });
 
   it("respects max_chunks trim even when budget remains", async () => {

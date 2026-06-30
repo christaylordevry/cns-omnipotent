@@ -176,8 +176,12 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
   const maxChunks = channelPolicy.max_chunks;
   const secretGateCache = new Map<string, Awaited<ReturnType<typeof evaluateNoteForEmbeddingSecretGate>>>();
 
+  type InjectableCandidate = { path: string; passageText: string; score: number };
+  const candidates: InjectableCandidate[] = [];
+
+  // Pass 1: collect up to max_chunks injectable candidates (blocklist, secret-gate, empty passage).
   for (const hit of queryOut.results) {
-    if (chunks.length >= maxChunks) {
+    if (candidates.length >= maxChunks) {
       break;
     }
     const vaultPath = hit.path;
@@ -219,24 +223,32 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
       continue;
     }
 
-    const remainingTokens = maxTokens - tokensUsed;
-    if (remainingTokens <= 0) {
-      break;
-    }
+    candidates.push({ path: vaultPath, passageText, score });
+  }
 
+  // Pass 2: two-pass budget split — equal per-slot cap from injectable count so a lone note
+  // keeps the full channel budget; multi-note queries share maxTokens across slots. If
+  // fitRecallChunkToBudget returns null, that slot's share is not redistributed (mild under-use).
+  const injectableCount = candidates.length;
+  const perChunkCap =
+    injectableCount === 1
+      ? maxTokens
+      : Math.floor(maxTokens / Math.min(injectableCount, maxChunks));
+
+  for (const candidate of candidates) {
     const fitted = fitRecallChunkToBudget({
-      path: vaultPath,
-      passageText,
-      score,
-      remainingTokens,
+      path: candidate.path,
+      passageText: candidate.passageText,
+      score: candidate.score,
+      remainingTokens: perChunkCap,
     });
     if (fitted === null) {
-      dropped.push({ path: vaultPath, reason: "BUDGET" });
+      dropped.push({ path: candidate.path, reason: "BUDGET" });
       continue;
     }
 
     chunks.push(fitted.chunk);
-    citations.push({ path: vaultPath, score });
+    citations.push({ path: candidate.path, score: candidate.score });
     tokensUsed += fitted.tokens;
   }
 
