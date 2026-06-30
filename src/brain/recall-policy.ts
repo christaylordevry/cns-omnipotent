@@ -35,6 +35,19 @@ const brainRecallPolicySchema = z.object({
       quality_weight_strength: z.number().min(0).max(1).optional(),
     })
     .optional(),
+  prefetch: z
+    .object({
+      timeout_seconds: z.number().positive().optional(),
+      voice_pane_timeout_seconds: z.number().positive().optional(),
+    })
+    .optional(),
+  embedder_warm_keep: z
+    .object({
+      enabled: z.boolean(),
+      ping_interval_minutes: z.number().int().positive().optional(),
+      warm_on_dashboard_start: z.boolean().optional(),
+    })
+    .optional(),
   shadow_mode: z.boolean(),
 });
 

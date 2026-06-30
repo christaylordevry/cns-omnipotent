@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "policy_version": "0.2.0",
-  "policy_notes": "Story 79-7: quality_weight_strength α=0.3 softens PAKE product penalty (effective = 1 - α·(1 - raw)). Thresholds retuned for text-embedding-3-large chunked index score band (~0.12–0.18 voice); iterate via brain:calibrate only — no code round-trips.",
+  "policy_version": "0.2.1",
+  "policy_notes": "Story 82-6: voice_pane_timeout_seconds raised to 6s (operator true-cold 4.95s + margin); embedder_warm_keep is primary cold-turn fix. Story 79-7: quality_weight_strength α=0.3 softens PAKE product penalty (effective = 1 - α·(1 - raw)). Thresholds retuned for text-embedding-3-large chunked index score band (~0.12–0.18 voice); iterate via brain:calibrate only — no code round-trips.",
   "inject_blocked_paths": [
     "AI-Context/AGENTS.md",
     "_meta/logs/**"
@@ -35,7 +35,12 @@
   },
   "prefetch": {
     "timeout_seconds": 5,
-    "voice_pane_timeout_seconds": 3
+    "voice_pane_timeout_seconds": 6
+  },
+  "embedder_warm_keep": {
+    "enabled": false,
+    "ping_interval_minutes": 10,
+    "warm_on_dashboard_start": true
   },
   "shadow_mode": false
 }

@@ -142,6 +142,9 @@ Next steps:
   systemctl --user restart hermes-dashboard.service
   systemctl --user restart hermes-gateway.service   # optional — only if gateway drop-ins were added
 
+Embedder warm-keep (Story 82-6): set embedder_warm_keep.enabled=true in config/brain-recall-policy.json, then:
+  bash scripts/install-brain-embedder-warm-cron.sh
+
 Verify dashboard env:
   tr '\\0' '\\n' < /proc/\$(systemctl --user show hermes-dashboard.service -p MainPID --value)/environ | grep -E 'CNS_BRAIN_INDEX_PATH|CNS_NODE_BIN|^PATH='
 EOF
