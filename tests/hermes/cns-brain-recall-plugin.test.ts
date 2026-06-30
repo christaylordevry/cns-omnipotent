@@ -926,3 +926,169 @@ print("ok")`,
     expect(out.trim()).toBe("ok");
   });
 });
+
+describe("Story 82-5 bare-PATH prefetch hardening", () => {
+  it("resolveNodeExecutable honors CNS_NODE_BIN under bare PATH", async () => {
+    const { resolveNodeExecutable } = await import("../../src/brain/resolve-node-toolchain.js");
+    const prev = process.env.CNS_NODE_BIN;
+    process.env.CNS_NODE_BIN = process.execPath;
+    try {
+      expect(resolveNodeExecutable()).toBe(process.execPath);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.CNS_NODE_BIN;
+      } else {
+        process.env.CNS_NODE_BIN = prev;
+      }
+    }
+  });
+
+  it("resolveNodeExecutable selects newest nvm node and never uses dot as nodeBinDir", async () => {
+    const { resolveNodeExecutable, resolveTsxRunner, pathWithNodeBin } = await import(
+      "../../src/brain/resolve-node-toolchain.js"
+    );
+    const tempRoot = mkdtempSync(join(tmpdir(), "cns-82-5-resolver-"));
+    tempRoots.push(tempRoot);
+    const home = join(tempRoot, "home");
+    const oldBin = join(home, ".nvm/versions/node/v9.11.2/bin");
+    const newBin = join(home, ".nvm/versions/node/v24.14.0/bin");
+    mkdirSync(oldBin, { recursive: true });
+    mkdirSync(newBin, { recursive: true });
+    writeFileSync(join(oldBin, "node"), "", "utf8");
+    writeFileSync(join(newBin, "node"), "", "utf8");
+
+    const prevHome = process.env.HOME;
+    const prevCnsNode = process.env.CNS_NODE_BIN;
+    const prevNode = process.env.NODE_BIN;
+    const prevPath = process.env.PATH;
+    try {
+      process.env.HOME = home;
+      delete process.env.CNS_NODE_BIN;
+      delete process.env.NODE_BIN;
+      expect(resolveNodeExecutable()).toBe(join(newBin, "node"));
+
+      process.env.HOME = join(tempRoot, "empty-home");
+      process.env.PATH = "";
+      const runner = resolveTsxRunner({ repoRoot: root, cliEntry: prefetchScript, argv: [] });
+      expect(runner.nodeBinDir).toBe("");
+
+      const path = pathWithNodeBin("/opt/node/v24.14.0/bin-extra:/usr/bin", "/opt/node/v24.14.0/bin");
+      expect(path.split(":")[0]).toBe("/opt/node/v24.14.0/bin");
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevCnsNode === undefined) delete process.env.CNS_NODE_BIN;
+      else process.env.CNS_NODE_BIN = prevCnsNode;
+      if (prevNode === undefined) delete process.env.NODE_BIN;
+      else process.env.NODE_BIN = prevNode;
+      if (prevPath === undefined) delete process.env.PATH;
+      else process.env.PATH = prevPath;
+    }
+  });
+
+  it("brain-recall-prefetch.mjs succeeds with PATH=/usr/bin:/bin when CNS_NODE_BIN is set", async () => {
+    const anchor = "Bare PATH prefetch probe for Story 82-5.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-5-bare-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-5-bare-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/bare-path.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/bare-path.md",
+    });
+
+    const res = spawnSync(
+      process.execPath,
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          HOME: process.env.HOME ?? "",
+          USER: process.env.USER ?? "",
+          PATH: "/usr/bin:/bin",
+          CNS_NODE_BIN: process.execPath,
+          CNS_BRAIN_EMBEDDER: "stub",
+        },
+      },
+    );
+
+    expect(res.status, res.stderr).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload.citations.length).toBeGreaterThan(0);
+    expect(payload.citations[0]?.path).toBe("notes/bare-path.md");
+    expect(res.stderr).not.toMatch(/ENOENT/);
+  });
+
+  it("install-hermes-brain-recall-env.sh writes dashboard drop-ins with brain-recall + PATH", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "cns-82-5-install-"));
+    tempRoots.push(tempRoot);
+    const hermesHome = join(tempRoot, "hermes-home");
+    const home = join(tempRoot, "home with space");
+    const olderNodeBin = join(home, ".nvm/versions/node/v9.11.2/bin");
+    const newestNodeBin = join(home, ".nvm/versions/node/v24.14.0/bin");
+    mkdirSync(olderNodeBin, { recursive: true });
+    mkdirSync(newestNodeBin, { recursive: true });
+    writeFileSync(join(olderNodeBin, "node"), "", "utf8");
+    writeFileSync(join(newestNodeBin, "node"), "", "utf8");
+    const installBrainEnv = join(root, "scripts/install-hermes-brain-recall-env.sh");
+
+    execFileSync("bash", [installBrainEnv], {
+      encoding: "utf8",
+      env: {
+        HERMES_HOME: hermesHome,
+        XDG_CONFIG_HOME: join(tempRoot, "config"),
+        HOME: home,
+        PATH: process.env.PATH,
+      },
+    });
+
+    const configRoot = join(tempRoot, "config/systemd/user/hermes-dashboard.service.d");
+    const brainConf = readFileSync(join(configRoot, "brain-recall.conf"), "utf8");
+    const envConf = readFileSync(join(configRoot, "env.conf"), "utf8");
+    const brainEnvPath = join(hermesHome, "brain-recall.env");
+    const brainEnv = readFileSync(brainEnvPath, "utf8");
+
+    expect(brainConf).toContain("EnvironmentFile=-%h/.hermes/brain-recall.env");
+    expect(envConf).toContain(`Environment=PATH=${newestNodeBin}:`);
+    expect(existsSync(join(hermesHome, "brain-recall.env"))).toBe(true);
+    expect(brainEnv).toContain("CNS_VAULT_ROOT='/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE'");
+    expect(brainEnv).not.toMatch(/^PATH=/m);
+
+    const sourced = execFileSync(
+      "bash",
+      ["-c", `set -a; source "${brainEnvPath}"; printf '%s' "$CNS_VAULT_ROOT"`],
+      { encoding: "utf8" },
+    );
+    expect(sourced).toBe("/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE");
+
+    writeFileSync(join(configRoot, "env.conf"), "[Service]\nEnvironment=PATH=/usr/bin:/bin\n", "utf8");
+    writeFileSync(join(configRoot, "brain-recall.conf"), "[Service]\nEnvironmentFile=/tmp/wrong.env\n", "utf8");
+    execFileSync("bash", [installBrainEnv], {
+      encoding: "utf8",
+      env: {
+        HERMES_HOME: hermesHome,
+        XDG_CONFIG_HOME: join(tempRoot, "config"),
+        HOME: home,
+        PATH: process.env.PATH,
+      },
+    });
+
+    expect(readFileSync(join(configRoot, "env.conf"), "utf8")).toContain(
+      `Environment=PATH=${newestNodeBin}:`,
+    );
+    expect(readFileSync(join(configRoot, "brain-recall.conf"), "utf8")).toContain(
+      "EnvironmentFile=-%h/.hermes/brain-recall.env",
+    );
+  });
+});

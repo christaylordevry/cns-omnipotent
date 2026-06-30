@@ -7,7 +7,34 @@ bash scripts/install-hermes-plugin-cns-brain-recall.sh
 hermes plugins enable cns-brain-recall
 ```
 
-Required env (WSL operator shell or `~/.hermes/.env`):
+## Brain-recall env (gateway + dashboard)
+
+Brain vars live in `~/.hermes/brain-recall.env` (**no `PATH=` line**). NVM `bin` on PATH comes from a **separate** systemd drop-in `env.conf` — same two-file pattern as `hermes-gateway.service`.
+
+```bash
+# Idempotent: creates brain-recall.env template + dashboard/gateway drop-ins
+bash scripts/install-hermes-brain-recall-env.sh
+systemctl --user daemon-reload
+systemctl --user restart hermes-dashboard.service
+systemctl --user restart hermes-gateway.service   # if gateway drop-ins were added
+```
+
+Drop-ins installed under `~/.config/systemd/user/`:
+
+| File | Purpose |
+|------|---------|
+| `hermes-dashboard.service.d/brain-recall.conf` | `EnvironmentFile=-%h/.hermes/brain-recall.env` |
+| `hermes-dashboard.service.d/env.conf` | `Environment=PATH=<nvm>/bin:…` |
+| `hermes-gateway.service.d/brain-recall.conf` | same as dashboard (if missing) |
+| `hermes-gateway.service.d/env.conf` | PATH only if missing (preserves existing gateway `EnvironmentFile` lines) |
+
+Manual (non-systemd) dashboard launch:
+
+```bash
+bash scripts/hermes-dashboard-start.sh
+```
+
+Required env in `brain-recall.env` (or operator shell):
 
 ```bash
 export CNS_OMNIPOTENT_ROOT=/home/christ/ai-factory/projects/Omnipotent.md
