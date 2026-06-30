@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-30T00:00:00+10:00"
+last_updated: "2026-06-30T23:23:36+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -650,15 +650,15 @@ development_status:
   epic-78-retrospective: optional
 
   # Epic 79 — Felt Recall — Semantic Brain + Cited Auto-Injection (hermes-omniscient)
-  epic-79: in-progress
+  epic-79: done
   79-1-a4-0-inject-probe: done
   79-2-portalembedder-production-brain-index: done
   79-3-recall-policy-config-recall-inject: done
   79-4-golden-set-calibration-gate: done
   79-5-production-cns-brain-recall-plugin-prefetch-cli: done
-  79-6-chunked-brain-index-chunk-aware-recall: review
-  79-7-recall-calibration-soften-quality-weighting: review
-  79-8-distribute-recall-budget-across-max-chunks: review
+  79-6-chunked-brain-index-chunk-aware-recall: done
+  79-7-recall-calibration-soften-quality-weighting: done
+  79-8-distribute-recall-budget-across-max-chunks: done
   epic-79-retrospective: optional
 
   # Epic 82 — Local Nexus JARVIS Voice (hermes-omniscient Phase D; cns-dashboard)
@@ -667,4 +667,5 @@ development_status:
   82-2-spike-omni-002-voice-channel: done
   82-3-voice-drawer: done # smoke-verified live 2026-06-29
   82-4-spike-omni-003-voice-recall-status-ground-truth: done
+  82-5-brain-recall-prefetch-bare-path-dashboard-env: in-progress
   epic-82-retrospective: optional

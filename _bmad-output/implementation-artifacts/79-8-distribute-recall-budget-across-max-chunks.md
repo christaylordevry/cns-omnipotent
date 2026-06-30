@@ -9,7 +9,7 @@ depends_on:
 
 # Story 79.8: Distribute recall injection budget across `max_chunks`
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 

@@ -6,7 +6,7 @@ branch: hermes-consolidation
 
 # Story 79.7: Recall calibration — soften quality weighting (tunable α) + threshold retune + recalibrate to pass
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 

@@ -6,7 +6,7 @@ branch: hermes-consolidation
 
 # Story 79.6: Chunked Brain index + chunk-aware recall
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
