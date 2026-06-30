@@ -83,6 +83,15 @@ so that **voice answers ground in multiple vault sources (e.g. Operator Guide + 
   - [x] `npm test -- tests/brain/recall-inject.test.ts`
   - [x] `bash scripts/verify.sh` (story-specific brain tests green)
 
+### Review Findings
+
+- [x] [Review][Patch] Fit-time `BUDGET` drops can consume a `max_chunks` slot and hide later eligible hits [src/brain/recall-inject.ts:183] — fixed: pass 1 now collects all eligible top-k candidates, and pass 2 skips fit-time `BUDGET` drops until `max_chunks` successful injections.
+
+### Review Verification
+
+- `npm test -- tests/brain/recall-inject.test.ts` — PASS (includes full `test:node`; targeted Vitest file 23/23 pass)
+- `bash scripts/verify.sh` — FAIL only at final Hermes skill install gate: pre-existing `session-close` mirror parity drift (`scripts/hermes-skill-examples/session-close/SKILL.md` differs from `~/.hermes/skills/cns/session-close/SKILL.md`); CNS tests, lint, typecheck, build, and sibling cns-dashboard tests passed.
+
 ## Dev Notes
 
 ### Current code state (READ BEFORE EDITING)

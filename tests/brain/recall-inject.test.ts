@@ -517,14 +517,17 @@ describe("buildRecallInjection", () => {
     const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-budget-drop-"));
     const indexDir = await mkdtemp(path.join(os.tmpdir(), "cns-79-8-budget-drop-idx-"));
     const tooLongName = `notes/${"x".repeat(180)}.md`;
-    const longBody = "second-note-body ".repeat(80);
+    const secondBody = "second-note-body ".repeat(80);
+    const thirdBody = "third-note-body ".repeat(80);
     await writeVaultNote(vaultRoot, tooLongName, "Oversized path header body.");
-    await writeVaultNote(vaultRoot, "notes/second.md", longBody);
+    await writeVaultNote(vaultRoot, "notes/second.md", secondBody);
+    await writeVaultNote(vaultRoot, "notes/third.md", thirdBody);
     const indexPath = await writeIndex({
       dir: indexDir,
       records: [
         { path: tooLongName, embedding: [1, 0], text: "Oversized path header body." },
-        { path: "notes/second.md", embedding: [0.99, 0.01], text: longBody },
+        { path: "notes/second.md", embedding: [0.99, 0.01], text: secondBody },
+        { path: "notes/third.md", embedding: [0.98, 0.02], text: thirdBody },
       ],
     });
 
@@ -534,7 +537,7 @@ describe("buildRecallInjection", () => {
         ...FIXTURE_POLICY.channels,
         voice_pane: {
           ...FIXTURE_POLICY.channels.voice_pane,
-          max_injection_tokens: 50,
+          max_injection_tokens: 75,
           max_chunks: 2,
         },
       },
@@ -549,10 +552,11 @@ describe("buildRecallInjection", () => {
       embedder,
     });
 
-    expect(out.citations.map((c) => c.path)).toEqual(["notes/second.md"]);
+    expect(out.citations.map((c) => c.path)).toEqual(["notes/second.md", "notes/third.md"]);
     expect(out.dropped).toContainEqual({ path: tooLongName, reason: "BUDGET" });
     expect(out.context).toContain("vault:notes/second.md");
-    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(50);
+    expect(out.context).toContain("vault:notes/third.md");
+    expect(out.tokensUsedEstimate).toBeLessThanOrEqual(75);
   });
 
   it("respects max_chunks trim even when budget remains", async () => {

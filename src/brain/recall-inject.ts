@@ -179,11 +179,10 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
   type InjectableCandidate = { path: string; passageText: string; score: number };
   const candidates: InjectableCandidate[] = [];
 
-  // Pass 1: collect up to max_chunks injectable candidates (blocklist, secret-gate, empty passage).
+  // Pass 1: collect eligible candidates from the bounded top-k result set
+  // (blocklist, secret-gate, empty passage). Fit-time BUDGET drops happen later and
+  // must not consume one of the max_chunks successful injection slots.
   for (const hit of queryOut.results) {
-    if (candidates.length >= maxChunks) {
-      break;
-    }
     const vaultPath = hit.path;
     const score = hit.score ?? 0;
     const passageText = hit.text?.trim() ?? "";
@@ -227,8 +226,8 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
   }
 
   // Pass 2: two-pass budget split — equal per-slot cap from injectable count so a lone note
-  // keeps the full channel budget; multi-note queries share maxTokens across slots. If
-  // fitRecallChunkToBudget returns null, that slot's share is not redistributed (mild under-use).
+  // keeps the full channel budget; multi-note queries share maxTokens across target slots.
+  // Fit-time BUDGET drops are skipped in rank order until max_chunks successful injections.
   const injectableCount = candidates.length;
   const perChunkCap =
     injectableCount === 1
@@ -236,6 +235,9 @@ export async function buildRecallInjection(params: BuildRecallInjectionParams): 
       : Math.floor(maxTokens / Math.min(injectableCount, maxChunks));
 
   for (const candidate of candidates) {
+    if (chunks.length >= maxChunks) {
+      break;
+    }
     const fitted = fitRecallChunkToBudget({
       path: candidate.path,
       passageText: candidate.passageText,
