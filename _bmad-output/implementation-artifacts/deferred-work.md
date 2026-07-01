@@ -1,5 +1,85 @@
 # Deferred work
 
+## Deferred from: code review of 82-2-spike-omni-002-voice-channel (2026-06-28)
+
+- **`profile_home` vs launch `HERMES_HOME` state.db split** — Plugin reads only `{HERMES_HOME}/state.db`; remote-profile sessions persist elsewhere. Channel Resolution Contract flags for 82-3 VoiceDrawer.
+
+- **Per-turn sqlite open on discord/text hot path** — `_session_source_from_db` runs on every hook call. Acceptable for spike; revisit if voice prefetch p95 exceeds budget.
+
+- **Spike log PII on disk** — `CNS_BRAIN_RECALL_SPIKE_LOG=1` writes truncated `user_message` to `~/.hermes/logs/`. Env-gated spike tooling; tighten if promoted to production observability.
+
+---
+
+## Deferred from: code review of 79-5-production-cns-brain-recall-plugin-prefetch-cli (2026-06-26)
+
+- **Per-turn recall latency (cold-start + index load + Portal embed)** — measure p95 at Story 79-4 live cutover (`shadow_mode: false`); if over budget, consider persistent prefetch helper instead of per-turn `npx tsx` subprocess. Forward flag only; not blocking shadow wiring.
+
+---
+
+## Hermes Desktop Electron build — AC#4 voice E2E blocker (2026-06-25)
+
+**Surfaced by:** Story 78-1 operator assessment.
+
+**Problem:** Story 78-1 voice config on WSL is correct (`auto_tts: true`, `tts.use_gateway: true`, `stt.use_gateway: true`, whisper-1). AC#4 Desktop E2E cannot run:
+
+1. **No packaged native Desktop app** — Windows Store search finds nothing; `install.ps1` updates CLI/upstream but does not produce a Desktop `.exe`.
+2. **Electron source only** — `apps/desktop` present in hermes-agent repo after pull; requires build/packaging step (out of 78-1 scope).
+3. **Browser UI voice fallback blocked** — WSL sounddevice / audio device limitation for mic capture at `http://localhost:9119`.
+
+**Operator action when ready:**
+
+- Build/package Hermes Desktop from `apps/desktop` (Electron) per upstream docs, or install when Nous ships a packaged Windows Desktop release.
+- Re-run AC#4: remote gateway `http://localhost:9119`, OAuth, Ctrl+B push-to-talk, streaming TTS confirmation.
+- Update `78-1-voice-e2e-evidence.md` §AC #4 from PARTIAL → PASS; move story 78-1 to `review`.
+
+**Unblocked:** Story **78-2** (per-skill Hermes model routing) — pure config, no Desktop dependency.
+
+---
+
+## cns-dashboard CI failure — @esbuild/aix-ppc64 platform mismatch (2026-06-25)
+
+GitHub CI fails on `npm ci` with `EBADPLATFORM @esbuild/aix-ppc64 — wanted aix/ppc64, runner is linux/x64`. Stray platform-specific optional dep in `package-lock.json`. Vercel builds fine. Fix: `package-lock.json` cleanup to remove stray platform entries. Not blocking any Epic 77 story.
+
+---
+
+## Ops health items — surfaced by awareness-sync live smoke (2026-06-25)
+
+Observed from `awareness-sync` Discord response during Epic 77 Story 77-4 validation:
+
+- **Run-chain dormant 25 days** — last run was Story 52.1 (Morning Digest NotebookLM Synthesis). Trigger a manual chain run when ready; skill + endpoint are live.
+- **Inbox 23** — triage backlog from 76-3 plan still pending execution. Run `/triage` family via Hermes when ready.
+- **MCPs 2/7 healthy** — vault-io stale; context7, discord, firecrawl, playwright all unknown status. Run an MCP health check and resolve stale/unknown statuses.
+- **8 investigations, all in triage** — nothing active or progressing. Review investigation board when ops window allows.
+
+---
+
+## Deferred from: code review of 75-5-run-chain-end-to-end-revival-verification (2026-06-25)
+
+- **Dashboard `RUN_CHAIN_STORY_KEY` still 38-2** — `scripts/dashboard-sync.ts:112` points at Epic 38 story; dashboard shows dormant after 75-5 Revived docs until key updated or status derived from `run-chain.md`.
+- **`parseEnvFile` edge cases (EXPORT casing, CRLF, duplicates)** — incremental hardening on `validate-anthropic-key.ts` optional; land via 75-4 patch if `.env.live-chain` uses `export` lines (75-5 review decision 2B reverted in-story fix).
+- **Skill mirror stale dormant messaging** — `trigger-pattern.md` / `task-prompt.md` still reference dormant/75-4 gate; update when `#hermes` binding follow-up lands or via 75-3 review patch.
+- **`AGENTS.md` Run-chain module row (WriteGate)** — Session 4 housekeeping: add Run-chain row to §7 module table via `/session-close` in `#hermes`; sync `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` + `specs/cns-vault-contract/AGENTS.md` + canonical vault in one operation. Reverted from 75-5 working tree (WriteGate).
+
+## Parked initiative — CNS/Nexus Dashboard UX Redesign (2026-06-24)
+
+**Status:** Intentionally deferred. **Not in Hermes Consolidation scope (Epics 74–78).**
+
+Operator wants a full redesign of how the cns-dashboard / Nexus cockpit **looks and operates**. Deliberately kept OUT of the Hermes Consolidation overhaul to avoid scope blow-up and to protect the "nothing breaks" goal (G2) while the backend is being stabilized.
+
+**Why deferred to its own epic (not folded into 74–78):**
+- The conversational JARVIS lives on Desktop/Discord (ADR-HERMES-001 topology a), not the cockpit — a redesign does not advance the JARVIS goal.
+- A better redesign is possible *after* Epic 77 (D1 awareness): design against real, working JARVIS data flows rather than a system that doesn't exist yet.
+- Epic 77's new UI (awareness panels + async ask box) is scoped minimal + theme-consistent (UX-DR1–5, reusing `nexus-theme.css`), so it moves with any future redesign — not throwaway.
+- Adding a live-dashboard redesign mid-overhaul fights the stabilization goal.
+
+**Recommended path when picked up:**
+1. Run `bmad-ux` / UX designer agent (Sally) as a **planning-only** track to capture the redesign vision (can happen anytime; does not block 74–78).
+2. Build as a **dedicated epic after the Hermes Consolidation overhaul lands** (ideally post-Epic 77).
+
+**Reference:** `prd-hermes-consolidation.md`, `architecture-hermes-consolidation.md` (topology a, cockpit = awareness surface), `ux-designs/ux-CNS-2026-06-21/` (current Nexus UX baseline).
+
+---
+
 ## Deferred from: code review of 73-7-digest-entity-sections (2026-06-22)
 
 - Full verify gate fails seven unrelated session-close Section 8 tests because the changed draft validator rejects existing fixtures that do not start with `###`; Story 73.7 focused tests pass 66 of 66.
@@ -546,9 +626,11 @@ Repeated runs of the same research prompt can yield **different source URLs** fr
 
 ### Per-skill Hermes model routing
 
-Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain. Blocked on Hermes native per-skill model API. Policy documented in MEMORY.md.
+**Status (2026-06-25, Story 78-2):** Config **activated** — `~/.hermes/config.yaml` → `smart_model_routing` tier + skill map; governance in `AI-Context/modules/routing.md`. Hermes **v0.17.0** stores the block via deep-merge but **does not consume it at gateway runtime** (consumer-pending — only `AGENTS.md` references the key; no `DEFAULT_CONFIG` / `gateway/` reader). Runtime two-tier smoke (triage Haiku vs vault-think Sonnet) blocked until upstream ships router.
 
-- **Class:** (b) Phase 2 backlog
+- **Class:** (b) Phase 2 backlog — **consumer follow-up** when Hermes reads `smart_model_routing`
+- **Policy:** Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain (see `routing.md` §Epic 78)
+- **Rollback:** `smart_model_routing.enabled: false` or remove block; global Sonnet default unchanged
 
 ### `vault-lint-remediate-34-2.ts` `--verify-only`
 
@@ -994,3 +1076,8 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 60-2-dry-refactor-shared-withsessioncloseenv-isolation-helper (2026-06-04)
 
 - Optional direct unit tests for `tests/helpers/hermes-env-isolation.mjs` (save/restore ordering, nested-call safety); integration coverage via three migrated suites is sufficient for now.
+
+## Deferred from: code review of 79-4-golden-set-calibration-gate (2026-06-26)
+
+- `precision@k` metric is expected-recall-in-top-k (|expected ∩ topK| / |expected|), not classic IR precision — documented in harness; acceptable for SM-1 bar if operator agrees.
+- Operator live calibration not run — golden paths verified in vault (including `AI-Context/modules/run-chain.md`); `operator_signoff: pending` until Chris runs Portal index calibrate.

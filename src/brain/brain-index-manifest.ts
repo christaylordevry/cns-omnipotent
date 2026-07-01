@@ -10,6 +10,7 @@ import { INDEXING_SECRET_EXCLUSION_REASON } from "./indexing-secret-gate.js";
 import type { BuildIndexExclusion } from "./build-index.js";
 import { assertOutputDirOutsideVault } from "./build-index.js";
 import { effectiveCorpusRoots } from "./load-corpus-allowlist.js";
+import type { BrainIndexChunkingMetadata } from "./note-chunker.js";
 
 export const BRAIN_INDEX_MANIFEST_SCHEMA_VERSION = 1 as const;
 export const BRAIN_INDEX_MANIFEST_FILENAME = "brain-index-manifest.json" as const;
@@ -34,7 +35,10 @@ export type BrainIndexManifestAllowlistSnapshot = {
 
 export type BrainIndexManifestCounts = {
   candidates_discovered: number;
+  /** Total embedded chunks. */
   embedded: number;
+  /** Unique parent notes with at least one embedded chunk. */
+  notes_embedded: number;
   excluded: number;
   failed: number;
 };
@@ -70,6 +74,7 @@ export type BrainIndexManifest = {
 
   allowlist_snapshot: BrainIndexManifestAllowlistSnapshot;
   embedder: EmbedderMetadata;
+  chunking?: BrainIndexChunkingMetadata;
 
   counts: BrainIndexManifestCounts;
   exclusion_reason_breakdown: Record<string, number>;
@@ -194,7 +199,12 @@ export async function computeVaultSnapshotAndFreshness(
 }
 
 function isPerFileFailure(ex: BuildIndexExclusion): boolean {
-  return ex.reasonCode === "IO_ERROR" || ex.reasonCode === "FRONTMATTER_PARSE";
+  return (
+    ex.reasonCode === "IO_ERROR" ||
+    ex.reasonCode === "FRONTMATTER_PARSE" ||
+    ex.reasonCode === "EMBEDDING_ERROR" ||
+    ex.reasonCode === "DIMENSION_MISMATCH"
+  );
 }
 
 export function buildExclusionReasonBreakdown(
@@ -217,14 +227,16 @@ export function buildExclusionReasonBreakdown(
 
 export function buildCounts(
   candidatesDiscovered: number,
-  embedded: number,
+  embeddedChunks: number,
+  notesEmbedded: number,
   exclusions: BuildIndexExclusion[],
 ): BrainIndexManifestCounts {
   const failed = exclusions.filter(isPerFileFailure).length;
   const excluded = exclusions.length - failed;
   return {
     candidates_discovered: candidatesDiscovered,
-    embedded,
+    embedded: embeddedChunks,
+    notes_embedded: notesEmbedded,
     excluded,
     failed,
   };
@@ -237,6 +249,7 @@ export function serializeBrainIndexManifest(manifest: BrainIndexManifest): strin
     build_timestamp_utc: manifest.build_timestamp_utc,
     allowlist_snapshot: manifest.allowlist_snapshot,
     embedder: manifest.embedder,
+    ...(manifest.chunking ? { chunking: manifest.chunking } : {}),
     counts: manifest.counts,
     exclusion_reason_breakdown: manifest.exclusion_reason_breakdown,
     failures: normalizeManifestFailures(manifest.failures),
@@ -348,4 +361,3 @@ export async function writeBrainIndexManifest(
   await rename(tmpPath, outPath);
   return outPath;
 }
-

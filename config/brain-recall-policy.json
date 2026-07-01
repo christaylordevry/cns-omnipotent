@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "policy_version": "0.2.1",
+  "policy_notes": "Story 82-6: voice_pane_timeout_seconds raised to 6s (operator true-cold 4.95s + margin); embedder_warm_keep is primary cold-turn fix. Story 79-7: quality_weight_strength α=0.3 softens PAKE product penalty (effective = 1 - α·(1 - raw)). Thresholds retuned for text-embedding-3-large chunked index score band (~0.12–0.18 voice); iterate via brain:calibrate only — no code round-trips.",
+  "inject_blocked_paths": [
+    "AI-Context/AGENTS.md",
+    "_meta/logs/**"
+  ],
+  "channels": {
+    "voice_pane": {
+      "max_top_k_fetch": 5,
+      "min_score_threshold": 0.15,
+      "max_injection_tokens": 800,
+      "max_chunks": 2
+    },
+    "standard_text": {
+      "max_top_k_fetch": 8,
+      "min_score_threshold": 0.12,
+      "max_injection_tokens": 1500,
+      "max_chunks": 4
+    },
+    "yapped_text": {
+      "max_top_k_fetch": 12,
+      "min_score_threshold": 0.1,
+      "max_injection_tokens": 3000,
+      "max_chunks": 6
+    }
+  },
+  "yapped_text_min_chars": 400,
+  "index": {
+    "incremental_cron_minutes": 20,
+    "stale_penalty_factor": 0.85,
+    "max_staleness_minutes": 180,
+    "quality_weight_strength": 0.3
+  },
+  "prefetch": {
+    "timeout_seconds": 5,
+    "voice_pane_timeout_seconds": 6
+  },
+  "embedder_warm_keep": {
+    "enabled": false,
+    "ping_interval_minutes": 10,
+    "warm_on_dashboard_start": true
+  },
+  "shadow_mode": false
+}

@@ -1,0 +1,1094 @@
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+import { execFileSync, spawnSync } from "node:child_process";
+import { detectRecallChannel } from "../../src/brain/recall-inject.js";
+import { StubEmbedder } from "../../src/brain/embedder.js";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const pluginRoot = join(root, "scripts/hermes-plugin-examples/cns-brain-recall");
+const installScript = join(root, "scripts/install-hermes-plugin-cns-brain-recall.sh");
+const prefetchScript = join(root, "scripts/brain-recall-prefetch.mjs");
+const sourcePycache = join(pluginRoot, "__pycache__");
+const bytecodeEnv = { ...process.env, PYTHONDONTWRITEBYTECODE: "1" };
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+  for (const tempRoot of tempRoots.splice(0)) {
+    rmSync(tempRoot, { force: true, recursive: true });
+  }
+  rmSync(sourcePycache, { force: true, recursive: true });
+});
+
+async function writeIndex(params: {
+  dir: string;
+  records: Array<{ path: string; embedding: number[]; text?: string }>;
+}): Promise<string> {
+  const indexPath = join(params.dir, "brain-index.json");
+  await writeFile(
+    indexPath,
+    JSON.stringify(
+      {
+        schema_version: 2,
+        embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
+        chunking: {
+          target_tokens: 768,
+          overlap_tokens: 64,
+          tokenizer_encoding: "cl100k_base",
+          tokenizer_package: "gpt-tokenizer@3.4.0",
+        },
+        records: params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: i,
+          char_start: 0,
+          char_end: (r.text ?? "fixture chunk").length,
+          text: r.text ?? "fixture chunk",
+          embedding: r.embedding,
+        })),
+        exclusions: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  return indexPath;
+}
+
+async function writeStubIndex(params: {
+  dir: string;
+  anchorText: string;
+  vaultRel: string;
+}): Promise<string> {
+  const stub = new StubEmbedder();
+  const embedding = await stub.embed(params.anchorText);
+  return writeIndex({
+    dir: params.dir,
+    records: [{ path: params.vaultRel, embedding, text: params.anchorText }],
+  });
+}
+
+async function writeVaultNote(vaultRoot: string, vaultRel: string, body: string): Promise<void> {
+  const abs = join(vaultRoot, vaultRel);
+  await mkdir(dirname(abs), { recursive: true });
+  await writeFile(abs, `---\ntitle: Test\n---\n\n${body}`, "utf8");
+}
+
+describe("Story 79-5 cns-brain-recall production plugin", () => {
+  it("has version-controlled plugin source files", () => {
+    expect(existsSync(join(pluginRoot, "plugin.py"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "plugin.yaml"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "__init__.py"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "references/config-snippet.md"))).toBe(true);
+    expect(existsSync(prefetchScript)).toBe(true);
+  });
+
+  it("plugin.yaml declares pre_llm_call hook and Story 79-5 version", () => {
+    const yaml = readFileSync(join(pluginRoot, "plugin.yaml"), "utf8");
+    expect(yaml).toMatch(/name:\s*cns-brain-recall/);
+    expect(yaml).toMatch(/pre_llm_call/);
+    expect(yaml).toMatch(/version:\s*0\.2\.2/);
+  });
+
+  it("plugin.py subprocesses brain-recall-prefetch.mjs and returns empty context in shadow mode", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys, tempfile, textwrap
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+shadow_payload = json.dumps({
+    "context": None,
+    "citations": [{"path": "notes/recall.md", "score": 0.9}],
+    "channel": "standard_text",
+    "shadow": True,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = shadow_payload + "\\n"
+    stderr = "[cns-brain-recall:shadow] would-inject\\n"
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()) as run_mock:
+        result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+        assert result == {}, result
+        cmd = run_mock.call_args[0][0]
+        assert "brain-recall-prefetch.mjs" in cmd[-2] or cmd[-1].endswith("brain-recall-prefetch.mjs") or any("brain-recall-prefetch.mjs" in str(x) for x in cmd)
+        assert cmd[0] == mod._resolve_node_bin()
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+    expect(existsSync(sourcePycache)).toBe(false);
+  });
+
+  it("__init__.py registers pre_llm_call through the Hermes loader path", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+live_payload = json.dumps({
+    "context": "### vault:notes/live.md",
+    "citations": [{"path": "notes/live.md", "score": 0.8}],
+    "channel": "standard_text",
+    "shadow": False,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = live_payload
+    stderr = ""
+
+class Ctx:
+    def __init__(self):
+        self.calls = []
+    def register_hook(self, name, callback):
+        self.calls.append((name, callback))
+
+ctx = Ctx()
+mod.register(ctx)
+assert len(ctx.calls) == 1, ctx.calls
+name, callback = ctx.calls[0]
+assert name == "pre_llm_call", name
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch("subprocess.run", return_value=FakeProc()):
+        result = callback(user_message="hello", platform="discord")
+        assert result == {"context": "### vault:notes/live.md"}, result
+print("ok")`,
+        join(pluginRoot, "__init__.py"),
+        root,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+    expect(existsSync(sourcePycache)).toBe(false);
+  });
+
+  it("install script uses HERMES_HOME, replaces stale files, and skips bytecode", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "cns-brain-recall-test-"));
+    tempRoots.push(tempRoot);
+    const hermesHome = join(tempRoot, "hermes-home");
+    const destRoot = join(hermesHome, "plugins/cns-brain-recall");
+    const staleFile = join(destRoot, "stale.txt");
+    const sourceBytecode = join(sourcePycache, "plugin.cpython-312.pyc");
+
+    mkdirSync(destRoot, { recursive: true });
+    writeFileSync(staleFile, "stale");
+    mkdirSync(sourcePycache, { recursive: true });
+    writeFileSync(sourceBytecode, "bytecode");
+
+    const out = execFileSync("bash", [installScript], {
+      encoding: "utf8",
+      env: { ...process.env, HERMES_HOME: hermesHome },
+    });
+
+    expect(out).toContain(`Installed Hermes plugin to: ${destRoot}`);
+    expect(existsSync(join(destRoot, "plugin.py"))).toBe(true);
+    expect(existsSync(staleFile)).toBe(false);
+    expect(existsSync(join(destRoot, "__pycache__"))).toBe(false);
+  });
+
+  it("recall_hook fail-opens on subprocess TimeoutExpired", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+import subprocess
+
+path = sys.argv[1]
+repo = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": repo}, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 5)):
+        result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+        assert result == {}, result
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("recall_hook fail-opens when omnipotent root is missing", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_OMNIPOTENT_ROOT": "/nonexistent/omnipotent"}, clear=True):
+    result = mod.recall_hook(user_message="What is CNS?", platform="discord")
+    assert result == {}, result
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("_resolve_node_bin honors CNS_NODE_BIN", () => {
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+fake_node = sys.argv[2]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with patch.dict(os.environ, {"CNS_NODE_BIN": fake_node}, clear=False):
+    assert mod._resolve_node_bin() == fake_node
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        process.execPath,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+});
+
+describe("Story 79-5 brain-recall-prefetch CLI", () => {
+  it("detectRecallChannel uses nexus-voice platform hint for voice_pane", () => {
+    expect(
+      detectRecallChannel({
+        userMessage: "short",
+        platformHint: "nexus-voice",
+        yappedTextMinChars: 400,
+      }),
+    ).toBe("voice_pane");
+  });
+
+  it("brain-recall-prefetch.mjs wrapper prints JSON stdout contract", async () => {
+    const anchor = "Wrapper CLI body for recall.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/wrap.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/wrap.md",
+    });
+
+    // Isolate shadow_mode from the live committed config (go-live sets it to
+    // false); this test asserts the shadow=true contract deterministically.
+    const shadowRepo = await mkdtemp(join(tmpdir(), "cns-79-5-wrap-repo-"));
+    tempRoots.push(shadowRepo);
+    await mkdir(join(shadowRepo, "config"), { recursive: true });
+    const livePolicyWrap = JSON.parse(
+      readFileSync(join(root, "config/brain-recall-policy.json"), "utf8"),
+    );
+    await writeFile(
+      join(shadowRepo, "config/brain-recall-policy.json"),
+      JSON.stringify({ ...livePolicyWrap, shadow_mode: true }),
+    );
+
+    const res = spawnSync(
+      "node",
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+        "--repo-root",
+        shadowRepo,
+      ],
+      { cwd: root, encoding: "utf8", env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" } },
+    );
+
+    expect(res.status).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload).toMatchObject({
+      context: null,
+      channel: "standard_text",
+      shadow: true,
+    });
+    expect(payload.citations.length).toBeGreaterThan(0);
+    expect(payload.citations[0]?.path).toBe("notes/wrap.md");
+    expect(res.stderr).toMatch(/cns-brain-recall:shadow/);
+  });
+
+  it("voice_pane channel when platform is nexus-voice via wrapper", async () => {
+    const anchor = "Voice pane recall body.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-voice-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-voice-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/voice.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice.md",
+    });
+
+    const res = spawnSync(
+      "node",
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--platform",
+        "nexus-voice",
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+      ],
+      { cwd: root, encoding: "utf8", env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" } },
+    );
+
+    expect(res.status).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload.channel).toBe("voice_pane");
+  });
+
+  it("recall_hook end-to-end passes user_message to prefetch CLI (live inject + real citations)", async () => {
+    const anchor = "Hermes pre_llm_call hook probe for Story 79-5 evidence.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-79-5-hook-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-79-5-hook-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/hook-probe.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/hook-probe.md",
+    });
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+query = sys.argv[6]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+}
+
+with __import__("unittest.mock").mock.patch.dict(os.environ, env, clear=False):
+    result = mod.recall_hook(user_message=query, platform="discord", session_id="probe-s")
+
+# Post go-live (shadow_mode:false in the committed policy), the hook injects real
+# cited context instead of returning empty. Assert the live-inject contract.
+ctx = result.get("context")
+assert isinstance(ctx, str) and "notes/hook-probe.md" in ctx, result
+print(json.dumps({"hook_injected": True}))
+`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    expect(out.trim()).toContain('"hook_injected": true');
+  });
+});
+
+describe("Story 82-2 SPIKE-OMNI-002 voice_pane channel (Path C + Path A fallback)", () => {
+  it("Path C: session.source nexus-voice in state.db yields voice_pane via --recall-channel", async () => {
+    const anchor = "Voice pane Path C recall probe.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-2-voice-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-2-voice-i-"));
+    tempRoots.push(indexDir);
+    const hermesHome = await mkdtemp(join(tmpdir(), "cns-82-2-hermes-"));
+    tempRoots.push(hermesHome);
+    await writeVaultNote(vaultRoot, "notes/voice-path-c.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice-path-c.md",
+    });
+
+    const sessionKey = "20260628_200000_spike82";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "nexus-voice"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+hermes_home = sys.argv[6]
+session_key = sys.argv[7]
+query = sys.argv[8]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+    "HERMES_HOME": hermes_home,
+}
+
+with __import__("unittest.mock").mock.patch.dict(os.environ, env, clear=False):
+    payload = mod._run_prefetch(
+        user_message=query,
+        platform="tui",
+        recall_channel="voice_pane",
+    )
+print(json.dumps(payload))`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        hermesHome,
+        sessionKey,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const payload = JSON.parse(out.trim());
+    expect(payload.channel).toBe("voice_pane");
+  });
+
+  it("Path C: recall_hook resolves voice_pane from state.db without mutating user_message", async () => {
+    const anchor = "Plain voice turn without prefix.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-2-hook-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-2-hook-i-"));
+    tempRoots.push(indexDir);
+    const hermesHome = await mkdtemp(join(tmpdir(), "cns-82-2-hook-hermes-"));
+    tempRoots.push(hermesHome);
+    await writeVaultNote(vaultRoot, "notes/voice-hook.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/voice-hook.md",
+    });
+
+    const sessionKey = "20260628_200001_spike82";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "nexus-voice"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+index_path = sys.argv[3]
+vault_root = sys.argv[4]
+node_bin = sys.argv[5]
+hermes_home = sys.argv[6]
+session_key = sys.argv[7]
+query = sys.argv[8]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "voice_pane", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "CNS_BRAIN_INDEX_PATH": index_path,
+    "CNS_VAULT_ROOT": vault_root,
+    "CNS_BRAIN_EMBEDDER": "stub",
+    "CNS_NODE_BIN": node_bin,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(
+            session_id=session_key,
+            user_message=query,
+            platform="tui",
+            task_id="task-uuid",
+            turn_id=f"{session_key}:task-uuid:abc12345",
+            sender_id="",
+            is_first_turn=True,
+            model="anthropic/claude-sonnet-4.6",
+        )
+
+cmd = calls[0]
+assert "--recall-channel" in cmd and "voice_pane" in cmd, cmd
+assert query in cmd, cmd
+assert "[cns-recall:" not in " ".join(cmd), cmd
+print(json.dumps({"argv_ok": True, "platform_passed": "tui" in cmd}))`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        indexPath,
+        vaultRoot,
+        process.execPath,
+        hermesHome,
+        sessionKey,
+        anchor,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    expect(JSON.parse(out.trim())).toEqual({ argv_ok: true, platform_passed: true });
+  });
+
+  it("Path A fallback: prefix stripped for prefetch --query only", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-2-path-a-hermes-"));
+    tempRoots.push(hermesHome);
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "voice_pane", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(
+            user_message="[cns-recall:voice_pane] hello voice",
+            platform="tui",
+            session_id="",
+        )
+
+cmd = calls[0]
+q_idx = cmd.index("--query")
+assert cmd[q_idx + 1] == "hello voice", cmd
+assert "--recall-channel" in cmd and "voice_pane" in cmd, cmd
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("regression: discord platform unchanged (no --recall-channel for standard text)", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-2-discord-hermes-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260628_124027_89e373ac";
+    const dbPath = join(hermesHome, "state.db");
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL)")
+db.execute("INSERT INTO sessions (id, source) VALUES (?, ?)", (sys.argv[2], "discord"))
+db.commit()
+db.close()`,
+        dbPath,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+calls = []
+
+def capture_run(cmd, **kwargs):
+    calls.append(list(cmd))
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps({"context": None, "citations": [], "channel": "standard_text", "shadow": True})
+        stderr = ""
+    return FakeProc()
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", side_effect=capture_run):
+        mod.recall_hook(user_message="hello", platform="discord", session_id=session_key)
+
+cmd = calls[0]
+assert "--recall-channel" not in cmd, cmd
+assert cmd[cmd.index("--platform") + 1] == "discord", cmd
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("writes atomic recall-status sidecar after prefetch with injected ground truth", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-4-sidecar-hermes-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260629_101522_ec20fc";
+    const turnId = `${sessionKey}:task-uuid:abc12345`;
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from pathlib import Path
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+turn_id = sys.argv[5]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+inject_payload = json.dumps({
+    "context": "[[notes/recall.md]] vault context",
+    "citations": [{"path": "notes/recall.md", "score": 0.91}],
+    "channel": "voice_pane",
+    "shadow": False,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = inject_payload + "\\n"
+    stderr = ""
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()):
+        result = mod.recall_hook(
+            session_id=session_key,
+            user_message="What is CNS?",
+            platform="tui",
+            turn_id=turn_id,
+        )
+
+assert result == {"context": "[[notes/recall.md]] vault context"}, result
+sidecar_path = Path(hermes_home) / "recall-status" / f"{session_key}.json"
+assert sidecar_path.is_file(), sidecar_path
+sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+assert sidecar["session_id"] == session_key
+assert sidecar["turn_id"] == turn_id
+assert sidecar["channel"] == "voice_pane"
+assert sidecar["injected"] is True
+assert sidecar["shadow"] is False
+assert sidecar["citations"] == ["notes/recall.md"]
+assert sidecar["ts"].endswith("Z")
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+        turnId,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+
+  it("sidecar records injected=false for shadow prefetch without failing hook", () => {
+    const hermesHome = mkdtempSync(join(tmpdir(), "cns-82-4-shadow-sidecar-"));
+    tempRoots.push(hermesHome);
+    const sessionKey = "20260629_120000_shadow1";
+
+    const out = execFileSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import importlib.util, json, os, sys
+from pathlib import Path
+from unittest.mock import patch
+
+path = sys.argv[1]
+repo = sys.argv[2]
+hermes_home = sys.argv[3]
+session_key = sys.argv[4]
+
+spec = importlib.util.spec_from_file_location("cns_brain_recall_plugin", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+shadow_payload = json.dumps({
+    "context": None,
+    "citations": [{"path": "notes/shadow.md", "score": 0.5}],
+    "channel": "voice_pane",
+    "shadow": True,
+})
+
+class FakeProc:
+    returncode = 0
+    stdout = shadow_payload + "\\n"
+    stderr = ""
+
+env = {
+    **os.environ,
+    "CNS_OMNIPOTENT_ROOT": repo,
+    "HERMES_HOME": hermes_home,
+}
+
+with patch.dict(os.environ, env, clear=False):
+    with patch.object(mod.subprocess, "run", return_value=FakeProc()):
+        result = mod.recall_hook(
+            session_id=session_key,
+            user_message="voice question",
+            platform="tui",
+        )
+
+assert result == {}, result
+sidecar = json.loads((Path(hermes_home) / "recall-status" / f"{session_key}.json").read_text(encoding="utf-8"))
+assert sidecar["injected"] is False
+assert sidecar["shadow"] is True
+print("ok")`,
+        join(pluginRoot, "plugin.py"),
+        root,
+        hermesHome,
+        sessionKey,
+      ],
+      { encoding: "utf8", env: bytecodeEnv },
+    );
+    expect(out.trim()).toBe("ok");
+  });
+});
+
+describe("Story 82-5 bare-PATH prefetch hardening", () => {
+  it("resolveNodeExecutable honors CNS_NODE_BIN under bare PATH", async () => {
+    const { resolveNodeExecutable } = await import("../../src/brain/resolve-node-toolchain.js");
+    const prev = process.env.CNS_NODE_BIN;
+    process.env.CNS_NODE_BIN = process.execPath;
+    try {
+      expect(resolveNodeExecutable()).toBe(process.execPath);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.CNS_NODE_BIN;
+      } else {
+        process.env.CNS_NODE_BIN = prev;
+      }
+    }
+  });
+
+  it("resolveNodeExecutable selects newest nvm node and never uses dot as nodeBinDir", async () => {
+    const { resolveNodeExecutable, resolveTsxRunner, pathWithNodeBin } = await import(
+      "../../src/brain/resolve-node-toolchain.js"
+    );
+    const tempRoot = mkdtempSync(join(tmpdir(), "cns-82-5-resolver-"));
+    tempRoots.push(tempRoot);
+    const home = join(tempRoot, "home");
+    const oldBin = join(home, ".nvm/versions/node/v9.11.2/bin");
+    const newBin = join(home, ".nvm/versions/node/v24.14.0/bin");
+    mkdirSync(oldBin, { recursive: true });
+    mkdirSync(newBin, { recursive: true });
+    writeFileSync(join(oldBin, "node"), "", "utf8");
+    writeFileSync(join(newBin, "node"), "", "utf8");
+
+    const prevHome = process.env.HOME;
+    const prevCnsNode = process.env.CNS_NODE_BIN;
+    const prevNode = process.env.NODE_BIN;
+    const prevPath = process.env.PATH;
+    try {
+      process.env.HOME = home;
+      delete process.env.CNS_NODE_BIN;
+      delete process.env.NODE_BIN;
+      expect(resolveNodeExecutable()).toBe(join(newBin, "node"));
+
+      process.env.HOME = join(tempRoot, "empty-home");
+      process.env.PATH = "";
+      const runner = resolveTsxRunner({ repoRoot: root, cliEntry: prefetchScript, argv: [] });
+      expect(runner.nodeBinDir).toBe("");
+
+      const path = pathWithNodeBin("/opt/node/v24.14.0/bin-extra:/usr/bin", "/opt/node/v24.14.0/bin");
+      expect(path.split(":")[0]).toBe("/opt/node/v24.14.0/bin");
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevCnsNode === undefined) delete process.env.CNS_NODE_BIN;
+      else process.env.CNS_NODE_BIN = prevCnsNode;
+      if (prevNode === undefined) delete process.env.NODE_BIN;
+      else process.env.NODE_BIN = prevNode;
+      if (prevPath === undefined) delete process.env.PATH;
+      else process.env.PATH = prevPath;
+    }
+  });
+
+  it("brain-recall-prefetch.mjs succeeds with PATH=/usr/bin:/bin when CNS_NODE_BIN is set", async () => {
+    const anchor = "Bare PATH prefetch probe for Story 82-5.";
+    const vaultRoot = await mkdtemp(join(tmpdir(), "cns-82-5-bare-v-"));
+    tempRoots.push(vaultRoot);
+    const indexDir = await mkdtemp(join(tmpdir(), "cns-82-5-bare-i-"));
+    tempRoots.push(indexDir);
+    await writeVaultNote(vaultRoot, "notes/bare-path.md", anchor);
+    const indexPath = await writeStubIndex({
+      dir: indexDir,
+      anchorText: anchor,
+      vaultRel: "notes/bare-path.md",
+    });
+
+    const res = spawnSync(
+      process.execPath,
+      [
+        prefetchScript,
+        "--query",
+        anchor,
+        "--index-path",
+        indexPath,
+        "--vault-root",
+        vaultRoot,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          HOME: process.env.HOME ?? "",
+          USER: process.env.USER ?? "",
+          PATH: "/usr/bin:/bin",
+          CNS_NODE_BIN: process.execPath,
+          CNS_BRAIN_EMBEDDER: "stub",
+        },
+      },
+    );
+
+    expect(res.status, res.stderr).toBe(0);
+    const payload = JSON.parse(res.stdout.trim());
+    expect(payload.citations.length).toBeGreaterThan(0);
+    expect(payload.citations[0]?.path).toBe("notes/bare-path.md");
+    expect(res.stderr).not.toMatch(/ENOENT/);
+  });
+
+  it("install-hermes-brain-recall-env.sh writes dashboard drop-ins with brain-recall + PATH", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "cns-82-5-install-"));
+    tempRoots.push(tempRoot);
+    const hermesHome = join(tempRoot, "hermes-home");
+    const home = join(tempRoot, "home with space");
+    const olderNodeBin = join(home, ".nvm/versions/node/v9.11.2/bin");
+    const newestNodeBin = join(home, ".nvm/versions/node/v24.14.0/bin");
+    mkdirSync(olderNodeBin, { recursive: true });
+    mkdirSync(newestNodeBin, { recursive: true });
+    writeFileSync(join(olderNodeBin, "node"), "", "utf8");
+    writeFileSync(join(newestNodeBin, "node"), "", "utf8");
+    const installBrainEnv = join(root, "scripts/install-hermes-brain-recall-env.sh");
+
+    execFileSync("bash", [installBrainEnv], {
+      encoding: "utf8",
+      env: {
+        HERMES_HOME: hermesHome,
+        XDG_CONFIG_HOME: join(tempRoot, "config"),
+        HOME: home,
+        PATH: process.env.PATH,
+      },
+    });
+
+    const configRoot = join(tempRoot, "config/systemd/user/hermes-dashboard.service.d");
+    const brainConf = readFileSync(join(configRoot, "brain-recall.conf"), "utf8");
+    const envConf = readFileSync(join(configRoot, "env.conf"), "utf8");
+    const brainEnvPath = join(hermesHome, "brain-recall.env");
+    const brainEnv = readFileSync(brainEnvPath, "utf8");
+
+    expect(brainConf).toContain("EnvironmentFile=-%h/.hermes/brain-recall.env");
+    expect(envConf).toContain(`Environment=PATH=${newestNodeBin}:`);
+    expect(existsSync(join(hermesHome, "brain-recall.env"))).toBe(true);
+    expect(brainEnv).toContain("CNS_VAULT_ROOT='/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE'");
+    expect(brainEnv).not.toMatch(/^PATH=/m);
+
+    const sourced = execFileSync(
+      "bash",
+      ["-c", `set -a; source "${brainEnvPath}"; printf '%s' "$CNS_VAULT_ROOT"`],
+      { encoding: "utf8" },
+    );
+    expect(sourced).toBe("/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE");
+
+    writeFileSync(join(configRoot, "env.conf"), "[Service]\nEnvironment=PATH=/usr/bin:/bin\n", "utf8");
+    writeFileSync(join(configRoot, "brain-recall.conf"), "[Service]\nEnvironmentFile=/tmp/wrong.env\n", "utf8");
+    execFileSync("bash", [installBrainEnv], {
+      encoding: "utf8",
+      env: {
+        HERMES_HOME: hermesHome,
+        XDG_CONFIG_HOME: join(tempRoot, "config"),
+        HOME: home,
+        PATH: process.env.PATH,
+      },
+    });
+
+    expect(readFileSync(join(configRoot, "env.conf"), "utf8")).toContain(
+      `Environment=PATH=${newestNodeBin}:`,
+    );
+    expect(readFileSync(join(configRoot, "brain-recall.conf"), "utf8")).toContain(
+      "EnvironmentFile=-%h/.hermes/brain-recall.env",
+    );
+  });
+});
