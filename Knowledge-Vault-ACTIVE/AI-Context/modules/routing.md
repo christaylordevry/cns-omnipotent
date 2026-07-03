@@ -45,49 +45,40 @@ hermes config set auxiliary.compression.model openai/gpt-4o-mini
 
 **Reconciled:** 2026-06-24 — Hermes v0.17.0 (2026.6.19) — Story 74-8 — matches live `~/.hermes/config.yaml` (`grep` model + auxiliary.compression; `hermes config show` compression provider nous / Haiku 4.5).
 
-## Hermes per-skill routing (Epic 78 / FR14)
+## Hermes auxiliary routing (Epic 80 / FR14) — sole cost lever
 
-Per-skill inference tiers live in `~/.hermes/config.yaml` → `smart_model_routing`. Global primary (`model.default`) stays Sonnet; cheap Hermes skills are mapped to Haiku when the Hermes gateway consumes this block.
+Hermes **v0.17.0** routes side-work inference through `~/.hermes/config.yaml` → `auxiliary.<task>.*` only (`agent/auxiliary_client.py`). This is the **only** consumed cost-routing surface for auxiliary tasks. Main operator turns (gateway, Discord, browser chat) use `model.default` (Sonnet on Portal).
 
-**Runtime status (2026-06-25):** Config **activated** (Story 78-2). Hermes **v0.17.0** lists `smart_model_routing` as a top-level config section in contributor docs but **does not yet read it at gateway runtime** (no matches in `gateway/` or `DEFAULT_CONFIG`; `agent/coding_context.py` exposes `model_hint` as an extension seam only). Treat as **config-ready / consumer-pending** until upstream ships the router. Rollback: set `smart_model_routing.enabled: false` or remove the block; global Sonnet default unchanged.
+### Auxiliary task table (Story 80-1 pins)
 
-**Run-chain note (FR11 Option A):** The `run-chain` **Hermes skill** is mapped to the **standard** tier here, but **run-chain LLM stages** inside Omnipotent.md (`src/agents/*-adapter-llm.ts`, `scripts/run-chain.ts`) remain on **`ANTHROPIC_API_KEY`** / protect-list adapters. This story routes **Hermes skill invocations** only.
+| Task | Provider | Model | Config path |
+|------|----------|-------|-------------|
+| `compression` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.compression.*` |
+| `approval` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.approval.*` |
+| `skills_hub` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.skills_hub.*` |
+| `mcp` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.mcp.*` |
+| `title_generation` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.title_generation.*` |
+| `triage_specifier` | `nous` | `anthropic/claude-haiku-4.5` | `auxiliary.triage_specifier.*` |
 
-### Tier table (CNS alias → Portal model)
+**Tune cost routing here only.** Do not change `model.default` to Haiku for main operator turns.
+
+**Reconciled:** 2026-07-03 — Hermes v0.17.0 (2026.6.19) — Story 80-1 — six auxiliary tasks on Portal Haiku.
+
+## Hermes per-skill routing (Epic 78 / FR14) — RETIRED
+
+> [!warning] **Retired Story 80-2 (2026-07-03).** `smart_model_routing` had **zero consumers** in Hermes v0.17.0 (confirmed Story 78-2 audit + fresh `rg` 2026-07-03). The block is **YAML-commented out** in `~/.hermes/config.yaml` — not deleted (NFR5 reversibility). **Do not re-enable, extend, or file stories to "implement" it** unless Hermes upstream ships a documented gateway consumer (then treat as a **new epic**, not resurrection of the 78-2 tier map).
+
+**Historical context:** Story 78-2 activated a tier + skill map (`fast` / Haiku vs `standard` / Sonnet) but Hermes never read it at runtime. All Discord skill invocations used `model.default` (Sonnet) unless an auxiliary path fired. Cost control is **`auxiliary:`** only (Epic 80).
+
+**Rollback (if ever needed):** Restore from `~/.hermes/config.yaml.bak-*-80-2` or uncomment the block. Global Sonnet default unchanged.
+
+### Historical tier table (archaeological record — not active)
 
 | CNS alias (Epic 15) | Tier key | Portal provider | Portal model ID | Cost posture |
 |---------------------|----------|-----------------|-----------------|--------------|
 | `fast` | `fast` | `nous` | `anthropic/claude-haiku-4.5` | Cheap — triage, lint, inbox, bounded scripts |
 | `default-coding` | `standard` | `nous` | `anthropic/claude-sonnet-4.6` | Standard — reasoning skills, ingest, digest |
-| `default-reasoning` | (same Sonnet class) | `nous` | `anthropic/claude-sonnet-4.6` | Reserved; v1 maps reasoning skills to `standard` |
 
-Crosswalk registry: `config/model-routing/model-alias-registry.json` (`fast`, `default-coding`, `default-reasoning`).
+**Run-chain note (FR11 Option A):** Omnipotent.md `src/agents/*-adapter-llm.ts` and `scripts/run-chain.ts` remain on **`ANTHROPIC_API_KEY`** protect-list adapters — unchanged by Epic 80.
 
-### Skill → tier map (`~/.hermes/skills/cns/`)
-
-| Skill | Tier | CNS alias |
-|-------|------|-----------|
-| `triage` | **fast** | `fast` |
-| `vault-lint` | fast | `fast` |
-| `vault-graduate` | fast | `fast` |
-| `session-close` | fast | `fast` |
-| `hermes-url-auto-capture-inbox` | fast | `fast` |
-| `notebook-query` | fast | `fast` |
-| `investigate-trend` | fast | `fast` |
-| `awareness-sync` | fast | `fast` |
-| `hermes-cns-verify-gate-summary` | fast | `fast` |
-| `vault-think` | **standard** | `default-coding` |
-| `run-chain` | **standard** | `default-coding` |
-| `hermes-url-ingest-vault` | standard | `default-coding` |
-| `morning-digest` | standard | `default-coding` |
-
-**Highlighted pairs:** `triage` (fast / Haiku) vs `vault-think` or `run-chain` (standard / Sonnet).
-
-**Gateway restart after routing edits:**
-
-```bash
-hermes gateway restart
-pgrep -af 'hermes_cli.main gateway'
-```
-
-**Reconciled:** 2026-06-25 — Hermes v0.17.0 (2026.6.19) — Story 78-2 — `smart_model_routing` block in live `~/.hermes/config.yaml`; consumer-pending per source audit.
+**Reconciled:** 2026-07-03 — Hermes v0.17.0 (2026.6.19) — Story 80-2 — `smart_model_routing` retired; `auxiliary:` sole lever per `80-2-retire-smart-model-routing-evidence.md`.

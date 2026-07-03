@@ -626,11 +626,11 @@ Repeated runs of the same research prompt can yield **different source URLs** fr
 
 ### Per-skill Hermes model routing
 
-**Status (2026-06-25, Story 78-2):** Config **activated** — `~/.hermes/config.yaml` → `smart_model_routing` tier + skill map; governance in `AI-Context/modules/routing.md`. Hermes **v0.17.0** stores the block via deep-merge but **does not consume it at gateway runtime** (consumer-pending — only `AGENTS.md` references the key; no `DEFAULT_CONFIG` / `gateway/` reader). Runtime two-tier smoke (triage Haiku vs vault-think Sonnet) blocked until upstream ships router.
+**Status (2026-07-03, Story 80-2):** **Closed / superseded by Epic 80.** Hermes v0.17.0 never shipped a `smart_model_routing` consumer (confirmed 78-2 + fresh grep audit). Block **retired** — YAML-commented in `~/.hermes/config.yaml` Story 80-2. **Sole cost routing lever:** `auxiliary:` block (Story 80-1 — six tasks pinned to Portal Haiku). Do not re-enable, extend, or file stories to "implement" `smart_model_routing` unless Hermes upstream ships a documented consumer (then new epic, not resurrection of 78-2 tier map).
 
-- **Class:** (b) Phase 2 backlog — **consumer follow-up** when Hermes reads `smart_model_routing`
-- **Policy:** Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain (see `routing.md` §Epic 78)
-- **Rollback:** `smart_model_routing.enabled: false` or remove block; global Sonnet default unchanged
+- **Class:** ~~(b) Phase 2 backlog~~ **closed**
+- **Policy:** Tune `auxiliary:` only; main operator turns stay `model.default` Sonnet on Portal
+- **Rollback:** Uncomment `smart_model_routing` block from `~/.hermes/config.yaml.bak-*-80-2` or restore full backup; see `AI-Context/modules/routing.md` §Epic 80
 
 ### `vault-lint-remediate-34-2.ts` `--verify-only`
 

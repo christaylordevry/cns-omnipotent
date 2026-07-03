@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-05-29
+modified: 2026-07-03
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -442,6 +442,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-06-03 | 1.38.0 | Session close **Story 59-1:** total Hermes session input target **<20k**; LLM reads `section8-input.json` only; deterministic Discord reply via `hermes-run-render-discord-reply.sh`; bump skill `version`, reinstall, restart gateway after deploy | 59-1-session-close-context-reduction |
 | 2026-06-11 | 1.38.1 | **Morning digest X/Twitter (Story 68-7):** §15.11.1 session-cookie setup, `--check` health probe, rotation runbook; optional Source 11 when cookies configured | 68-7-x-integration-env-docs |
 | 2026-06-24 | 1.39.0 | **Portal + Desktop (Epic 74):** §15.13 browser UI at `:9119`, OAuth-primary; pointers to `hermes-desktop.md` runbook and `routing.md` Hermes surface | 74-8-portal-and-desktop-governance-documentation |
+| 2026-07-03 | 1.40.0 | **Hermes cost routing (Epic 80):** §15.14 — main turns Sonnet on Portal; auxiliary side-work Haiku (`auxiliary:` block); `smart_model_routing` retired inert config (Story 80-2) | 80-2-retire-inert-smart-model-routing-operator-guide |
 
 ---
 
@@ -1041,6 +1042,19 @@ systemctl --user is-active hermes-dashboard.service
 curl -s http://127.0.0.1:9119/api/status | jq '.auth_required, .auth_providers'
 hermes portal info
 ```
+
+### 15.14 Hermes cost routing (Epic 80 / FR14)
+
+**Main operator turns** use `model.default` — **`anthropic/claude-sonnet-4.6`** on Portal (`nous`). This covers gateway, Discord `#hermes`, and browser chat.
+
+**Auxiliary side-work** (compression, approval, skills_hub, mcp, title_generation, triage_specifier) routes through the **`auxiliary:`** block in `~/.hermes/config.yaml` — pinned to Portal **Haiku** (`anthropic/claude-haiku-4.5`) per Story 80-1. Tune cost here only; do not downgrade main turns to Haiku.
+
+**`smart_model_routing` is retired** (Story 80-2). The Epic 78 tier + skill map was config-ready but **never consumed** by Hermes v0.17.0. The block is YAML-commented out in live config. **Do not re-enable or tune it.** If Hermes upstream ships a documented consumer, treat as a new epic — see `AI-Context/modules/routing.md` §Epic 80 + §Epic 78 retired.
+
+| Resource | Path |
+|----------|------|
+| **Routing SSOT** | `AI-Context/modules/routing.md` |
+| **Rollback** | `~/.hermes/config.yaml.bak-*-80-2` or uncomment block (not recommended) |
 
 ---
 
