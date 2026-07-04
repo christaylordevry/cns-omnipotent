@@ -4,10 +4,12 @@ baseline_commit: 7b0077a
 
 # Story 77.4: Awareness-sync Hermes skill
 
-Status: review
+Status: done
+
+**Live data-accuracy closeout (2026-07-04):** T3 live-chat smoke test in `#hermes` surfaced a real bug — Hermes's self-improvement loop had auto-patched the deployed `SKILL.md` with a false claim ("sprint-status.yaml only covers Epics 1-76") plus a frozen, already-stale story-status reference table, neither of which existed in the git-tracked repo mirror (bypassed code-review + verify.sh parity gate entirely). Fixed via `77-4-awareness-sync-data-accuracy-fix-evidence.md`: corrected SKILL.md + reference file, propagated to repo mirror, re-installed, verified deployed==repo via `diff -rq`. Live re-tested three times in `#hermes` (including a full gateway restart) until the answer matched `sprint-status.yaml` exactly — confirmed accurate after a `/session-close` refreshed the `CNS-Daily-Rhythm.md` AUTO block that brain-recall was also citing. Governance gap (ungoverned self-improvement writes to deployed skill files) logged in `deferred-work.md` as a follow-up, not fixed here.
 
 **Epic:** 77 — JARVIS Awareness in Nexus (alias Epic D1)  
-**Repo boundary:** **Omnipotent.md only** (Hermes skill mirror, install script, contract tests). Pull client is **77-2** (`review`); Convex endpoint is **77-1** (`done`).  
+**Repo boundary:** **Omnipotent.md only** (Hermes skill mirror, install script, contract tests). Pull client is **77-2** (`done`); Convex endpoint is **77-1** (`done`).  
 **Normative spec:** `_bmad-output/planning-artifacts/epics-hermes-consolidation.md` Story 77-4; `architecture-hermes-consolidation.md` ADR-HERMES-002, FR12 pull + chat surface  
 **Prerequisites:** **77-2** pull client implemented (`scripts/hermes-awareness-pull.ts`, cron optional but not required for skill AC)  
 **Blocks:** Operator FR12 chat queries on Desktop/Discord until this skill is installed and bound  

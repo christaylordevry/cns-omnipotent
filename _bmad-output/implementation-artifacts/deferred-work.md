@@ -1,5 +1,21 @@
 # Deferred work
 
+## Hermes self-improvement ungoverned skill writes (2026-07-04)
+
+**Surfaced by:** Story 77-4 awareness-sync data-accuracy fix (live Discord test).
+
+**Problem:** Hermes's self-improvement loop can auto-patch deployed skill files under `~/.hermes/skills/cns/` without mirroring to `scripts/hermes-skill-examples/` in the repo. The 2026-07-04 pass added a false "sprint-status.yaml only covers Epics 1–76" claim to `awareness-sync/SKILL.md` and created `references/cns-epic-project-status.md` with a hand-frozen story table — both bypassed code review and the `verify.sh` skill-parity gate entirely.
+
+**Follow-up to scope (not fixed in 77-4 data-accuracy patch):**
+
+- Should self-improvement patches to skill files require a review/PR step before deploy?
+- Or at minimum: always mirror writes to the repo SSOT so `assert-hermes-skill-install-gate.mjs` catches drift on next `verify.sh`?
+- Consider extending protect-list / curator rules for skill reference files that must not contain mutable status tables.
+
+**Related observation (same live-test session):** repeated identical "what's the state of X project" questions in the same or a freshly-restarted Discord session did not appear to re-invoke the `awareness-sync` skill/tool at all — Hermes answered from brain-recall's passive `CNS-Daily-Rhythm.md` `AUTO:ACTIVE_PROJECTS` citation plus its own conversational memory of prior answers, even across a full gateway restart. The answer only became accurate after `/session-close` refreshed that AUTO block — not because the skill was re-run. Worth investigating whether brain-recall's pre_llm_call injection is satisfying the model's "I have enough context" threshold before it considers invoking bound skills for story-level detail questions. Not blocking (the AUTO block is a legitimate, if coarser-grained, accurate source once refreshed), but the awareness-sync skill's story-level table may be effectively unreachable via natural-language questions until this is understood.
+
+---
+
 ## Deferred from: code review of 82-2-spike-omni-002-voice-channel (2026-06-28)
 
 - **`profile_home` vs launch `HERMES_HOME` state.db split** — Plugin reads only `{HERMES_HOME}/state.db`; remote-profile sessions persist elsewhere. Channel Resolution Contract flags for 82-3 VoiceDrawer.

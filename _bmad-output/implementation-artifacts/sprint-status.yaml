@@ -636,7 +636,7 @@ development_status:
   77-1-convex-hermes-awareness-snapshot-http-endpoint: done # cns-dashboard commit 6299704; gates 77-5
   77-2-hermes-awareness-pull-client-and-cron-cache: done # Omnipotent.md commit 7b0077a
   77-3-convex-webhook-push-for-high-signal-events: ready-for-dev
-  77-4-awareness-sync-hermes-skill: review # skill mirror + install + contract tests
+  77-4-awareness-sync-hermes-skill: done # skill mirror + install + contract tests; data-accuracy bug found+fixed via 3x live Discord retest 2026-07-04
   77-5-nexus-awareness-panels-ui: done # cns-dashboard commit 1118ee4; Vercel live
   77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
   77-7-dashboard-sync-retention-decision: backlog
@@ -645,7 +645,7 @@ development_status:
   # Epic 78 — JARVIS Voice + Model Routing (alias Epic D2; depends Epic 74; FR-GATE for TTS)
   epic-78: in-progress
   78-1-portal-tts-and-push-to-talk-on-desktop: in-progress # config done; AC#4 PARTIAL — Desktop Electron build deferred (see deferred-work.md)
-  78-2-per-skill-hermes-model-routing-activation: review
+  78-2-per-skill-hermes-model-routing-activation: cancelled # superseded by Epic 80 (80-1 auxiliary pin + 80-2 retirement) — smart_model_routing had zero consumers in Hermes v0.17.0; see 78-2-skill-routing-evidence.md + 80-2-retire-smart-model-routing-evidence.md
   78-3-voice-and-routing-operator-guide-section: backlog
   epic-78-retrospective: optional
 
@@ -667,8 +667,8 @@ development_status:
   82-2-spike-omni-002-voice-channel: done
   82-3-voice-drawer: done # smoke-verified live 2026-06-29
   82-4-spike-omni-003-voice-recall-status-ground-truth: done
-  82-5-brain-recall-prefetch-bare-path-dashboard-env: in-progress
-  82-6-voice-pane-cold-turn-embedder-warm-keep: review
+  82-5-brain-recall-prefetch-bare-path-dashboard-env: done # AC5 live PTT proof 2026-07-01 confirmed 2026-07-03
+  82-6-voice-pane-cold-turn-embedder-warm-keep: done # live PTT gate confirmed 2026-07-03; chip UI bug tracked separately as 82-8
   82-7-voice-session-persist-and-rt-refresh: done
   epic-82-retrospective: optional
 

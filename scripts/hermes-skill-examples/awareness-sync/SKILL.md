@@ -72,6 +72,19 @@ On-demand refresh and bounded summary of the **Hermes awareness snapshot** (Nexu
 2. If `OMNIPOTENT_REPO` is missing, reply with export instructions — **do not** run terminal.
 3. Route operator questions to snapshot sections per task-prompt routing table.
 
+## Pitfalls
+
+### Snapshot lacks story-level granularity
+
+The `awareness-snapshot.json` has **no story-level keys** (eight cockpit sections only: sync, vault, chain, mcps, digest, entities, investigations, trends). For story-level detail (e.g. "what's the status of story 77-2?" or "state of the JARVIS project"):
+
+1. **Read `sprint-status.yaml` first** — authoritative for **all** epics and stories (including 77+). Grep epic and story keys live; never trust hand-copied status tables.
+2. Fall back to the investigation pattern in `references/cns-epic-project-status.md` (vault search, `project-context.md`, story artifact `Status:` grep).
+
+### JARVIS is not a standalone project — it's Epics 74–82 (Hermes Consolidation)
+
+"JARVIS project" questions map to the Hermes Consolidation epic set. See `references/cns-epic-project-status.md` for alias table (A=74, B=75, C=76, D1=77, D2=78) and grep patterns — **not** frozen status tables.
+
 ## Tools
 
 - **`terminal()`** with `workdir` = resolved repo root for pull and cache read (`cat` with quoted path)
@@ -84,3 +97,4 @@ On-demand refresh and bounded summary of the **Hermes awareness snapshot** (Nexu
 - Example Q&A: `references/example-prompts.md`
 - Optional `#hermes` binding: `references/config-snippet.md`
 - Pull client SSOT: `scripts/hermes-awareness-pull.ts` (Story 77-2 — consume, do not modify)
+- Epic/story status navigation: `references/cns-epic-project-status.md` (JARVIS Epics 74–82 aliases, sprint-status grep patterns — no frozen tables)

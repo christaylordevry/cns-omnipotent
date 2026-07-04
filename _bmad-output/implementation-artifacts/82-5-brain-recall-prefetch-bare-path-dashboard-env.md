@@ -5,7 +5,9 @@ branch: hermes-consolidation
 
 # Story 82.5: Brain-recall prefetch bare-PATH hardening + dashboard voice-server env
 
-Status: in-progress
+Status: done
+
+**AC5 closeout (2026-07-03):** Live operator PTT smoke (pending per evidence file at time of writing) completed 2026-07-01 — `~/.hermes/recall-status/20260701_220523_0b91d9.json` shows `channel=voice_pane, injected=true` with 2 vault citations, confirmed via two real PTT turns on `localhost:5173/nexus`. AC5 satisfied.
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 

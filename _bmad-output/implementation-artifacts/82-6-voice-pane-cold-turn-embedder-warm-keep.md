@@ -5,7 +5,9 @@ branch: hermes-consolidation
 
 # Story 82.6: Voice-pane cold-turn embedder warm-keep + prefetch budget headroom
 
-Status: review
+Status: done
+
+**Live PTT closeout (2026-07-03):** Live validation gate (dev session did not run live PTT per evidence file) completed 2026-07-01 — same PTT session proving 82-5 AC5 (`~/.hermes/recall-status/20260701_220523_0b91d9.json`, `channel=voice_pane, injected=true`) also confirms the 6s budget holds on a cold turn. Chip UI itself still shows false "degraded" — tracked separately as Story 82-8, not a regression of this story's scope (prefetch/budget, not chip display logic).
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 

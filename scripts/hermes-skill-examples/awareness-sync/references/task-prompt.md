@@ -151,8 +151,17 @@ When stderr indicates 401 or auth failure, add:
 | Entity intelligence | `snapshot.entities` | tracked/emerging display names + momentum one-liners |
 | Trends / anomalies | `snapshot.trends` | anomaly keywords, score lifecycle stages |
 | Sync freshness | `snapshot.sync` + envelope `pulledAt` | last sync time; stale if age > 5 min |
+| JARVIS / epic story status | `_bmad-output/implementation-artifacts/sprint-status.yaml` via `terminal()` grep | Epic + story keys for 74–82; cite live grep output — **never** hand-copied tables |
 
 When operator message is bare `awareness-sync` (no specific question), post **§5 cockpit digest**.
+
+### Story-level status (Epics 74–82 / JARVIS)
+
+When the question asks for per-story status (e.g. "state of the JARVIS project", "is 77-5 done?"):
+
+1. Run `grep` on `sprint-status.yaml` for relevant epic/story keys (see `references/cns-epic-project-status.md`).
+2. Optionally supplement with awareness snapshot **cockpit sections** (chain, digest, vault, etc.) from §4 routing — not epic/story status.
+3. If narrative sources disagree with `sprint-status.yaml`, **sprint-status wins**.
 
 ## 5) Output templates
 
