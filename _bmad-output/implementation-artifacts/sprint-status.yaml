@@ -632,10 +632,11 @@ development_status:
 
   # Epic 77 — JARVIS Awareness in Nexus (alias Epic D1; cross-repo cns-dashboard + Omnipotent.md)
   # Gate: 77-1 before 77-5; depends Epic 74
-  epic-77: in-progress
+  # Closed 2026-07-04: 77-1..77-5 done (MVP gate satisfied); 77-6/77-7 explicitly non-blocking per their own AC text
+  epic-77: done
   77-1-convex-hermes-awareness-snapshot-http-endpoint: done # cns-dashboard commit 6299704; gates 77-5
   77-2-hermes-awareness-pull-client-and-cron-cache: done # Omnipotent.md commit 7b0077a
-  77-3-convex-webhook-push-for-high-signal-events: ready-for-dev
+  77-3-convex-webhook-push-for-high-signal-events: done # cns-dashboard commit be5246e; tracker sync gap found+closed 2026-07-04, was already done there
   77-4-awareness-sync-hermes-skill: done # skill mirror + install + contract tests; data-accuracy bug found+fixed via 3x live Discord retest 2026-07-04
   77-5-nexus-awareness-panels-ui: done # cns-dashboard commit 1118ee4; Vercel live
   77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
