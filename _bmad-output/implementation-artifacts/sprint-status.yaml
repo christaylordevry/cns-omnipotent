@@ -585,7 +585,8 @@ development_status:
 
   # Epic 73 — Nexus Entity Intelligence (spec-nexus-entity-intelligence; architecture 2026-06-21)
   # Gate: 73-1 → 73-2/73-3 (parallel) → 73-4 → 73-5 → 73-6/73-7 (parallel) → 73-8
-  epic-73: in-progress
+  # Closed 2026-07-04: all stories done, live-prod verified (hasBaselineHistory cross-ref confirmed independently)
+  epic-73: done
   73-1-entity-mentions-schema-and-mutations: done
   73-2-extract-entities-pure-functions: done
   73-3-build-entity-mention-payload: done
@@ -593,7 +594,7 @@ development_status:
   73-5-get-entity-intelligence-query: done
   73-6-dashboard-entity-intelligence-modules: done
   73-7-digest-entity-sections: done
-  73-8-entity-intelligence-health-live-prod: ready-for-dev
+  73-8-entity-intelligence-health-live-prod: done # cns-dashboard story file: 73-8-entity-intelligence-health-live-prod-verification.md
 
   # Epic 74 — Hermes on Portal + Desktop (alias Epic A; prd + architecture 2026-06-24)
   # First executable: 74-1 (no Portal). Pre-4 at 74-2. Pre-2 session-close → 76-1 (deferred).
