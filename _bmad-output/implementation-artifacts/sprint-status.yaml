@@ -702,7 +702,7 @@ development_status:
   # Epic 84 — Unified Loop run-chain (hermes-omniscient v1.5; FR22)
   # DDR-E84-001 LOCKED 2026-07-06; discover artifact ~/.hermes/artifacts/unified-loop/discover.json
   epic-84: in-progress
-  84-1-unified-loop-governance-schedule-shell: review
+  84-1-unified-loop-governance-schedule-shell: done
   84-2-adversarial-verify-wiring: backlog
   84-3-approval-gated-build-governed-persist: backlog
   epic-84-retrospective: optional
