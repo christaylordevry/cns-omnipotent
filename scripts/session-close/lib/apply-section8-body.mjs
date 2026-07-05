@@ -96,7 +96,7 @@ export function insertChangelogRow(text, row) {
   for (let i = 0; i < lines.length; i += 1) {
     if (/^\|\s*Date\s*\|/i.test(lines[i])) {
       for (let j = i + 1; j < lines.length; j += 1) {
-        if (/^\|[-|\s]+\|$/.test(lines[j])) {
+        if (/^\|[-|\s]+\|\r?$/.test(lines[j])) {
           insertAt = j + 1;
           break;
         }
