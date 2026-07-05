@@ -62,6 +62,7 @@ import { runWriteMemory } from "../scripts/session-close/write-memory.mjs";
 import { runGateApplySection8 } from "../scripts/session-close/gate-apply-section8.mjs";
 import {
   buildActiveEpics,
+  deriveProjectStatusLine,
   excerptStoryBullet,
   notebookTargetsFromWatchRegistry,
   parseAgentsSection8,
@@ -79,6 +80,7 @@ import {
 import { withSessionCloseEnvIsolation } from "./helpers/hermes-env-isolation.mjs";
 
 const execFileAsync = promisify(execFile);
+const STALE_PROJECT_STATUS_MARKERS = ["Phase 6", "1–37", "Epics 38", "43 in progress"];
 const TEST_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const NLM_AUTH_WATCHDOG_SCRIPT = join(TEST_ROOT, "scripts/session-close/lib/nlm-auth-watchdog.mjs");
 const NLM_AUTH_WATCHDOG_WRAPPER = join(TEST_ROOT, "scripts/session-close/hermes-run-nlm-auth-watchdog.sh");
@@ -268,6 +270,40 @@ describe("session-close read-sources", () => {
     assert.equal(active[0].id, "epic-48");
     assert.ok(active[0].stories.some((s) => s.includes("48-1-session-close")));
     assert.ok(active[0].stories.some((s) => s.includes("ready-for-dev")));
+  });
+
+  it("deriveProjectStatusLine uses sprint-status SSOT with plural in-progress epics", () => {
+    const lines = ["development_status:"];
+    for (let n = 1; n <= 86; n += 1) {
+      if (n === 78 || n === 86) {
+        lines.push(`  epic-${n}: in-progress`);
+      } else {
+        lines.push(`  epic-${n}: done`);
+      }
+    }
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "84 epics done; 2 in-progress (78, 86)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine uses singular in-progress label for one active epic", () => {
+    const lines = ["development_status:"];
+    for (let n = 1; n <= 82; n += 1) {
+      lines.push(`  epic-${n}: ${n === 78 ? "in-progress" : "done"}`);
+    }
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "81 epics done; 1 in-progress (78)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine reports none in-progress when all epics done", () => {
+    const lines = ["development_status:", "  epic-1: done", "  epic-2: done"];
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "2 epics done; none in-progress");
   });
 
   it("extracts section8 between ## 8. and ## 9.", () => {

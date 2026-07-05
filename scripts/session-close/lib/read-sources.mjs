@@ -99,26 +99,53 @@ export function buildActiveEpics(entries) {
 }
 
 /**
- * @param {string} repoRoot
- * @returns {Promise<string>}
+ * Derive compact project status from sprint-status.yaml epic rows (SSOT).
+ * Format: "{done} epics done; {n} in-progress ({nums})" | "{done} epics done; none in-progress"
+ *
+ * @param {{ key: string, status: string }[]} entries
+ * @returns {string}
  */
-export async function readProjectStatusLine(repoRoot) {
-  try {
-    const claudePath = join(repoRoot, "CLAUDE.md");
-    const raw = await readFile(claudePath, "utf8");
-    const phaseBlock = raw.match(/## Phase Status\s+([\s\S]*?)(?=\n## |\n---|$)/);
-    if (phaseBlock) {
-      for (const line of phaseBlock[1].split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("Phase ")) {
-          return trimmed.replace(/\.$/, "");
-        }
-      }
-    }
-  } catch {
-    // fall through
+export function deriveProjectStatusLine(entries) {
+  const epicRows = entries.filter(({ key }) => EPIC_KEY_RE.test(key));
+  if (epicRows.length === 0) {
+    return "Sprint status unavailable";
   }
-  return "Phase 6 complete; active epics in sprint-status.yaml";
+
+  let done = 0;
+  /** @type {number[]} */
+  const inProgressNums = [];
+
+  for (const { key, status } of epicRows) {
+    const epicMatch = key.match(EPIC_KEY_RE);
+    if (!epicMatch) {
+      continue;
+    }
+    const num = Number.parseInt(epicMatch[1], 10);
+    if (status === "done") {
+      done += 1;
+    } else if (status === "in-progress") {
+      inProgressNums.push(num);
+    }
+  }
+
+  inProgressNums.sort((a, b) => a - b);
+
+  if (inProgressNums.length === 0) {
+    return `${done} epics done; none in-progress`;
+  }
+
+  const nums = inProgressNums.join(", ");
+  const inProgressLabel =
+    inProgressNums.length === 1 ? "1 in-progress" : `${inProgressNums.length} in-progress`;
+  return `${done} epics done; ${inProgressLabel} (${nums})`;
+}
+
+/**
+ * @param {{ key: string, status: string }[]} entries
+ * @returns {string}
+ */
+export function readProjectStatusLine(entries) {
+  return deriveProjectStatusLine(entries);
 }
 
 /**
@@ -531,10 +558,10 @@ export async function selectRecentStories(artifactsDir, limit = 3) {
  * @param {string} sprintPath
  * @param {string} repoRoot
  */
-export async function readSprintSnapshot(sprintPath, repoRoot) {
+export async function readSprintSnapshot(sprintPath) {
   const yaml = await readFile(sprintPath, "utf8");
   const entries = parseDevelopmentStatus(yaml);
   const active_epics = buildActiveEpics(entries);
-  const project_status_line = await readProjectStatusLine(repoRoot);
+  const project_status_line = deriveProjectStatusLine(entries);
   return { active_epics, project_status_line };
 }

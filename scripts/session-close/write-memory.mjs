@@ -45,7 +45,7 @@ export async function runWriteMemory(opts = {}) {
 
   const agentsText = await readFile(paths.agentsPath, "utf8");
   const sprintYaml = await readFile(paths.sprintPath, "utf8");
-  const sprint = await readSprintSnapshot(paths.sprintPath, paths.repoRoot);
+  const sprint = await readSprintSnapshot(paths.sprintPath);
   const projectStatusLine =
     projectStatusFromPack(pack) ?? sprint.project_status_line;
 
