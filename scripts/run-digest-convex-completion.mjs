@@ -43,6 +43,7 @@ import {
   resolveDigestTrigger,
 } from './lib/digest-run-outcome.mjs';
 import { collectDigestLogActionsForDate } from './lib/digest-retry-eligibility.mjs';
+import { trySelectiveSourceRefetch } from './lib/selective-digest-source-refetch.mjs';
 import {
   formatWatchdogLogLine,
   resolveWatchdogLogPath,
@@ -56,6 +57,11 @@ const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 
 export { invokePostPushEntityStage };
 export { enrichPayloadWithEntityDigest } from './hermes-skill-examples/morning-digest/scripts/render-digest-entity-section.mjs';
+export {
+  detectFailedPrimaryTrendSources,
+  mergeSelectiveRefetchIntoPayload,
+  trySelectiveSourceRefetch,
+} from './lib/selective-digest-source-refetch.mjs';
 export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 export {
   buildErrorsBySource,
@@ -1010,6 +1016,22 @@ export async function runDigestConvexCompletion(opts = {}) {
         return result;
       }
     } else {
+      await trySelectiveSourceRefetch({
+        env,
+        todayDate,
+        operatorHome,
+        log,
+        dedupeFn: dedupeSignals,
+        scoreFn: scoreSignals,
+        writeArtifactFn: async (payload, writeEnv) => {
+          await writeDigestPushArtifact({
+            ...writeEnv,
+            DIGEST_PUSH_JSON: JSON.stringify(payload),
+          });
+        },
+        collectFn: opts.collectSelectiveFn,
+      });
+
       const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
       const watchdogResult = await watchdogFn({ env, todayDate });
       if (watchdogResult.action === 'skipped-already-pushed') {

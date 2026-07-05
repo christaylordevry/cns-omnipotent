@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 81-2-morning-digest-internal-block-watchdog-reliability (2026-07-05)
+
+- **`DIGEST_WATCHDOG_REFETCH=1` env set but no consumer reads it** — `selective-digest-source-refetch.mjs` passes the flag to wrapper subprocesses; no adapter checks it yet. Proposal optional hook; wrapper re-exec is sufficient for v1.
+- **Skip-path watchdog log actions registered but not emitted** — `skipped-already-refetched` and `skipped-no-refetch-needed` are in `DIGEST_LOG_ACTIONS` but `trySelectiveSourceRefetch` returns without logging those skip paths. Minor observability gap.
+
+---
+
 ## Deferred from: code review of 81-1b-internal-dev-state-collector-dashboard-sync-push (2026-07-05)
 
 - **No `main()` integration test for Story 81-1b independent failure semantics (AC3)** — snapshot-fail/dev-state-succeed and vice versa are covered by manual code trace and unit tests of the individual pieces (secret scan, push builder, exit-code logic) but not exercised together through `dashboard-sync.ts`'s `main()`. Add an integration test mocking `collectAndMaybePush` + `pushInternalDevState` if this path ever needs to change.

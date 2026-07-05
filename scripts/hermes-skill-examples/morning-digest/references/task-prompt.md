@@ -14,7 +14,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → **18** → **19** → 3 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → **18** → **19** → 3 → 6 → §9 map → dedup → score → artifact → **20** → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
@@ -36,6 +36,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 17 | Polymarket | `terminal(command="bash scripts/session-close/hermes-run-polymarket.sh", …)` — **MUST fire before Source 18**; keyword watchlist primary (`MORNING_DIGEST_POLYMARKET_KEYWORDS`) |
 | 18 | Threads | `terminal(command="bash scripts/session-close/hermes-run-threads.sh", …)` — **MUST fire before Source 19**; handle watchlist primary (`MORNING_DIGEST_THREADS_HANDLES`) |
 | 19 | LinkedIn | `terminal(command="bash scripts/session-close/hermes-run-linkedin.sh", …)` — **MUST fire before Source 3**; dual primary watchlists (`MORNING_DIGEST_LINKEDIN_COMPANIES` + `MORNING_DIGEST_LINKEDIN_PROFILES`) |
+| 20 | Internal dev-state | `terminal(command="npx tsx scripts/hermes-skill-examples/morning-digest/scripts/render-internal-dev-state-section.mjs", workdir=resolved_repo_root, timeout=30)` — **MUST fire after Persist digest push artifact and before Discord post** |
 | 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 19, before Source 6**; top keyword from Source 1 only |
 | 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, and 3** |
 
@@ -43,7 +44,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 **Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **19** and before Source 6 or Discord post.
 
-**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → **Step 20 internal dev-state** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -857,6 +858,38 @@ terminal(
 
 The script always exits **0**. Stderr warnings use prefix `write-digest-push-artifact:`.
 
+## Step 20 — Internal dev-state (Story 81-2)
+
+Call `terminal` exactly once for internal dev-state markdown **after** the Persist digest push artifact terminal returns and **before** posting the Output contract to `#hermes`:
+
+```text
+terminal(
+  command="npx tsx scripts/hermes-skill-examples/morning-digest/scripts/render-internal-dev-state-section.mjs",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Optional env (passed through when available): `CNS_VAULT_ROOT`, `DIGEST_RUN_AT` (same numeric `digest_start_ms` as `run.ranAt`).
+
+Stdout shape:
+
+```json
+{ "markdown": "## Internal work prioritized\n• ...", "status": "ok", "linesRendered": 3, "reason": null }
+```
+
+**After the Step 20 terminal returns** (mandatory stdout threading — mirror Source 5 HN stdout pattern):
+
+1. Let `internal_stdout` = Step 20 terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `internal_json = JSON.parse(internal_stdout)` inside try/catch or equivalent safe parse.
+3. If `internal_json.status === 'ok'` and `typeof internal_json.markdown === 'string' && internal_json.markdown.trim()`:
+   - Save `internal_dev_markdown = internal_json.markdown.trim()` for Discord Output contract **Internal work prioritized** block.
+4. Else (`empty`, `failed`, invalid JSON, or empty markdown):
+   - Omit the **Internal work prioritized** block entirely — **do not** abort the digest.
+5. On failure, stderr may contain `[internal-dev-digest] …` — observability only; never post a Discord warning for Step 20 failure.
+
+**Pre-flight gate:** Do not post to `#hermes` until Step 20 terminal has fired (success or graceful empty/failed).
+
 ## Output contract (post to `#hermes`)
 
 ```text
@@ -956,7 +989,12 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 _Matched signal:_ <winning_signal>
 
 **Recommended focus:** <top keyword to watch today or (none — trends unavailable)>
+
+**Internal work prioritized**
+<Step 20 markdown when status ok; omit entire block when empty/failed>
 ```
+
+When Step 20 returned `status: 'ok'` with non-empty `markdown`, include the **Internal work prioritized** section using that markdown (includes `## Internal work prioritized` header and bullets). When Step 20 returned `empty` or `failed`, omit this section entirely — do not post `(source unavailable)` placeholder.
 
 **Vault context** when `route.status === 'NO_ROUTE'`:
 
