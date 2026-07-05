@@ -1,5 +1,23 @@
 # Deferred work
 
+## Session-close / constitution hygiene (2026-07-05, session 15)
+
+**Surfaced by:** Post-incident cleanup after the session-14 MEMORY.md/AGENTS.md drift incident (see `HANDOFF-2026-07-05-session14-hermes-consolidation.md`). Root cause of the AGENTS.md pollution was fixed this session (Story 86-1: `readProjectStatusLine` now derives from `sprint-status.yaml` SSOT, not stale `CLAUDE.md` Phase Status). Remaining items:
+
+- **Vault `AI-Context/MEMORY.md` is orphaned and stale — delete it** — the current session-close router (`SKILL.md` v1.0.16) has no MEMORY.md regeneration step (that logic lives only in `references/task-prompt.legacy.md`, which the router explicitly skips). No live consumer reads it: hermes-agent code and `config.yaml` greps are empty, the NotebookLM export excludes `AI-Context/`, and constitution §6.5's cold-start budget maps to the Hermes native memory dir (`~/.hermes/memories/{USER,MEMORY}.md`), which IS live and clean. Superseded by the Hermes native memory system. **Action:** operator-direct delete (WriteGate-owned path).
+
+- **Test-fixture-shaped corruption of a live file — root cause still unconfirmed** — before session 14 the vault MEMORY.md had been overwritten with unit-test fixture content ("AGENTS v9.9.10", "Epics: 48 in-progress", "Tests: skipped (dry-run)"), matching `tests/session-close-pipeline.test.mjs` SC-4 fixtures. That test only does in-memory string transforms (no real file write), so how fixture data reached a production path is unexplained. Lower stakes now that the file is orphaned/being-deleted, but the write-path leak is a real latent bug worth a dedicated trace before writing any new artifact through the same helpers.
+
+- **§7 Active Modules registration pending for Epic 76 modules** — `modules/two-bot-vault-boundary.md` and `modules/memory-pillars-verification.md` are committed as content (`5e50d88`) but not registered as rows in AGENTS.md §7 Active Modules. Session-close only regenerates §8, so registration must be an operator-direct constitution edit (both AGENTS copies + version bump to 2.1.50 + changelog row). Drafted rows exist in the session-15 transcript.
+
+- **NotebookLM drive-sync 60s write timeout on large exports** — session-14 fixed the `GOOGLE_REFRESH_TOKEN` OAuth 403; the 2026-07-05 ~20:23 session-close now fails all 3 drive targets with `drive_write_error` = a 60s write timeout on the ~1.5 MB (1466 KB) export (Google Docs batchUpdate). Distinct from the fixed permission issue; NLM auth itself is healthy. Consider chunked/streamed writes or a longer per-target timeout for large exports.
+
+- **AGENTS.md line-ending flip-flop (LF↔CRLF) pollutes history** — session-close writes the vault-mirrored `specs/cns-vault-contract/AGENTS.md` with CRLF; prior commits stored LF, so each session-close commit shows a whole-file diff (e.g. `cf89643`: 440/441 raw vs 12/13 real content lines). Add a `.gitattributes` entry pinning the constitution files' EOL so future diffs stay clean.
+
+- **(Optional) session-close Section 8 synthesis runs on the global default model (Sonnet 4.6)** — session-close is a *skill*, so it inherits `model.default`; Hermes v0.17.0 has no per-skill routing (the `auxiliary:` Haiku pins from Epic 80 cover framework sub-tasks only, not skills). The only way to run just this pass on Haiku without downgrading all of JARVIS is to re-architect the bounded Section 8 synthesis into a scripted direct-to-Haiku API call (Phase A already runs deterministic scripts). Low priority — the pass is a bounded ~1,500-token call.
+
+---
+
 ## Deferred from: code review of 81-2-morning-digest-internal-block-watchdog-reliability (2026-07-05)
 
 - **`DIGEST_WATCHDOG_REFETCH=1` env set but no consumer reads it** — `selective-digest-source-refetch.mjs` passes the flag to wrapper subprocesses; no adapter checks it yet. Proposal optional hook; wrapper re-exec is sufficient for v1.
