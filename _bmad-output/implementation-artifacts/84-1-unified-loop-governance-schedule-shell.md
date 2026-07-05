@@ -2,7 +2,9 @@
 
 **Input of record:** `_bmad-output/planning-artifacts/ddr-e84-001-unified-loop.md` (LOCKED 2026-07-06). All five DDR decisions are settled — do not re-open approval mechanism, shell choice, schedule split, cost posture, or scope.
 
-Status: ready-for-dev
+baseline_commit: 3f5d4af7cd6fc8183669a6ee34e379877dfc8c41
+
+Status: review
 
 <!-- Ultimate context engine analysis completed 2026-07-06. Operator locked: artifact #1B (~/.hermes/artifacts/), continuation #2A (unified-loop approve-build). -->
 
@@ -163,29 +165,29 @@ so that **Discover/Build/Verify/Persist compose without rewriting the run-chain 
 
 ## Tasks / Subtasks
 
-- [ ] **AC2 — Repo skill mirror** (AC: #2, #5)
-  - [ ] Scaffold `scripts/hermes-skill-examples/unified-loop/` from morning-digest / awareness-sync patterns
-  - [ ] Author `SKILL.md`, `references/task-prompt.md`, trigger/cron/config snippets
-  - [ ] Add `scripts/install-hermes-skill-unified-loop.sh`
-  - [ ] Register in skill install gate manifest if required (`tests/hermes-skill-install-gate.test.mjs`)
-- [ ] **AC3 — Discover collector wiring** (AC: #3)
-  - [ ] Terminal invocation of `collectInternalDevState` (reuse 81-1b module; no fork)
-  - [ ] `#hermes` summary template (top N prioritized items)
-  - [ ] Artifact writer: `~/.hermes/artifacts/unified-loop/discover.json` per schema v1; mkdir `-p` on write
-- [ ] **AC4 — Forbidden-action enumeration** (AC: #4)
-  - [ ] All seven forbidden rows in task-prompt with "violation = skill failure"
-  - [ ] Document native approval as terminal-only (not MCP net)
-- [ ] **AC6 — Cron shell** (AC: #6)
-  - [ ] `scripts/install-unified-loop-discover-cron.sh`
-  - [ ] `scripts/run-unified-loop-discover-cron.sh`
-- [ ] **AC7 — Governance module** (AC: #7)
-  - [ ] Draft module content in story/evidence; apply via **session-close WriteGate** only
-  - [ ] Record `diff -q` vault copies in evidence artifact
-- [ ] **AC8 — Tests + verify** (AC: #2, #4, #6, #8)
-  - [ ] `tests/hermes-unified-loop-skill.test.mjs`
-  - [ ] `bash scripts/verify.sh` green
-- [ ] **AC1 — Protect-list audit** (AC: #1)
-  - [ ] Confirm zero diffs on five protect-list paths
+- [x] **AC2 — Repo skill mirror** (AC: #2, #5)
+  - [x] Scaffold `scripts/hermes-skill-examples/unified-loop/` from morning-digest / awareness-sync patterns
+  - [x] Author `SKILL.md`, `references/task-prompt.md`, trigger/cron/config snippets
+  - [x] Add `scripts/install-hermes-skill-unified-loop.sh`
+  - [x] Register in skill install gate manifest if required (`tests/hermes-skill-install-gate.test.mjs`)
+- [x] **AC3 — Discover collector wiring** (AC: #3)
+  - [x] Terminal invocation of `collectInternalDevState` (reuse 81-1b module; no fork)
+  - [x] `#hermes` summary template (top N prioritized items)
+  - [x] Artifact writer: `~/.hermes/artifacts/unified-loop/discover.json` per schema v1; mkdir `-p` on write
+- [x] **AC4 — Forbidden-action enumeration** (AC: #4)
+  - [x] All seven forbidden rows in task-prompt with "violation = skill failure"
+  - [x] Document native approval as terminal-only (not MCP net)
+- [x] **AC6 — Cron shell** (AC: #6)
+  - [x] `scripts/install-unified-loop-discover-cron.sh`
+  - [x] `scripts/run-unified-loop-discover-cron.sh`
+- [x] **AC7 — Governance module** (AC: #7)
+  - [x] Draft module content in story/evidence; apply via **session-close WriteGate** only
+  - [x] Record `diff -q` vault copies in evidence artifact
+- [x] **AC8 — Tests + verify** (AC: #2, #4, #6, #8)
+  - [x] `tests/hermes-unified-loop-skill.test.mjs`
+  - [x] `bash scripts/verify.sh` green
+- [x] **AC1 — Protect-list audit** (AC: #1)
+  - [x] Confirm zero diffs on five protect-list paths
 
 ---
 
@@ -382,15 +384,45 @@ Epic 84 tracked in `sprint-status.yaml` — story key `84-1-unified-loop-governa
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.6 (Cursor)
 
 ### Debug Log References
 
+- Protect-list audit: `git diff --name-only 3f5d4af7...` on five paths — empty (AC1 PASS)
+- Contract tests: `node --test tests/hermes-unified-loop-skill.test.mjs tests/write-discover-artifact.test.mjs` — PASS
+- Verify gate: `bash scripts/verify.sh` — PASS
+
 ### Completion Notes List
+
+- Repo SSOT skill mirror at `scripts/hermes-skill-examples/unified-loop/` (SKILL.md, task-prompt, trigger/cron/config snippets, `write-discover-artifact.mjs`).
+- Install script `scripts/install-hermes-skill-unified-loop.sh` rsyncs mirror → `~/.hermes/skills/cns/unified-loop/` (morning-digest parity).
+- Discover artifact writer invokes `collectInternalDevState()` read-only; schema v1 `items[]` uses real `PrioritizedItem` shape; absolute `repoRoot` + `artifactPath`.
+- task-prompt §5 enumerates all seven forbidden rows verbatim with `violation = skill failure`; native approval documented as terminal-only (not MCP).
+- Cron shell: `install-unified-loop-discover-cron.sh` + `run-unified-loop-discover-cron.sh` with tag `cns-unified-loop-discover`, dummy Hermes schedule, `--skill unified-loop`.
+- Governance module drafted in `84-1-governance-evidence.md` for session-close WriteGate — **no** direct `AI-Context/` edit (AC7).
+- Skill install gate: unified-loop not added to live bindings manifest (optional until operator binds); mirror satisfies install-gate when bound.
+- Build/Verify/Persist remain documented placeholders only (AC9).
 
 ### File List
 
----
+- `scripts/hermes-skill-examples/unified-loop/SKILL.md` (NEW)
+- `scripts/hermes-skill-examples/unified-loop/references/task-prompt.md` (NEW)
+- `scripts/hermes-skill-examples/unified-loop/references/trigger-pattern.md` (NEW)
+- `scripts/hermes-skill-examples/unified-loop/references/cron-snippet.md` (NEW)
+- `scripts/hermes-skill-examples/unified-loop/references/config-snippet.md` (NEW)
+- `scripts/hermes-skill-examples/unified-loop/scripts/write-discover-artifact.mjs` (NEW)
+- `scripts/install-hermes-skill-unified-loop.sh` (NEW)
+- `scripts/install-unified-loop-discover-cron.sh` (NEW)
+- `scripts/run-unified-loop-discover-cron.sh` (NEW)
+- `tests/hermes-unified-loop-skill.test.mjs` (NEW)
+- `tests/write-discover-artifact.test.mjs` (NEW)
+- `_bmad-output/implementation-artifacts/84-1-governance-evidence.md` (NEW)
+- `_bmad-output/implementation-artifacts/84-1-unified-loop-governance-schedule-shell.md` (UPDATED)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (UPDATED)
+
+### Change Log
+
+- 2026-07-06: Story 84-1 implementation — Unified Loop governance shell, Discover-only skill mirror, cron install, contract tests, governance evidence draft (session-close pending).
 
 ## References
 
