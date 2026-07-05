@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 81-1b-internal-dev-state-collector-dashboard-sync-push (2026-07-05)
+
+- **No `main()` integration test for Story 81-1b independent failure semantics (AC3)** — snapshot-fail/dev-state-succeed and vice versa are covered by manual code trace and unit tests of the individual pieces (secret scan, push builder, exit-code logic) but not exercised together through `dashboard-sync.ts`'s `main()`. Add an integration test mocking `collectAndMaybePush` + `pushInternalDevState` if this path ever needs to change.
+
+---
+
 ## Hermes self-improvement ungoverned skill writes (2026-07-04)
 
 **Surfaced by:** Story 77-4 awareness-sync data-accuracy fix (live Discord test).

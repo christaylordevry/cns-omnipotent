@@ -16,6 +16,10 @@ import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 import { loadMergedSecretPatterns } from "../src/secrets/load-patterns.js";
 import { findFirstMatchingSecretPatternId } from "../src/secrets/scan.js";
+import {
+  collectInternalDevState,
+  type PrioritizedItem,
+} from "./lib/collect-internal-dev-state.js";
 
 /** Hand-mirrored from cns-dashboard/convex/constants.ts — keep in sync. */
 export const MCP_NAMES = [
@@ -527,6 +531,7 @@ export async function buildDashboardSnapshot(
 }
 
 export const INGEST_MUTATION_PATH = "dashboard:ingestDashboardSnapshot";
+export const INGEST_INTERNAL_DEV_STATE_PATH = "internalDevState:ingestInternalDevState";
 export const CONVEX_PUSH_TIMEOUT_MS = 30_000;
 export const MAX_SYNC_ERROR_LENGTH = 2000;
 export const DEFAULT_DASHBOARD_SYNC_ENV_REL = ".hermes/dashboard-sync.env";
@@ -543,6 +548,18 @@ export function buildIngestMutationRequest(snapshot: DashboardSnapshot): {
   return {
     path: INGEST_MUTATION_PATH,
     args: { snapshot },
+    format: "json",
+  };
+}
+
+export function buildIngestInternalDevStateRequest(items: PrioritizedItem[]): {
+  path: string;
+  args: { items: PrioritizedItem[] };
+  format: "json";
+} {
+  return {
+    path: INGEST_INTERNAL_DEV_STATE_PATH,
+    args: { items },
     format: "json",
   };
 }
@@ -593,6 +610,48 @@ export async function scanSnapshotForSecretPatternId(
 ): Promise<string | null> {
   const patterns = await loadMergedSecretPatterns(vaultRoot);
   return findFirstMatchingSecretPatternId(JSON.stringify(snapshot), patterns);
+}
+
+export async function scanInternalDevStateForSecretPatternId(
+  items: PrioritizedItem[],
+  vaultRoot: string,
+): Promise<string | null> {
+  const patterns = await loadMergedSecretPatterns(vaultRoot);
+  return findFirstMatchingSecretPatternId(JSON.stringify(items), patterns);
+}
+
+export async function pushInternalDevState(
+  items: PrioritizedItem[],
+  opts: { convexUrl: string; deployKey: string; fetchImpl?: typeof fetch; timeoutMs?: number },
+): Promise<void> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const url = `${normalizeConvexUrl(opts.convexUrl)}/api/mutation`;
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${opts.deployKey}`,
+    },
+    body: JSON.stringify(buildIngestInternalDevStateRequest(items)),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? CONVEX_PUSH_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Convex HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  let payload: ConvexMutationResponse;
+  try {
+    payload = (await response.json()) as ConvexMutationResponse;
+  } catch {
+    throw new Error("Convex mutation response was not valid JSON");
+  }
+  if (payload.status === "error") {
+    throw new Error(payload.errorMessage ?? "Convex mutation failed");
+  }
+  if (payload.status !== "success") {
+    throw new Error(payload.errorMessage ?? "Convex mutation returned unexpected status");
+  }
 }
 
 export function truncateSyncError(errorMessage: string, maxLength = MAX_SYNC_ERROR_LENGTH): string {
@@ -719,22 +778,45 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const push = expectPush && shouldPushFromEnv(process.env);
 
     if (push) {
+      const convexUrl = process.env.CONVEX_URL?.trim() ?? "";
+      const deployKey = process.env.CONVEX_DEPLOY_KEY?.trim() ?? "";
+      const now = Date.now();
+
       const result = await collectAndMaybePush({
         vaultRoot,
         repoRoot,
-        convexUrl: process.env.CONVEX_URL,
-        deployKey: process.env.CONVEX_DEPLOY_KEY,
+        convexUrl,
+        deployKey,
+        now,
       });
-      if (result.exitCode !== 0) {
-        return result.exitCode;
-      }
+      let exitCode = result.exitCode;
       const { snapshot } = result;
-      console.log(
-        `dashboard-sync: pushed ${snapshot.vaultHealth.noteCount} notes, ` +
-          `${snapshot.agentLogEntries.length} log entries ` +
-          `(sync ok)`,
-      );
-      return 0;
+
+      if (result.pushed) {
+        console.log(
+          `dashboard-sync: pushed ${snapshot.vaultHealth.noteCount} notes, ` +
+            `${snapshot.agentLogEntries.length} log entries ` +
+            `(sync ok)`,
+        );
+      }
+
+      try {
+        const items = await collectInternalDevState({ repoRoot, vaultRoot, now });
+        const patternId = await scanInternalDevStateForSecretPatternId(items, vaultRoot);
+        if (patternId !== null) {
+          console.error(`FATAL: internal-dev-state matches secret pattern: ${patternId}`);
+          exitCode = exitCode || 1;
+        } else {
+          await pushInternalDevState(items, { convexUrl, deployKey });
+          console.log(`dashboard-sync: pushed ${items.length} internal dev-state items`);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`FATAL: internal-dev-state push failed: ${message}`);
+        exitCode = exitCode || 1;
+      }
+
+      return exitCode;
     }
 
     const snapshot = await buildDashboardSnapshot({ vaultRoot, repoRoot });
