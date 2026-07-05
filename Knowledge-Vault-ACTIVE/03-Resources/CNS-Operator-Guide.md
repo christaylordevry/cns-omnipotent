@@ -3,7 +3,7 @@ pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
 title: "CNS Operator Guide"
 created: 2026-04-05
-modified: 2026-07-03
+modified: 2026-07-06
 status: stable
 confidence_score: 1.0
 verification_status: verified
@@ -443,6 +443,7 @@ To manually update: edit this file and run `bash scripts/verify.sh`.
 | 2026-06-11 | 1.38.1 | **Morning digest X/Twitter (Story 68-7):** §15.11.1 session-cookie setup, `--check` health probe, rotation runbook; optional Source 11 when cookies configured | 68-7-x-integration-env-docs |
 | 2026-06-24 | 1.39.0 | **Portal + Desktop (Epic 74):** §15.13 browser UI at `:9119`, OAuth-primary; pointers to `hermes-desktop.md` runbook and `routing.md` Hermes surface | 74-8-portal-and-desktop-governance-documentation |
 | 2026-07-03 | 1.40.0 | **Hermes cost routing (Epic 80):** §15.14 — main turns Sonnet on Portal; auxiliary side-work Haiku (`auxiliary:` block); `smart_model_routing` retired inert config (Story 80-2) | 80-2-retire-inert-smart-model-routing-operator-guide |
+| 2026-07-06 | 1.41.0 | **Memory automation vs session-close (Epic 83, FR15):** §15.3.1 — Honcho per-turn compounding + native flush on session exit/reset only; manual `/session-close` for governance; no scheduled session-close cron (OQ-8 closed) | 83-3-automated-session-close-feeding-memory |
 
 ---
 
@@ -687,6 +688,24 @@ Adjust the script path if your Omnipotent.md clone lives elsewhere. For **manual
 - Destination: `~/.hermes/skills/cns/triage/`
 
 **Routing note:** Hermes upstream supports per-channel skill bindings (see HI-6). Bind `#hermes` to skill `triage` in `~/.hermes/config.yaml` if needed; reference: `~/.hermes/skills/cns/triage/references/config-snippet.md`.
+
+### 15.3.1 Memory automation vs session-close (Epic 83, FR15)
+
+**Memory compounds automatically — no scheduled session-close required.**
+
+| What | Trigger | Cost |
+|------|---------|------|
+| Honcho operator modeling | Every turn (dialectic cadence 3) | Honcho API (see 83-1 evidence) |
+| Native `MEMORY.md` / `USER.md` | **Session exit** (CLI) or **session reset** (Discord: `idle_minutes: 60`, `at_hour: 21` in `session_reset`) — **not per-turn**; plus `memory` tool writes during chat (immediate disk persist) | $0 |
+| Brain vault recall (`cns-brain-recall`) | Every turn (`pre_llm_call`) | Portal inference tokens |
+
+Native auxiliary flush (`flush_min_turns: 6`, `nudge_interval: 10`, `creation_nudge_interval: 15`) runs on session shutdown/reset when turn count meets threshold — not on every message. Mid-session facts still persist via Honcho observation and explicit `memory` tool calls.
+
+**Run `/session-close` manually only** when you need AGENTS.md Section 8 regen, vault synthesis, CNS-Daily-Rhythm AUTO blocks, fast-scan index, or NotebookLM fan-out — typically end of a BMAD story session. Each real close costs roughly **$3–5** in LLM usage; do **not** cron it for memory — automated memory feeding is already live via Honcho + native flush.
+
+**No scheduled session-close cron** (operator cost decision 2026-07-06; OQ-8 closed).
+
+Evidence: `_bmad-output/implementation-artifacts/83-3-automated-memory-feed-evidence.md`
 
 ### 15.4 Session close (`/session-close`, Epic 48)
 
