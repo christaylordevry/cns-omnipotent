@@ -685,7 +685,8 @@ development_status:
 
   # Epic 81 — Morning Intelligence — Digest Enrichment + Discovery Surface (hermes-omniscient)
   # 81-1 split: 81-1a cns-dashboard Convex transport (done @a0e7c73) → 81-1b Omnipotent collector+push
-  epic-81: in-progress
+  # 81-3 (DiscoveryWorkPanel.svelte) done in cns-dashboard @a926191+9d75da4
+  epic-81: done
   81-1b-internal-dev-state-collector-dashboard-sync-push: done
   81-2-morning-digest-internal-block-watchdog-reliability: done
   epic-81-retrospective: optional
