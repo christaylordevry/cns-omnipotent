@@ -622,13 +622,13 @@ development_status:
 
   # Epic 76 — Orientation & Governance Cleanup (alias Epic C; parallel with Epic 75)
   # Pre-2 session-close executes here via 76-1 after Portal restores provider
-  epic-76: in-progress
+  epic-76: done
   76-1-session-close-orientation-artifact-refresh: done # absorbs deferred Pre-2; story file story-76-1-session-close-refresh.md
   76-2-both-project-context-md-files-synced: done
   76-3-fast-scan-index-and-inbox-triage-plan: done
-  76-4-missing-governance-files-mobile-posture-and-personas: backlog
-  76-5-two-bot-vault-boundary-documentation: backlog
-  76-6-memory-pillars-and-honcho-verification: backlog
+  76-4-missing-governance-files-mobile-posture-and-personas: done
+  76-5-two-bot-vault-boundary-documentation: done
+  76-6-memory-pillars-and-honcho-verification: done
   epic-76-retrospective: optional
 
   # Epic 77 — JARVIS Awareness in Nexus (alias Epic D1; cross-repo cns-dashboard + Omnipotent.md)
