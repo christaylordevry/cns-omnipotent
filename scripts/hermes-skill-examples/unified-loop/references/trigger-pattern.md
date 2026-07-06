@@ -1,4 +1,4 @@
-# Trigger pattern: `unified-loop` (Story 84-1)
+# Trigger pattern: `unified-loop` (Story 84-1 / 84-2)
 
 ## Surfaces
 
@@ -14,7 +14,7 @@ After trimming leading/trailing whitespace, the **first non-empty line** is the 
 |--------------|------|-------------|
 | `unified-loop` | Discover then **pause** at gate | Partial |
 | `unified-loop cron:discover` | Discover-only (manual smoke of cron label) | Yes (read-only) |
-| `unified-loop approve-build` | Build→Verify→Persist after approved Discover | No |
+| `unified-loop approve-build` | Build→Verify→Persist after approved Discover (Verify handoff only on this path) | No |
 | `unified-loop approve-build <token>` | Same; optional single token e.g. `story:84-2` | No |
 
 ### Case rule
@@ -59,6 +59,7 @@ unified-loop approve-build story:84-2
 - Hermes job uses `--skill unified-loop` with dummy schedule `0 0 1 1 *`.
 - Cron **never** enters full-loop / Build path — Discover-only (`cron:discover` pseudo-label).
 - Cron does **not** use Discord line-1 grammar.
+- **Verify forbidden on cron:** `unified-loop cron:discover`, `cns-unified-loop-discover`, and all Discover-only paths must **never** invoke `bmad-code-review`, `bmad-review-adversarial-general`, or `bmad-review-edge-case-hunter`. Verify runs **only** after `unified-loop approve-build` (post-approval). Verify is **not** on recurring schedule (DDR 4a dormant-after-proof).
 
 Pseudo-trigger label for logs: `cron:discover`.
 
@@ -75,4 +76,6 @@ Pseudo-trigger label for logs: `cron:discover`.
 
 - Discover posts bounded `#hermes` summary + writes `~/.hermes/artifacts/unified-loop/discover.json`.
 - Full loop manual path pauses after Discover until `unified-loop approve-build`.
+- On `approve-build`: Build placeholder → Verify handoff (operator runs three BMAD skills in IDE) → Persist placeholder (84-3).
+- Verify is **never** auto-fired on cron or recurring schedule.
 - No vault writes on Discover/cron path.

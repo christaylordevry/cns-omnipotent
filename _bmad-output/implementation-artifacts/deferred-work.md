@@ -1128,3 +1128,15 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 
 - `precision@k` metric is expected-recall-in-top-k (|expected ∩ topK| / |expected|), not classic IR precision — documented in harness; acceptable for SM-1 bar if operator agrees.
 - Operator live calibration not run — golden paths verified in vault (including `AI-Context/modules/run-chain.md`); `operator_signoff: pending` until Chris runs Portal index calibrate.
+
+## Deferred from: 84-2 Verify dry-run findings on 84-1 discover shell (2026-07-06)
+
+Surfaced by the prove-once Verify dry-run (bmad-code-review + adversarial-general + edge-case-hunter on `3f5d4af..1d6d77e`, evidence `84-2-verify-evidence.md`). None block 84-2 (wiring proven); all are 84-1 robustness gaps. **Do before enabling the discover cron** (dormant under 4a until operator turns it on):
+
+- **`write-discover-artifact.mjs`** — no guard when `collectInternalDevState()` throws or returns a non-array → malformed `discover.json`; add `Array.isArray` check + `TypeError`.
+- **`write-discover-artifact.mjs`** — empty `items[]` writes a `topPick` fallback but no operator-facing "no ranked work" message → operator could approve Build with no work item; document empty-items path in task-prompt.
+- **`write-discover-artifact.mjs`** — no schema/size validation on `discover.json` before/after write (partial write / disk full → corrupt JSON consumed by Build); add a post-write parse/validate.
+- **`install-unified-loop-discover-cron.sh`** — non-idempotent: re-running appends a second `cns-unified-loop-discover` crontab line → double Discover runs; check-for-existing-tag before append.
+- **`run-unified-loop-discover-cron.sh`** — hard `exit 1` when `.env.live-chain` missing (it sources `HERMES_DISCORD_TOKEN` there) is correct behavior but undocumented; add a troubleshooting row to `references/cron-snippet.md`.
+- **Portability (low, single-operator OK):** `write-discover-artifact.mjs` `DEFAULT_REPO_ROOT` is an operator-absolute path; fine while `OMNIPOTENT_REPO` is set or the default matches, but fail-fast if `repoRoot` lacks `collect-internal-dev-state.ts`.
+- Contract tests assert file/string presence but never execute `write-discover-artifact.mjs` against a temp `$HOME` ("green tests, broken cron" risk) — add an execution test when the above hardening lands.

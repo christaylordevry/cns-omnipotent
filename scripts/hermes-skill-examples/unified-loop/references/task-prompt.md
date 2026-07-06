@@ -1,4 +1,4 @@
-# Task: `unified-loop` (Story 84-1 / FR22 v1.5)
+# Task: `unified-loop` (Story 84-1 / 84-2 / FR22 v1.5)
 
 ## Hard constraints (must follow)
 
@@ -22,7 +22,7 @@ Parse the **first non-empty line** of the operator message (trimmed). Case-sensi
 |--------------|------------|-------------|
 | `unified-loop` | Discover → **pause** at gate (Build not auto-run) | Partial |
 | `unified-loop cron:discover` | Discover-only | Yes (read-only) |
-| `unified-loop approve-build` | Build→Verify→Persist (84-2/84-3 — **contract only in 84-1**) | No |
+| `unified-loop approve-build` | Build→Verify→Persist (Verify **handoff** 84-2; Build/Persist placeholders 84-3) | No |
 | `unified-loop approve-build <token>` | Same; optional single token e.g. `story:84-2` | No |
 
 **Continuation grammar (Discover → Build):**
@@ -144,17 +144,43 @@ There is **no** `vault_write` MCP tool — use the five mutator names above.
 | Tertiary — WriteGate | Enforcement, not approval |
 | Quaternary — native dangerous-command approval | **No — terminal shell only** |
 
-## 7) Build / Verify / Persist placeholders (84-1)
+## 7) Build / Verify / Persist (84-2 Verify handoff)
 
-Document only — **do not execute** in 84-1:
+### Verify — post-approval only (84-2, HARD gate)
 
-| Stage | Future wiring |
-|-------|---------------|
-| Build | `bmad-dev-story` + EnterWorktree (84-3) |
-| Verify | `bmad-code-review`, `bmad-review-adversarial-general`, `bmad-review-edge-case-hunter` (84-2) |
-| Persist | session-close WriteGate / PAKE / audit (84-3) |
+Verify runs **only** on `unified-loop approve-build` — within Build→Verify→Persist sequence **after** operator approval. Verify is **forbidden** on:
 
-On `unified-loop approve-build` in 84-1: reply that Build/Verify/Persist wiring is deferred to 84-2/84-3; reference `AI-Context/modules/unified-loop.md` after session-close apply.
+- `unified-loop cron:discover`
+- WSL cron tag `cns-unified-loop-discover`
+- Any Discover-only / read-only path
+
+Verify is **never** auto-fired on recurring schedule or cron. The three review skills are **paid** — the loop must **not** auto-invoke them without operator action (DDR Decision 4a: prove-once dry-run, then **dormant** capability).
+
+**Composition (no new review logic):** Verify composes three existing BMAD skills by exact registered skill ID:
+
+| Order | Skill ID | Purpose |
+|-------|----------|---------|
+| 1 | `bmad-code-review` | Structured adversarial code review (parallel layers + triage) |
+| 2 | `bmad-review-adversarial-general` | Cynical Review — attitude-driven gap finding |
+| 3 | `bmad-review-edge-case-hunter` | Path-tracer — unhandled edge cases only (JSON output) |
+
+**Handoff (operator decision #2A):** Hermes does **not** run review skills inline. On `unified-loop approve-build`:
+
+1. Acknowledge Build placeholder (84-3 wires execution)
+2. **STOP** and post `#hermes` Verify handoff per `references/verify-handoff.md`
+3. Operator runs the three skills in Cursor (or Claude Code); saves outputs to `84-2-verify-evidence.md`
+4. Persist remains placeholder until 84-3
+
+No terminal/CLI wrapper for review skills. No inline Hermes adversarial review. No duplicate adversarial prompts in this skill tree.
+
+### Build / Persist — placeholders (84-3)
+
+| Stage | Status | Wiring |
+|-------|--------|--------|
+| Build | **Placeholder** | `bmad-dev-story` + EnterWorktree (84-3) |
+| Persist | **Placeholder** | session-close WriteGate / PAKE / audit (84-3) |
+
+On `unified-loop approve-build`: acknowledge Build placeholder → Verify handoff → note Persist deferred. Reference `AI-Context/modules/unified-loop.md` after session-close apply.
 
 ## 8) discover.json schema v1 (summary)
 

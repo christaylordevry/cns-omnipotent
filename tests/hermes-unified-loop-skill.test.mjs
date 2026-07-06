@@ -45,7 +45,7 @@ describe("Story 84-1 Hermes unified-loop skill mirror", () => {
 
     const body = readFileSync(skillPath, "utf8");
     assert.ok(body.includes("name: unified-loop"));
-    assert.ok(body.includes("version: 1.0.0"));
+    assert.match(body, /version: 1\.\d+\.\d+/);
     assert.ok(body.includes("requires_toolsets: [terminal]"));
     assert.match(body, /REFERENCE ONLY|invocation already confirmed/i);
     assert.ok(body.includes('skill_view("unified-loop", "references/task-prompt.md")') || body.includes("references/task-prompt.md"));
@@ -151,5 +151,58 @@ describe("Story 84-1 Hermes unified-loop skill mirror", () => {
     assert.ok(body.includes("collect-internal-dev-state.ts"));
     assert.ok(body.includes("awaiting-operator-approval"));
     assert.ok(body.includes("schemaVersion"));
+  });
+});
+
+describe("Story 84-2 Verify handoff wiring", () => {
+  const verifyHandoffPath = join(skillDir, "references/verify-handoff.md");
+
+  it("verify-handoff.md exists and names all three review skills by exact ID", () => {
+    assert.ok(existsSync(verifyHandoffPath));
+    const body = readFileSync(verifyHandoffPath, "utf8");
+
+    assert.ok(body.includes("bmad-code-review"));
+    assert.ok(body.includes("bmad-review-adversarial-general"));
+    assert.ok(body.includes("bmad-review-edge-case-hunter"));
+    assert.doesNotMatch(body, SECRET_LIKE);
+  });
+
+  it("task-prompt documents Verify post-approval-only and cron forbidden", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+
+    assert.ok(body.includes("bmad-code-review"));
+    assert.ok(body.includes("bmad-review-adversarial-general"));
+    assert.ok(body.includes("bmad-review-edge-case-hunter"));
+    assert.ok(body.includes("unified-loop approve-build"));
+    assert.ok(body.includes("unified-loop cron:discover"));
+    assert.ok(body.includes("cns-unified-loop-discover"));
+    assert.ok(body.includes("references/verify-handoff.md"));
+    assert.match(body, /Verify is \*\*never\*\* auto-fired on recurring schedule or cron/i);
+    assert.match(body, /dormant/i);
+  });
+
+  it("SKILL.md marks Verify as documented handoff; Build/Persist remain placeholders", () => {
+    const body = readFileSync(skillPath, "utf8");
+
+    assert.ok(body.includes("bmad-code-review"));
+    assert.ok(body.includes("bmad-review-adversarial-general"));
+    assert.ok(body.includes("bmad-review-edge-case-hunter"));
+    assert.ok(body.includes("references/verify-handoff.md"));
+    assert.match(body, /Verify.*handoff|Documented \+ handoff/i);
+    assert.match(body, /Build.*Placeholder/i);
+    assert.match(body, /Persist.*Placeholder/i);
+    assert.match(body, /never cron|Never.*cron/i);
+    assert.match(body, /dormant/i);
+  });
+
+  it("trigger-pattern forbids Verify on cron and documents approve-build-only path", () => {
+    const body = readFileSync(triggerPatternPath, "utf8");
+
+    assert.ok(body.includes("unified-loop approve-build"));
+    assert.ok(body.includes("unified-loop cron:discover"));
+    assert.ok(body.includes("cns-unified-loop-discover"));
+    assert.ok(body.includes("bmad-code-review"));
+    assert.match(body, /Verify forbidden on cron|Verify is \*\*never\*\* auto-fired/i);
+    assert.match(body, /not.*recurring schedule|dormant/i);
   });
 });
