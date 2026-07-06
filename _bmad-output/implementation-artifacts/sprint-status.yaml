@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-06T10:07:00+10:00"
+last_updated: "2026-07-06T19:10:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -701,10 +701,10 @@ development_status:
 
   # Epic 84 — Unified Loop run-chain (hermes-omniscient v1.5; FR22)
   # DDR-E84-001 LOCKED 2026-07-06; discover artifact ~/.hermes/artifacts/unified-loop/discover.json
-  epic-84: in-progress
+  epic-84: done
   84-1-unified-loop-governance-schedule-shell: done
   84-2-adversarial-verify-wiring: done
-  84-3-approval-gated-build-governed-persist: backlog
+  84-3-approval-gated-build-governed-persist: done
   epic-84-retrospective: optional
 
   # Epic 86 — Session-close project status SSOT (hotfix 2026-07-05; HANDOFF session 14)

@@ -181,7 +181,7 @@ describe("Story 84-2 Verify handoff wiring", () => {
     assert.match(body, /dormant/i);
   });
 
-  it("SKILL.md marks Verify as documented handoff; Build/Persist remain placeholders", () => {
+  it("SKILL.md marks Verify as documented handoff; Build/Persist documented handoffs (84-3)", () => {
     const body = readFileSync(skillPath, "utf8");
 
     assert.ok(body.includes("bmad-code-review"));
@@ -189,20 +189,126 @@ describe("Story 84-2 Verify handoff wiring", () => {
     assert.ok(body.includes("bmad-review-edge-case-hunter"));
     assert.ok(body.includes("references/verify-handoff.md"));
     assert.match(body, /Verify.*handoff|Documented \+ handoff/i);
-    assert.match(body, /Build.*Placeholder/i);
-    assert.match(body, /Persist.*Placeholder/i);
+    assert.match(body, /Build.*Documented \+ handoff|Documented \+ handoff.*Build/i);
+    assert.match(body, /Persist.*Documented \+ handoff|Documented \+ handoff.*Persist/i);
+    assert.ok(body.includes("bmad-dev-story"));
+    assert.ok(body.includes("references/build-handoff.md"));
+    assert.ok(body.includes("references/persist-handoff.md"));
+    assert.ok(body.includes("unified-loop build-complete"));
     assert.match(body, /never cron|Never.*cron/i);
     assert.match(body, /dormant/i);
+    assert.doesNotMatch(body, /Build.*Placeholder/i);
+    assert.doesNotMatch(body, /Persist.*Placeholder/i);
   });
 
-  it("trigger-pattern forbids Verify on cron and documents approve-build-only path", () => {
+  it("trigger-pattern forbids Verify on cron and documents build-complete path", () => {
     const body = readFileSync(triggerPatternPath, "utf8");
 
     assert.ok(body.includes("unified-loop approve-build"));
+    assert.ok(body.includes("unified-loop build-complete"));
     assert.ok(body.includes("unified-loop cron:discover"));
     assert.ok(body.includes("cns-unified-loop-discover"));
     assert.ok(body.includes("bmad-code-review"));
-    assert.match(body, /Verify forbidden on cron|Verify is \*\*never\*\* auto-fired/i);
+    assert.match(body, /Build\/Verify\/Persist forbidden on cron|Verify forbidden on cron|forbidden on cron/i);
     assert.match(body, /not.*recurring schedule|dormant/i);
+  });
+});
+
+describe("Story 84-3 Build and Persist handoff wiring", () => {
+  const buildHandoffPath = join(skillDir, "references/build-handoff.md");
+  const persistHandoffPath = join(skillDir, "references/persist-handoff.md");
+
+  it("build-handoff.md exists and references bmad-dev-story, EnterWorktree, build-complete, post-approval-only", () => {
+    assert.ok(existsSync(buildHandoffPath));
+    const body = readFileSync(buildHandoffPath, "utf8");
+
+    assert.ok(body.includes("bmad-dev-story"));
+    assert.ok(body.includes("EnterWorktree"));
+    assert.ok(body.includes("unified-loop build-complete"));
+    assert.ok(body.includes("unified-loop approve-build"));
+    assert.match(body, /post-approval|post approval/i);
+    assert.match(body, /never.*cron|not.*cron/i);
+    assert.match(body, /dormant/i);
+    assert.doesNotMatch(body, SECRET_LIKE);
+  });
+
+  it("persist-handoff.md exists and references WriteGate, vault_log_action, Story 5.2, #2B no session-close in E2E", () => {
+    assert.ok(existsSync(persistHandoffPath));
+    const body = readFileSync(persistHandoffPath, "utf8");
+
+    assert.ok(body.includes("WriteGate"));
+    assert.ok(body.includes("vault_log_action"));
+    assert.ok(body.includes("5-2-mutations-and-vault-log-action"));
+    assert.match(body, /#2B|2B/i);
+    assert.match(body, /do not.*fire session-close|session-close deferred|not.*fire session-close/i);
+    assert.match(body, /never.*cron|not.*cron/i);
+    assert.doesNotMatch(body, SECRET_LIKE);
+  });
+
+  it("task-prompt documents build-complete positive grammar and negative examples", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+
+    assert.ok(body.includes("unified-loop build-complete"));
+    assert.ok(body.includes("unified-loop build complete"));
+    assert.ok(body.includes("unified-loop build-done"));
+    assert.ok(body.includes("references/build-handoff.md"));
+    assert.ok(body.includes("references/persist-handoff.md"));
+  });
+
+  it("task-prompt: Build not placeholder; EnterWorktree isolation language", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+
+    assert.doesNotMatch(body, /Build.*\*\*Placeholder\*\*/i);
+    assert.ok(body.includes("EnterWorktree"));
+    assert.ok(body.includes("bmad-dev-story"));
+    assert.match(body, /worktree.*not main checkout|not main checkout/i);
+  });
+
+  it("task-prompt: Persist not placeholder; governed mutation language", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+
+    assert.doesNotMatch(body, /Persist.*\*\*Placeholder\*\*/i);
+    assert.ok(body.includes("vault_log_action"));
+    assert.ok(body.includes("WriteGate"));
+    assert.match(body, /no silent vault mutation|No silent vault mutation/i);
+  });
+
+  it("approve-build routes to Build handoff only — not Verify handoff (84-2 regression)", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+
+    assert.ok(body.includes("references/build-handoff.md"));
+    assert.match(
+      body,
+      /approve-build.*Build handoff|Build handoff.*STOP.*build-complete|await `build-complete`/is,
+    );
+    assert.match(
+      body,
+      /approve-build alone.*NO|not Verify handoff|Build handoff first/i,
+    );
+  });
+
+  it("Build and Persist forbidden on cron paths; 4a dormant language", () => {
+    const taskBody = readFileSync(taskPromptPath, "utf8");
+    const triggerBody = readFileSync(triggerPatternPath, "utf8");
+
+    for (const body of [taskBody, triggerBody]) {
+      assert.ok(body.includes("unified-loop cron:discover"));
+      assert.ok(body.includes("cns-unified-loop-discover"));
+      assert.match(body, /dormant/i);
+      assert.match(body, /never.*auto-fired|not.*recurring schedule/i);
+    }
+    assert.ok(taskBody.includes("bmad-dev-story"));
+    assert.ok(taskBody.includes("vault_log_action"));
+  });
+
+  it("seven forbidden rows still verbatim in task-prompt (AC5)", () => {
+    const body = readFileSync(taskPromptPath, "utf8");
+    for (const [num, forbidden, detection] of FORBIDDEN_ROWS) {
+      assert.ok(
+        body.includes(`| ${num} | ${forbidden} | ${detection} |`),
+        `missing forbidden row ${num}`,
+      );
+    }
+    assert.ok(body.includes("violation = skill failure"));
   });
 });

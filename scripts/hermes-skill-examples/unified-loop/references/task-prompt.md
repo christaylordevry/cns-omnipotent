@@ -1,4 +1,4 @@
-# Task: `unified-loop` (Story 84-1 / 84-2 / FR22 v1.5)
+# Task: `unified-loop` (Story 84-1 / 84-2 / 84-3 / FR22 v1.5)
 
 ## Hard constraints (must follow)
 
@@ -22,18 +22,34 @@ Parse the **first non-empty line** of the operator message (trimmed). Case-sensi
 |--------------|------------|-------------|
 | `unified-loop` | Discover → **pause** at gate (Build not auto-run) | Partial |
 | `unified-loop cron:discover` | Discover-only | Yes (read-only) |
-| `unified-loop approve-build` | Build→Verify→Persist (Verify **handoff** 84-2; Build/Persist placeholders 84-3) | No |
-| `unified-loop approve-build <token>` | Same; optional single token e.g. `story:84-2` | No |
+| `unified-loop approve-build` | Build handoff only → await `build-complete` → Verify handoff → Persist handoff (84-3) | No |
+| `unified-loop approve-build <token>` | Same; optional single token e.g. `story:84-3` | No |
+| `unified-loop build-complete` | Build → **Verify** handoff only (no Persist yet) | No |
+| `unified-loop build-complete <token>` | Same; optional token e.g. `worktree:branch-name` | No |
 
 **Continuation grammar (Discover → Build):**
 
 - First line exactly: `unified-loop approve-build`
-- OR prefix: `unified-loop approve-build ` with optional **single** trailing token (e.g. `story:84-2`)
+- OR prefix: `unified-loop approve-build ` with optional **single** trailing token (e.g. `story:84-3`)
 - Single-line Discord; case-sensitive
 
-**Negative example (must NOT trigger Build):**
+**Build-complete grammar (Build → Verify):**
+
+- First line exactly: `unified-loop build-complete`
+- OR prefix: `unified-loop build-complete ` with optional **single** trailing token
+- Case-sensitive; **not** free-text `#hermes` Build summary
+
+**Negative examples (must NOT trigger Build):**
 
 ```text
+unified-loop continue
+```
+
+**Negative examples (must NOT trigger Verify):**
+
+```text
+unified-loop build complete
+unified-loop build-done
 unified-loop continue
 ```
 
@@ -105,7 +121,7 @@ After artifact write, post a **bounded** operator briefing (≤25 lines):
 …
 
 **Build intent:** awaiting operator approval
-**Continue with:** `unified-loop approve-build` (optional token e.g. `story:84-2`)
+**Continue with:** `unified-loop approve-build` (optional token e.g. `story:84-3`)
 ```
 
 Use `items[]` from artifact (PrioritizedItem shape: `rank`, `rankScore`, `title`, `category`, `rationale`, `sourcePath`).
@@ -117,7 +133,7 @@ After §3 completes on `unified-loop` or `unified-loop cron:discover`:
 - On **`unified-loop cron:discover`** / cron: **STOP** after Discover — no Build intent execution.
 - On **`unified-loop`** (manual full-loop entry): **STOP** after Discover; emit structured Build intent in summary; **do not** run Build-stage work.
 
-Build stage (84-3) loads artifact from **absolute** `~/.hermes/artifacts/unified-loop/discover.json` (or `UNIFIED_LOOP_DISCOVER_ARTIFACT`); uses **`artifact.repoRoot`** to resolve checkout — never cwd alone.
+Build stage (84-3) loads artifact from **absolute** `~/.hermes/artifacts/unified-loop/discover.json` (or `UNIFIED_LOOP_DISCOVER_ARTIFACT`); uses **`artifact.repoRoot`** only as **parent-repo reference** — Build execution occurs in **EnterWorktree** worktree, not main checkout.
 
 ## 5) Forbidden pre-approval actions
 
@@ -144,15 +160,37 @@ There is **no** `vault_write` MCP tool — use the five mutator names above.
 | Tertiary — WriteGate | Enforcement, not approval |
 | Quaternary — native dangerous-command approval | **No — terminal shell only** |
 
-## 7) Build / Verify / Persist (84-2 Verify handoff)
+## 7) Build / Verify / Persist (84-2 Verify + 84-3 Build/Persist handoffs)
 
-### Verify — post-approval only (84-2, HARD gate)
+### Build — post-approval only (84-3, HARD gate)
 
-Verify runs **only** on `unified-loop approve-build` — within Build→Verify→Persist sequence **after** operator approval. Verify is **forbidden** on:
+Build runs **only** after operator posts `unified-loop approve-build` — within Discover→[PAUSE]→Build sequence. Build is **forbidden** on:
 
 - `unified-loop cron:discover`
 - WSL cron tag `cns-unified-loop-discover`
 - Any Discover-only / read-only path
+
+Build is **never** auto-fired on recurring schedule or cron. `bmad-dev-story` is **paid** — the loop must **not** auto-invoke it without operator action (DDR Decision 4a: prove-once dry-run, then **dormant** capability).
+
+**Composition (no new build logic):** Build composes **`bmad-dev-story`** by exact registered skill ID in **EnterWorktree** isolation (constitution §9).
+
+**Handoff (operator decision #1A):** Hermes does **not** run dev-story inline. On `unified-loop approve-build`:
+
+1. Load discover.json from absolute `~/.hermes/artifacts/unified-loop/discover.json` (or `UNIFIED_LOOP_DISCOVER_ARTIFACT`)
+2. Post `#hermes` Build handoff per `references/build-handoff.md`
+3. **STOP** — no Verify handoff until operator posts `unified-loop build-complete`
+4. Operator runs EnterWorktree + `bmad-dev-story` in Cursor (or Claude Code)
+
+**Build-complete trigger:** Operator posts exact line-1 `unified-loop build-complete` → Hermes posts Verify handoff → **STOP** (no Persist yet).
+
+### Verify — post-approval only (84-2, HARD gate)
+
+Verify runs **only** after `unified-loop build-complete` — within Build→Verify sequence **after** operator approval and Build completion. Verify is **forbidden** on:
+
+- `unified-loop cron:discover`
+- WSL cron tag `cns-unified-loop-discover`
+- Any Discover-only / read-only path
+- `unified-loop approve-build` alone (Build handoff first — regression guard vs 84-2)
 
 Verify is **never** auto-fired on recurring schedule or cron. The three review skills are **paid** — the loop must **not** auto-invoke them without operator action (DDR Decision 4a: prove-once dry-run, then **dormant** capability).
 
@@ -164,23 +202,43 @@ Verify is **never** auto-fired on recurring schedule or cron. The three review s
 | 2 | `bmad-review-adversarial-general` | Cynical Review — attitude-driven gap finding |
 | 3 | `bmad-review-edge-case-hunter` | Path-tracer — unhandled edge cases only (JSON output) |
 
-**Handoff (operator decision #2A):** Hermes does **not** run review skills inline. On `unified-loop approve-build`:
+**Handoff (operator decision #2A):** Hermes does **not** run review skills inline. On `unified-loop build-complete`:
 
-1. Acknowledge Build placeholder (84-3 wires execution)
-2. **STOP** and post `#hermes` Verify handoff per `references/verify-handoff.md`
-3. Operator runs the three skills in Cursor (or Claude Code); saves outputs to `84-2-verify-evidence.md`
-4. Persist remains placeholder until 84-3
+1. Post `#hermes` Verify handoff per `references/verify-handoff.md`
+2. **STOP** — no Persist until operator completes Verify in IDE
+3. Operator runs the three skills in Cursor (or Claude Code); may reference `84-2-verify-evidence.md` or re-run on Build diff
 
 No terminal/CLI wrapper for review skills. No inline Hermes adversarial review. No duplicate adversarial prompts in this skill tree.
 
-### Build / Persist — placeholders (84-3)
+### Persist — governed mutation (84-3, HARD gate)
 
-| Stage | Status | Wiring |
-|-------|--------|--------|
-| Build | **Placeholder** | `bmad-dev-story` + EnterWorktree (84-3) |
-| Persist | **Placeholder** | session-close WriteGate / PAKE / audit (84-3) |
+Persist runs **only** on post-approval path after Build + Verify complete. Persist is **forbidden** on:
 
-On `unified-loop approve-build`: acknowledge Build placeholder → Verify handoff → note Persist deferred. Reference `AI-Context/modules/unified-loop.md` after session-close apply.
+- `unified-loop cron:discover`
+- WSL cron tag `cns-unified-loop-discover`
+- Any Discover-only / read-only path
+- Before `unified-loop approve-build` (forbidden row #5: `vault_log_action` pre-approval)
+
+Persist is **never** auto-fired on recurring schedule or cron (4a dormant-after-proof).
+
+**Governance (NFR-GOV-1, Story 5.2):** No silent vault mutation. Every Persist write is governed via WriteGate + `vault_log_action` / `appendRecord` audit. No alternate write path to `AI-Context/` or `_meta/logs/agent-log.md`.
+
+**Composition (not new logic):**
+
+| Scope | Path |
+|-------|------|
+| **#2B E2E proof** | Single `vault_log_action` via MCP per `references/persist-handoff.md` |
+| **Full Persist** | session-close orchestrator — WriteGate/PAKE/audit on `AI-Context/` mutations |
+
+**Handoff (#2B):** After Verify in IDE, operator follows `references/persist-handoff.md` — operator-driven in Cursor/MCP; **no** Hermes trigger token for #2B. Governance module delta via session-close WriteGate only — **not** direct dev-story edit to `AI-Context/`.
+
+**On `unified-loop approve-build` sequence (full):**
+
+1. Build handoff → **STOP** (await `build-complete`)
+2. On `build-complete`: Verify handoff → **STOP** (await operator Verify)
+3. After Verify: Persist handoff reference — operator executes `vault_log_action` proof (#2B) or session-close (production)
+
+Reference `AI-Context/modules/unified-loop.md` after session-close apply.
 
 ## 8) discover.json schema v1 (summary)
 

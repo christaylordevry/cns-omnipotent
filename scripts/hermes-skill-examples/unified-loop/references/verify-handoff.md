@@ -1,12 +1,13 @@
 # Verify handoff — operator procedure (Story 84-2)
 
-**SSOT for Verify stage invocation.** Hermes does **not** run BMAD review skills inline. On `unified-loop approve-build`, Hermes **STOPs** after Build placeholder acknowledgment and posts this handoff to `#hermes`. The operator runs three existing BMAD skills in **Cursor** (or Claude Code) in fixed order.
+**SSOT for Verify stage invocation.** Hermes does **not** run BMAD review skills inline. On `unified-loop build-complete`, Hermes posts this handoff to `#hermes` and **STOPs**. The operator runs three existing BMAD skills in **Cursor** (or Claude Code) in fixed order.
 
 ## When Verify runs (HARD gate)
 
 | Path | Verify allowed? |
 |------|-----------------|
-| `unified-loop approve-build` (post-approval Build→Verify→Persist) | **YES** |
+| `unified-loop build-complete` (after Build in EnterWorktree) | **YES** |
+| `unified-loop approve-build` alone | **NO** — Build handoff first (84-3) |
 | `unified-loop` (manual Discover only — pauses at gate) | **NO** |
 | `unified-loop cron:discover` | **NO** |
 | WSL cron tag `cns-unified-loop-discover` | **NO** |
@@ -43,7 +44,7 @@ Protect-list paths are **out of scope** and must show zero diffs:
 
 ## Operator steps (Cursor / Claude Code)
 
-1. **Confirm trigger:** You arrived here from `unified-loop approve-build` — not from cron or Discover-only path.
+1. **Confirm trigger:** You arrived here from `unified-loop build-complete` — after Build handoff and EnterWorktree + `bmad-dev-story`.
 2. **Export diff** (or use `branch changes` / `uncommitted changes` when reviewing live Build output):
 
    ```bash
@@ -63,19 +64,19 @@ Protect-list paths are **out of scope** and must show zero diffs:
    - Attach skill; provide same diff/content
    - Capture JSON array: `[{location, trigger_condition, guard_snippet, potential_consequence}]`
 
-6. **Save evidence:** Append invocation paths + outputs to `_bmad-output/implementation-artifacts/84-2-verify-evidence.md`
+6. **Save evidence:** Append invocation paths + outputs to `_bmad-output/implementation-artifacts/84-2-verify-evidence.md` or `84-3-e2e-evidence.md`
 
-7. **Return to Hermes:** Post summary in `#hermes`; Persist stage remains placeholder until 84-3
+7. **Persist:** Follow `references/persist-handoff.md` after Verify (#2B: `vault_log_action` proof)
 
 ## Hermes STOP template (`#hermes`)
 
-After Build placeholder ack on `unified-loop approve-build`, post:
+On `unified-loop build-complete`, post:
 
 ```markdown
 ## Unified Loop — Verify handoff
 
-**Stage:** Verify (post-approval only)
-**Build:** placeholder acknowledged (84-3 wires execution)
+**Stage:** Verify (post-Build only)
+**Build:** complete — operator posted `unified-loop build-complete`
 **Procedure:** `references/verify-handoff.md`
 
 Run in Cursor (operator action required):
@@ -83,11 +84,11 @@ Run in Cursor (operator action required):
 2. `bmad-review-adversarial-general`
 3. `bmad-review-edge-case-hunter`
 
-**Diff scope:** Build output (dry-run: `git diff 3f5d4af..1d6d77e`)
-**Evidence:** `_bmad-output/implementation-artifacts/84-2-verify-evidence.md`
+**Diff scope:** Build output from EnterWorktree
+**Evidence:** `_bmad-output/implementation-artifacts/84-3-e2e-evidence.md`
 
 Verify is **not** on cron. After prove-once dry-run (4a), capability is dormant — documented, not auto-fired.
-**Persist:** deferred to 84-3 (session-close WriteGate)
+**Persist:** `references/persist-handoff.md` (#2B `vault_log_action` proof)
 ```
 
 ## 4a dormant-after-proof posture
