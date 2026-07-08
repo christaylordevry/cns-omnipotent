@@ -82,16 +82,66 @@ export function parseNlmDriveSourceList(stdout) {
   return parsed;
 }
 
+/** Canonical vault-export title (without extension) for PDF / Doc matching. */
+export const VAULT_EXPORT_SOURCE_TITLE = "vault-export-for-notebooklm";
+
 /**
+ * @param {unknown} title
+ * @returns {boolean}
+ */
+function titleMatchesVaultExport(title) {
+  if (typeof title !== "string") {
+    return false;
+  }
+  const normalized = title.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  const base = VAULT_EXPORT_SOURCE_TITLE.toLowerCase();
+  return (
+    normalized === base ||
+    normalized === `${base}.pdf` ||
+    normalized === `${base}.md` ||
+    normalized.startsWith(`${base}.`)
+  );
+}
+
+/**
+ * Prefer google_docs type (legacy Doc source) when drive_doc_id match misses.
  * @param {unknown[]} sources
  * @returns {{ sourceId: string; source: Record<string, unknown> } | null}
  */
-function matchGoogleDocsSourceFallback(sources) {
+export function matchGoogleDocsSourceFallback(sources) {
   if (!Array.isArray(sources)) {
     return null;
   }
   for (const source of sources) {
     if (!isObject(source) || source.type !== "google_docs" || typeof source.id !== "string") {
+      continue;
+    }
+    const sourceId = source.id.trim();
+    if (sourceId) {
+      return { sourceId, source };
+    }
+  }
+  return null;
+}
+
+/**
+ * PDF Drive sources (spike): type `word_doc`, no drive_doc_id/url.
+ * Anchor to vault-export title so migration (Doc + PDF both present) does not pick the wrong source.
+ * @param {unknown[]} sources
+ * @returns {{ sourceId: string; source: Record<string, unknown> } | null}
+ */
+export function matchWordDocVaultExportFallback(sources) {
+  if (!Array.isArray(sources)) {
+    return null;
+  }
+  for (const source of sources) {
+    if (!isObject(source) || source.type !== "word_doc" || typeof source.id !== "string") {
+      continue;
+    }
+    if (!titleMatchesVaultExport(source.title)) {
       continue;
     }
     const sourceId = source.id.trim();
@@ -162,10 +212,13 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     matched = matchGoogleDocsSourceFallback(sources);
   }
   if (!matched) {
+    matched = matchWordDocVaultExportFallback(sources);
+  }
+  if (!matched) {
     return {
       status: "failed",
       stderr:
-        `no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID ${driveDocId} and no google_docs fallback source was available; add the Doc as a Drive source in NotebookLM UI`,
+        `no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID ${driveDocId} and no google_docs / vault-export word_doc fallback source was available; add the PDF (or Doc) as a Drive source titled vault-export-for-notebooklm in NotebookLM UI`,
       driveSourceId: null,
     };
   }

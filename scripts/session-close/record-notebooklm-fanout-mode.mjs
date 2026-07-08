@@ -46,11 +46,11 @@ export async function recordNotebooklmFanoutMode(reportPath, opts = {}) {
 
   if (resolved.oauthSetupRequired) {
     process.stderr.write(
-      "session-close: GOOGLE_OAUTH_SETUP_REQUIRED — Drive Doc ID is set but OAuth credentials are missing; falling back to legacy source_add\n",
+      "session-close: GOOGLE_OAUTH_SETUP_REQUIRED — Drive PDF/Doc ID is set but OAuth credentials are missing; falling back to legacy source_add\n",
     );
   } else if (resolved.mode === "legacy-source-add" && !resolved.driveDocId) {
     process.stderr.write(
-      "session-close: NOTEBOOKLM_DRIVE_DOC_ID not set — legacy source_add fan-out (deprecated); set Drive Doc ID per references/drive-export-sync.md\n",
+      "session-close: NOTEBOOKLM_DRIVE_DOC_ID not set — legacy source_add fan-out (deprecated); set Drive PDF file ID per references/drive-export-sync.md\n",
     );
   }
 

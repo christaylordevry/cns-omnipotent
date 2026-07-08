@@ -20,11 +20,19 @@ import { mergeFanoutIntoCloseReport } from "../scripts/session-close/merge-noteb
 import { recordNotebooklmFanoutMode } from "../scripts/session-close/record-notebooklm-fanout-mode.mjs";
 import {
   appendDriveSyncFailureLogs,
+  matchGoogleDocsSourceFallback,
+  matchWordDocVaultExportFallback,
   parseNlmDriveSourceList,
   runSyncVaultExportDrive,
   syncNotebookDriveSource,
+  VAULT_EXPORT_SOURCE_TITLE,
 } from "../scripts/session-close/sync-vault-export-drive.mjs";
 import { runWriteVaultExportToDrive } from "../scripts/session-close/write-vault-export-to-drive.mjs";
+import {
+  escapeHtmlForPdf,
+  wrapMarkdownAsPrintHtml,
+} from "../scripts/session-close/lib/render-vault-export-pdf.mjs";
+import { overwriteDrivePdfContent } from "../scripts/session-close/lib/google-drive-pdf-write.mjs";
 
 const FIXTURE_NOTEBOOK = "981466f0-de1c-4551-93a9-f3bc2a24b184";
 const FIXTURE_DRIVE_DOC = "1AbCdEfGhIjKlMnOpQrStUvWxYz";
@@ -51,6 +59,45 @@ const DRIVE_SOURCE_LIST_WITHOUT_DOC_ID_FIXTURE = [
     title: "vault-export-for-notebooklm",
     type: "google_docs",
     can_sync: true,
+  },
+];
+
+/** Spike-shaped PDF payload: type word_doc, no drive_doc_id/url. */
+const DRIVE_SOURCE_LIST_PDF_WORD_DOC_FIXTURE = [
+  {
+    id: "src-old-doc",
+    title: "vault-export-for-notebooklm",
+    type: "google_docs",
+    drive_doc_id: "legacy-doc-id-should-not-match-pdf-id",
+  },
+  {
+    id: "src-unrelated-pdf",
+    title: "random-other.pdf",
+    type: "word_doc",
+    url: null,
+    is_stale: false,
+  },
+  {
+    id: "src-vault-pdf",
+    title: "vault-export-for-notebooklm.pdf",
+    type: "word_doc",
+    url: null,
+    is_stale: true,
+  },
+];
+
+const DRIVE_SOURCE_LIST_PDF_ONLY_FIXTURE = [
+  {
+    id: "src-unrelated-pdf",
+    title: "CNS-SPIKE-other.pdf",
+    type: "word_doc",
+    url: null,
+  },
+  {
+    id: "src-vault-pdf",
+    title: VAULT_EXPORT_SOURCE_TITLE,
+    type: "word_doc",
+    url: null,
   },
 ];
 
@@ -209,8 +256,78 @@ describe("match-drive-source (58-1)", () => {
   });
 });
 
-describe("write-vault-export-to-drive (58-1)", () => {
-  it("runWriteVaultExportToDrive reads export_path from close-report under Hermes cwd", async () => {
+describe("render-vault-export-pdf helpers (58-3)", () => {
+  it("escapeHtmlForPdf escapes markup and wrapMarkdownAsPrintHtml embeds text", () => {
+    assert.equal(escapeHtmlForPdf("a <b> & c"), "a &lt;b&gt; &amp; c");
+    const html = wrapMarkdownAsPrintHtml("# Title\n");
+    assert.match(html, /# Title/);
+    assert.match(html, /white-space:pre-wrap/);
+  });
+
+  it("renderVaultExportPdf with mock chromium writes %PDF magic", async () => {
+    const { renderVaultExportPdf } = await import(
+      "../scripts/session-close/lib/render-vault-export-pdf.mjs"
+    );
+    const dir = await mkdtemp(join(tmpdir(), "render-pdf-"));
+    const outPath = join(dir, "out.pdf");
+    const fakePdf = Buffer.from("%PDF-1.4 mock extractable text");
+    const chromium = {
+      launch: async () => ({
+        newPage: async () => ({
+          setContent: async () => {},
+          pdf: async () => fakePdf,
+        }),
+        close: async () => {},
+      }),
+    };
+    const result = await renderVaultExportPdf({
+      markdown: "# hello\n",
+      outputPath: outPath,
+      chromium,
+    });
+    assert.equal(result.bytes.slice(0, 5).toString("utf8"), "%PDF-");
+    assert.ok(result.bytes.length > 8);
+  });
+});
+
+describe("google-drive-pdf-write (58-3)", () => {
+  it("overwriteDrivePdfContent PATCHes uploadType=media with application/pdf", async () => {
+    /** @type {Array<{ url: string; init?: RequestInit }>} */
+    const calls = [];
+    const fetchFn = async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (String(url).includes("oauth2.googleapis.com/token")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ access_token: "test-token" }),
+        };
+      }
+      return { ok: true, status: 200, text: async () => "{}" };
+    };
+    const pdfBytes = Buffer.from("%PDF-1.4 test");
+    await overwriteDrivePdfContent({
+      fileId: FIXTURE_DRIVE_DOC,
+      pdfBytes,
+      clientId: "id",
+      clientSecret: "secret",
+      refreshToken: "refresh",
+      fetchFn,
+    });
+    const media = calls.find((c) => String(c.url).includes("uploadType=media"));
+    assert.ok(media);
+    assert.equal(media.init?.method, "PATCH");
+    assert.match(String(media.url), /upload\/drive\/v3\/files\//);
+    assert.equal(
+      /** @type {Record<string, string>} */ (media.init?.headers)?.["Content-Type"],
+      "application/pdf",
+    );
+    assert.equal(media.init?.body, pdfBytes);
+  });
+});
+
+describe("write-vault-export-to-drive (58-3)", () => {
+  it("runWriteVaultExportToDrive renders PDF then media-uploads (not Docs batchUpdate)", async () => {
     const dir = await mkdtemp(join(tmpdir(), "write-drive-hermes-cwd-"));
     const repoRoot = join(dir, "repo");
     const exportPath = join(repoRoot, "scripts/output/vault-export-for-notebooklm.md");
@@ -228,8 +345,8 @@ describe("write-vault-export-to-drive (58-1)", () => {
     );
 
     const fetchCalls = [];
-    const fetchFn = async (url) => {
-      fetchCalls.push(String(url));
+    const fetchFn = async (url, init) => {
+      fetchCalls.push({ url: String(url), method: init?.method });
       if (String(url).includes("oauth2.googleapis.com/token")) {
         return {
           ok: true,
@@ -237,17 +354,21 @@ describe("write-vault-export-to-drive (58-1)", () => {
           text: async () => JSON.stringify({ access_token: "test-token" }),
         };
       }
-      if (String(url).includes(":batchUpdate")) {
+      if (String(url).includes("uploadType=media")) {
         return { ok: true, status: 200, text: async () => "{}" };
       }
-      return {
-        ok: true,
-        status: 200,
-        text: async () =>
-          JSON.stringify({
-            body: { content: [{ startIndex: 1, endIndex: 2 }] },
-          }),
-      };
+      return { ok: false, status: 500, text: async () => "unexpected" };
+    };
+
+    const fakePdf = Buffer.from("%PDF-1.4 mock");
+    const chromium = {
+      launch: async () => ({
+        newPage: async () => ({
+          setContent: async () => {},
+          pdf: async () => fakePdf,
+        }),
+        close: async () => {},
+      }),
     };
 
     const result = await runWriteVaultExportToDrive({
@@ -262,12 +383,16 @@ describe("write-vault-export-to-drive (58-1)", () => {
         NOTEBOOKLM_DRIVE_DOC_ID: FIXTURE_DRIVE_DOC,
       },
       fetchFn,
+      chromium,
     });
 
     assert.equal(result.ok, true);
-    assert.ok(fetchCalls.some((url) => url.includes(":batchUpdate")));
+    assert.equal(result.message, "drive pdf overwritten");
+    assert.ok(fetchCalls.some((c) => c.url.includes("uploadType=media") && c.method === "PATCH"));
+    assert.ok(!fetchCalls.some((c) => c.url.includes(":batchUpdate")));
     const saved = JSON.parse(await readFile(reportPath, "utf8"));
     assert.equal(saved.steps.drive_write.status, "ok");
+    assert.equal(saved.steps.drive_write.message, "drive pdf overwritten");
   });
 
   it("runWriteVaultExportToDrive skips empty export with a clear message", async () => {
@@ -340,6 +465,74 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.ok(
       calls.some((c) => c.includes("source sync") && c.includes("src-vault-google-doc")),
     );
+  });
+
+  it("matchWordDocVaultExportFallback anchors to vault-export title not first word_doc", () => {
+    const matched = matchWordDocVaultExportFallback(DRIVE_SOURCE_LIST_PDF_WORD_DOC_FIXTURE);
+    assert.ok(matched);
+    assert.equal(matched.sourceId, "src-vault-pdf");
+    assert.notEqual(matched.sourceId, "src-unrelated-pdf");
+  });
+
+  it("match cascade: drive_doc_id first, then google_docs, then title-anchored word_doc", () => {
+    assert.equal(
+      matchDriveSourceByDocId(DRIVE_SOURCE_LIST_PDF_WORD_DOC_FIXTURE, FIXTURE_DRIVE_DOC),
+      null,
+    );
+    const byDocs = matchGoogleDocsSourceFallback(DRIVE_SOURCE_LIST_PDF_WORD_DOC_FIXTURE);
+    assert.equal(byDocs?.sourceId, "src-old-doc");
+    const byWord = matchWordDocVaultExportFallback(DRIVE_SOURCE_LIST_PDF_ONLY_FIXTURE);
+    assert.equal(byWord?.sourceId, "src-vault-pdf");
+  });
+
+  it("syncNotebookDriveSource falls back to title-anchored word_doc for PDF sources", async () => {
+    const calls = [];
+    const runNlm = async (_cmd, args) => {
+      calls.push(args.join(" "));
+      if (args.includes("list")) {
+        return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_PDF_ONLY_FIXTURE) };
+      }
+      return { stdout: "{}" };
+    };
+    const result = await syncNotebookDriveSource(FIXTURE_NOTEBOOK, FIXTURE_DRIVE_DOC, runNlm);
+    assert.equal(result.status, "ok");
+    assert.equal(result.driveSourceId, "src-vault-pdf");
+    assert.ok(calls.some((c) => c.includes("source sync") && c.includes("src-vault-pdf")));
+  });
+
+  it("syncNotebookDriveSource prefers google_docs over word_doc during migration", async () => {
+    const result = await syncNotebookDriveSource(
+      FIXTURE_NOTEBOOK,
+      FIXTURE_DRIVE_DOC,
+      async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_PDF_WORD_DOC_FIXTURE) };
+        }
+        return { stdout: "{}" };
+      },
+    );
+    assert.equal(result.status, "ok");
+    assert.equal(result.driveSourceId, "src-old-doc");
+  });
+
+  it("syncNotebookDriveSource migration-miss message mentions PDF", async () => {
+    const result = await syncNotebookDriveSource(
+      FIXTURE_NOTEBOOK,
+      FIXTURE_DRIVE_DOC,
+      async (_cmd, args) => {
+        if (args.includes("list")) {
+          return {
+            stdout: JSON.stringify([
+              { id: "x", title: "unrelated.pdf", type: "word_doc", url: null },
+            ]),
+          };
+        }
+        return { stdout: "{}" };
+      },
+    );
+    assert.equal(result.status, "failed");
+    assert.match(result.stderr ?? "", /PDF/);
+    assert.match(result.stderr ?? "", /vault-export-for-notebooklm/);
   });
 
   it("runSyncVaultExportDrive marks targets drive_write_error when drive write failed", async () => {

@@ -3,16 +3,15 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import {
-  overwriteGoogleDocContent,
-  readExportMarkdown,
-} from "./lib/google-drive-doc-write.mjs";
+import { overwriteDrivePdfContent } from "./lib/google-drive-pdf-write.mjs";
+import { readExportMarkdown } from "./lib/google-drive-doc-write.mjs";
 import {
   hasGoogleOAuthCredentials,
   readNotebooklmDriveDocId,
   readSessionCloseEnvVar,
 } from "./lib/load-session-close-env.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { renderVaultExportPdf } from "./lib/render-vault-export-pdf.mjs";
 
 /**
  * @param {unknown} value
@@ -79,6 +78,16 @@ async function resolveExportPathFromReport(reportPath, repoRoot) {
     // Caller handles missing/invalid report when patching drive_write.
   }
   return join(repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+}
+
+/**
+ * @param {string} markdownPath
+ */
+function resolvePdfPathBesideMarkdown(markdownPath) {
+  if (markdownPath.toLowerCase().endsWith(".md")) {
+    return `${markdownPath.slice(0, -3)}.pdf`;
+  }
+  return `${markdownPath}.pdf`;
 }
 
 /**
@@ -151,18 +160,28 @@ export async function runWriteVaultExportToDrive(opts = {}) {
     return { ok: false, reason: "export-empty", message: driveWrite.message };
   }
 
+  const pdfPath =
+    typeof opts.pdfPath === "string" && opts.pdfPath.trim()
+      ? opts.pdfPath.trim()
+      : resolvePdfPathBesideMarkdown(exportPath);
+
   try {
-    await overwriteGoogleDocContent({
-      documentId: docId,
-      text: markdown,
+    const { bytes } = await renderVaultExportPdf({
+      markdown,
+      outputPath: pdfPath,
+      chromium: opts.chromium,
+    });
+    await overwriteDrivePdfContent({
+      fileId: docId,
+      pdfBytes: bytes,
       clientId,
       clientSecret,
       refreshToken,
       fetchFn: opts.fetchFn,
     });
-    const driveWrite = { status: "ok", message: "drive doc overwritten" };
+    const driveWrite = { status: "ok", message: "drive pdf overwritten" };
     await patchCloseReportDriveWrite(reportPath, driveWrite);
-    return { ok: true, message: driveWrite.message };
+    return { ok: true, message: driveWrite.message, pdfPath };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const driveWrite = { status: "failed", message: message.slice(0, 240) };

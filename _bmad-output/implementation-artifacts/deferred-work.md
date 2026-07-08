@@ -10,7 +10,7 @@
 
 - **§7 Active Modules registration pending for Epic 76 modules** — `modules/two-bot-vault-boundary.md` and `modules/memory-pillars-verification.md` are committed as content (`5e50d88`) but not registered as rows in AGENTS.md §7 Active Modules. Session-close only regenerates §8, so registration must be an operator-direct constitution edit (both AGENTS copies + version bump to 2.1.50 + changelog row). Drafted rows exist in the session-15 transcript.
 
-- **NotebookLM drive-sync 60s write timeout on large exports** — session-14 fixed the `GOOGLE_REFRESH_TOKEN` OAuth 403; the 2026-07-05 ~20:23 session-close now fails all 3 drive targets with `drive_write_error` = a 60s write timeout on the ~1.5 MB (1466 KB) export (Google Docs batchUpdate). Distinct from the fixed permission issue; NLM auth itself is healthy. Consider chunked/streamed writes or a longer per-target timeout for large exports.
+- **NotebookLM drive-sync 60s write timeout on large exports** — **RESOLVED by Story 58-3** (`58-3-session-close-notebooklm-pdf-source-fix.md`): session-close writes vault export as Drive PDF via media upload (≪ 60 s) instead of Docs `insertText` (~134 s). Operator still migrates env PDF file ID + notebook Drive sources.
 
 - **AGENTS.md line-ending flip-flop (LF↔CRLF) pollutes history** — session-close writes the vault-mirrored `specs/cns-vault-contract/AGENTS.md` with CRLF; prior commits stored LF, so each session-close commit shows a whole-file diff (e.g. `cf89643`: 440/441 raw vs 12/13 real content lines). Add a `.gitattributes` entry pinning the constitution files' EOL so future diffs stay clean.
 

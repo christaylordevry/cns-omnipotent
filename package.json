@@ -28,16 +28,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "gpt-tokenizer": "^3.4.0",
     "gray-matter": "^4.0.3",
     "ignore": "^7.0.5",
     "rss-parser": "^3.13.0",
-    "gpt-tokenizer": "^3.4.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.19.15",
     "eslint": "^10.1.0",
+    "playwright": "^1.58.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.0",
