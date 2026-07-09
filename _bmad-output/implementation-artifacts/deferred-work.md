@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 87-1-untrack-vault-ai-context-constitution-duplicates (2026-07-09)
+
+- **vault-fast-scan-index date churn** — Incidental `2026-07-03` → `2026-07-05` edit bundled in 87-1 constitution dedup diff; harmless but out of stated scope.
+- **note-style-guide vs AGENTS PAKE template** — Canonical `note-style-guide.md` forbids `confidence_score` / `verification_status` while AGENTS §3 requires them; pre-existing vault tension mirrored into specs, not introduced by untrack logic.
+- **CLAUDE.md vault SSOT wording** — Repo-root `CLAUDE.md` still cites `Knowledge-Vault-ACTIVE/` as source of truth; pre-existing doc drift, not in 87-1 diff.
+- **canonical byte-parity CI gate** — Story 87-2 owns automated `diff -qr` enforcement; 87-1 test only checks file existence.
+
 ## Session-close / constitution hygiene (2026-07-05, session 15)
 
 **Surfaced by:** Post-incident cleanup after the session-14 MEMORY.md/AGENTS.md drift incident (see `HANDOFF-2026-07-05-session14-hermes-consolidation.md`). Root cause of the AGENTS.md pollution was fixed this session (Story 86-1: `readProjectStatusLine` now derives from `sprint-status.yaml` SSOT, not stale `CLAUDE.md` Phase Status). Remaining items:
@@ -8,7 +15,7 @@
 
 - **Test-fixture-shaped corruption of a live file — root cause still unconfirmed** — before session 14 the vault MEMORY.md had been overwritten with unit-test fixture content ("AGENTS v9.9.10", "Epics: 48 in-progress", "Tests: skipped (dry-run)"), matching `tests/session-close-pipeline.test.mjs` SC-4 fixtures. That test only does in-memory string transforms (no real file write), so how fixture data reached a production path is unexplained. Lower stakes now that the file is orphaned/being-deleted, but the write-path leak is a real latent bug worth a dedicated trace before writing any new artifact through the same helpers.
 
-- **§7 Active Modules registration pending for Epic 76 modules** — `modules/two-bot-vault-boundary.md` and `modules/memory-pillars-verification.md` are committed as content (`5e50d88`) but not registered as rows in AGENTS.md §7 Active Modules. Session-close only regenerates §8, so registration must be an operator-direct constitution edit (both AGENTS copies + version bump to 2.1.50 + changelog row). Drafted rows exist in the session-15 transcript.
+- **§7 Active Modules registration — RESOLVED 2026-07-09 (AGENTS v2.1.52).** Operator-direct edit registered all 6 previously-unregistered canonical modules in AGENTS.md §7 (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook), so §7 now matches the 11-module canonical set (Epic 87). Applied identically to all three AGENTS copies (real vault SSOT, `specs/`, `_bmad-output/planning-artifacts/`); `constitution.test.mjs` green (budget 450/500, planning==specs parity). Next session-close `apply-section8` keeps them in sync.
 
 - **NotebookLM drive-sync 60s write timeout on large exports** — **RESOLVED by Story 58-3 — VERIFIED LIVE 2026-07-09** (`58-3-session-close-notebooklm-pdf-source-fix.md`): session-close writes vault export as Drive PDF via media upload (≪ 60 s) instead of Docs `insertText` (~134 s). Write path confirmed on live `/session-close` (no more `drive_write_error`; PDF on Drive). Operator migration done (all 3 notebooks on the `word_doc` PDF source, env `NOTEBOOKLM_DRIVE_DOC_ID=1olnj…`).
 
@@ -107,7 +114,7 @@ Observed from `awareness-sync` Discord response during Epic 77 Story 77-4 valida
 - **Dashboard `RUN_CHAIN_STORY_KEY` still 38-2** — `scripts/dashboard-sync.ts:112` points at Epic 38 story; dashboard shows dormant after 75-5 Revived docs until key updated or status derived from `run-chain.md`.
 - **`parseEnvFile` edge cases (EXPORT casing, CRLF, duplicates)** — incremental hardening on `validate-anthropic-key.ts` optional; land via 75-4 patch if `.env.live-chain` uses `export` lines (75-5 review decision 2B reverted in-story fix).
 - **Skill mirror stale dormant messaging** — `trigger-pattern.md` / `task-prompt.md` still reference dormant/75-4 gate; update when `#hermes` binding follow-up lands or via 75-3 review patch.
-- **`AGENTS.md` Run-chain module row (WriteGate)** — Session 4 housekeeping: add Run-chain row to §7 module table via `/session-close` in `#hermes`; sync `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` + `specs/cns-vault-contract/AGENTS.md` + canonical vault in one operation. Reverted from 75-5 working tree (WriteGate).
+- **`AGENTS.md` Run-chain module row (WriteGate)** — Session 4 housekeeping: add Run-chain row to §7 module table via `/session-close` in `#hermes`; sync `specs/cns-vault-contract/AGENTS.md` + canonical vault `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` in one operation (do not sync in-repo untracked `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`). Reverted from 75-5 working tree (WriteGate).
 
 ## Parked initiative — CNS/Nexus Dashboard UX Redesign (2026-06-24)
 
