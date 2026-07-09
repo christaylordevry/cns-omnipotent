@@ -2,19 +2,19 @@
 story_id: 87-3
 epic: 87
 title: pake-quality-enrichment-frontmatter-reconcile
-status: review
+status: done
 baseline_branch: hermes-consolidation
 baseline_commit: 720e7238adeec11d8020b64a8fb0f65d91cbe586
 zone: Omnipotent.md PAKE schema + constitution/spec alignment
 predecessors: 87-1, 87-2
 investigation: _bmad-output/implementation-artifacts/investigations/note-frontmatter-schema-conflict-investigation.md
 related_deferred: deferred-work.md §note-style-guide vs AGENTS PAKE template (resolved by this story)
-writegate_required: AGENTS.md §3 (v2.1.52 → 2.1.53)
+writegate_required: AGENTS.md §3 (v2.1.53 → 2.1.54) — applied operator-direct 2026-07-10
 ---
 
 # Story 87.3: PAKE quality enrichment tier — reconcile note-frontmatter two-bot conflict
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -173,10 +173,10 @@ Changes:
 
 ### AC8 — AGENTS.md constitution (WriteGate)
 
-- [ ] §3 moves 3 fields to "Optional Quality Enrichment" with population guidance.
-- [ ] Version bumped **2.1.52 → 2.1.53** with changelog row.
-- [ ] Diff authored against **canonical vault AGENTS** at session-close; applied via WriteGate only.
-- [ ] All constitution copies byte-identical post session-close (`constitution.test.mjs` green).
+- [x] §3 moves 3 fields to "Optional Quality Enrichment" with population guidance.
+- [x] Version bumped **2.1.53 → 2.1.54** with changelog row.
+- [x] Applied operator-direct to specs + canonical vault (session-close had already consumed 2.1.53 for §8).
+- [x] All constitution copies byte-identical post session-close (`constitution.test.mjs` green).
 
 ### AC9 — Verify gate
 
@@ -288,7 +288,7 @@ Claude Sonnet 4.6 (Cursor)
 
 ### Completion Notes List
 
-- AC1–AC7, AC9–AC11 implemented. AC8 **pending** operator `/session-close` WriteGate — proposed §3 diff at `_bmad-output/implementation-artifacts/87-3-agents-section3-writegate-diff.md`.
+- AC1–AC11 implemented. AC8 applied operator-direct 2026-07-10: §3 quality-enrichment reclassification at **v2.1.54**; all three AGENTS copies byte-identical (`cmp` verified).
 - **AC5 hunt-and-flip:** Grep across `tests/` found **no** explicit assertions that reject *missing* enrichment fields (rejection was enforced solely by required Zod fields). Added new core-only pass cases per `pake_type` plus invalid-when-present tests; existing invalid-value tests (`confidence_score: 2`, `confidence_score: 99`, append-daily bad score) left unchanged. Empty `{}` governed-path test unchanged.
 - Hermes writers (`vault-create-note.ts`, `vault-append-daily.ts`) **not edited**; AC3 proven via existing `ingest-pipeline.test.ts` / create / append tests still green.
 - `bulk_scan.py`: split `CORE_REQUIRED_FIELDS` vs `QUALITY_ENRICHMENT_FIELDS`; added `warnings_r4_missing_quality`, `invalid_creation_method` handler, updated summary line `R4(missing_quality)=…`.
@@ -311,6 +311,7 @@ Claude Sonnet 4.6 (Cursor)
 
 ### Change Log
 
+- 2026-07-10: AC8 applied — AGENTS §3 quality-enrichment tier at v2.1.54; specs + vault + planning mirror byte-identical; story done.
 - 2026-07-09: Story 87-3 — quality enrichment tier optional in Zod/lint; Nexus triage E2E; spec + module sync; AGENTS §3 WriteGate diff prepared (AC8 pending session-close).
 - 2026-07-09: Code review patches applied — bulk_scan enrichment loop guards non-string/empty-list values with ERROR instead of crash.
 

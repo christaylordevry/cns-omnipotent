@@ -724,5 +724,5 @@ development_status:
   epic-87: in-progress
   87-1-untrack-vault-ai-context-constitution-duplicates: done
   87-2-specs-modules-vault-sync-drift-gate: done
-  87-3-pake-quality-enrichment-frontmatter-reconcile: review
+  87-3-pake-quality-enrichment-frontmatter-reconcile: done
   epic-87-retrospective: optional
