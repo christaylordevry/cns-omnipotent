@@ -431,10 +431,13 @@ development_status:
 
   # Epic 58 — NotebookLM vault export Drive sync (operator brief 2026-06-03)
   # Reopened 2026-07-08: 58-3 PDF source fix for deterministic drive_write_error (Doc write 134s > ~60s budget)
+  # 58-3 VERIFIED LIVE 2026-07-09: /session-close write path succeeded (no drive_write_error, PDF on Drive fast).
+  #   Residual (NOT 58-3): drive-sync PHASE hit 90s wall-clock on a flaky-NLM night — the `nlm source list` calls
+  #   before each sync are the slow part (sync itself is instant). WATCH next session-close; see deferred-work.md.
   epic-58: in-progress
   58-1-migrate-vault-export-drive-doc-sync: done
   58-2-watchedsurface-tier2-multi-surface: reserved  # planned in 58-1; not yet scoped
-  58-3-session-close-notebooklm-pdf-source-fix: review
+  58-3-session-close-notebooklm-pdf-source-fix: done
 
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
   epic-59: done
