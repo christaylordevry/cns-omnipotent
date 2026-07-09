@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.54 | Last updated: 2026-07-10
+> Version: 2.1.55 | Last updated: 2026-07-10
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -254,6 +254,7 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
 | Note style guide    | `AI-Context/modules/note-style-guide.md`    | Creating or editing any note: callout, frontmatter, and structure conventions (also referenced in Section 4) |
 | Run-chain           | `AI-Context/modules/run-chain.md`           | Running, reviving, or debugging the Research, Synthesis, Hook, Boss research chain (Epic 75; engine protect-listed) |
+| Unified Loop        | `AI-Context/modules/unified-loop.md`        | Epic 84 Discover→Build→Verify→Persist loop, skill-contract approval gate, discover artifact, or operator handoffs (not run-chain) |
 | Two-bot vault boundary | `AI-Context/modules/two-bot-vault-boundary.md` | Hermes and NEXUS coexistence, dual write-surface governance, collision zones, or `HERMES_`/`CNS_`/`NEXUS_` env namespaces |
 | Memory pillars verification | `AI-Context/modules/memory-pillars-verification.md` | Verifying which JARVIS memory layers are active, session-close-fed, or gated (Hermes native memory; Epic 76) |
 | Hermes desktop      | `AI-Context/modules/hermes-desktop.md`      | Hermes Portal and desktop surface, browser JARVIS chat at localhost:9119, or dashboard OAuth and basic-auth (Epic 74) |
@@ -378,6 +379,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-10 | 2.1.55 | Section 7: registered unified-loop module (Epic 84). Operator-direct edit. |
 | 2026-07-10 | 2.1.54 | Section 3: quality-enrichment fields reclassified from required to optional PAKE Standard tier — reconciles note-style-guide two-bot conflict (Story 87-3 AC8). Operator-direct edit. |
 | 2026-07-10 | 2.1.53 | **Section 7:** Registered 6 modules in Active Modules (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook) so the table matches the canonical 11-module set (Epic 87). Operator-direct edit. |
 | 2026-07-09 | 2.1.52 | **Section 7:** Registered 6 modules in Active Modules (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook) so the table matches the canonical 11-module set (Epic 87). Operator-direct edit. |

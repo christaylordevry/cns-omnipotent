@@ -169,7 +169,7 @@ Cynical Review findings (84-1 diff):
 
 ## Governance delta — Verify section (session-close WriteGate)
 
-**Status:** Draft for session-close apply — **NOT** direct vault edit (NFR-GOV-1)
+**Status:** Applied operator-direct 2026-07-10 (Verify section in unified-loop module)
 
 Apply delta to `AI-Context/modules/unified-loop.md` via `/session-close` (both vault copies identical per AGENTS.md sync rule):
 
@@ -205,7 +205,7 @@ diff -q \
   specs/cns-vault-contract/../../../Knowledge-Vault-ACTIVE/AI-Context/modules/unified-loop.md
 ```
 
-**Result:** _PENDING session-close apply_
+**Result:** APPLIED operator-direct 2026-07-10
 
 ---
 

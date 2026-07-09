@@ -233,7 +233,7 @@ Apply via batched `/session-close` — **both** vault copies per AGENTS.md sync 
 One Verify dry-run (84-2) + one E2E approval-pause dry-run (84-3) complete. Epic 84 governance-complete; loop proven once, not standing automation.
 ```
 
-**Post-apply `diff -q`:** _PENDING batched session-close_
+**Post-apply `diff -q`:** APPLIED operator-direct 2026-07-10
 
 ---
 

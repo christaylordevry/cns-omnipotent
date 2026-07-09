@@ -47,7 +47,7 @@ describe("Story 1.1 constitution mirror", () => {
     );
   });
 
-  it("Story 87-1: specs modules mirror canonical vault (11 files, vault-lint at spec root)", () => {
+  it("Story 87-1: specs modules mirror canonical vault (12 files, vault-lint at spec root)", () => {
     const modulesDir = join(root, "specs/cns-vault-contract/modules");
     const expected = [
       "vault-io.md",
@@ -56,6 +56,7 @@ describe("Story 1.1 constitution mirror", () => {
       "notebooklm-workflow.md",
       "hermes-desktop.md",
       "run-chain.md",
+      "unified-loop.md",
       "two-bot-vault-boundary.md",
       "memory-pillars-verification.md",
       "routing.md",
