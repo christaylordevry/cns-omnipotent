@@ -24,7 +24,8 @@
     "brain:recall-prefetch": "node scripts/brain-recall-prefetch.mjs",
     "archive:sources": "tsx scripts/archive-source-notes.ts",
     "vault:fast-scan": "node scripts/generate-vault-fast-scan-index.mjs",
-    "sync-notebooks": "node scripts/session-close/sync-notebooks.mjs"
+    "sync-notebooks": "node scripts/session-close/sync-notebooks.mjs",
+    "sync-vault-modules": "node scripts/session-close/sync-vault-modules.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

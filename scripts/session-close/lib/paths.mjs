@@ -94,6 +94,8 @@ export function resolvePaths(overrides = {}) {
   return {
     repoRoot,
     vaultRoot,
+    vaultModulesPath: join(vaultRoot, "AI-Context", "modules"),
+    repoModulesPath: join(repoRoot, "specs/cns-vault-contract/modules"),
     agentsPath: join(vaultRoot, "AI-Context", "AGENTS.md"),
     repoAgentsPath: join(repoRoot, "specs/cns-vault-contract/AGENTS.md"),
     planningAgentsPath: join(

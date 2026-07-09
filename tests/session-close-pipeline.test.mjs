@@ -680,6 +680,8 @@ describe("session-close run-deterministic", () => {
       assert.equal(report.mode, "dry-run");
       assert.equal(report.steps.export.status, "skipped");
       assert.ok(report.steps.export.message.includes("dry-run"));
+      assert.equal(report.steps.sync_vault_modules.status, "skipped");
+      assert.ok(report.steps.sync_vault_modules.message.includes("dry-run"));
       assert.equal(report.steps.fast_scan.status, "skipped");
       assert.equal(report.steps.tests.status, "skipped");
       assert.equal(report.failure_class, null);
@@ -695,6 +697,7 @@ describe("session-close run-deterministic", () => {
       const onDiskReport = JSON.parse(await readFile(reportPath, "utf8"));
       const onDiskPack = JSON.parse(await readFile(packPath, "utf8"));
       assert.equal(onDiskReport.steps.export.status, "skipped");
+      assert.equal(onDiskReport.steps.sync_vault_modules.status, "skipped");
       assert.deepEqual(onDiskReport.convex_push, {
         status: "skipped",
         rows: 0,
