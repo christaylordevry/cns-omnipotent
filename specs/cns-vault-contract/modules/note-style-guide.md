@@ -38,11 +38,12 @@ Status by location:
 
 ## Frontmatter — Prohibited Fields 
 Do not add fields not listed above. The following are not part of this vault's schema and must never appear in note frontmatter: 
-- confidence_score 
-- verification_status 
-- creation_method 
 - certainty 
 - status_reason
+
+## Optional Quality Enrichment
+
+The PAKE quality-enrichment tier (`confidence_score`, `verification_status`, `creation_method`) is optional on governed notes. Hermes Vault IO stamps defaults on governed creates; `/verify` may update `verification_status`; Nexus-shaped notes may omit these fields until triage via `vault_move` or `vault_update_frontmatter`. See AGENTS.md §3 for the canonical template.
 
 ## Callout Conventions
 

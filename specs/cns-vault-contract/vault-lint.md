@@ -159,7 +159,7 @@ Intent: ensure governed notes match the PAKE Standard from `specs/cns-vault-cont
 
 Scope: governed folders, all `.md` files except `_README.md`.
 
-Critical fields are ERROR if missing, empty, or wrong type:
+**Core fields** are ERROR if missing, empty, or wrong type:
 
 | Field | Requirement |
 |-------|-------------|
@@ -169,10 +169,17 @@ Critical fields are ERROR if missing, empty, or wrong type:
 | `created` | `YYYY-MM-DD`. |
 | `modified` | `YYYY-MM-DD`. |
 | `status` | One of `draft`, `in-progress`, `reviewed`, `archived`. |
+| `tags` | YAML list with at least one entry. |
+
+**Quality enrichment fields** are WARNING if missing; ERROR if present but invalid:
+
+| Field | Requirement |
+|-------|-------------|
 | `confidence_score` | Parseable number in `[0.0, 1.0]`. |
 | `verification_status` | One of `pending`, `verified`, `disputed`. |
 | `creation_method` | One of `human`, `ai`, `hybrid`. |
-| `tags` | YAML list with at least one entry. |
+
+Missing core field → ERROR (`errors_r4`). Missing quality enrichment field → WARNING (`warnings_r4_missing_quality`, distinct from `warnings_r4_uuid`). Present-but-invalid any field → ERROR (`errors_r4`).
 
 Missing critical field resolution shape:
 

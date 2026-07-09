@@ -24,6 +24,20 @@ tags:
 Keep this line.
 `;
 
+const nexusShapedFm = `---
+pake_id: "550e8400-e29b-41d4-a716-446655440001"
+pake_type: SourceNote
+title: "Nexus capture"
+created: "2026-04-02"
+modified: "2026-04-02"
+status: draft
+tags:
+  - nexus
+---
+
+# Nexus body
+`;
+
 describe("vaultUpdateFrontmatter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -52,6 +66,22 @@ describe("vaultUpdateFrontmatter", () => {
     expect(frontmatter.tags).toEqual(["seed"]);
     expect(frontmatter.modified).toBe("2026-06-15");
     expect(body).toContain("Keep this line.");
+  });
+
+  it("updates modified only on Nexus-shaped note (core-only frontmatter) without SCHEMA_INVALID", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-ufm-nexus-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    const rel = "03-Resources/nexus-capture.md";
+    await writeFile(path.join(vaultRoot, rel), nexusShapedFm, "utf8");
+
+    const out = await vaultUpdateFrontmatter(vaultRoot, rel, { modified: "2026-06-15" });
+
+    expect(out.path).toBe(rel);
+    expect(out.updated_fields).toEqual(["modified"]);
+    const disk = await readFile(path.join(vaultRoot, rel), "utf8");
+    const { frontmatter } = parseNoteFrontmatter(disk);
+    expect(frontmatter.modified).toBe("2026-06-15");
+    expect(frontmatter.confidence_score).toBeUndefined();
   });
 
   it("lists modified in updated_fields when the caller included modified in updates", async () => {

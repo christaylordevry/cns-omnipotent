@@ -1,5 +1,14 @@
 # Deferred work
 
+## Deferred from: code review of 87-3-pake-quality-enrichment-frontmatter-reconcile (2026-07-09)
+
+- **`status: stable` lint vs Zod mismatch** — bulk_scan `STATUSES` includes `stable`; Zod and vault-lint spec do not. Pre-existing; notes can pass lint but fail governed mutations.
+- **vault-lint Rule 4 `pake_type` table** — Spec lists 5 types; bulk_scan and Zod accept 7 (includes HookSetNote, WeaponsCheckNote). Pre-existing spec drift.
+- **Scalar `tags:` string** — bulk_scan ERROR; Zod coerces string to array. Pre-existing cross-layer mismatch.
+- **Hermes vault-lint `task-prompt.md`** — Still documents missing enrichment as ERROR; bulk_scan now WARNING. Follow-up doc sync outside 87-3 file list.
+- **`vault-lint-remediate-34-2.ts`** — `rule4Findings()` still flags absent enrichment as ERROR; remediate script not in 87-3 scope.
+- **note-style-guide legacy `date`/`reference` fields** — Required-field list still uses Nexus-era keys; enrichment section added but top-of-file PAKE list not reconciled. Pre-existing.
+
 ## Deferred from: code review of 87-2-specs-modules-vault-sync-drift-gate (2026-07-09)
 
 - **`apply-section8.mjs` edited in commit `4d4902e`** — 87-1 review bundle added `usingRepoVaultFallback` vault-target skip; violates 87-2 hard constraint "do not edit apply-section8.mjs" but change is out of 87-2 file scope and correct for 87-1. Track under 87-1 follow-up if needed.

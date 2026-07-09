@@ -155,11 +155,16 @@ title: [human-readable title]
 created: [ISO date]
 modified: [ISO date]
 status: draft | in-progress | reviewed | archived
+tags: [list]
+---
+```
+
+**Optional quality enrichment** (recommended when known; Hermes writers stamp defaults on governed creates; Nexus-shaped notes may omit until triage):
+
+```yaml
 confidence_score: [0.0 to 1.0]
 verification_status: pending | verified | disputed
 creation_method: human | ai | hybrid
-tags: [list]
----
 ```
 
 Optional fields (vary by pake_type):

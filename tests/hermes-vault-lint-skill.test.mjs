@@ -29,5 +29,8 @@ describe("Story 36-2 Hermes vault-lint skill mirror", () => {
   it("bulk_scan.py is present and documents VAULT env", () => {
     const body = readFileSync(bulkScanPath, "utf8");
     assert.ok(body.includes("VAULT") || body.includes("vault"));
+    assert.ok(body.includes("warnings_r4_missing_quality"));
+    assert.ok(body.includes("QUALITY_ENRICHMENT_FIELDS"));
+    assert.ok(body.includes("invalid_creation_method"));
   });
 });
