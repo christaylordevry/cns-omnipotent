@@ -187,7 +187,7 @@ Notes in `00-Inbox/` have no schema requirement. They represent raw captures. Th
 
 ### Location and Distribution
 
-**Canonical source:** `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
+**Canonical source:** `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` (runtime SSOT). **Git mirror:** `specs/cns-vault-contract/AGENTS.md` in the implementation repo.
 
 **Distribution to tools:**
 

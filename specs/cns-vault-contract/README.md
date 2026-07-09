@@ -1,15 +1,15 @@
 # CNS Vault Contract Specification
 
-This directory holds the git **normative** mirror for CNS Phase 1: Foundation Layer. Copy or sync from here into `Knowledge-Vault-ACTIVE/AI-Context/` when deploying to the live vault: place `AGENTS.md` at `AI-Context/AGENTS.md` and copy `modules/*.md` to `AI-Context/modules/`.
+This directory holds the git **normative** mirror for CNS Phase 1: Foundation Layer. It mirrors the live vault constitution tree at `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/` (`AGENTS.md`, `modules/`, optional `personas/`). Deploy from here into the live vault when promoting changes; the in-repo `Knowledge-Vault-ACTIVE/AI-Context/` copy is **untracked** (Story 87-1).
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `CNS-Phase-1-Spec.md` | Complete Phase 1 specification: folder contract, `AGENTS.md` design, Vault IO MCP tool definitions, acceptance criteria |
-| `AGENTS.md` | Vault constitution; deploy to `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` |
-| `modules/*.md` | Vault IO and Security policy modules; deploy to `Knowledge-Vault-ACTIVE/AI-Context/modules/` |
-| `modules/vault-lint.md` | Normative four-rule vault lint contract for Epic 29 |
+| `AGENTS.md` | Vault constitution mirror; runtime SSOT at canonical vault `AI-Context/AGENTS.md` |
+| `modules/*.md` | **11 vault modules** mirroring canonical `AI-Context/modules/` (vault-io, security, note-style-guide, notebooklm-workflow, hermes-desktop, run-chain, two-bot-vault-boundary, memory-pillars-verification, routing, mobile-posture, mcp-operator-runbook) |
+| `vault-lint.md` | Normative four-rule vault lint contract for Epic 29 (skill/operator docs — not a vault module) |
 | `AUDIT-PLAYBOOK.md` | Operator guide: reading `_meta/logs/agent-log.md`, correlating paths to log lines (FR23), human-only archive or trim (FR24, NFR-S3) |
 | `README.md` | This file: index, IDE shim summary, **grounding parity checklist** |
 | `shims/` | Templates for vault-root `CLAUDE.md` and Cursor rules (see below) |

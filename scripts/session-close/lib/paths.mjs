@@ -47,7 +47,8 @@ export function isValidRepoRoot(repoRoot) {
  */
 function vaultFallbackUnderRepo(repoRoot) {
   const candidate = join(repoRoot, "Knowledge-Vault-ACTIVE");
-  if (existsSync(join(candidate, "AI-Context", "AGENTS.md"))) {
+  // Story 87-1: AGENTS.md under repo mock vault is untracked; use a tracked fixture marker.
+  if (existsSync(join(candidate, "AI-Context", "vault-fast-scan-index.md"))) {
     try {
       return realpathSync(candidate);
     } catch {

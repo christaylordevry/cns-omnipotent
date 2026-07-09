@@ -8,7 +8,7 @@ Lean implementation rules for AI agents. Normative specs live in `specs/cns-vaul
 - **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
 - **Vault** — `Knowledge-Vault-ACTIVE/` (PARA) is source of truth
 - **Hermes** — `~/.hermes/`; `model.provider: nous`, `model.default: anthropic/claude-sonnet-4.6`; Discord gateway + morning-digest cron live; dashboard `0.0.0.0:9119` (systemd `hermes-dashboard.service`, `--skip-build`, `auth_path: oauth` primary); CNS skills at `~/.hermes/skills/cns/`
-- **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v2.1.44)
+- **Constitution** — `specs/cns-vault-contract/AGENTS.md` (git-tracked mirror of canonical vault `AI-Context/AGENTS.md`)
 - **cns-dashboard** — Layer 3 SvelteKit + Convex dashboard; sibling at `../cns-dashboard`
 
 ## Nexus intelligence principle
@@ -75,7 +75,7 @@ Full normative text: `_bmad-output/planning-artifacts/architecture-hermes-consol
 
 1. **Spec-first** — read relevant `specs/cns-vault-contract/` before implementing in this repo
 2. **Verify gate** — `bash scripts/verify.sh` before done (CNS tests + sibling `cns-dashboard` when present; override with `CNS_DASHBOARD_ROOT`)
-3. **WriteGate** — never directly edit `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`; route via Hermes session-close. When editing constitution, sync both `specs/cns-vault-contract/AGENTS.md` and vault canonical copy in one operation
+3. **WriteGate** — never directly edit canonical vault `AI-Context/AGENTS.md`; route via Hermes session-close. When editing constitution, sync both `specs/cns-vault-contract/AGENTS.md` and `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` in one operation. The in-repo `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` is untracked (Story 87-1).
 4. **Vault boundaries** — never write outside vault path contract
 5. **Context7** — `resolve-library-id` → `query-docs` before any library/tool implementation; never guess API signatures
 6. **Safe edits** — ask before: MCP tool signature changes, audit log path changes, `security.md`, bulk refactors

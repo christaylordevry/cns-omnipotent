@@ -1,5 +1,7 @@
 # Module: Vault IO
 
+> **Path note:** Links to `../../../specs/` point at the CNS implementation repository (three levels up from this `modules/` folder when the vault is `…/Omnipotent.md/Knowledge-Vault-ACTIVE/`).
+
 Load this file when you plan or execute vault reads, writes, search, or moves beyond quick browsing. It extends `AGENTS.md` Sections 2 (routing) and 3 (formatting). If anything here conflicts with `AGENTS.md`, the constitution wins.
 
 ## Reading Notes
@@ -38,12 +40,6 @@ Load this file when you plan or execute vault reads, writes, search, or moves be
 - Modify `AI-Context/AGENTS.md` without explicit human approval.
 - Overwrite an existing note without reading it first.
 
-## Operator runbook (MCP env, rotation, smoke)
-
-If you are wiring MCP servers, rotating keys, or running live tool-call smoke, use the MCP operator runbook:
-
-- `specs/cns-vault-contract/modules/mcp-operator-runbook.md`
-
 ## Mediated access (Vault IO MCP)
 
-When the Vault IO MCP server is configured for your session, prefer its tools for scoped search, reads, governed writes, moves, and explicit audit lines instead of ad hoc raw filesystem edits. **Phase 1 tool names:** `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`, `vault_request_disambiguation`. Normative parameters and behaviour: `specs/cns-vault-contract/CNS-Phase-1-Spec.md` in the implementation repository. If MCP is not available, follow the sections above using normal vault-relative paths and human-approved tools.
+When the Vault IO MCP server is configured for your session, prefer its tools for scoped search, reads, governed writes, moves, and explicit audit lines instead of ad hoc raw filesystem edits. **Phase 1 tool names:** `vault_read`, `vault_read_frontmatter`, `vault_list`, `vault_search`, `vault_create_note`, `vault_update_frontmatter`, `vault_append_daily`, `vault_move`, `vault_log_action`. Normative parameters and behaviour: `../../../specs/cns-vault-contract/CNS-Phase-1-Spec.md`. If MCP is not available, follow the sections above using normal vault-relative paths and human-approved tools.

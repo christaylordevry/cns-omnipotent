@@ -13,7 +13,9 @@ This repository implements CNS Phase 1. Treat `specs/cns-vault-contract/AGENTS.m
 
 Whenever you edit `AGENTS.md` in this repo, you MUST update **both** copies in the same operation:
 
-1. `specs/cns-vault-contract/AGENTS.md` (repo mirror)
-2. `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` (canonical vault)
+1. `specs/cns-vault-contract/AGENTS.md` (git-tracked mirror)
+2. `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` (canonical vault runtime SSOT)
 
 Never commit or save changes to one without updating the other. Both copies must be identical after every edit. Confirm both files match before committing.
+
+The in-repo `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` copy is **untracked** (Story 87-1). Do not sync to it; use `specs/cns-vault-contract/` for constitution work in this repo.

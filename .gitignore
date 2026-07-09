@@ -22,6 +22,11 @@ scripts/output/
 # Hermes morning digest Mode B inbox captures (operator-local; Story 26-7)
 Knowledge-Vault-ACTIVE/00-Inbox/hermes-morning-digest-*.md
 
+# Constitution mirror dedup (Story 87-1): specs/cns-vault-contract/ is git-tracked mirror
+Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md
+Knowledge-Vault-ACTIVE/AI-Context/modules/
+Knowledge-Vault-ACTIVE/AI-Context/personas/
+
 # node / python common
 node_modules/
 dist/

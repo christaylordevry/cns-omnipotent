@@ -14,7 +14,7 @@ metadata:
 
 ## Overview
 
-Normative rules, severities, Discord layout, on-disk report, and JSON machine block: **`specs/cns-vault-contract/modules/vault-lint.md`** in the Omnipotent repo (or vault mirror). This skill does **not** restate the full algorithm; the model follows **`references/task-prompt.md`**.
+Normative rules, severities, Discord layout, on-disk report, and JSON machine block: **`specs/cns-vault-contract/vault-lint.md`** in the Omnipotent repo. This skill does **not** restate the full algorithm; the model follows **`references/task-prompt.md`**.
 
 ## When to use
 
