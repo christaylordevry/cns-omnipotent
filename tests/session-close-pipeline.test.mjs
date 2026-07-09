@@ -37,6 +37,7 @@ import {
   stripAnsi,
 } from "../scripts/session-close/run-deterministic.mjs";
 import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
+import { runSessionCloseVaultModulesSync } from "../scripts/session-close/lib/sync-vault-modules.mjs";
 import {
   formatNlmAuthWarning,
   mergeNlmAuthIntoCloseReport,
@@ -704,6 +705,34 @@ describe("session-close run-deterministic", () => {
         reason: "dry-run",
       });
       assert.equal(onDiskPack.mode, "dry-run");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runDeterministicPipeline skips modules sync on repo vault fallback (Story 87-2)", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-sync-fallback-"));
+    const repoVault = join(fixtureRoot, "Knowledge-Vault-ACTIVE");
+    const specsModules = join(fixtureRoot, "specs/cns-vault-contract/modules");
+    await seedSessionCloseFixture(fixtureRoot, repoVault);
+    await writeFile(
+      join(repoVault, "AI-Context", "vault-fast-scan-index.md"),
+      "# fast-scan fixture\n",
+      "utf8",
+    );
+    await mkdir(specsModules, { recursive: true });
+    await writeFile(join(specsModules, "note-style-guide.md"), "# canonical specs copy\n", "utf8");
+
+    try {
+      const step = await runSessionCloseVaultModulesSync({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: repoVault,
+      });
+      assert.equal(step.status, "skipped");
+      assert.match(step.message, /repo vault fallback/);
+      const onDisk = await readFile(join(specsModules, "note-style-guide.md"), "utf8");
+      assert.equal(onDisk, "# canonical specs copy\n");
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }

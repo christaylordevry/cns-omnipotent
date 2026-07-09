@@ -14,6 +14,7 @@ import {
   listModuleFiles,
   normalizeLf,
   resolveLiveVaultModulesDir,
+  runSessionCloseVaultModulesSync,
   runSyncVaultModules,
 } from "../scripts/session-close/lib/sync-vault-modules.mjs";
 import { readSessionCloseEnvVar } from "../scripts/session-close/lib/load-session-close-env.mjs";
@@ -148,6 +149,70 @@ describe("sync-vault-modules lib", () => {
 
       const parity = await compareVaultModulesMirror(vaultModules, specsModules);
       assert.equal(parity.ok, true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("runSyncVaultModules refuses empty vault when specs mirror has files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "vault-modules-empty-guard-"));
+    const vault = join(root, "vault");
+    const specs = join(root, "repo", "specs/cns-vault-contract");
+    const { specsModules } = await seedModulesFixture(
+      join(root, "repo"),
+      vault,
+      specs,
+      {},
+      { "orphan-only.md": "specs content\n" },
+    );
+
+    try {
+      await assert.rejects(
+        () =>
+          runSyncVaultModules({
+            dryRun: false,
+            repoRoot: join(root, "repo"),
+            vaultRoot: vault,
+          }),
+        /Refusing vault modules sync: vault dir is empty/,
+      );
+      assert.equal(existsSync(join(specsModules, "orphan-only.md")), true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("runSessionCloseVaultModulesSync skips when repo vault fallback is active", async () => {
+    const root = await mkdtemp(join(tmpdir(), "vault-modules-fallback-skip-"));
+    const repoVault = join(root, "Knowledge-Vault-ACTIVE");
+    const specsModules = join(root, "specs/cns-vault-contract/modules");
+    await mkdir(join(repoVault, "AI-Context", "modules"), { recursive: true });
+    await mkdir(specsModules, { recursive: true });
+    await mkdir(join(root, "_bmad-output", "implementation-artifacts"), { recursive: true });
+    await mkdir(join(root, "scripts"), { recursive: true });
+    await writeFile(join(root, "scripts/export-vault-for-notebooklm.sh"), "#!/bin/bash\n", "utf8");
+    await writeFile(
+      join(root, "_bmad-output", "implementation-artifacts", "sprint-status.yaml"),
+      "development_status: {}\n",
+      "utf8",
+    );
+    await writeFile(
+      join(repoVault, "AI-Context", "vault-fast-scan-index.md"),
+      "# fast-scan fixture\n",
+      "utf8",
+    );
+    await writeFile(join(specsModules, "note-style-guide.md"), "# canonical\n", "utf8");
+
+    try {
+      const step = await runSessionCloseVaultModulesSync({
+        dryRun: false,
+        repoRoot: root,
+        vaultRoot: repoVault,
+      });
+      assert.equal(step.status, "skipped");
+      assert.match(step.message, /repo vault fallback/);
+      const onDisk = await readFile(join(specsModules, "note-style-guide.md"), "utf8");
+      assert.equal(onDisk, "# canonical\n");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -128,6 +128,16 @@ export async function runSyncVaultModules(opts = {}) {
     throw new Error(`Vault modules directory not found: ${vaultModulesPath}`);
   }
 
+  const vaultFiles = await listModuleFiles(vaultModulesPath);
+  const initialSpecsFiles = existsSync(repoModulesPath)
+    ? await listModuleFiles(repoModulesPath)
+    : [];
+  if (vaultFiles.length === 0 && initialSpecsFiles.length > 0) {
+    throw new Error(
+      `Refusing vault modules sync: vault dir is empty but specs mirror has ${initialSpecsFiles.length} file(s) — possible mount failure; verify vault access before syncing`,
+    );
+  }
+
   const diff = await compareVaultModulesMirror(vaultModulesPath, repoModulesPath);
 
   if (opts.dryRun) {
@@ -142,7 +152,6 @@ export async function runSyncVaultModules(opts = {}) {
 
   await mkdir(repoModulesPath, { recursive: true });
 
-  const vaultFiles = await listModuleFiles(vaultModulesPath);
   const vaultSet = new Set(vaultFiles);
 
   /** @type {string[]} */
@@ -172,7 +181,7 @@ export async function runSyncVaultModules(opts = {}) {
   for (const name of specsFiles) {
     if (!vaultSet.has(name)) {
       removed.push(name);
-      await rm(join(repoModulesPath, name));
+      await rm(join(repoModulesPath, name), { force: true });
     }
   }
 
@@ -201,4 +210,57 @@ export async function resolveLiveVaultModulesDir(opts = {}) {
     return null;
   }
   return modulesDir;
+}
+
+/**
+ * Session-close Phase A modules sync step (vault → specs). Skips on dry-run or repo vault fallback.
+ * @param {{ dryRun?: boolean; repoRoot?: string; vaultRoot?: string }} opts
+ * @returns {Promise<{ status: "skipped" | "ok" | "failed"; message: string }>}
+ */
+export async function runSessionCloseVaultModulesSync(opts = {}) {
+  if (opts.dryRun) {
+    return {
+      status: "skipped",
+      message: "sync-vault-modules: skipped (dry-run)",
+    };
+  }
+
+  const paths = resolvePaths({
+    repoRoot: opts.repoRoot,
+    vaultRoot: opts.vaultRoot,
+  });
+
+  if (paths.usingRepoVaultFallback) {
+    return {
+      status: "skipped",
+      message:
+        "sync-vault-modules: skipped (repo vault fallback — in-repo mock is not canonical SSOT)",
+    };
+  }
+
+  try {
+    const syncResult = await runSyncVaultModules({
+      dryRun: false,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    const parts = [];
+    if (syncResult.added.length > 0) {
+      parts.push(`added ${syncResult.added.length}`);
+    }
+    if (syncResult.updated.length > 0) {
+      parts.push(`updated ${syncResult.updated.length}`);
+    }
+    if (syncResult.removed.length > 0) {
+      parts.push(`removed ${syncResult.removed.length}`);
+    }
+    const message =
+      parts.length > 0
+        ? `sync complete (${parts.join(", ")})`
+        : "sync complete (already in sync)";
+    return { status: "ok", message };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { status: "failed", message };
+  }
 }

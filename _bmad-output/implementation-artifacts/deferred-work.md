@@ -1,5 +1,11 @@
 # Deferred work
 
+## Deferred from: code review of 87-2-specs-modules-vault-sync-drift-gate (2026-07-09)
+
+- **`apply-section8.mjs` edited in commit `4d4902e`** — 87-1 review bundle added `usingRepoVaultFallback` vault-target skip; violates 87-2 hard constraint "do not edit apply-section8.mjs" but change is out of 87-2 file scope and correct for 87-1. Track under 87-1 follow-up if needed.
+
+- **`resolveLiveVaultModulesDir` session-close.env fallback** — Parity gate reads `~/.hermes/session-close.env` when `CNS_VAULT_ROOT` process env unset (intentional hotfix). Deviates from AC#2 literal skip wording but correct on operator machines.
+
 ## Deferred from: code review of 87-1-untrack-vault-ai-context-constitution-duplicates (2026-07-09)
 
 - **vault-fast-scan-index date churn** — Incidental `2026-07-03` → `2026-07-05` edit bundled in 87-1 constitution dedup diff; harmless but out of stated scope.

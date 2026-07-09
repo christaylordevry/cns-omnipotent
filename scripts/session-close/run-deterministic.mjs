@@ -27,7 +27,7 @@ import {
   resolveOperatorHome,
 } from "./lib/operator-home.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
-import { runSyncVaultModules } from "./lib/sync-vault-modules.mjs";
+import { runSessionCloseVaultModulesSync } from "./lib/sync-vault-modules.mjs";
 import { formatPriorFanoutSummary } from "./lib/update-memory-cns-state.mjs";
 import { runWriteMemory } from "./write-memory.mjs";
 
@@ -704,35 +704,20 @@ export async function runDeterministicPipeline(opts = {}) {
   const exportPath = join(paths.repoRoot, "scripts/output/vault-export-for-notebooklm.md");
 
   if (dryRun) {
-    steps.sync_vault_modules = {
-      status: "skipped",
-      message: "sync-vault-modules: skipped (dry-run)",
-    };
+    const syncStep = await runSessionCloseVaultModulesSync({
+      dryRun: true,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    steps.sync_vault_modules = { status: syncStep.status, message: syncStep.message };
   } else {
-    try {
-      const syncResult = await runSyncVaultModules({
-        dryRun: false,
-        repoRoot: paths.repoRoot,
-        vaultRoot: paths.vaultRoot,
-      });
-      const parts = [];
-      if (syncResult.added.length > 0) {
-        parts.push(`added ${syncResult.added.length}`);
-      }
-      if (syncResult.updated.length > 0) {
-        parts.push(`updated ${syncResult.updated.length}`);
-      }
-      if (syncResult.removed.length > 0) {
-        parts.push(`removed ${syncResult.removed.length}`);
-      }
-      const message =
-        parts.length > 0
-          ? `sync complete (${parts.join(", ")})`
-          : "sync complete (already in sync)";
-      steps.sync_vault_modules = { status: "ok", message };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      steps.sync_vault_modules = { status: "failed", message };
+    const syncStep = await runSessionCloseVaultModulesSync({
+      dryRun: false,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    steps.sync_vault_modules = { status: syncStep.status, message: syncStep.message };
+    if (syncStep.status === "failed") {
       setFailure("sync_vault_modules");
     }
   }
