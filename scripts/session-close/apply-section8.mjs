@@ -125,12 +125,11 @@ export async function runApplySection8(opts) {
     opts.contextPack ?? (await loadContextPackIfPresent(contextPackPath));
   const changelogMessage = changelogMessageFromPack(pack);
 
-  const sourceAgentsPath = paths.repoAgentsPath;
   let agentsText;
   try {
-    agentsText = await readFile(sourceAgentsPath, "utf8");
+    agentsText = await readFile(paths.constitutionAgentsPath, "utf8");
   } catch {
-    agentsText = await readFile(paths.agentsPath, "utf8");
+    agentsText = await readFile(paths.repoAgentsPath, "utf8");
   }
 
   const { text: patched, newVersion, changelogRow } = applySection8ToAgentsText(
@@ -142,10 +141,12 @@ export async function runApplySection8(opts) {
     },
   );
 
-  const targets = [
-    { label: "repo", path: paths.repoAgentsPath },
-    { label: "vault", path: paths.agentsPath },
-  ];
+  /** @type {{ label: string, path: string }[]} */
+  const targets = [{ label: "repo", path: paths.repoAgentsPath }];
+  // Story 87-1: do not write gitignored in-repo AGENTS when repo vault fallback is active.
+  if (!paths.usingRepoVaultFallback) {
+    targets.push({ label: "vault", path: paths.agentsPath });
+  }
 
   if (dryRun) {
     const previewPath = join(paths.sessionCloseDir, "section8-apply-preview.md");

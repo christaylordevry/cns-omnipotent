@@ -1786,6 +1786,49 @@ describe("session-close SC-4 apply-section8", () => {
     assert.ok(text.includes("| 2026-01-01 | 9.9.9 | fixture row |"));
   });
 
+  it("runApplySection8 skips in-repo vault AGENTS when repo fallback is active (Story 87-1)", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-fallback-"));
+    const repoVault = join(fixtureRoot, "Knowledge-Vault-ACTIVE");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, repoVault);
+    await writeFile(
+      join(repoVault, "AI-Context", "vault-fast-scan-index.md"),
+      "# fast-scan fixture\n",
+      "utf8",
+    );
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
+    const staleVaultAgents = join(repoVault, "AI-Context", "AGENTS.md");
+    const beforeRepo = await readFile(repoAgents, "utf8");
+    const beforeStale = await readFile(staleVaultAgents, "utf8");
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: repoVault,
+        dateStr: "2026-05-28",
+      });
+      assert.equal(result.written, true);
+      assert.equal(result.targets.length, 1);
+      assert.equal(result.targets[0], repoAgents);
+      const repoAfter = await readFile(repoAgents, "utf8");
+      const staleAfter = await readFile(staleVaultAgents, "utf8");
+      assert.notEqual(repoAfter, beforeRepo);
+      assert.equal(staleAfter, beforeStale);
+      assert.ok(repoAfter.includes("9.9.10"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it("runApplySection8 byte-syncs repo and vault AGENTS copies", async () => {
     const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-"));
     const vault = join(fixtureRoot, "vault");

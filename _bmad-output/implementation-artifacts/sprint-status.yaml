@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-06T06:19:00Z
+# last_updated: 2026-07-09T07:57:00Z
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -722,6 +722,6 @@ development_status:
   # Epic 87 — Constitution mirror dedup (stop tracking stale Knowledge-Vault-ACTIVE/AI-Context copies)
   # specs/cns-vault-contract/ is sole git-tracked mirror; vault mock tree keeps non-constitution fixtures
   epic-87: in-progress
-  87-1-untrack-vault-ai-context-constitution-duplicates: review
+  87-1-untrack-vault-ai-context-constitution-duplicates: done
   87-2-specs-modules-vault-sync-drift-gate: review
   epic-87-retrospective: optional

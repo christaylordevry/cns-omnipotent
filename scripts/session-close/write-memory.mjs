@@ -43,7 +43,7 @@ export async function runWriteMemory(opts = {}) {
     opts.contextPack ??
     (await loadContextPackIfPresent(contextPackPath));
 
-  const agentsText = await readFile(paths.agentsPath, "utf8");
+  const agentsText = await readFile(paths.constitutionAgentsPath, "utf8");
   const sprintYaml = await readFile(paths.sprintPath, "utf8");
   const sprint = await readSprintSnapshot(paths.sprintPath);
   const projectStatusLine =

@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
@@ -65,6 +65,12 @@ describe("Story 1.1 constitution mirror", () => {
     for (const f of expected) {
       assert.ok(existsSync(join(modulesDir, f)), `missing module ${f}`);
     }
+    const moduleFiles = readdirSync(modulesDir).filter((f) => f.endsWith(".md"));
+    assert.strictEqual(
+      moduleFiles.length,
+      expected.length,
+      `expected exactly ${expected.length} modules, found: ${moduleFiles.join(", ")}`,
+    );
     assert.ok(
       !existsSync(join(modulesDir, "vault-lint.md")),
       "vault-lint must not live under modules/",

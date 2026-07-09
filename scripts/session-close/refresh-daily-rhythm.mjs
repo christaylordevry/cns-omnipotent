@@ -36,7 +36,7 @@ export async function runRefreshDailyRhythm(opts = {}) {
   const { markers, providerLine, sessionDate } = await loadRhythmRefreshInputs({
     repoRoot: paths.repoRoot,
     vaultRoot: paths.vaultRoot,
-    agentsPath: paths.agentsPath,
+    agentsPath: paths.constitutionAgentsPath,
     rhythmPath,
     staticRowsPath,
     sprintPath: paths.sprintPath,

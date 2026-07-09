@@ -13,7 +13,7 @@ canonical_vault_modules: /mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/
 
 # Story 87.1: Vault-first constitution mirror — specs tracks vault; repo copy untracked
 
-Status: review
+Status: done
 
 <!-- Corrected 2026-07-09 — 11 vault modules (incl. mcp-operator-runbook); relocate vault-lint only. -->
 
@@ -204,6 +204,19 @@ ls -1 "$SPEC" | wc -l       # must be 11
 
 **Suggested commits:** (1) vault-lint relocation + 5 module adds + verify existing 6, (2) cross-link/doc updates, (3) gitignore/untrack
 
+### Review Findings
+
+- [x] [Review][Decision] Session-close still writes gitignored in-repo AGENTS — Resolved (A): skip vault target when `usingRepoVaultFallback`; constitution reads use `constitutionAgentsPath` (specs mirror).
+- [x] [Review][Patch] paths.mjs fallback marker too weak [`scripts/session-close/lib/paths.mjs:48-58`] — Added `constitutionAgentsPath` + `usingRepoVaultFallback`; constitution consumers route to specs when fallback active or vault AGENTS missing.
+- [x] [Review][Patch] deferred-work.md stale in-repo AGENTS sync [`_bmad-output/implementation-artifacts/deferred-work.md:110`] — Updated to specs + canonical vault only.
+- [x] [Review][Patch] planning mirror README deploy paths [`_bmad-output/planning-artifacts/cns-vault-contract/README.md:10-11`] — Updated to mirror-model wording (Story 87-1).
+- [x] [Review][Patch] vault-lint task-prompt bare reference [`scripts/hermes-skill-examples/vault-lint/references/task-prompt.md:57`] — Points at `specs/cns-vault-contract/vault-lint.md`.
+- [x] [Review][Patch] constitution test allows extra module files [`tests/constitution.test.mjs:50-76`] — Asserts `readdir` count === 11.
+- [x] [Review][Defer] vault-fast-scan-index date churn [`Knowledge-Vault-ACTIVE/AI-Context/vault-fast-scan-index.md`] — deferred, pre-existing scope creep unrelated to constitution dedup.
+- [x] [Review][Defer] note-style-guide vs AGENTS PAKE template [`specs/cns-vault-contract/modules/note-style-guide.md:41`] — deferred, pre-existing canonical vault content tension (not introduced by untrack logic).
+- [x] [Review][Defer] CLAUDE.md vault SSOT wording [`CLAUDE.md`] — deferred, pre-existing; not in 87-1 diff.
+- [x] [Review][Defer] canonical byte-parity CI gate — deferred, pre-existing; Story 87-2 owns automated `diff -qr` enforcement.
+
 ## Dev Notes
 
 ### Hard constraints
@@ -356,8 +369,9 @@ test -f specs/cns-vault-contract/vault-lint.md
 ## Change Log
 
 - 2026-07-09: Story 87-1 — vault-first mirror; 11 modules synced; vault-lint relocated; in-repo AI-Context constitution copies untracked.
+- 2026-07-09: Code review — session-close repo-fallback skip (decision A), constitutionAgentsPath routing, doc drift fixes, test hardening.
 
 ## Story Completion Status
 
-- **Status:** review
-- **Completion note:** All ACs satisfied; `bash scripts/verify.sh` exit 0.
+- **Status:** done
+- **Completion note:** All ACs satisfied; code review patches applied (session-close repo-fallback skip, doc drift fixes, constitution test hardening); `bash scripts/verify.sh` exit 0.

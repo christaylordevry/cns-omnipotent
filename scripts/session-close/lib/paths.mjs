@@ -42,13 +42,29 @@ export function isValidRepoRoot(repoRoot) {
 }
 
 /**
+ * @param {string} vaultRoot
+ * @param {string} repoRoot
+ * @returns {boolean}
+ */
+export function isRepoVaultFallback(vaultRoot, repoRoot) {
+  const candidate = join(repoRoot, "Knowledge-Vault-ACTIVE");
+  try {
+    return realpathSync(vaultRoot) === realpathSync(candidate);
+  } catch {
+    return resolve(vaultRoot) === resolve(candidate);
+  }
+}
+
+/**
  * @param {string} repoRoot
  * @returns {string | null}
  */
 function vaultFallbackUnderRepo(repoRoot) {
   const candidate = join(repoRoot, "Knowledge-Vault-ACTIVE");
-  // Story 87-1: AGENTS.md under repo mock vault is untracked; use a tracked fixture marker.
-  if (existsSync(join(candidate, "AI-Context", "vault-fast-scan-index.md"))) {
+  const aiContext = join(candidate, "AI-Context");
+  // Story 87-1: AGENTS.md under repo mock vault is untracked; use tracked fixture marker.
+  // Constitution reads/writes route via constitutionAgentsPath (specs mirror when fallback active).
+  if (existsSync(join(aiContext, "vault-fast-scan-index.md"))) {
     try {
       return realpathSync(candidate);
     } catch {
@@ -91,13 +107,21 @@ export function resolvePaths(overrides = {}) {
     );
   }
 
+  const agentsPath = join(vaultRoot, "AI-Context", "AGENTS.md");
+  const repoAgentsPath = join(repoRoot, "specs/cns-vault-contract/AGENTS.md");
+  const usingRepoVaultFallback = isRepoVaultFallback(vaultRoot, repoRoot);
+  const constitutionAgentsPath =
+    usingRepoVaultFallback || !existsSync(agentsPath) ? repoAgentsPath : agentsPath;
+
   return {
     repoRoot,
     vaultRoot,
+    usingRepoVaultFallback,
     vaultModulesPath: join(vaultRoot, "AI-Context", "modules"),
     repoModulesPath: join(repoRoot, "specs/cns-vault-contract/modules"),
-    agentsPath: join(vaultRoot, "AI-Context", "AGENTS.md"),
-    repoAgentsPath: join(repoRoot, "specs/cns-vault-contract/AGENTS.md"),
+    agentsPath,
+    constitutionAgentsPath,
+    repoAgentsPath,
     planningAgentsPath: join(
       repoRoot,
       "_bmad-output/planning-artifacts/cns-vault-contract/AGENTS.md",

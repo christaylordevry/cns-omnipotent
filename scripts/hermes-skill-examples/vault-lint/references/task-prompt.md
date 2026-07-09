@@ -54,7 +54,7 @@ Separately, call **`vault_list`** with `path: "."` and `recursive: true`. From a
 
 Batch **`vault_read_frontmatter`** using the `paths` array argument. Keep each request **≤ 40** paths. Cover every path in `GOVERNED_MD`.
 
-If frontmatter is missing or YAML breaks, treat as Rule 4 failures per `vault-lint.md` (invalid `created` blocks Rule 3 for that file).
+If frontmatter is missing or YAML breaks, treat as Rule 4 failures per `specs/cns-vault-contract/vault-lint.md` (invalid `created` blocks Rule 3 for that file).
 
 ## 5) Rule 1 — duplicate `source_uri` (ERROR)
 
