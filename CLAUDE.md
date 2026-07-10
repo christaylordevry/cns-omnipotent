@@ -95,3 +95,11 @@ Dumps the repo source into the codebase so the agent has code-as-context rather 
 - Never install an npm or pip package fewer than 14 days old unless explicitly approved by the operator. This prevents supply chain attacks via recently published malicious packages.
 - Never hardcode API keys or tokens in config files — use environment variables.
 - Hermes gateway watchdog runs every 3 min via cron — check `~/.hermes/logs/watchdog.log` if gateway is unresponsive.
+
+---
+
+## Note Style (when creating/editing vault notes)
+
+SSOT: `specs/cns-vault-contract/modules/note-style-guide.md` — loaded via `@` import for zero drift (callout + structure conventions auto-inlined at session start).
+
+@specs/cns-vault-contract/modules/note-style-guide.md
