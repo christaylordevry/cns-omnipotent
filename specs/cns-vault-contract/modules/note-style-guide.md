@@ -47,12 +47,19 @@ The PAKE quality-enrichment tier (`confidence_score`, `verification_status`, `cr
 
 ## Callout Conventions
 
-Use Obsidian callouts for key sections:
-- [!abstract] — core thesis or summary at the top of research notes
-- [!tip] — actionable insight or lesson
-- [!warning] — risk, caveat, or thing to avoid
-- [!todo] — next action or open question
-- [!note] — supporting context or elaboration
+Callouts are **Obsidian blockquotes** — every line starts with `>`, including the `[!type]`
+header line. They are NOT list items: `- [!tip]` renders as a plain bullet with literal
+"[!tip]" text, not a callout. Correct form:
+
+> [!tip] Optional inline title
+> Body text of the callout.
+
+Types and when to use each:
+- `[!abstract]` — core thesis or summary at the top of research notes
+- `[!tip]` — actionable insight or lesson
+- `[!warning]` — risk, caveat, or thing to avoid
+- `[!todo]` — next action or open question (checkbox items render inside the callout)
+- `[!note]` — supporting context or elaboration
 
 ## Structure Conventions
 
