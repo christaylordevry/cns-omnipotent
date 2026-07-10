@@ -7,7 +7,7 @@ Apply this block whenever you have already validated a **URL-ingest trigger** in
 2. Produce **markdown body only**. Do not emit YAML frontmatter in your output; Vault IO MCP adds PAKE frontmatter when you call `vault_create_note`.
 
 3. Structure the body exactly with these sections, in order:
-   - `[!abstract]` callout containing **2 to 4 sentences** summarizing the page.
+   - **`> [!abstract]` blockquote** (every line prefixed with `>`, not a list item) containing **2 to 4 sentences** summarizing the page.
    - `## Overview` with short contextual grounding.
    - `## Key points` as a bullet list (**at most 12 bullets**).
    - `## Source` with the **canonical URL exactly as the operator posted** (trim outer ASCII whitespace only) and a line giving **retrieval date** in **ISO8601 UTC** (for example `2026-05-03T12:00:00Z`).
