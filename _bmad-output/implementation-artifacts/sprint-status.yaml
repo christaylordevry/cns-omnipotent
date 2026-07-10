@@ -721,7 +721,7 @@ development_status:
 
   # Epic 87 — Constitution mirror dedup (stop tracking stale Knowledge-Vault-ACTIVE/AI-Context copies)
   # specs/cns-vault-contract/ is sole git-tracked mirror; vault mock tree keeps non-constitution fixtures
-  epic-87: in-progress
+  epic-87: done
   87-1-untrack-vault-ai-context-constitution-duplicates: done
   87-2-specs-modules-vault-sync-drift-gate: done
   87-3-pake-quality-enrichment-frontmatter-reconcile: done
