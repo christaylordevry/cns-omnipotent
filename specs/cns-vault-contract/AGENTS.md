@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.56 | Last updated: 2026-07-10
+> Version: 2.1.57 | Last updated: 2026-07-10
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -283,21 +283,19 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 - Epic 58: in-progress
 - Epic 78: in-progress
-- Epic 86: in-progress — Story 86-1 (session-close project status SSOT) in review
-- Epic 87: in-progress — Story 87-3 (PAKE quality enrichment — frontmatter reconcile two-bot conflict) in review
-- 77 epics done; 4 in-progress (58, 78, 86, 87)
+- 79 epics done; 2 in-progress (58, 78)
 
 ### Current Priorities
 
-1. Complete Story 87-3 review and merge — PAKE quality enrichment frontmatter reconcile (two-bot conflict resolution).
-2. Complete Story 86-1 review and merge — session-close project status SSOT.
-3. Advance Epics 58 and 78 — pick up next ready-for-dev stories.
+1. Advance Epic 58 — pick up next ready-for-dev story.
+2. Advance Epic 78 — pick up next ready-for-dev story.
+3. Verify status of Stories 84-2 and 84-3 (approval-gated build evidence — currently unknown).
 
 ### Recent Session Context
 
-- Story 87.3: PAKE quality enrichment tier — reconcile note-frontmatter two-bot conflict — in review.
-- Story 87-3 AGENTS.md §3 WriteGate diff (AC8) — status unknown; verify completion.
-- Story 87.2: specs/ constitution mirror auto-synced + drift-gated — done.
+- Story 86.1: session-close project status SSOT — done.
+- Story 84-3: E2E approval-pause dry-run evidence (Decision #2B) — status unknown; verify completion.
+- Story 84-2: Verify dry-run evidence (Decision 4a) — status unknown; verify completion.
 
 ## 9. Agent Behavior Guidelines
 
@@ -381,6 +379,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-10 | 2.1.57 | **§2–§3:** Registered HookSetNote and WeaponsCheckNote (run-chain adversarial artifacts, route 03-Resources/) in routing table, PAKE Standard scope, and template enum. Operator-direct edit (PAKE reconciliation Lane B). |
 | 2026-07-10 | 2.1.56 | **§2–§3:** Registered HookSetNote and WeaponsCheckNote (run-chain adversarial artifacts, route 03-Resources/) in routing table, PAKE Standard scope, and template enum. Operator-direct edit (PAKE reconciliation Lane B). |
 | 2026-07-10 | 2.1.55 | Section 7: registered unified-loop module (Epic 84). Operator-direct edit. |
 | 2026-07-10 | 2.1.54 | Section 3: quality-enrichment fields reclassified from required to optional PAKE Standard tier — reconciles note-style-guide two-bot conflict (Story 87-3 AC8). Operator-direct edit. |
