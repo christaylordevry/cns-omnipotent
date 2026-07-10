@@ -35,7 +35,7 @@ CORE_REQUIRED_FIELDS = ['pake_id','pake_type','title','created','modified','stat
 QUALITY_ENRICHMENT_FIELDS = ['confidence_score','verification_status','creation_method']
 PAKE_TYPES = ['SourceNote','InsightNote','HookSetNote','WeaponsCheckNote',
               'SynthesisNote','WorkflowNote','ValidationNote']
-STATUSES = ['draft','in-progress','reviewed','stable','archived']
+STATUSES = ['draft','in-progress','reviewed','archived']
 VERIF_STATUSES = ['pending','verified','disputed']
 CREATION_METHODS = ['human','ai','hybrid']
 

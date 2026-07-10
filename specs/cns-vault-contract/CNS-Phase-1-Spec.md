@@ -108,6 +108,8 @@ Knowledge-Vault-ACTIVE/
 │   ├── schemas/                 # PAKE frontmatter definitions
 │   │   ├── source-note.md       # Schema for SourceNote type
 │   │   ├── insight-note.md      # Schema for InsightNote type
+│   │   ├── hook-set-note.md     # Schema for HookSetNote type (run-chain)
+│   │   ├── weapons-check-note.md # Schema for WeaponsCheckNote type (run-chain)
 │   │   ├── synthesis-note.md    # Schema for SynthesisNote type
 │   │   ├── workflow-note.md     # Schema for WorkflowNote type
 │   │   └── validation-note.md   # Schema for ValidationNote type
@@ -150,7 +152,7 @@ All notes outside `00-Inbox/` must include:
 ```yaml
 ---
 pake_id: [auto-generated UUID]
-pake_type: SourceNote | InsightNote | SynthesisNote | WorkflowNote | ValidationNote
+pake_type: SourceNote | InsightNote | HookSetNote | WeaponsCheckNote | SynthesisNote | WorkflowNote | ValidationNote
 title: [human-readable title]
 created: [ISO date]
 modified: [ISO date]
@@ -315,6 +317,8 @@ Behavior:
       SynthesisNote -> 03-Resources/
       WorkflowNote  -> 01-Projects/ (requires explicit project context) or `02-Areas/` (fallback when project context is missing)
       ValidationNote -> 03-Resources/
+      HookSetNote      -> 03-Resources/
+      WeaponsCheckNote -> 03-Resources/
   - WorkflowNote disambiguation:
       - "Project context" means an explicit target project identifier. Do not infer project context.
       - If project context is missing, route to `02-Areas/<area-name>/` when the area is known, otherwise route to the `02-Areas/` root as a temporary holding location that requires triage.
@@ -434,7 +438,7 @@ Phase 1 is done when all of the following are true:
 - [ ] `AI-Context/AGENTS.md` exists and is under 500 lines
 - [ ] `CLAUDE.md` at vault root correctly references AGENTS.md
 - [ ] `.cursorrules` at vault root correctly references AGENTS.md
-- [ ] `_meta/schemas/` contains frontmatter definitions for all five pake_types
+- [ ] `_meta/schemas/` contains frontmatter definitions for all seven pake_types
 - [ ] At least one module exists in `AI-Context/modules/` (vault-io.md or security.md)
 - [ ] Vault IO MCP server runs and exposes all eight tools
 - [ ] Creating a note via `vault_create_note` produces valid PAKE-compliant frontmatter

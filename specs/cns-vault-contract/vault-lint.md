@@ -164,7 +164,7 @@ Scope: governed folders, all `.md` files except `_README.md`.
 | Field | Requirement |
 |-------|-------------|
 | `pake_id` | Non-empty string. Warn if present but not UUID v4. |
-| `pake_type` | One of `SourceNote`, `InsightNote`, `SynthesisNote`, `WorkflowNote`, `ValidationNote`. |
+| `pake_type` | One of `SourceNote`, `InsightNote`, `HookSetNote`, `WeaponsCheckNote`, `SynthesisNote`, `WorkflowNote`, `ValidationNote`. |
 | `title` | Non-empty string. |
 | `created` | `YYYY-MM-DD`. |
 | `modified` | `YYYY-MM-DD`. |
