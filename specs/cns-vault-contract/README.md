@@ -86,6 +86,14 @@ Vault IO has no built-in canonical-vs-fixture discriminator. The MCP host's `CNS
 
 `loadRuntimeConfig` emits a **stderr warning** (never throws) when the resolved root is the repo CI fixture so misconfigured live sessions are visible at MCP startup.
 
+### Where each client sets CNS_VAULT_ROOT
+
+- **Hermes:** `~/.hermes/config.yaml` → `mcp_servers.cns_vault_io.env.CNS_VAULT_ROOT`.
+- **Claude Code (desktop / local-agent-mode):** `%APPDATA%\Claude\claude_desktop_config.json` → `mcpServers.vault-io` (a `wsl.exe … bash -c "CNS_VAULT_ROOT='…' exec node …/dist/index.js"` launch). NOTE: not `~/.claude.json` and not `~/.cursor/mcp.json` — those do not define it.
+- **Cursor:** `~/.cursor/mcp.json` (add a `cns_vault_io` entry with the canonical root if Cursor should do live vault writes).
+
+Live operator sessions that can perform governed writes should run the vault folder in a prompt-on-write permission mode (not an auto-approve/bypass mode), so each mutation is human-gated; WriteGate still protects `AI-Context/` regardless.
+
 ### Vault IO MCP: `vault_request_disambiguation` (Discord `#hermes`)
 
 Optional. When set on the MCP server process, the **`vault_request_disambiguation`** tool can post numbered routing questions and wait for a human operator reply in Discord.
