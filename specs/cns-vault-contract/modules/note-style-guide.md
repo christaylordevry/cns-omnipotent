@@ -3,7 +3,7 @@ pake_id: 28fd2cae-5a4c-4004-ab5d-327a66c4038d
 pake_type: WorkflowNote
 title: note-style-guide
 created: 2026-04-03
-modified: 2026-04-03
+modified: 2026-07-10
 status: draft
 tags:
   - vault-meta
@@ -20,20 +20,20 @@ This module documents established conventions for this vault, reverse-engineered
 ## Frontmatter Fields
 
 Every note outside 00-Inbox requires:
-- pake_type: (SourceNote | InsightNote | SynthesisNote | ValidationNote | WorkflowNote)
+- pake_type: (SourceNote | InsightNote | SynthesisNote | ValidationNote | WorkflowNote | HookSetNote | WeaponsCheckNote)
 - pake_id: (UUID, generated on create)
 - tags: (array)
-- date: (YYYY-MM-DD)
-- status: (draft | in-progress | reference | archived)
+- created: (YYYY-MM-DD)
+- status: (draft | in-progress | reviewed | archived)
 - modified: (YYYY-MM-DD, updated on every write)
 - title: (optional but preferred)
-- source: (optional, for SourceNotes — URL or citation)
+- source_uri: (optional, for SourceNotes — URL or citation)
 
 Status by location:
 - 00-Inbox: draft
 - 01-Projects: in-progress
-- 03-Resources: reference
-- Clippings: reference
+- 03-Resources: reviewed
+- Clippings: reviewed
 - 04-Archive: archived
 
 ## Frontmatter — Prohibited Fields 
@@ -74,3 +74,5 @@ No PAKE frontmatter required (inbox exception)
 - SynthesisNote: connects multiple concepts or sources into a unified view
 - ValidationNote: test result, experiment outcome, proof of concept
 - WorkflowNote: project task, plan, process, or operational note
+- HookSetNote: run-chain hook agent output — four gated hook options with iteration trace
+- WeaponsCheckNote: run-chain weapons-check output — novelty and copy-intensity rubric verdict

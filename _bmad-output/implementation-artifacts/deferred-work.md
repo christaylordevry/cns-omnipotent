@@ -1,5 +1,14 @@
 # Deferred work
 
+## PAKE frontmatter three-layer reconcile — Lane B done (2026-07-10)
+
+Operator-direct specs edit + specs→vault sync (NOT session-close; NOT `sync-vault-modules` reverse):
+
+- **AGENTS.md v2.1.56** — §2 routing + §3 scope/template enum now include HookSetNote and WeaponsCheckNote (Epic 75 run-chain artifacts → `03-Resources/`). All 3 constitution copies byte-identical (`constitution.test` green).
+- **note-style-guide.md** — Gap 5 legacy keys reconciled (`created`, `reviewed` status enum, `source_uri`, 7 pake_types + PAKE Type Guide entries; Clippings/03-Resources → `reviewed`). Specs + canonical vault byte-identical (`vault-modules-parity` green).
+
+**Still open** from 87-3 investigation (Lane A partial / other lanes): `status: stable` lint-vs-Zod; scalar `tags`; vault-lint `task-prompt.md` + `vault-lint-remediate-34-2.ts` enrichment ERROR→WARNING sync; `vault-lint.md` pake_type table if not already done in Lane A.
+
 ## Repo↔canonical vault divergence (surfaced 2026-07-10, PAKE frontmatter reconcile)
 
 Two independently-maintained `Knowledge-Vault-ACTIVE` trees have drifted, and governed writes via a Claude Code session's vault-io MCP reach only the repo copy — NOT the vault Hermes/Nexus/brain-index actually use:

@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.55 | Last updated: 2026-07-10
+> Version: 2.1.56 | Last updated: 2026-07-10
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -79,6 +79,8 @@ When creating a note, route by pake_type:
 | SynthesisNote | 03-Resources/ | Cross-reference connections, summaries |
 | WorkflowNote | 01-Projects/ (requires project context) or 02-Areas/ (fallback to `02-Areas/` when project context is missing) | Action plans, specs, task tracking |
 | ValidationNote | 03-Resources/ | Fact-checks, confidence updates |
+| HookSetNote | 03-Resources/ | Run-chain hook agent output (four gated hooks) |
+| WeaponsCheckNote | 03-Resources/ | Run-chain weapons-check output (novelty + copy intensity) |
 
 Unstructured captures always go to `00-Inbox/`. When in doubt, use Inbox.
 
@@ -104,12 +106,12 @@ Unstructured captures always go to `00-Inbox/`. When in doubt, use Inbox.
 
 Every note outside Inbox must include this minimum frontmatter:
 
-This PAKE Standard applies to knowledge notes (SourceNote, InsightNote, SynthesisNote, WorkflowNote, ValidationNote). Directory contract manifests under `*/_README.md` are contract documents and are permitted to use the contract template frontmatter keys (`purpose`, `schema_required`, `allowed_pake_types`, `naming_convention`) instead.
+This PAKE Standard applies to governed knowledge notes (SourceNote, InsightNote, SynthesisNote, WorkflowNote, ValidationNote, HookSetNote, WeaponsCheckNote). HookSetNote and WeaponsCheckNote are run-chain adversarial artifacts emitted by the hook and weapons-check stages (Epic 75; see `AI-Context/modules/run-chain.md`). Directory contract manifests under `*/_README.md` are contract documents and are permitted to use the contract template frontmatter keys (`purpose`, `schema_required`, `allowed_pake_types`, `naming_convention`) instead.
 
 ```yaml
 ---
 pake_id: [UUID v4, auto-generated]
-pake_type: [SourceNote | InsightNote | SynthesisNote | WorkflowNote | ValidationNote]
+pake_type: [SourceNote | InsightNote | SynthesisNote | WorkflowNote | ValidationNote | HookSetNote | WeaponsCheckNote]
 title: "[Human-readable title]"
 created: [YYYY-MM-DD]
 modified: [YYYY-MM-DD]
@@ -379,6 +381,7 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-10 | 2.1.56 | **§2–§3:** Registered HookSetNote and WeaponsCheckNote (run-chain adversarial artifacts, route 03-Resources/) in routing table, PAKE Standard scope, and template enum. Operator-direct edit (PAKE reconciliation Lane B). |
 | 2026-07-10 | 2.1.55 | Section 7: registered unified-loop module (Epic 84). Operator-direct edit. |
 | 2026-07-10 | 2.1.54 | Section 3: quality-enrichment fields reclassified from required to optional PAKE Standard tier — reconciles note-style-guide two-bot conflict (Story 87-3 AC8). Operator-direct edit. |
 | 2026-07-10 | 2.1.53 | **Section 7:** Registered 6 modules in Active Modules (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook) so the table matches the canonical 11-module set (Epic 87). Operator-direct edit. |
