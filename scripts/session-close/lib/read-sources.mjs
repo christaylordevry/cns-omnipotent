@@ -111,16 +111,22 @@ export function deriveProjectStatusLine(entries) {
     return "Sprint status unavailable";
   }
 
-  let done = 0;
-  /** @type {number[]} */
-  const inProgressNums = [];
-
+  /** @type {Map<number, string>} */
+  const epicByNum = new Map();
   for (const { key, status } of epicRows) {
     const epicMatch = key.match(EPIC_KEY_RE);
     if (!epicMatch) {
       continue;
     }
     const num = Number.parseInt(epicMatch[1], 10);
+    epicByNum.set(num, status);
+  }
+
+  let done = 0;
+  /** @type {number[]} */
+  const inProgressNums = [];
+
+  for (const [num, status] of epicByNum) {
     if (status === "done") {
       done += 1;
     } else if (status === "in-progress") {
@@ -138,14 +144,6 @@ export function deriveProjectStatusLine(entries) {
   const inProgressLabel =
     inProgressNums.length === 1 ? "1 in-progress" : `${inProgressNums.length} in-progress`;
   return `${done} epics done; ${inProgressLabel} (${nums})`;
-}
-
-/**
- * @param {{ key: string, status: string }[]} entries
- * @returns {string}
- */
-export function readProjectStatusLine(entries) {
-  return deriveProjectStatusLine(entries);
 }
 
 /**
@@ -556,7 +554,6 @@ export async function selectRecentStories(artifactsDir, limit = 3) {
 
 /**
  * @param {string} sprintPath
- * @param {string} repoRoot
  */
 export async function readSprintSnapshot(sprintPath) {
   const yaml = await readFile(sprintPath, "utf8");

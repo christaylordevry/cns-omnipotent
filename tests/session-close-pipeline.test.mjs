@@ -305,6 +305,24 @@ describe("session-close read-sources", () => {
     const lines = ["development_status:", "  epic-1: done", "  epic-2: done"];
     const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
     assert.equal(line, "2 epics done; none in-progress");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine de-dupes duplicate epic keys with last row winning", () => {
+    const lines = [
+      "development_status:",
+      "  epic-1: done",
+      "  epic-5: done",
+      "  epic-5: done",
+      "  epic-5: in-progress",
+    ];
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "1 epics done; 1 in-progress (5)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
   });
 
   it("extracts section8 between ## 8. and ## 9.", () => {
