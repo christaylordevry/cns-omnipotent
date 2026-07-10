@@ -1,11 +1,11 @@
 ---
 pake_id: 70dab0da-cb64-4957-bb07-631c524fa80b
 pake_type: SourceNote
-title: "CNS Operator Guide"
-created: 2026-04-05
-modified: 2026-07-06
-status: stable
-confidence_score: 1.0
+title: CNS Operator Guide
+created: '2026-04-05'
+modified: '2026-07-10'
+status: reviewed
+confidence_score: 1
 verification_status: verified
 creation_method: ai
 tags:
