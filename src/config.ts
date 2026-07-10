@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { CnsError } from "./errors.js";
+import { getImplementationRepoRoot } from "./implementation-root.js";
 
 export type RuntimeConfig = {
   vaultRoot: string;
@@ -58,6 +59,34 @@ async function assertExistingDirectory(dirPath: string): Promise<void> {
   }
 }
 
+const CANONICAL_VAULT_ROOT = "/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE";
+
+/**
+ * Warn (never throw) when `CNS_VAULT_ROOT` points at the in-repo CI fixture
+ * (`<implementation-repo>/Knowledge-Vault-ACTIVE`) instead of the canonical live vault.
+ */
+export async function warnIfCiFixtureVaultRoot(vaultRoot: string): Promise<void> {
+  try {
+    const resolvedVault = path.resolve(vaultRoot);
+    if (path.basename(resolvedVault) !== "Knowledge-Vault-ACTIVE") return;
+
+    const parent = path.dirname(resolvedVault);
+    if (path.resolve(parent) !== path.resolve(getImplementationRepoRoot())) return;
+
+    const [packageJsonStat, indexTsStat] = await Promise.all([
+      stat(path.join(parent, "package.json")).catch(() => null),
+      stat(path.join(parent, "src", "index.ts")).catch(() => null),
+    ]);
+    if (!packageJsonStat?.isFile() || !indexTsStat?.isFile()) return;
+
+    process.stderr.write(
+      `[cns-vault-io] WARNING: CNS_VAULT_ROOT resolves to the repo CI fixture (${resolvedVault}), not the canonical live vault. Governed Vault IO writes will hit the CI fixture, not ${CANONICAL_VAULT_ROOT}. For live operator sessions, set CNS_VAULT_ROOT to the canonical vault path.\n`,
+    );
+  } catch {
+    // Warn-only guard — never interrupt MCP startup.
+  }
+}
+
 /** Reject configured root when it is the OS filesystem root — boundary checks would be meaningless (deferred-work / Epic B). */
 function assertVaultRootNotFilesystemRoot(vaultRoot: string): void {
   const resolved = path.resolve(vaultRoot);
@@ -91,6 +120,7 @@ export async function loadRuntimeConfig(inputs: ConfigInputs = {}): Promise<Runt
 
   assertVaultRootNotFilesystemRoot(vaultRoot);
   await assertExistingDirectory(vaultRoot);
+  await warnIfCiFixtureVaultRoot(vaultRoot);
 
   const defaultScopeRaw = env.CNS_VAULT_DEFAULT_SEARCH_SCOPE?.trim();
   const defaultSearchScope = defaultScopeRaw && defaultScopeRaw.length > 0 ? defaultScopeRaw : undefined;

@@ -7,7 +7,7 @@ Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/C
 ## System Context
 - **CNS** — control layer: agent routing, vault IO, security gates, input surfaces
 - **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
-- **Vault** — `Knowledge-Vault-ACTIVE/` (PARA structure) is the single source of truth
+- **Vault** — canonical live vault at `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` (PARA structure) is the single source of truth; repo `./Knowledge-Vault-ACTIVE/` is a **CI fixture only** — live governed Vault IO writes must target canonical unless the task is explicitly fixture maintenance
 - **Hermes** — `~/.hermes/` — Discord gateway, skills at `~/.hermes/skills/cns/`
 - **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v2.1.5)
 

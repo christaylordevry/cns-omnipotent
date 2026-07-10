@@ -1,8 +1,9 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { loadRuntimeConfig } from "../../src/config.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getImplementationRepoRoot } from "../../src/implementation-root.js";
+import { loadRuntimeConfig, warnIfCiFixtureVaultRoot } from "../../src/config.js";
 
 describe("loadRuntimeConfig", () => {
   it("fails when CNS_VAULT_ROOT is missing", async () => {
@@ -84,6 +85,54 @@ describe("loadRuntimeConfig", () => {
       } as NodeJS.ProcessEnv,
     });
     expect(cfg.discordBotToken).toBe("primary");
+  });
+});
+
+describe("warnIfCiFixtureVaultRoot", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("warns when CNS_VAULT_ROOT is the repo CI fixture", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const fixtureRoot = path.join(getImplementationRepoRoot(), "Knowledge-Vault-ACTIVE");
+
+    await warnIfCiFixtureVaultRoot(fixtureRoot);
+
+    expect(stderrSpy).toHaveBeenCalled();
+    const message = String(stderrSpy.mock.calls[0]?.[0] ?? "");
+    expect(message).toMatch(/CI fixture/i);
+    expect(message).toMatch(/canonical live vault/i);
+    expect(message).toMatch(/CNS_VAULT_ROOT/i);
+  });
+
+  it("stays silent for a non-fixture vault root", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-config-other-root-"));
+
+    await warnIfCiFixtureVaultRoot(dir);
+
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it("never throws even when the path is invalid", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(warnIfCiFixtureVaultRoot("\0bad")).resolves.toBeUndefined();
+
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it("loadRuntimeConfig warns for fixture root but still returns config", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const fixtureRoot = path.join(getImplementationRepoRoot(), "Knowledge-Vault-ACTIVE");
+
+    const cfg = await loadRuntimeConfig({
+      env: { CNS_VAULT_ROOT: fixtureRoot } as NodeJS.ProcessEnv,
+    });
+
+    expect(cfg.vaultRoot).toBe(fixtureRoot);
+    expect(stderrSpy).toHaveBeenCalled();
   });
 });
 

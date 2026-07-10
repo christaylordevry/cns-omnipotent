@@ -37,7 +37,14 @@ Verification gate for Phase 1 close-out: run `bash scripts/verify.sh` as documen
 
 ## Vault folder contract manifests
 
-This repository includes a deployable mock vault tree at `Knowledge-Vault-ACTIVE/` for CI and operator reference.
+Both trees use the directory name **`Knowledge-Vault-ACTIVE`**. They are not interchangeable:
+
+| Tree | Path | Role |
+|------|------|------|
+| **Canonical live vault** | `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` | Runtime SSOT for governed operator sessions (Hermes, Claude Code, Cursor live vault work). |
+| **Repo CI fixture** | `./Knowledge-Vault-ACTIVE` (under this implementation repo) | **Frozen** test and verify input — not a live mirror of canonical. |
+
+The repo `./Knowledge-Vault-ACTIVE/` tree is a **frozen CI fixture**. Drift from canonical is intentional. Update fixture seed notes only when a test or verify gate explicitly requires it — not to chase canonical churn.
 
 To deploy to your live vault, mirror these directories and copy their `_README.md` files into the vault root:
 - `00-Inbox/_README.md`
@@ -65,6 +72,19 @@ We ship a **Cursor rules** fragment (`*.mdc`) so rules stay versionable, can set
 1. **Stdio server** (`src/index.ts`): vault root comes **only** from the **`CNS_VAULT_ROOT`** environment variable on the MCP server process (validated in `loadRuntimeConfig`). On Cursor, Claude Code, and similar hosts, set `CNS_VAULT_ROOT` in the MCP **`env`** block. Do not assume an IDE-specific "vault root" field outside that process environment is read by the server today.
 2. **`vaultRootFromHost`** on `loadRuntimeConfig` is for **embedded use, tests, and future host wiring**. The current stdio entrypoint does **not** pass it.
 3. **Precedence:** when both could apply in programmatic calls, **`CNS_VAULT_ROOT` wins** over `vaultRootFromHost`. See `tests/vault-io/config.test.ts`.
+
+### Client-root matrix
+
+Vault IO has no built-in canonical-vs-fixture discriminator. The MCP host's `CNS_VAULT_ROOT` **fully determines** where governed writes land.
+
+| Client / session | `CNS_VAULT_ROOT` | Notes |
+|------------------|------------------|-------|
+| **Hermes** live (`~/.hermes/config.yaml` → `mcp_servers.cns_vault_io.env`) | `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` | Canonical live vault. |
+| **Claude Code** live vault sessions | `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` | Same canonical root as Hermes. |
+| **Cursor** live vault sessions | `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` | Register `cns_vault_io` with canonical root in the MCP `env` block. |
+| **Tests / fixture maintenance only** | `./Knowledge-Vault-ACTIVE` (repo-relative absolute path to the fixture) | Valid only for CI, unit tests, or deliberate fixture updates. Prefer a test-scoped MCP server name when possible so live `cns_vault_io` is not pointed at the fixture by mistake. |
+
+`loadRuntimeConfig` emits a **stderr warning** (never throws) when the resolved root is the repo CI fixture so misconfigured live sessions are visible at MCP startup.
 
 ### Vault IO MCP: `vault_request_disambiguation` (Discord `#hermes`)
 
