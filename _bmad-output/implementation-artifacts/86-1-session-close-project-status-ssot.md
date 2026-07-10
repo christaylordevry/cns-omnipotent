@@ -2,7 +2,7 @@
 story_id: 86-1
 epic: 86
 title: session-close-project-status-ssot
-status: review
+status: done
 zone: Omnipotent.md scripts/session-close
 branch: hermes-consolidation
 incident: HANDOFF-2026-07-05-session14-hermes-consolidation.md §0
@@ -11,7 +11,7 @@ predecessors: 48-1, 59-1, 76-1, 57-2
 
 # Story 86.1: Derive session-close project status from sprint-status.yaml (SSOT)
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 <!-- Format locked: Option A (generalized) — operator 2026-07-05. -->
@@ -261,8 +261,20 @@ Claude Sonnet 4.6 (Cursor)
 - `_bmad-output/implementation-artifacts/86-1-session-close-project-status-ssot.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (story tracking only)
 
+### Review Findings
+
+Code review 2026-07-10 (Blind Hunter + Edge Case Hunter + Acceptance Auditor). All 5 ACs verified MET against source; `bash scripts/verify.sh` PASSED (node 1409 + vitest 791, lint/typecheck/build, cns-dashboard, Hermes install-gate). Derivation logic confirmed correct (SSOT-only, comment-safe status match, singular/plural/none). No blockers, no majors, no decision-needed. Findings are LOW/non-AC polish — routed to a fast-follow patch, not blocking closure.
+
+- [ ] [Review][Patch] Stale `@param {string} repoRoot` JSDoc on `readSprintSnapshot` after the param was dropped [scripts/session-close/lib/read-sources.mjs:559]
+- [ ] [Review][Patch] Duplicate epic keys double-count in `deriveProjectStatusLine` — `parseDevelopmentStatus` pushes per matching line (no de-dupe), so two `epic-N:` rows count twice; asymmetric with `buildActiveEpics` which de-dupes via a Map (last-wins). Low likelihood (invalid YAML map / bad merge), silent wrong output. Fix: de-dupe last-wins before counting [scripts/session-close/lib/read-sources.mjs:108-129]
+- [ ] [Review][Patch] `readProjectStatusLine(entries)` is now a dead export — zero callers, no test references it (only `deriveProjectStatusLine` is used). Remove it, or add a direct unit test if the alias is intended as public API [scripts/session-close/lib/read-sources.mjs:147-149]
+- [ ] [Review][Patch] none-case test omits the stale-marker assertion loop present in the plural/singular tests (AC4-compliant, consistency only) [tests/session-close-pipeline.test.mjs]
+- [x] [Review][Defer] Token-cap deep truncation (`token-estimate.mjs` ~20-token last resort) can cut the in-progress nums list mid-string — pre-existing mechanism, not introduced here, unreachable at current epic scale — deferred, pre-existing
+- Dismissed (2): non-terminal epic statuses (review/backlog/cancelled) omitted from the tally — by ratified Option-A format (done count + in-progress list, not a census); un-migrated external caller TypeError — no callers of the old signatures exist (grep-confirmed).
+
 ## Story Completion Status
 
-- **Status:** review
-- **Ultimate context engine analysis completed** — implementation done pending code review
-- **Operator follow-up:** run `/session-close` via Discord after merge to heal AGENTS.md + MEMORY.md
+- **Status:** done
+- **Ultimate context engine analysis completed** — implementation done, code review passed (2026-07-10), all ACs verified, verify.sh green
+- **Review outcome:** 4 LOW patch items + 1 defer routed to fast-follow; closed done (deliverable complete against all ACs, no blocker/major)
+- **Operator follow-up:** run `/session-close` via Discord to heal AGENTS.md §8 + MEMORY.md from the now-SSOT-derived `project_status_line`

@@ -1,5 +1,17 @@
 # Deferred work
 
+## Deferred from: code review of 86-1-session-close-project-status-ssot (2026-07-10)
+
+- **Token-cap deep truncation can cut the in-progress nums list mid-string** — `token-estimate.mjs` (~20-token last-resort truncation of `project_status_line`) can slice `deriveProjectStatusLine`'s `(1, 5, 7, …)` list mid-number when the whole context pack is over budget. Pre-existing mechanism, not introduced by 86-1, and unreachable at current epic scale (only fires after notebooks + stories are dropped and still over budget). Revisit if the active-epic list ever grows large enough to approach the cap.
+
+### Fast-follow patch bundle (4 LOW items, code review of 86-1) — hand to Cursor
+
+Non-blocking polish on code 86-1 introduced; 86-1 closed done (all ACs met, verify green). Bundle into one small patch story:
+- Delete stale `@param {string} repoRoot` JSDoc on `readSprintSnapshot` (`scripts/session-close/lib/read-sources.mjs:559`).
+- De-dupe epic keys last-wins in `deriveProjectStatusLine` before counting (asymmetry with `buildActiveEpics`, which de-dupes via Map) + add a duplicate-key test (`scripts/session-close/lib/read-sources.mjs:108-129`).
+- Remove dead export `readProjectStatusLine(entries)` (0 callers, 0 tests) — or add a direct unit test if kept as public API (`scripts/session-close/lib/read-sources.mjs:147-149`).
+- Add the stale-marker assertion loop to the none-case test for consistency with plural/singular (`tests/session-close-pipeline.test.mjs`).
+
 ## Deferred from: code review of 87-3-pake-quality-enrichment-frontmatter-reconcile (2026-07-09)
 
 - **`status: stable` lint vs Zod mismatch** — bulk_scan `STATUSES` includes `stable`; Zod and vault-lint spec do not. Pre-existing; notes can pass lint but fail governed mutations.
