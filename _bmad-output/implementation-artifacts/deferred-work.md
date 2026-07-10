@@ -1,5 +1,15 @@
 # Deferred work
 
+## Repo↔canonical vault divergence (surfaced 2026-07-10, PAKE frontmatter reconcile)
+
+Two independently-maintained `Knowledge-Vault-ACTIVE` trees have drifted, and governed writes via a Claude Code session's vault-io MCP reach only the repo copy — NOT the vault Hermes/Nexus/brain-index actually use:
+- **Canonical (live runtime):** `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` — `CNS_VAULT_ROOT` in `~/.hermes/config.yaml:729`.
+- **Repo (git-tracked dev SSOT):** `./Knowledge-Vault-ACTIVE` — what `verify.sh` + the repo-bound vault-io MCP use.
+
+Evidence: `CNS-Operator-Guide.md` diverged on formatting (`title` quoting, `confidence_score` 1 vs 1.0) even before migration; `03-Resources/Vault-Intelligence-Discovery-Workflow.md` is a **stale repo copy** (`status: stable`, date-typed `created`, `modified: 2026-04-05`) while canonical is current (`reviewed`, quoted `created`, `modified: 2026-05-17`). Both trees required separate migration for the single Gap-1 `stable` note.
+
+Not blocking (Lane A safe — no test executes `bulk_scan` against the repo vault). But the trees need a defined sync direction/mechanism, and the "MCP writes don't reach the live vault" gap is a real operator hazard. Scope a vault-sync topology decision (which tree is authoritative, how they reconcile, whether the repo copy should be tracked at all). Related: [[reference_canonical_vs_repo_vault_path]], [[project_vault_module_ssot]]. Also: repo `Vault-Intelligence-Discovery-Workflow.md` still `stable` — sync to canonical (`reviewed`) on next touch.
+
 ## Deferred from: code review of 86-1-session-close-project-status-ssot (2026-07-10)
 
 - **Token-cap deep truncation can cut the in-progress nums list mid-string** — `token-estimate.mjs` (~20-token last-resort truncation of `project_status_line`) can slice `deriveProjectStatusLine`'s `(1, 5, 7, …)` list mid-number when the whole context pack is over budget. Pre-existing mechanism, not introduced by 86-1, and unreachable at current epic scale (only fires after notebooks + stories are dropped and still over budget). Revisit if the active-epic list ever grows large enough to approach the cap.
