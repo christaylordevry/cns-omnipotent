@@ -3,7 +3,7 @@ pake_id: 28fd2cae-5a4c-4004-ab5d-327a66c4038d
 pake_type: WorkflowNote
 title: note-style-guide
 created: 2026-04-03
-modified: 2026-07-11
+modified: 2026-07-12
 status: draft
 tags:
   - vault-meta
@@ -91,6 +91,23 @@ Types and when to use each:
   target note exists (vault search / list) or create a stub first; never invent
   links to notes that do not exist
 - Notes are launchpads (connected + actionable), not libraries — every note should connect outward
+
+## Rich Authoring
+
+When creating or editing any governed note, author the body at full useful depth — not a thin outline. Let the content warrant the structure; do not impose a rigid section skeleton.
+
+**Depth conventions:**
+- Use multiple callouts where the content warrants them (`[!abstract]` for core thesis, `[!tip]` for insights, `[!warning]` for risks, `[!todo]` for open actions, `[!note]` for supporting context)
+- Add block IDs (`^block-id`) on hub-style paragraphs that other notes should reference; do not spam IDs on every bullet
+- Use embeds (`![[Note]]`, `![[Note#Heading]]`) only for vault targets that are confirmed to exist
+- Standard Markdown depth is encouraged: tables, code blocks, footnotes when they improve the note
+
+**Link-target verification (hard rule — before writing any `[[link]]`):**
+1. **Enumerate first:** Build an explicit list of specific candidate note titles you intend to link (concrete names, e.g. `MCP-Servers-Ecosystem`, `ai-agent-orchestration-hub`). Do not treat a vague topic phrase as a candidate.
+2. **Batch-verify those names** in as few vault IO calls as possible — prefer one `vault_list` or `vault_search` sweep over the candidate set. Fall back to per-target calls only if a single sweep cannot cover the full set.
+3. Emit `[[title]]` for all candidates the sweep confirms exist. If a candidate is missing: omit the wikilink, use plain text. Do not invent titles. Do not create stubs unless the operator explicitly asks.
+
+**Synthesis framing:** When the operator asks to relate source material to the existing system ("size this up to our system," "where do we land"), produce a genuine synthesis note — gap analysis, positioning verdict, actionable next steps — not a summary of the source.
 
 ## Daily Notes
 
