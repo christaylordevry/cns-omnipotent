@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-11T13:54:00+10:00
+# last_updated: 2026-07-11T15:17:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-11T13:54:00+10:00"
+last_updated: "2026-07-11T15:17:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -731,5 +731,6 @@ development_status:
   # Trigger: E2E Claude Desktop note was lint-clean but violated creation-time status + linking intent
   epic-88: in-progress
   88-1-clarify-note-style-guide-fresh-ai-status-linking: done
-  88-2-pipeline-link-integrity-inline-linking-hardening: backlog # reserved — enforce link-exists + inline first-mention in pipeline/skills; not 88-1
+  88-2-pipeline-link-integrity-inline-linking-hardening: done # Hermes ingest-prompt connectivity + rich-note; AC1 demo loop-engineering-for-quant-trading-rohonchain
+  88-3-confirm-obsidian-markdown-fires-governed-create: backlog # confirm obsidian-markdown loads+fires on governed create (Claude Code + Desktop); fold connectivity where it doesn't — 88-2 fire-check: does not auto-fire
   epic-88-retrospective: optional
