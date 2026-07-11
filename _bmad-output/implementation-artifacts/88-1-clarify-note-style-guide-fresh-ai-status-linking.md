@@ -13,7 +13,7 @@ baseline_commit: 789795867501ff8d84108e3416ae48a1cf5bd070
 
 # Story 88.1: Clarify note-style-guide — fresh-AI status, no-dangling-links, aggressive inline linking
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -224,6 +224,11 @@ Keep the other Structure bullets (Related Notes, block IDs, launchpads) unchange
 - [x] **Task 5 — Commits** (AC7)
   - [x] Commit 1: Omnipotent.md (specs + cursor rule)
   - [x] Commit 2: Knowledge-Vault-ACTIVE mirror only
+
+### Review Findings
+
+- [x] [Review][Decision][Dismissed] Repo commit scope exceeds AC7 contract — Operator accepted current commit scope as normal BMAD metadata.
+- [x] [Review][Decision][Dismissed] Locked status wording leaves one governed-note edge case ambiguous — Operator chose to preserve the locked wording exactly. Revising to "missing `verification_status` = pending" is explicitly rejected because it would contradict the Nexus-shaped exemption; hardening this edge case belongs in 88-2 pipeline enforcement, not the guide.
 
 ## Dev Notes
 
