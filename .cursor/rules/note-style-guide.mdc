@@ -27,5 +27,19 @@ Types and when to use each:
 
 - Related Notes section at the bottom of every substantial note
 - Block IDs (^block-id) on referenceable paragraphs in hub notes
-- Wikilinks on first concept mention per section (aggressive)
+- Wikilinks on first concept mention per section (aggressive). Related Notes
+  alone is not enough — first body mention must be an inline wikilink.
+
+  Before (wrong — plain text + dump at bottom):
+  Honcho is the dialectic memory provider.
+  ## Related Notes
+  - [[Honcho]]
+
+  After (right — inline on first mention):
+  [[Honcho]] is the dialectic memory provider.
+  ## Related Notes
+  - [[Honcho]]
+- Wikilink only to notes that exist: before writing a `[[link]]`, confirm the
+  target note exists (vault search / list) or create a stub first; never invent
+  links to notes that do not exist
 - Notes are launchpads (connected + actionable), not libraries — every note should connect outward

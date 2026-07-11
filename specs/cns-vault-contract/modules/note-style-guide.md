@@ -3,7 +3,7 @@ pake_id: 28fd2cae-5a4c-4004-ab5d-327a66c4038d
 pake_type: WorkflowNote
 title: note-style-guide
 created: 2026-04-03
-modified: 2026-07-10
+modified: 2026-07-11
 status: draft
 tags:
   - vault-meta
@@ -29,7 +29,17 @@ Every note outside 00-Inbox requires:
 - title: (optional but preferred)
 - source_uri: (optional, for SourceNotes — URL or citation)
 
-Status by location:
+Creation-time status reflects review state, not location. Governed
+enrichment-carrying notes (those stamped with `verification_status`) enter as
+`draft` (or `in-progress` when created under `01-Projects/`) and are promoted
+to `reviewed` only after human or `/verify` review (which sets
+`verification_status: verified`). Never auto-stamp `reviewed` on a note whose
+`verification_status` is `pending`. Nexus-shaped sparse notes (which omit the
+enrichment tier) follow the Nexus triage model and are out of scope for this
+rule.
+
+Target status by location (after triage / review — not the value stamped at
+creation):
 - 00-Inbox: draft
 - 01-Projects: in-progress
 - 03-Resources: reviewed
@@ -65,7 +75,21 @@ Types and when to use each:
 
 - Related Notes section at the bottom of every substantial note
 - Block IDs (^block-id) on referenceable paragraphs in hub notes
-- Wikilinks on first concept mention per section (aggressive)
+- Wikilinks on first concept mention per section (aggressive). Related Notes
+  alone is not enough — first body mention must be an inline wikilink.
+
+  Before (wrong — plain text + dump at bottom):
+  Honcho is the dialectic memory provider.
+  ## Related Notes
+  - [[Honcho]]
+
+  After (right — inline on first mention):
+  [[Honcho]] is the dialectic memory provider.
+  ## Related Notes
+  - [[Honcho]]
+- Wikilink only to notes that exist: before writing a `[[link]]`, confirm the
+  target note exists (vault search / list) or create a stub first; never invent
+  links to notes that do not exist
 - Notes are launchpads (connected + actionable), not libraries — every note should connect outward
 
 ## Daily Notes
