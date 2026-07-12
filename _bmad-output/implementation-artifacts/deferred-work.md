@@ -29,7 +29,7 @@ Operator-direct specs edit + specs→vault sync (NOT session-close; NOT `sync-va
 
 **Still open** from 87-3 investigation (Lane A partial / other lanes): `status: stable` lint-vs-Zod; scalar `tags`; vault-lint `task-prompt.md` + `vault-lint-remediate-34-2.ts` enrichment ERROR→WARNING sync; `vault-lint.md` pake_type table if not already done in Lane A.
 
-## Repo↔canonical vault divergence (surfaced 2026-07-10, PAKE frontmatter reconcile)
+## Repo↔canonical vault topology (surfaced 2026-07-10) — ✅ RESOLVED IN SPEC (`00b25c5`/`237625f`)
 
 Two independently-maintained `Knowledge-Vault-ACTIVE` trees have drifted, and governed writes via a Claude Code session's vault-io MCP reach only the repo copy — NOT the vault Hermes/Nexus/brain-index actually use:
 - **Canonical (live runtime):** `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` — `CNS_VAULT_ROOT` in `~/.hermes/config.yaml:729`.
@@ -37,7 +37,14 @@ Two independently-maintained `Knowledge-Vault-ACTIVE` trees have drifted, and go
 
 Evidence: `CNS-Operator-Guide.md` diverged on formatting (`title` quoting, `confidence_score` 1 vs 1.0) even before migration; `03-Resources/Vault-Intelligence-Discovery-Workflow.md` is a **stale repo copy** (`status: stable`, date-typed `created`, `modified: 2026-04-05`) while canonical is current (`reviewed`, quoted `created`, `modified: 2026-05-17`). Both trees required separate migration for the single Gap-1 `stable` note.
 
-Not blocking (Lane A safe — no test executes `bulk_scan` against the repo vault). But the trees need a defined sync direction/mechanism, and the "MCP writes don't reach the live vault" gap is a real operator hazard. Scope a vault-sync topology decision (which tree is authoritative, how they reconcile, whether the repo copy should be tracked at all). Related: [[reference_canonical_vs_repo_vault_path]], [[project_vault_module_ssot]]. Also: repo `Vault-Intelligence-Discovery-Workflow.md` still `stable` — sync to canonical (`reviewed`) on next touch.
+**Resolved (confirmed at the 2026-07-12 re-orientation — a proposed BMAD architecture session was stopped as redundant).** The topology is settled contract, not an open design question: canonical = runtime SSOT; repo `./Knowledge-Vault-ACTIVE` = **frozen CI fixture** (drift is intentional, not a mirror — so there is no fixture "sync problem"). Full contract in `specs/cns-vault-contract/README.md` (client-root matrix; per-client `CNS_VAULT_ROOT` incl. the `%APPDATA%\Claude\claude_desktop_config.json` `wsl.exe` wrapper that sets it for Claude Code/Desktop; frozen-fixture policy) via commit `00b25c5`; fixture-root startup stderr-guard in `237625f`; decision trace in `investigations/vault-topology-mcp-root-contract-investigation.md` (backlog items 1 & 2 marked Done). All live surfaces (Hermes, Cursor, Claude Code, Desktop) point at canonical; `verify.sh` vault-modules-parity gates the specs↔canonical **module** mirror, which is distinct from the frozen fixture.
+
+**Residuals (small, non-architectural):**
+- **Canonical vault git discipline** — the vault is its own safety-net repo (baseline `227b490`); checkpoint `fbd5c03` (2026-07-12) captured session governed notes + module mirror + audit log, vault now clean (0 uncommitted). No automated commit cadence; hand checkpoints are current practice.
+- **`project-context.md`** still calls `Knowledge-Vault-ACTIVE/` the SoT ambiguously — 1-line cleanup to match the README contract (Cursor's turf).
+- Repo fixture `Vault-Intelligence-Discovery-Workflow.md` still `status: stable` — acceptable per the now-documented freeze policy; fix only if a fixture test needs it PAKE-valid.
+
+Related: [[reference_canonical_vs_repo_vault_path]], [[project_vault_module_ssot]].
 
 ## Deferred from: code review of 86-1-session-close-project-status-ssot (2026-07-10)
 
