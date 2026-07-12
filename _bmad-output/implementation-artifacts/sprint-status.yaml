@@ -729,8 +729,9 @@ development_status:
 
   # Epic 88 — Note-creation governance polish (guide clarifications + reserved pipeline hardening)
   # Trigger: E2E Claude Desktop note was lint-clean but violated creation-time status + linking intent
-  epic-88: in-progress
+  # Closed 2026-07-13: note-authoring parity proven on all 3 surfaces without obsidian-markdown skill — guide sufficient
+  epic-88: done
   88-1-clarify-note-style-guide-fresh-ai-status-linking: done
   88-2-pipeline-link-integrity-inline-linking-hardening: done # Hermes ingest-prompt connectivity + rich-note; AC1 demo loop-engineering-for-quant-trading-rohonchain
-  88-3-confirm-obsidian-markdown-fires-governed-create: backlog # confirm obsidian-markdown loads+fires on governed create (Claude Code + Desktop); fold connectivity where it doesn't — 88-2 fire-check: does not auto-fire
+  88-3-confirm-obsidian-markdown-fires-governed-create: done # closed 2026-07-13: guide sufficient, no skill-wiring needed — 2026-07-12 parity notes (0xjeff-hermes-analyst-60-day-lessons-vs-cns-positioning, pluto-system-design-vs-cns-architecture-sizing in canonical 03-Resources/) are Nexus-grade governed notes produced from note-style-guide alone; skill confirmed does-not-auto-fire and connectivity folded via 88-1/88-2 guide hardening
   epic-88-retrospective: optional
