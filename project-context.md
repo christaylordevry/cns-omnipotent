@@ -6,7 +6,7 @@ Lean implementation rules for AI agents. Normative specs live in `specs/cns-vaul
 
 - **CNS** — control layer: agent routing, vault IO, security gates, input surfaces
 - **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
-- **Vault** — `Knowledge-Vault-ACTIVE/` (PARA) is source of truth
+- **Vault** — canonical live vault at `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` (PARA) is the single source of truth; the in-repo `./Knowledge-Vault-ACTIVE/` is a frozen CI fixture only (Story 87-1; see `specs/cns-vault-contract/README.md`)
 - **Hermes** — `~/.hermes/`; `model.provider: nous`, `model.default: anthropic/claude-sonnet-4.6`; Discord gateway + morning-digest cron live; dashboard `0.0.0.0:9119` (systemd `hermes-dashboard.service`, `--skip-build`, `auth_path: oauth` primary); CNS skills at `~/.hermes/skills/cns/`
 - **Constitution** — `specs/cns-vault-contract/AGENTS.md` (git-tracked mirror of canonical vault `AI-Context/AGENTS.md`)
 - **cns-dashboard** — Layer 3 SvelteKit + Convex dashboard; sibling at `../cns-dashboard`
