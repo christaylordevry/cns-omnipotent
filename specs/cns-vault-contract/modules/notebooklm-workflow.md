@@ -59,6 +59,21 @@ from planned/deferred. Diagnoses failures from documented architecture.
 
 ---
 
+## Tooling Surface (`notebooklm-mcp-cli`, 39 tools)
+
+The NotebookLM MCP is the `notebooklm-mcp-cli` package (`uvx --from notebooklm-mcp-cli notebooklm-mcp`), registered and synchronized across all four surfaces (Claude Code, Cursor, Claude Desktop, Hermes) over one shared auth. Beyond the core query/source tools, the full surface is available:
+
+- **Query:** `notebook_query`, `cross_notebook_query`, `notebook_query_start` / `notebook_query_status` (async)
+- **Source management:** `source_add`, `source_list_drive`, `source_get_content`, `source_delete`, `source_rename`, `source_sync_drive`
+- **Notebook lifecycle:** `notebook_create`, `notebook_delete`, `notebook_list`, `notebook_get`, `notebook_rename`, `notebook_describe`, `notebook_share_public` / `notebook_share_invite`
+- **Studio artifacts:** `studio_create` (audio | video | slide_deck | infographic | report | flashcards | quiz | data_table | mind_map), `studio_status` (poll to completion), `studio_revise`, `download_artifact`
+- **Research automation:** `research_start` / `research_status` / `research_import` (web + Drive discovery before `source_add`)
+- **Batch / ops:** `batch`, `pipeline`, `tag`, `note`, `label`, `refresh_auth`, `server_info`
+
+Auth is a shared browser cookie (`~/.notebooklm-mcp-cli/auth.json`) that expires roughly every 2 to 4 weeks; one `nlm login` refreshes every surface at once. If a call returns an auth error, run `nlm login`, or check `server_info` (`auth_status`: configured | stale | not_configured).
+
+---
+
 ## Workflow Entry Points
 
 ### Entry Point A — Discord / Nexus capture
@@ -101,6 +116,18 @@ Research Tracker base panel shows cluster of related InsightNotes
   → Synthesise into vault_create_note(pake_type: SynthesisNote)
   → SynthesisNote may surface new project → bmad-product-brief
 ```
+
+### Entry Point E — Studio artifact generation
+
+```
+Notebook with good sources → want a consumable artifact (podcast / deck / infographic)
+  → studio_create(notebook_id, artifact_type=audio|slide_deck|infographic|…, confirm=true)
+  → poll studio_status(notebook_id) until the artifact status is completed with a URL
+  → download_artifact(notebook_id, artifact_type, output_path) to save locally
+  → optionally land a pointer or InsightNote in the vault
+```
+
+Audio deep-dives take several minutes; `studio_create` returns immediately and generation is async, so poll `studio_status` rather than blocking.
 
 ---
 
