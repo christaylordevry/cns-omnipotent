@@ -126,9 +126,10 @@ function errorOutput(err) {
 }
 
 /**
+ * Detect execFile timeout / kill (Node sets killed + SIGTERM; sync path may use ETIMEDOUT).
  * @param {unknown} err
  */
-function isTimeoutError(err) {
+export function isTimeoutError(err) {
   if (!err || typeof err !== "object") {
     return false;
   }

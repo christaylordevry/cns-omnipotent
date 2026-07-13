@@ -7,12 +7,33 @@ import { promisify } from "node:util";
 
 import { readNotebooklmDriveDocId } from "./lib/load-session-close-env.mjs";
 import { matchDriveSourceByDocId } from "./lib/match-drive-source.mjs";
-import { resolveNlmCommand, resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
+import { isTimeoutError, resolveNlmCommand, resolveNlmEnv } from "./lib/nlm-auth-watchdog.mjs";
 import { resolveOperatorHome } from "./lib/operator-home.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
 import { mergeFanoutUpdatesAtPath } from "./merge-notebooklm-fanout.mjs";
 
 const DRIVE_SYNC_LOG_BASENAME = "session-close-drive-sync.log";
+
+/** Per-call bound for `nlm source list` / `nlm source sync` (ms). */
+export const NLM_EXEC_TIMEOUT_MS = 25_000;
+
+/**
+ * Simple promise-chain mutex so concurrent notebook workers serialize
+ * close-report read-modify-write merges.
+ * @returns {(fn: () => Promise<unknown>) => Promise<unknown>}
+ */
+export function createAsyncMutex() {
+  /** @type {Promise<unknown>} */
+  let chain = Promise.resolve();
+  return function withLock(fn) {
+    const run = chain.then(() => fn());
+    chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+}
 
 /**
  * Append full drive-sync stderr to operator log before close-report sanitization.
@@ -68,6 +89,34 @@ async function patchCloseReport(reportPath, patch) {
   Object.assign(report, patch);
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   return report;
+}
+
+/**
+ * Merge fields into existing `drive_sync_phase` (preserves started_at etc.).
+ * @param {string} reportPath
+ * @param {Record<string, unknown>} phasePatch
+ */
+async function patchDriveSyncPhase(reportPath, phasePatch) {
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  if (!isObject(report)) {
+    throw new Error("close-report invalid");
+  }
+  const existing = isObject(report.drive_sync_phase) ? report.drive_sync_phase : {};
+  report.drive_sync_phase = { ...existing, ...phasePatch };
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  return report;
+}
+
+/**
+ * @param {unknown} err
+ * @returns {string}
+ */
+function formatExecError(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  if (err && typeof err === "object" && "stderr" in err && typeof err.stderr === "string") {
+    return `${message}\n${err.stderr}`;
+  }
+  return message;
 }
 
 /**
@@ -153,9 +202,19 @@ export function matchWordDocVaultExportFallback(sources) {
 }
 
 /**
+ * @typedef {{
+ *   status: 'ok' | 'failed';
+ *   stderr: string;
+ *   driveSourceId: string | null;
+ *   errorClass?: string;
+ * }} SyncNotebookResult
+ */
+
+/**
  * @param {string} notebookId
  * @param {string} driveDocId
  * @param {(cmd: string, args: string[]) => Promise<{ stdout: string }>} [runNlm]
+ * @returns {Promise<SyncNotebookResult>}
  */
 export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
   const nlmEnv = await resolveNlmEnv();
@@ -175,6 +234,7 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
         env: nlmEnv,
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
+        timeout: NLM_EXEC_TIMEOUT_MS,
       });
       return { stdout };
     });
@@ -191,11 +251,15 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     ]);
     listStdout = listed.stdout;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const stderr =
-      err && typeof err === "object" && "stderr" in err && typeof err.stderr === "string"
-        ? `${message}\n${err.stderr}`
-        : message;
+    const stderr = formatExecError(err);
+    if (isTimeoutError(err)) {
+      return {
+        status: "failed",
+        stderr,
+        driveSourceId: null,
+        errorClass: "nlm_list_timeout",
+      };
+    }
     return { status: "failed", stderr, driveSourceId: null };
   }
 
@@ -234,13 +298,42 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     ]);
     return { status: "ok", stderr: "", driveSourceId: matched.sourceId };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const stderr =
-      err && typeof err === "object" && "stderr" in err && typeof err.stderr === "string"
-        ? `${message}\n${err.stderr}`
-        : message;
+    const stderr = formatExecError(err);
+    if (isTimeoutError(err)) {
+      return {
+        status: "failed",
+        stderr,
+        driveSourceId: matched.sourceId,
+        errorClass: "nlm_sync_timeout",
+      };
+    }
     return { status: "failed", stderr, driveSourceId: matched.sourceId };
   }
+}
+
+/**
+ * @param {string} notebookId
+ * @param {string} driveDocId
+ * @param {SyncNotebookResult} result
+ * @returns {import('./merge-notebooklm-fanout.mjs').FanoutUpdate}
+ */
+function buildFanoutUpdate(notebookId, driveDocId, result) {
+  /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate} */
+  const update = {
+    notebook_id: notebookId,
+    status: result.status,
+    stderr: result.stderr,
+    drive_doc_id: driveDocId,
+  };
+  if (result.driveSourceId) {
+    update.drive_source_id = result.driveSourceId;
+  }
+  if (result.errorClass) {
+    update.error_class = result.errorClass;
+  } else if (result.status === "failed" && result.stderr.includes("NOTEBOOKLM_DRIVE_DOC_ID")) {
+    update.error_class = "unknown";
+  }
+  return update;
 }
 
 /**
@@ -249,8 +342,16 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
  * @param {unknown[]} targets
  * @param {string} message
  * @param {string | undefined} driveSyncLogPath
+ * @param {Record<string, string | undefined> | undefined} env
  */
-async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message, driveSyncLogPath) {
+async function mergeDriveWriteFailure(
+  reportPath,
+  driveDocId,
+  targets,
+  message,
+  driveSyncLogPath,
+  env,
+) {
   const updates = targets
     .filter((row) => isObject(row) && typeof row.notebook_id === "string")
     .map((row) => ({
@@ -260,7 +361,7 @@ async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message, 
       error_class: "drive_write_error",
       drive_doc_id: driveDocId,
     }));
-  await appendDriveSyncFailureLogs(updates, { logPath: driveSyncLogPath });
+  await appendDriveSyncFailureLogs(updates, { logPath: driveSyncLogPath, env });
   await mergeFanoutUpdatesAtPath(reportPath, updates);
   return { ok: false, reason: "drive-write-failed", merged: updates.length };
 }
@@ -271,10 +372,12 @@ async function mergeDriveWriteFailure(reportPath, driveDocId, targets, message, 
  *   driveDocId?: string;
  *   runNlm?: (cmd: string, args: string[]) => Promise<{ stdout: string }>;
  *   driveSyncLogPath?: string;
+ *   env?: Record<string, string | undefined>;
  * }} [opts]
  */
 export async function runSyncVaultExportDrive(reportPath, opts = {}) {
-  const driveDocId = opts.driveDocId ?? (await readNotebooklmDriveDocId());
+  const env = opts.env ?? process.env;
+  const driveDocId = opts.driveDocId ?? (await readNotebooklmDriveDocId({ env }));
   if (!driveDocId) {
     return { ok: false, skipped: true, reason: "missing-doc-id" };
   }
@@ -317,31 +420,46 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
         ? driveWrite.message
         : "drive doc overwrite not completed (steps.drive_write missing or not ok)";
     process.stderr.write(`session-close: sync-vault-export-drive skipped (${message})\n`);
-    return mergeDriveWriteFailure(reportPath, driveDocId, targets, message, opts.driveSyncLogPath);
+    return mergeDriveWriteFailure(
+      reportPath,
+      driveDocId,
+      targets,
+      message,
+      opts.driveSyncLogPath,
+      env,
+    );
   }
 
-  /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate[]} */
-  const updates = [];
-  for (const target of targets) {
-    if (!isObject(target) || typeof target.notebook_id !== "string") {
-      continue;
-    }
-    const notebookId = target.notebook_id;
-    const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm);
-    updates.push({
-      notebook_id: notebookId,
-      status: result.status,
-      stderr: result.stderr,
-      drive_doc_id: driveDocId,
-      ...(result.driveSourceId ? { drive_source_id: result.driveSourceId } : {}),
-      ...(result.status === "failed" && result.stderr.includes("NOTEBOOKLM_DRIVE_DOC_ID")
-        ? { error_class: "unknown" }
-        : {}),
-    });
-  }
+  const notebookIds = targets
+    .filter((row) => isObject(row) && typeof row.notebook_id === "string")
+    .map((row) => /** @type {string} */ (row.notebook_id));
 
-  await appendDriveSyncFailureLogs(updates, { logPath: opts.driveSyncLogPath });
-  await mergeFanoutUpdatesAtPath(reportPath, updates);
+  const mergeLock = createAsyncMutex();
+
+  await mergeLock(async () =>
+    patchDriveSyncPhase(reportPath, { started_at: new Date().toISOString() }),
+  );
+
+  const settled = await Promise.allSettled(
+    notebookIds.map(async (notebookId) => {
+      const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm);
+      const update = buildFanoutUpdate(notebookId, driveDocId, result);
+      await appendDriveSyncFailureLogs([update], {
+        logPath: opts.driveSyncLogPath,
+        env,
+      });
+      await mergeLock(async () => mergeFanoutUpdatesAtPath(reportPath, [update]));
+      return update;
+    }),
+  );
+
+  await mergeLock(async () =>
+    patchDriveSyncPhase(reportPath, { finished_at: new Date().toISOString() }),
+  );
+
+  const updates = settled
+    .filter((row) => row.status === "fulfilled")
+    .map((row) => /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate} */ (row.value));
 
   return { ok: true, synced: updates.filter((u) => u.status === "ok").length };
 }
