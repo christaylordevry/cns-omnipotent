@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-13T10:45:00+10:00
+# last_updated: 2026-07-13T10:50:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-13T10:45:00+10:00"
+last_updated: "2026-07-13T10:50:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -439,7 +439,7 @@ development_status:
   58-1-migrate-vault-export-drive-doc-sync: done
   58-2-watchedsurface-tier2-multi-surface: reserved  # planned in 58-1; not yet scoped
   58-3-session-close-notebooklm-pdf-source-fix: done
-  58-4-drive-sync-phase-hardening-and-diagnostics-integrity: review
+  58-4-drive-sync-phase-hardening-and-diagnostics-integrity: done
 
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
   epic-59: done

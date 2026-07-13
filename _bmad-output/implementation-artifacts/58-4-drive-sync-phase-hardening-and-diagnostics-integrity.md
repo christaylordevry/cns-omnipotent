@@ -2,7 +2,7 @@
 story_id: 58-4
 epic: 58
 title: drive-sync-phase-hardening-and-diagnostics-integrity
-status: review
+status: done
 baseline_commit: 462a622072fede27ce3f19ff6ba65f6b8ab390f0
 predecessors: 58-3
 repos: Omnipotent.md
@@ -12,7 +12,7 @@ diagnosed: 2026-07-13 (Claude Code; do not re-diagnose)
 
 # Story 58.4: Drive-sync phase hardening and diagnostics integrity
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -126,6 +126,10 @@ so that **wall-clock kills leave diagnosable partial results, worst-case sync ti
   - [x] Update `fanout-diagnostics.md` error_class table with `nlm_list_timeout` / `nlm_sync_timeout`
   - [x] Bump `SKILL.md` version → `1.0.18`; run `bash scripts/install-hermes-skill-session-close.sh`
   - [x] `bash scripts/verify.sh`
+
+### Review Findings
+
+- [x] [Review][Patch] Surface rejected concurrent workers instead of returning ok:true with unstamped rows [`scripts/session-close/sync-vault-export-drive.mjs:443`]
 
 ## Dev Notes
 
@@ -289,6 +293,7 @@ Composer (Cursor agent router)
 - `drive_sync_phase`: `started_at` before work; `finished_at` merged into existing phase object (preserves started_at); omitted on skip / drive-write-fail paths
 - AC4 regression uses sandboxed `opts.env.HOME` (never fingerprints real operator HOME); all tests pass explicit `driveSyncLogPath` or sandboxed env; fake fixture UUID
 - Skill mirror 1.0.18 installed; deferred-work WATCH rewritten (gate-fired / 58-4); `bash scripts/verify.sh` PASS
+- Code review patch: stamp-before-append + surface `partial-merge-failed` when a concurrent worker rejects (35/35 drive-sync tests)
 
 ### File List
 
@@ -308,3 +313,4 @@ Composer (Cursor agent router)
 |------|--------|
 | 2026-07-13 | Story created (`ready-for-dev`) — gate-fired residual + test-log integrity |
 | 2026-07-13 | Implemented 58-4: concurrent+timeout sync, incremental merge, phase markers, test isolation, skill 1.0.18 → `review` |
+| 2026-07-13 | Code review: stamp-before-append + `partial-merge-failed` on worker reject → `done` |

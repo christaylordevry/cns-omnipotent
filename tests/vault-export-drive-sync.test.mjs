@@ -990,6 +990,46 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.ok(typeof saved.drive_sync_phase.finished_at === "string");
     assert.ok(listStarts.size === 3);
   });
+
+  it("log append failure after stamp returns ok:false (does not swallow worker reject)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-append-fail-"));
+    const reportPath = join(dir, "close-report.json");
+    // Directory path → appendFile rejects after merge stamp.
+    const badLogPath = join(dir, "logs-as-dir");
+    await mkdir(badLogPath);
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: badLogPath,
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        // Failed sync → appendDriveSyncFailureLogs is attempted after stamp.
+        throw new Error("nlm sync boom");
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "partial-merge-failed");
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.notebooklm_targets[0].fanout_status, "failed");
+    assert.ok(typeof saved.drive_sync_phase?.finished_at === "string");
+  });
 });
 
 describe("record-notebooklm-fanout-mode (58-1)", () => {

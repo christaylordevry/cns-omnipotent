@@ -444,11 +444,12 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     notebookIds.map(async (notebookId) => {
       const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm);
       const update = buildFanoutUpdate(notebookId, driveDocId, result);
+      // Stamp first so a log-append IO failure cannot leave the row UNSTAMPED.
+      await mergeLock(async () => mergeFanoutUpdatesAtPath(reportPath, [update]));
       await appendDriveSyncFailureLogs([update], {
         logPath: opts.driveSyncLogPath,
         env,
       });
-      await mergeLock(async () => mergeFanoutUpdatesAtPath(reportPath, [update]));
       return update;
     }),
   );
@@ -460,6 +461,20 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
   const updates = settled
     .filter((row) => row.status === "fulfilled")
     .map((row) => /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate} */ (row.value));
+  const rejected = settled.filter((row) => row.status === "rejected");
+  if (rejected.length > 0) {
+    const first = rejected[0];
+    const reason = first.status === "rejected" ? first.reason : undefined;
+    const message = reason instanceof Error ? reason.message : String(reason ?? "unknown");
+    process.stderr.write(
+      `session-close: sync-vault-export-drive worker failed for ${rejected.length} notebook(s): ${message}\n`,
+    );
+    return {
+      ok: false,
+      reason: "partial-merge-failed",
+      synced: updates.filter((u) => u.status === "ok").length,
+    };
+  }
 
   return { ok: true, synced: updates.filter((u) => u.status === "ok").length };
 }
