@@ -1,5 +1,11 @@
 # Deferred work
 
+## 58-2 WatchedSurface Tier-2 multi-surface — ✅ CLOSED 2026-07-13, NO-GO / cancelled
+
+Reserved in 58-1 for additional watched NotebookLM sources beyond the single vault-export Drive PDF (candidates: per-PARA exports, CNS-Daily-Rhythm.md, sprint-status.yaml, AGENTS.md §8). Product brief `_bmad-output/planning-artifacts/briefs/brief-CNS-2026-07-13/brief.md` settled **NO-GO**: no concrete recurring operator decision measurably fails on the Tier-1 single-PDF fan-out; origin was reservation-without-pain; building would add duplication + sync failure modes after 58-3/58-4 hardening. Export scope is `01-Projects` + `03-Resources` by design (`export-vault-for-notebooklm.sh`); coverage gaps without a failing query do not earn a build. Operator bottleneck is revenue, not NotebookLM surface coverage.
+
+**Epic 58 closed** (58-1, 58-3, 58-4 done; 58-2 `cancelled`). Reopen only with a named failing query + proposed scoped surface as evidence — do not keep a reserved stub.
+
 ## Fable 5 reasoning-manual extraction → CNS reasoning layer (QUEUED 2026-07-13)
 
 Extract Claude Fable 5's reasoning "operating manual" while access lasts and deploy it so Fable-grade reasoning runs on cheaper models. Full plan, corrected prompts, and anti-downgrade guardrails in **`HANDOFF-2026-07-13-fable5-reasoning-extraction.md`** (repo root). **Phased — operator decision 2026-07-13, start safe:**

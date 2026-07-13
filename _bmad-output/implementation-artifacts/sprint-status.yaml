@@ -435,9 +435,10 @@ development_status:
   # 58-4 (2026-07-13): residual gate FIRED — both 07-09 and 07-10 closes left all 3 targets UNSTAMPED.
   #   Root causes: all-or-nothing merge after sequential loop + no per-call nlm timeout + no phase markers.
   #   Separate: tests polluted ~/.hermes/logs/session-close-drive-sync.log (382 fake OAuth lines).
-  epic-58: in-progress
+  # Closed 2026-07-13: 58-2 WatchedSurface Tier-2 NO-GO (brief-CNS-2026-07-13) — reservation withdrawn.
+  epic-58: done
   58-1-migrate-vault-export-drive-doc-sync: done
-  58-2-watchedsurface-tier2-multi-surface: reserved  # planned in 58-1; not yet scoped
+  58-2-watchedsurface-tier2-multi-surface: cancelled # NO-GO 2026-07-13 (brief-CNS-2026-07-13): reservation-without-pain, no failing single-corpus query; Tier-2 reopens 58-3/58-4 sync failure modes; export scope 01-Projects+03-Resources by design
   58-3-session-close-notebooklm-pdf-source-fix: done
   58-4-drive-sync-phase-hardening-and-diagnostics-integrity: done
 
