@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { describe, it } from "node:test";
 
 import {
@@ -16,12 +17,15 @@ import {
   extractDriveDocIdFromSource,
   matchDriveSourceByDocId,
 } from "../scripts/session-close/lib/match-drive-source.mjs";
+import { isTimeoutError } from "../scripts/session-close/lib/nlm-auth-watchdog.mjs";
+import { resolveOperatorHome } from "../scripts/session-close/lib/operator-home.mjs";
 import { mergeFanoutIntoCloseReport } from "../scripts/session-close/merge-notebooklm-fanout.mjs";
 import { recordNotebooklmFanoutMode } from "../scripts/session-close/record-notebooklm-fanout-mode.mjs";
 import {
   appendDriveSyncFailureLogs,
   matchGoogleDocsSourceFallback,
   matchWordDocVaultExportFallback,
+  NLM_EXEC_TIMEOUT_MS,
   parseNlmDriveSourceList,
   runSyncVaultExportDrive,
   syncNotebookDriveSource,
@@ -34,8 +38,36 @@ import {
 } from "../scripts/session-close/lib/render-vault-export-pdf.mjs";
 import { overwriteDrivePdfContent } from "../scripts/session-close/lib/google-drive-pdf-write.mjs";
 
-const FIXTURE_NOTEBOOK = "981466f0-de1c-4551-93a9-f3bc2a24b184";
+/** Obviously fake — never a production NotebookLM notebook id. */
+const FIXTURE_NOTEBOOK = "00000000-0000-4000-a000-ffffffffffff";
+const FIXTURE_NOTEBOOK_2 = "00000000-0000-4000-a000-fffffffffffe";
+const FIXTURE_NOTEBOOK_3 = "00000000-0000-4000-a000-fffffffffffd";
 const FIXTURE_DRIVE_DOC = "1AbCdEfGhIjKlMnOpQrStUvWxYz";
+const PRODUCTION_NOTEBOOK_IDS = new Set([
+  "981466f0-de1c-4551-93a9-f3bc2a24b184",
+  "dc6abf1a-99d2-428d-af63-107591ff2c2e",
+  "f037c741-f7e1-4a90-880f-d2d38986767b",
+]);
+
+/**
+ * @param {string} dir
+ */
+function tmpDriveSyncLogPath(dir) {
+  return join(dir, "session-close-drive-sync.log");
+}
+
+/**
+ * @returns {Error & { killed: boolean; signal: string; code: string }}
+ */
+function makeTimeoutError(message = "timed out") {
+  const err = /** @type {Error & { killed: boolean; signal: string; code: string }} */ (
+    new Error(message)
+  );
+  err.killed = true;
+  err.signal = "SIGTERM";
+  err.code = "ETIMEDOUT";
+  return err;
+}
 
 const DRIVE_SOURCE_LIST_FIXTURE = [
   {
@@ -538,6 +570,7 @@ describe("sync-vault-export-drive (58-1)", () => {
   it("runSyncVaultExportDrive marks targets drive_write_error when drive write failed", async () => {
     const dir = await mkdtemp(join(tmpdir(), "sync-drive-write-fail-"));
     const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
     await writeFile(
       reportPath,
       `${JSON.stringify({
@@ -551,7 +584,10 @@ describe("sync-vault-export-drive (58-1)", () => {
       })}\n`,
       "utf8",
     );
-    const result = await runSyncVaultExportDrive(reportPath, { driveDocId: FIXTURE_DRIVE_DOC });
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: logPath,
+    });
     assert.equal(result.reason, "drive-write-failed");
     const saved = JSON.parse(await readFile(reportPath, "utf8"));
     const row = saved.notebooklm_targets[0];
@@ -559,11 +595,13 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.equal(row.error_class, "drive_write_error");
     assert.equal(row.drive_doc_id, FIXTURE_DRIVE_DOC);
     assert.equal(saved.notebooklm_fanout_mode, "drive-sync");
+    assert.ok(!saved.drive_sync_phase);
   });
 
   it("runSyncVaultExportDrive skips sync when steps.drive_write is missing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "sync-drive-write-missing-"));
     const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
     await writeFile(
       reportPath,
       `${JSON.stringify({
@@ -574,7 +612,10 @@ describe("sync-vault-export-drive (58-1)", () => {
       })}\n`,
       "utf8",
     );
-    const result = await runSyncVaultExportDrive(reportPath, { driveDocId: FIXTURE_DRIVE_DOC });
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: logPath,
+    });
     assert.equal(result.reason, "drive-write-failed");
     const saved = JSON.parse(await readFile(reportPath, "utf8"));
     assert.equal(saved.notebooklm_targets[0].error_class, "drive_write_error");
@@ -583,6 +624,7 @@ describe("sync-vault-export-drive (58-1)", () => {
   it("runSyncVaultExportDrive persists drive_source_id on successful sync", async () => {
     const dir = await mkdtemp(join(tmpdir(), "sync-drive-ok-"));
     const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
     await writeFile(
       reportPath,
       `${JSON.stringify({
@@ -606,6 +648,7 @@ describe("sync-vault-export-drive (58-1)", () => {
     const result = await runSyncVaultExportDrive(reportPath, {
       driveDocId: FIXTURE_DRIVE_DOC,
       runNlm,
+      driveSyncLogPath: logPath,
     });
     assert.equal(result.synced, 1);
     const saved = JSON.parse(await readFile(reportPath, "utf8"));
@@ -613,11 +656,13 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.equal(row.fanout_status, "ok");
     assert.equal(row.drive_source_id, "src-vault");
     assert.equal(row.drive_doc_id, FIXTURE_DRIVE_DOC);
+    assert.ok(typeof saved.drive_sync_phase?.started_at === "string");
+    assert.ok(typeof saved.drive_sync_phase?.finished_at === "string");
   });
 
   it("appendDriveSyncFailureLogs writes full stderr before close-report sanitization", async () => {
     const dir = await mkdtemp(join(tmpdir(), "drive-sync-log-"));
-    const logPath = join(dir, "session-close-drive-sync.log");
+    const logPath = tmpDriveSyncLogPath(dir);
     const longStderr = `Traceback (most recent call last):\n${"x".repeat(400)}`;
 
     await appendDriveSyncFailureLogs(
@@ -637,7 +682,7 @@ describe("sync-vault-export-drive (58-1)", () => {
   it("runSyncVaultExportDrive logs full stderr and classifies nlm_cli_exception", async () => {
     const dir = await mkdtemp(join(tmpdir(), "sync-drive-nlm-exc-"));
     const reportPath = join(dir, "close-report.json");
-    const logPath = join(dir, "session-close-drive-sync.log");
+    const logPath = tmpDriveSyncLogPath(dir);
     const longStderr = `╭─ Error ─────────────────────╮\n│ sync failed                 │\n╰─────────────────────────────╯\n${"y".repeat(300)}`;
     await writeFile(
       reportPath,
@@ -695,6 +740,255 @@ describe("sync-vault-export-drive (58-1)", () => {
     const row = merged.notebooklm_targets[0];
     assert.equal(row.fanout_status, "failed");
     assert.equal(row.error_class, "drive_write_error");
+  });
+
+  it("fixture notebook ids are never production notebook UUIDs", () => {
+    assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK));
+    assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK_2));
+    assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK_3));
+    assert.equal(NLM_EXEC_TIMEOUT_MS, 25_000);
+  });
+
+  it("default drive-sync log path resolves into sandbox HOME (never real operator HOME)", async () => {
+    const sandboxHome = await mkdtemp(join(tmpdir(), "drive-sync-sandbox-home-"));
+    const env = { HOME: sandboxHome };
+    const resolvedHome = await resolveOperatorHome(env);
+    assert.equal(resolvedHome, sandboxHome);
+    const defaultLogPath = join(sandboxHome, ".hermes", "logs", "session-close-drive-sync.log");
+
+    const reportPath = join(sandboxHome, "close-report.json");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "failed", message: "Google OAuth token refresh failed" },
+        },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    // Intentionally omit driveSyncLogPath — default must use opts.env HOME.
+    await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      env,
+    });
+
+    const logged = await readFile(defaultLogPath, "utf8");
+    assert.ok(logged.includes("Google OAuth token refresh failed"));
+    assert.ok(defaultLogPath.startsWith(sandboxHome));
+
+    // Ok-path with default log under same sandbox (no driveSyncLogPath).
+    const okReportPath = join(sandboxHome, "close-report-ok.json");
+    await writeFile(
+      okReportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+    const fingerprintBefore = await stat(defaultLogPath);
+    await runSyncVaultExportDrive(okReportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      env,
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        return { stdout: "{}" };
+      },
+    });
+    const fingerprintAfter = await stat(defaultLogPath);
+    assert.equal(fingerprintAfter.size, fingerprintBefore.size);
+    assert.equal(fingerprintAfter.mtimeMs, fingerprintBefore.mtimeMs);
+  });
+
+  it("incremental merge stamps notebook 1 before notebook 2 finishes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-incremental-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "NB1", export_path: "/tmp/export.md" },
+          { notebook_id: FIXTURE_NOTEBOOK_2, title: "NB2", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    /** @type {(() => void) | undefined} */
+    let releaseNb2;
+    const nb2Gate = new Promise((resolve) => {
+      releaseNb2 = resolve;
+    });
+
+    const runNlm = async (_cmd, args) => {
+      const notebookId = args[2];
+      if (args.includes("list")) {
+        if (notebookId === FIXTURE_NOTEBOOK_2) {
+          await nb2Gate;
+        }
+        return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+      }
+      return { stdout: "{}" };
+    };
+
+    const syncPromise = runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      runNlm,
+      driveSyncLogPath: logPath,
+    });
+
+    let observedMidRun = false;
+    for (let i = 0; i < 100; i += 1) {
+      await delay(20);
+      const mid = JSON.parse(await readFile(reportPath, "utf8"));
+      const nb1 = mid.notebooklm_targets.find((r) => r.notebook_id === FIXTURE_NOTEBOOK);
+      const nb2 = mid.notebooklm_targets.find((r) => r.notebook_id === FIXTURE_NOTEBOOK_2);
+      if (nb1?.fanout_status === "ok" && !nb2?.fanout_status) {
+        assert.ok(typeof mid.drive_sync_phase?.started_at === "string");
+        assert.equal(mid.drive_sync_phase?.finished_at, undefined);
+        observedMidRun = true;
+        releaseNb2?.();
+        break;
+      }
+    }
+    assert.equal(observedMidRun, true, "expected notebook 1 stamped before notebook 2");
+    await syncPromise;
+
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.notebooklm_targets[0].fanout_status, "ok");
+    assert.equal(saved.notebooklm_targets[1].fanout_status, "ok");
+    assert.ok(typeof saved.drive_sync_phase.finished_at === "string");
+  });
+
+  it("list timeout maps to nlm_list_timeout and sync timeout to nlm_sync_timeout", async () => {
+    assert.equal(isTimeoutError(makeTimeoutError()), true);
+
+    const listResult = await syncNotebookDriveSource(
+      FIXTURE_NOTEBOOK,
+      FIXTURE_DRIVE_DOC,
+      async (_cmd, args) => {
+        if (args.includes("list")) {
+          throw makeTimeoutError("nlm source list timed out");
+        }
+        return { stdout: "{}" };
+      },
+    );
+    assert.equal(listResult.status, "failed");
+    assert.equal(listResult.errorClass, "nlm_list_timeout");
+
+    const syncResult = await syncNotebookDriveSource(
+      FIXTURE_NOTEBOOK,
+      FIXTURE_DRIVE_DOC,
+      async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        throw makeTimeoutError("nlm source sync timed out");
+      },
+    );
+    assert.equal(syncResult.status, "failed");
+    assert.equal(syncResult.errorClass, "nlm_sync_timeout");
+    assert.equal(syncResult.driveSourceId, "src-vault");
+
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-list-timeout-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+    await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: logPath,
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          throw makeTimeoutError("list timeout");
+        }
+        return { stdout: "{}" };
+      },
+    });
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.notebooklm_targets[0].error_class, "nlm_list_timeout");
+  });
+
+  it("concurrent notebooks all stamp under parallel merges", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-concurrent-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
+    const ids = [FIXTURE_NOTEBOOK, FIXTURE_NOTEBOOK_2, FIXTURE_NOTEBOOK_3];
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: ids.map((notebook_id, i) => ({
+          notebook_id,
+          title: `NB${i + 1}`,
+          export_path: "/tmp/export.md",
+        })),
+      })}\n`,
+      "utf8",
+    );
+
+    /** @type {Map<string, number>} */
+    const listStarts = new Map();
+    const runNlm = async (_cmd, args) => {
+      const notebookId = args[2];
+      if (args.includes("list")) {
+        listStarts.set(notebookId, Date.now());
+        await delay(30);
+        return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+      }
+      return { stdout: "{}" };
+    };
+
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      runNlm,
+      driveSyncLogPath: logPath,
+    });
+    assert.equal(result.synced, 3);
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    for (const id of ids) {
+      const row = saved.notebooklm_targets.find((r) => r.notebook_id === id);
+      assert.equal(row.fanout_status, "ok");
+      assert.equal(row.drive_source_id, "src-vault");
+    }
+    assert.ok(typeof saved.drive_sync_phase.started_at === "string");
+    assert.ok(typeof saved.drive_sync_phase.finished_at === "string");
+    assert.ok(listStarts.size === 3);
   });
 });
 
