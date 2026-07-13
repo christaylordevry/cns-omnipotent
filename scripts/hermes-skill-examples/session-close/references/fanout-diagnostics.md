@@ -65,6 +65,8 @@ Rows merge **in place** on `notebook_id` (no duplicates). Never write export fil
 | `api_error` | `HTTP 5xx`, `502`, `503`, `504`, `internal server`, `service unavailable` |
 | `unknown` | default (e.g. bare `Could not add file source.`) |
 | `drive_write_error` | Drive PDF media overwrite failed (drive-sync path only; set via merge `--error-class` or sync script) |
+| `nlm_list_timeout` | Drive-sync: `nlm source list` hit 25 s exec timeout (explicit `error_class`) |
+| `nlm_sync_timeout` | Drive-sync: `nlm source sync` hit 25 s exec timeout (explicit `error_class`) |
 
 ## HTTP status parsing
 

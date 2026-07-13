@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-11T15:17:00+10:00
+# last_updated: 2026-07-13T10:45:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-11T15:17:00+10:00"
+last_updated: "2026-07-13T10:45:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -432,12 +432,14 @@ development_status:
   # Epic 58 — NotebookLM vault export Drive sync (operator brief 2026-06-03)
   # Reopened 2026-07-08: 58-3 PDF source fix for deterministic drive_write_error (Doc write 134s > ~60s budget)
   # 58-3 VERIFIED LIVE 2026-07-09: /session-close write path succeeded (no drive_write_error, PDF on Drive fast).
-  #   Residual (NOT 58-3): drive-sync PHASE hit 90s wall-clock on a flaky-NLM night — the `nlm source list` calls
-  #   before each sync are the slow part (sync itself is instant). WATCH next session-close; see deferred-work.md.
+  # 58-4 (2026-07-13): residual gate FIRED — both 07-09 and 07-10 closes left all 3 targets UNSTAMPED.
+  #   Root causes: all-or-nothing merge after sequential loop + no per-call nlm timeout + no phase markers.
+  #   Separate: tests polluted ~/.hermes/logs/session-close-drive-sync.log (382 fake OAuth lines).
   epic-58: in-progress
   58-1-migrate-vault-export-drive-doc-sync: done
   58-2-watchedsurface-tier2-multi-surface: reserved  # planned in 58-1; not yet scoped
   58-3-session-close-notebooklm-pdf-source-fix: done
+  58-4-drive-sync-phase-hardening-and-diagnostics-integrity: review
 
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
   epic-59: done

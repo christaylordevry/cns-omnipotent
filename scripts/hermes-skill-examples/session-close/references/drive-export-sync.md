@@ -34,11 +34,14 @@ The Drive source is a **Google Drive PDF** (media byte-swap), not a native Googl
 - Renders `deterministic.export_path` markdown → `vault-export-for-notebooklm.pdf` (beside the `.md`) via Playwright Chromium (`page.pdf`, extractable text).
 - Media-overwrites the same Drive PDF `fileId` (`Content-Type: application/pdf`). Typical wall-clock ≪ 60 s.
 - Sync only runs when `steps.drive_write.status === "ok"`.
-- Per notebook: `nlm source list <id> --drive --json --skip-freshness` → match cascade:
+- Notebooks sync **concurrently** (`Promise.allSettled`); each `nlm` call is bounded by **25 s** (`NLM_EXEC_TIMEOUT_MS`).
+- Per notebook (incremental merge under a mutex): `nlm source list <id> --drive --json --skip-freshness` → match cascade:
   1. `drive_doc_id` / id fields / URL parse (`matchDriveSourceByDocId`)
   2. first `type === "google_docs"` (legacy Doc)
   3. `type === "word_doc"` **and** title anchored to `vault-export-for-notebooklm` (PDF; spike-proven payload has no `drive_doc_id` / `url`)
   → `nlm source sync <id> --source-ids <uuid> -y`.
+- Each notebook's fan-out row is merged into `.session-close/close-report.json` **immediately** after that notebook settles (ok / failed / timeout) — a mid-phase kill leaves already-finished notebooks stamped.
+- Phase markers: `drive_sync_phase.started_at` before notebook work; `drive_sync_phase.finished_at` after all settle (merge into existing phase object). Kill after start leaves `started_at` without `finished_at`.
 
 4. **Legacy mode** (`legacy_fanout_deprecation: true`): when Drive file ID or OAuth missing — use `references/fanout-diagnostics.md` `source_add` loop unchanged.
 
@@ -50,12 +53,15 @@ The Drive source is a **Google Drive PDF** (media byte-swap), not a native Googl
 | `legacy_fanout_deprecation` | `false` | `true` |
 | `steps.drive_write` | `{ status, message }` e.g. `drive pdf overwritten` | omitted |
 | `drive_doc_id` / `drive_source_id` on targets | when known | omitted |
+| `drive_sync_phase` | `{ started_at, finished_at? }` when sync path entered | omitted |
 
 ## error_class
 
 | Class | When |
 |-------|------|
 | `drive_write_error` | Drive PDF media overwrite failed (all targets failed with this class) |
+| `nlm_list_timeout` | `nlm source list` exceeded 25 s (explicit; wins over classifier) |
+| `nlm_sync_timeout` | `nlm source sync` exceeded 25 s (explicit; wins over classifier) |
 | `unknown` | No matching Drive source in notebook (operator must add PDF titled `vault-export-for-notebooklm` in UI) |
 | Others | Sync stderr via `classify-source-add-error.mjs` |
 

@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
-version: 1.0.17
+version: 1.0.18
 author: CNS Operator
 license: MIT
 metadata:
