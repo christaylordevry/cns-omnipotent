@@ -2,7 +2,10 @@
 story_id: OPS-2
 epic: ops-observability
 title: cross-repo-digest-signal-schema-contract-guard
-status: draft-pending-design-gate
+status: review
+baseline_commit: 5fd3e7d2e294d2f4f5f27b6c7deebbdb6340906d
+design_gate: APPROVED_2026-07-20
+sequencing: cns-dashboard half FIRST (generates manifest) → Omnipotent.md half (consumes)
 created: 2026-07-20
 operator_brief: 2026-07-20
 incident: 2026-06-20 ArgumentValidationError `viewCount` — partial write, 11 signals landed, 5 silent failures
@@ -13,7 +16,42 @@ supersedes_priority_of: OPS-3 (retry — recommended close-unbuilt)
 
 # Story OPS-2: Cross-repo digest-signal schema contract guard
 
-Status: **draft — design gate OPEN, operator approval required before dev**
+Status: **review — Phase B (Omnipotent.md) complete 2026-07-20**
+
+## Design decisions — RESOLVED 2026-07-20 (these override the "Open Questions" section below)
+
+| # | Question | **Decision** |
+|---|---|---|
+| 1 | Manifest location | **`Omnipotent.md/contracts/digest-signal-contract.json`** — it is a generated build artifact; `specs/cns-vault-contract/` is governed prose under the 87-2 sync-drift gate and would fight a regenerated file |
+| 2 | Sweep vs runtime assertion | **BOTH.** The sweep catches drift at `verify.sh` time; the pre-flight assertion converts any escapee into a clean local failure with zero partial write. Dropping the assertion leaves `signalsWritten: 11` possible — the actual 06-20 harm |
+| 3 | 60-1 skill-parity gate coverage | **Verify empirically**, do not assume. Run it, paste output. If it does not cover the morning-digest scripts, add an explicit `cmp` step |
+| 4 | Run-level (`createDigestRun`) payload | **Include in v1.** Same pattern, much smaller object; deferring leaves a second unguarded surface on the same boundary |
+
+### ⚠️ Consequence of decision 1 — the cross-repo skip trap
+
+The manifest lives in `Omnipotent.md`, but AC2's test runs in `cns-dashboard` and must read across
+repos (mirroring `verify.sh:59-72`, which locates the sibling via `CNS_DASHBOARD_ROOT`).
+
+**A test that silently skips when the sibling repo is absent is not a guard** — it is the exact
+"default toward silence" defect OPS-1 was built to eliminate, relocated into the test suite. In a
+Vercel build or a fresh single-repo clone, the sibling will be missing.
+
+Binding rules:
+
+- **The `Omnipotent.md` half (AC3) is the HARD gate.** The manifest and the producer both live in
+  that repo, so that test can never legitimately skip. It must fail, never skip, under all
+  conditions.
+- **The `cns-dashboard` half (AC2) may skip only when the sibling repo is genuinely absent**, and
+  when it skips it must print a loud, explicit reason naming the resolved path it tried. A silent
+  green is forbidden.
+- Resolve the sibling via an env var with a sane default (`OMNIPOTENT_ROOT`, defaulting to
+  `../Omnipotent.md`), matching the existing `CNS_DASHBOARD_ROOT` convention.
+- **AC2 must include a test that the skip path itself behaves** — point it at a nonexistent root
+  and assert it reports skipped-with-reason rather than passing quietly.
+
+---
+
+## Original gate (superseded above where they conflict)
 
 ## Story
 
@@ -189,11 +227,75 @@ cd ../cns-dashboard && npm test -- digest
 
 Plus both red-test proofs (AC2, AC3) demonstrated and pasted into the Dev Agent Record.
 
+## Tasks / Subtasks (Phase B — Omnipotent.md)
+
+- [x] AC3 — Fixture sweep: `buildDigestPushPayload` + `dedupeSignals` emitted keys ⊆ manifest
+- [x] AC3 — Red-test proof: strip `viewCount` from manifest copy → FAIL (paste below)
+- [x] AC4 — New-adapter tripwire against `COLLECT_ADAPTER_TASK_KEYS` (17)
+- [x] AC5 — Pre-flight validation in `pushDigestToConvex` before first Convex write (zero partial writes)
+- [x] AC6 — OPS-1 interop: contract violation → `overall !== success` → exit 1 + Discord alert naming field; AC2 zero-call spy preserved
+- [x] AC7 — Dual-copy `cmp` of modified morning-digest scripts; empirical 60-1 skill-parity check
+- [x] AC8 — `bash scripts/verify.sh` PASS
+
 ## Open Questions — close before dev
 
-1. **Manifest location** — `specs/cns-vault-contract/contracts/` (vault-governed) vs
-   `Omnipotent.md/contracts/`? See gate (a).
-2. **Fixture sweep vs runtime assertion** — confirm both (gate (b) 1+2), or one?
+1. **Manifest location** — RESOLVED: `Omnipotent.md/contracts/`
+2. **Fixture sweep vs runtime assertion** — RESOLVED: BOTH
 3. Does `verify.sh`'s 60-1 skill-parity gate already cover the morning-digest scripts touched here,
-   or is a `cmp` step needed in this story? (AC7)
-4. Include the run-level (`createDigestRun`) payload in v1, or defer? (gate (c))
+   or is a `cmp` step needed in this story? (AC7) — **RESOLVED empirically: YES, 60-1 covers `morning-digest` via `PARITY_SKILLS` (`diff -rq` of entire skill tree). Explicit `cmp` still run for the two modified files.**
+4. Include the run-level (`createDigestRun`) payload in v1, or defer? — RESOLVED: include in v1
+
+## Dev Agent Record
+
+### Implementation Plan
+
+1. Consume Phase A manifest at `contracts/digest-signal-contract.json` (hard gate — never skip).
+2. Guard module `digest-signal-contract-guard.mjs`: load manifest, collect emitted keys, validate ⊆ field sets; sanitize rescore-transport `run.digestRunId` / `signal.digestSignalId` before check.
+3. All-adapter fixture covering 17 `COLLECT_ADAPTER_TASK_KEYS` + dedicated dedupe cluster for `:446` merge.
+4. Wire `assertPayloadMatchesDigestSignalContract` into `pushDigestToConvex` before any Convex fetch.
+5. OPS-1 interop test: poison payload → real `pushDigestToConvex` → `completion-convex-push-failed` → exit 1 + alert naming field; strengthen AC2 zero-call spy.
+6. Dual-copy via `install-hermes-skill-morning-digest.sh` + `cmp`.
+
+### Debug Log
+
+- Pre-flight initially rejected rescore payloads carrying `run.digestRunId` / `signal.digestSignalId` (local identity carriers, omitted before Convex mutations). Fixed via `sanitizePayloadForContractCheck` + omit `digestRunId` on create path.
+- Lint: `preserve-caught-error` required `{ cause: err }` on contract parse failure.
+
+### Completion Notes
+
+- **Phase B only** (AC3–AC8). Phase A (AC1–AC2) landed in cns-dashboard; manifest present at `contracts/digest-signal-contract.json`.
+- Decision 4: run-level `digestRunInput` / `digestSourceOutcome` included in validation.
+- **AC3 red-test proof (pasted):**
+  ```
+  [OPS-2 AC3 red-test] FAIL as required:
+   OPS-2 contract violation: extra field(s) not in digest-signal-contract.json: sourceMetadata.viewCount
+  violations: sourceMetadata.viewCount
+  ✔ RED-TEST PROOF: emit viewCount with viewCount removed from manifest → FAIL
+  ```
+- **AC7 `cmp` proof (pasted):**
+  ```
+  cmp guard: OK
+  cmp push: OK
+  ```
+- **Decision 3 / 60-1 empirical:** `PARITY_SKILLS = ['notebook-query', 'morning-digest', 'session-close']` — **YES, the 60-1 gate covers these files** (`diff -rq` of the entire `morning-digest` skill tree). Explicit `cmp` still executed for the two modified scripts. `node scripts/assert-hermes-skill-install-gate.mjs` → exit 0.
+- OPS-1 AC2 not weakened: skipped-already-pushed asserts `alertCalls === 0`.
+- `bash scripts/verify.sh` → **VERIFY PASSED** (both repos).
+
+### File List
+
+- `contracts/digest-signal-contract.json` (Phase A artifact — consumed, not authored here)
+- `scripts/hermes-skill-examples/morning-digest/scripts/digest-signal-contract-guard.mjs` (new)
+- `scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs` (modified — AC5 pre-flight)
+- `tests/fixtures/all-adapters-digest-contract.fixture.mjs` (new)
+- `tests/digest-signal-contract-guard.test.mjs` (new — AC3/AC4)
+- `tests/morning-digest-push-convex.test.mjs` (modified — AC5)
+- `tests/run-digest-convex-completion.test.mjs` (modified — AC6 + OPS-1 AC2 spy)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/implementation-artifacts/OPS-2-digest-signal-schema-contract-guard.md` (this story)
+- `~/.hermes/skills/cns/morning-digest/scripts/{digest-signal-contract-guard,push-digest-convex}.mjs` (dual-copy install)
+
+### Change Log
+
+- 2026-07-20: OPS-2 Phase B — fixture sweep ⊆ manifest, new-adapter tripwire, pre-flight assertion (zero partial writes), OPS-1 interop, dual-copy parity. verify.sh PASS.
+
+## Open Questions — closed (see Design decisions table at top)
