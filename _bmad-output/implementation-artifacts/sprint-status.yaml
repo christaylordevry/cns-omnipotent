@@ -746,7 +746,7 @@ development_status:
 
   # Ops observability — digest pipeline must fail loudly (incident 2026-07-20 Convex free-plan outage)
   # A full day of signals was lost silently: action=completion-convex-push-failed … signalsWritten:0, exit=0
-  ops-observability: in-progress
+  ops-observability: done # OPS-1 done, OPS-2 done (both phases reviewed), OPS-3 cancelled-unbuilt 2026-07-20
   OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
   OPS-2-digest-signal-schema-contract-guard: done # Phase A reviewed+patched 2026-07-20 (cns-dashboard); Phase B reviewed+patched 2026-07-20 (hollow fieldSets throw, contributingSources type check, contract-load→failed path, forceRescore poison AC5 test, merge assertion lock); dual-copy cmp OK
-  OPS-3-digest-push-in-run-retry: draft-recommend-close # EVIDENCE 2026-07-20: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither. Day-level retry already exists (push-digest-watchdog.mjs:435). Recommend close unbuilt; reopen only if a push failure ever self-heals on the next run. Awaiting operator decision.
+  OPS-3-digest-push-in-run-retry: cancelled # CLOSED UNBUILT 2026-07-20 by operator decision on evidence: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither, and a naive retry can duplicate the run row (BD-2 delta corruption). Day-level retry already exists (push-digest-watchdog.mjs:435). REOPEN TRIGGER: a completion-convex-push-failed that self-heals on the next run without intervention. Story text retained — the analysis records why not to build this next time it looks obvious.
