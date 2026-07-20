@@ -10,7 +10,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { applySection8ToAgentsText } from "./lib/apply-section8-body.mjs";
+import {
+  assertAgentsPropagationAllowed,
+  normalizeLf,
+  parseAgentsHeaderVersion,
+} from "./lib/agents-constitution-guard.mjs";
+import {
+  applySection8ToAgentsText,
+  bumpPatchVersion,
+} from "./lib/apply-section8-body.mjs";
 import { loadContextPackIfPresent } from "./lib/load-context-pack.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
 import { estimateTokens, SECTION8_DRAFT_TOKEN_LIMIT } from "./lib/token-estimate.mjs";
@@ -34,26 +42,57 @@ export function parseApplySection8Argv(argv) {
 
 /**
  * @param {string} closeReportPath
- * @param {string} message
+ * @returns {Promise<Record<string, unknown>>}
  */
-export async function recordSection8Failure(closeReportPath, message) {
-  /** @type {Record<string, unknown>} */
-  let report = {};
+async function readCloseReportObject(closeReportPath) {
   try {
     const raw = await readFile(closeReportPath, "utf8");
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      report = parsed;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return /** @type {Record<string, unknown>} */ (parsed);
     }
   } catch {
-    // partial close: create or overwrite failure marker
+    // partial close: create fresh report
   }
+  return {};
+}
+
+/**
+ * @param {string} closeReportPath
+ * @param {Record<string, unknown>} patch
+ */
+async function mergeCloseReport(closeReportPath, patch) {
+  const report = await readCloseReportObject(closeReportPath);
+  Object.assign(report, patch);
+  await mkdir(dirname(closeReportPath), { recursive: true });
+  await writeFile(closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  return report;
+}
+
+/**
+ * @param {string} closeReportPath
+ * @param {string} message
+ * @param {Record<string, unknown>} [constitutionGuard]
+ */
+export async function recordSection8Failure(
+  closeReportPath,
+  message,
+  constitutionGuard,
+) {
+  /** @type {Record<string, unknown>} */
+  const report = await readCloseReportObject(closeReportPath);
   report.failure_class = "section8";
   const steps =
     report.steps && typeof report.steps === "object" && !Array.isArray(report.steps)
       ? /** @type {Record<string, unknown>} */ (report.steps)
       : {};
-  steps.section8 = { status: "failed", message };
+  /** @type {Record<string, unknown>} */
+  const section8Step = { status: "failed", message };
+  if (constitutionGuard) {
+    section8Step.constitution_guard = constitutionGuard;
+    report.constitution_guard = constitutionGuard;
+  }
+  steps.section8 = section8Step;
   report.steps = steps;
   await mkdir(dirname(closeReportPath), { recursive: true });
   await writeFile(closeReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
@@ -118,11 +157,72 @@ export async function runApplySection8(opts) {
     opts.contextPack ?? (await loadContextPackIfPresent(contextPackPath));
   const changelogMessage = changelogMessageFromPack(pack);
 
+  let sourcePath = paths.constitutionAgentsPath;
   let agentsText;
   try {
     agentsText = await readFile(paths.constitutionAgentsPath, "utf8");
   } catch {
     agentsText = await readFile(paths.repoAgentsPath, "utf8");
+    sourcePath = paths.repoAgentsPath;
+  }
+
+  /** @type {string | null} */
+  let mirrorText;
+  try {
+    mirrorText = await readFile(paths.repoAgentsPath, "utf8");
+  } catch {
+    mirrorText = null;
+  }
+
+  const sourceNorm = normalizeLf(agentsText);
+  let newVersionPreview;
+  try {
+    newVersionPreview = bumpPatchVersion(parseAgentsHeaderVersion(sourceNorm));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const guardMessage = message.startsWith("constitution-guard:")
+      ? message
+      : `constitution-guard: structural: ${message}`;
+    if (!dryRun) {
+      await recordSection8Failure(paths.closeReportPath, guardMessage);
+    }
+    throw new Error(guardMessage, { cause: err });
+  }
+
+  /** @type {Record<string, unknown>} */
+  let constitutionGuard;
+  try {
+    constitutionGuard = assertAgentsPropagationAllowed({
+      sourcePath,
+      mirrorPath: paths.repoAgentsPath,
+      sourceText: sourceNorm,
+      mirrorText,
+      newVersion: newVersionPreview,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    /** @type {Record<string, unknown>} */
+    const failedGuard = {
+      structural: message.includes("structural:") ? "failed" : "passed",
+      stale: message.includes(": stale:") ? "failed" : "unknown",
+      collision: message.includes("version-collision:") ? "failed" : "unknown",
+      reason: message,
+    };
+    if (message.includes("mirror-unreadable:")) {
+      failedGuard.structural = "unknown";
+      failedGuard.stale = "failed";
+      failedGuard.collision = "failed";
+    }
+    if (!dryRun) {
+      await recordSection8Failure(paths.closeReportPath, message, failedGuard);
+    }
+    throw err instanceof Error ? err : new Error(message);
+  }
+
+  if (!dryRun) {
+    await mergeCloseReport(paths.closeReportPath, {
+      constitution_guard: constitutionGuard,
+    });
   }
 
   const { text: patched, newVersion, changelogRow } = applySection8ToAgentsText(
@@ -152,6 +252,7 @@ export async function runApplySection8(opts) {
       previewPath,
       targets: targets.map((t) => t.path),
       written: false,
+      constitution_guard: constitutionGuard,
     };
   }
 
@@ -195,6 +296,7 @@ export async function runApplySection8(opts) {
     targets: targets.map((t) => t.path),
     written: true,
     bytes: Buffer.byteLength(patched, "utf8"),
+    constitution_guard: constitutionGuard,
   };
 }
 

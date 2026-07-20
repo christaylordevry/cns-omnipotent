@@ -103,6 +103,26 @@ const SAMPLE_AGENTS = `# AGENTS
 
 > Version: 9.9.9 | Last updated: 2026-01-01
 
+## 2. Vault Map
+
+| pake_type | Default destination | Notes |
+|-----------|---------------------|-------|
+| SourceNote | 03-Resources/ | Original source material |
+| InsightNote | 03-Resources/ | Derived observations |
+| SynthesisNote | 03-Resources/ | Cross-reference connections |
+| WorkflowNote | 01-Projects/ | Action plans |
+| ValidationNote | 03-Resources/ | Fact-checks |
+| HookSetNote | 03-Resources/ | Run-chain hook output |
+| WeaponsCheckNote | 03-Resources/ | Run-chain weapons-check output |
+
+## 3. Formatting Standards
+
+This PAKE Standard applies to governed knowledge notes.
+
+## 4. Vault IO Protocol
+
+Vault IO summary for fixtures.
+
 ## 8. Current Focus
 
 > intro
