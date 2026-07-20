@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "generated": true,
+    "generatedFrom": "cns-dashboard/convex/validators.ts",
+    "regenerateCommand": "npm run generate:digest-signal-contract  # from cns-dashboard; writes ../Omnipotent.md/contracts/digest-signal-contract.json",
+    "generatedAt": "2026-07-20T05:51:21.036Z"
+  },
+  "fieldSets": {
+    "digestSignalInput": [
+      "digestRunId",
+      "disposition",
+      "externalId",
+      "normalizedEngagement",
+      "rank",
+      "rankScore",
+      "score",
+      "scores",
+      "section",
+      "sourceMetadata",
+      "sourceType",
+      "summary",
+      "title",
+      "topicSlug",
+      "url",
+      "workspaceId"
+    ],
+    "digestSignalScores": [
+      "momentum",
+      "novelty",
+      "personalRelevance",
+      "relevance",
+      "urgency"
+    ],
+    "sourceMetadata": [
+      "author",
+      "authorHandle",
+      "categories",
+      "commentCount",
+      "comments",
+      "contributingSources",
+      "dedupClusterSize",
+      "forks",
+      "leadingOutcome",
+      "leadingProbability",
+      "likes",
+      "liquidityUsd",
+      "outcomePrices",
+      "outcomes",
+      "peopleMatch",
+      "points",
+      "publishedAt",
+      "quotes",
+      "replies",
+      "reposts",
+      "stars",
+      "upvotes",
+      "viewCount",
+      "volumeUsd"
+    ],
+    "contributingSources": [
+      "commentCount",
+      "comments",
+      "forks",
+      "likes",
+      "points",
+      "publishedAt",
+      "quotes",
+      "replies",
+      "reposts",
+      "sourceType",
+      "stars",
+      "upvotes",
+      "url",
+      "viewCount"
+    ],
+    "peopleMatch": [
+      "bonusPoints",
+      "matchType",
+      "matchedHandle",
+      "personName"
+    ],
+    "digestRunInput": [
+      "briefingId",
+      "date",
+      "deepSignalSummary",
+      "errors_by_source",
+      "focusKeyword",
+      "notebookId",
+      "ranAt",
+      "sourceOutcomes",
+      "status",
+      "topTrend",
+      "vaultContextSummary",
+      "workspaceId"
+    ],
+    "digestSourceOutcome": [
+      "reason",
+      "signalCount",
+      "sourceKey",
+      "status"
+    ]
+  }
+}
