@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of OPS-1-digest-push-fail-loud.md (2026-07-20)
+
+- Concurrent alert + `writeDayOutcomeRecordAtomic` stamp race (check-then-act): two overlapping invocations could both post before either stamps. Pre-existing day-outcome file concurrency model; digest cron slots are hours apart. Revisit only if overlapping watchdog invocations become real.
+
 ## Open Design — wire Hermes MCP (deferred 2026-07-16)
 
 Open Design (`nexu-io/open-design`) was installed system-wide 2026-07-16 (see memory `reference_open_design_install`). MCP wired into **claude / cursor / codex** via `od mcp install <agent>`; **Hermes deliberately skipped** — `od mcp install hermes` only prints a manual block because "Hermes config format is unverified," and `~/.hermes/config.yaml` is a governed CNS surface (WriteGate / non-negotiable #4). Defer until there's a concrete need for Hermes to drive OD design generation (e.g. a Discord "design a landing page with the CNS Instrument system" skill).
