@@ -16,7 +16,15 @@ supersedes_priority_of: OPS-3 (retry — recommended close-unbuilt)
 
 # Story OPS-2: Cross-repo digest-signal schema contract guard
 
-Status: **done — Phase A patches from code review applied 2026-07-20; Phase B complete**
+Status: **done — Phase A reviewed+patched 2026-07-20; Phase B reviewed+patched 2026-07-20**
+
+> The Phase A code review (`ced8406`, cns-dashboard) closed **Phase A only**. Phase B
+> (`b230a1a` + `6a7de0a`) is implemented and green but has **never been code-reviewed**. It is the
+> half that modifies `push-digest-convex.mjs` — the production write path — and is dual-copied into
+> the live Hermes runtime, so a defect there ships to the 07:15 cron, not just the repo. Phase A's
+> review found 5 real patches including an allowlisted-instead-of-recursive walk that would have
+> hollowed out the guard; there is no basis for assuming the larger half is cleaner.
+> **Do not mark this story done until the Phase B review lands.**
 
 ## Design decisions — RESOLVED 2026-07-20 (these override the "Open Questions" section below)
 
@@ -312,4 +320,22 @@ Phase A commit `ced8406` reviewed 2026-07-20 (cns-dashboard half). Focus: comple
 - [x] [Review][Defer] Convex validator introspection depends on undocumented `kind`/`fields`/`element` (+ `isOptional` flag) — deferred, inherent to mechanical approach; live Convex keeps optional as `kind=object|array` with `isOptional`, so current nests work; if Convex wraps as `kind=optional`, extractor throws (loud) not silent skip
 - [x] [Review][Defer] Sibling presence check is `package.json` only — deferred, soft false-positive risk if another Node tree sits at `OMNIPOTENT_ROOT`
 - [x] [Review][Defer] Generator writes into sibling repo without Omnipotent identity check / atomic write — deferred, operational; `OMNIPOTENT_ROOT` documented
+
+Phase B commits `b230a1a` + `6a7de0a` reviewed 2026-07-20 (Omnipotent.md half). Focus: skip/no-op paths, AC5 force-rescore, AC4 tripwire, dedupe merge reality, AC6/OPS-1, HEAD self-containment. Layers: Blind Hunter + Edge Case Hunter + Acceptance Auditor.
+
+- [x] [Review][Decision] Treat absent `sourceMetadata` as a hard fail? — **(c) leave as-is.** Absent metadata is a designed production state (`categories ? { categories } : undefined`); (a)/(b) would false-block real pushes. Sweep coverage already self-asserts `viewCount` + merge keys.
+- [x] [Review][Dismiss] Empty `signals` vacuous-pass at contract layer — **confirmed no duplicate guard.** Orchestrator `completion-no-signals` (L1222) and `tryRescoreFromArtifact` empty-artifact skip (L918) already fail loud before push. Documented in `validatePayloadAgainstContract` JSDoc.
+- [x] [Review][Patch] Hollow/empty + non-array `fieldSets` throw in `loadDigestSignalContract` [`digest-signal-contract-guard.mjs`]
+- [x] [Review][Patch] Non-array `sourceMetadata.contributingSources` fails subset check [`digest-signal-contract-guard.mjs`]
+- [x] [Review][Patch] Missing/malformed contract caught in `pushDigestToConvex` → `formatPushResult({ status: 'failed' })` [`push-digest-convex.mjs`]
+- [x] [Review][Patch] AC5 `forceRescore` + poison regression test (`6dfc424` class) [`tests/morning-digest-push-convex.test.mjs`]
+- [x] [Review][Patch] Sweep merge proof asserts `dedupClusterSize >= 2` + multi-source `contributingSources` [`tests/digest-signal-contract-guard.test.mjs`]
+- [x] [Review][Defer] `ADAPTER_TASK_KEY_TO_SOURCE_TYPE` is a hand-copied map (AC4 still imports live `COLLECT_ADAPTER_TASK_KEYS`) [`digest-signal-contract-guard.mjs:307-325`] — deferred, tripwire fails if map omits a new collect key
+- [x] [Review][Defer] `resolveContractRepoRoot` returns `dirname(DIGEST_SIGNAL_CONTRACT_PATH)` which is not the repo root if callers later join the relative contract path onto it [`digest-signal-contract-guard.mjs:26-30`] — deferred, latent; current resolve path uses the explicit file path directly
+
+**Phase B review patches dual-copy (AC7):**
+```
+cmp guard: OK
+cmp push: OK
+```
 

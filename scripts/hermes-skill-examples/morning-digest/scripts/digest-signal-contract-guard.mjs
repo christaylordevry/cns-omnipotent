@@ -16,6 +16,17 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
 
 export const DIGEST_SIGNAL_CONTRACT_RELATIVE_PATH = 'contracts/digest-signal-contract.json';
 
+/** Required field-set names on a valid digest-signal-contract.json (Phase A manifest). */
+export const REQUIRED_DIGEST_SIGNAL_FIELD_SETS = Object.freeze([
+  'digestSignalInput',
+  'digestSignalScores',
+  'sourceMetadata',
+  'contributingSources',
+  'peopleMatch',
+  'digestRunInput',
+  'digestSourceOutcome',
+]);
+
 /**
  * Resolve Omnipotent repo root for the contract file.
  * Prefer explicit env, then MODULE_DIR-relative repo layout.
@@ -78,8 +89,20 @@ export function loadDigestSignalContract(contractPath) {
       cause: err,
     });
   }
-  if (!parsed?.fieldSets || typeof parsed.fieldSets !== 'object') {
+  if (!parsed?.fieldSets || typeof parsed.fieldSets !== 'object' || Array.isArray(parsed.fieldSets)) {
     throw new Error(`OPS-2 contract missing fieldSets at ${contractPath}`);
+  }
+  const sets = /** @type {Record<string, unknown>} */ (parsed.fieldSets);
+  for (const name of REQUIRED_DIGEST_SIGNAL_FIELD_SETS) {
+    const entry = sets[name];
+    if (!Array.isArray(entry)) {
+      throw new Error(
+        `OPS-2 contract fieldSets.${name} must be a non-empty array at ${contractPath}`,
+      );
+    }
+    if (entry.length === 0) {
+      throw new Error(`OPS-2 contract fieldSets.${name} is empty at ${contractPath}`);
+    }
   }
   return parsed;
 }
@@ -91,7 +114,10 @@ export function loadDigestSignalContract(contractPath) {
  * @returns {string[]}
  */
 function extrasBeyondAllowed(keys, allowed, pathPrefix) {
-  const allow = new Set(allowed);
+  if (!Array.isArray(allowed) && !(allowed instanceof Set)) {
+    throw new Error(`OPS-2 fieldSets entry for ${pathPrefix} must be an array`);
+  }
+  const allow = allowed instanceof Set ? allowed : new Set(allowed);
   /** @type {string[]} */
   const violations = [];
   for (const key of keys) {
@@ -171,11 +197,16 @@ export function collectEmittedFieldKeys(payload) {
       for (const key of Object.keys(meta)) {
         sourceMetadata.add(key);
       }
-      if (Array.isArray(meta.contributingSources)) {
-        for (const entry of meta.contributingSources) {
-          if (entry && typeof entry === 'object') {
-            for (const key of Object.keys(/** @type {Record<string, unknown>} */ (entry))) {
-              contributingSources.add(key);
+      if (meta.contributingSources != null) {
+        if (!Array.isArray(meta.contributingSources)) {
+          // Non-array must not silently skip nested extras — surface as a synthetic illicit key.
+          contributingSources.add('__non_array_contributingSources__');
+        } else {
+          for (const entry of meta.contributingSources) {
+            if (entry && typeof entry === 'object') {
+              for (const key of Object.keys(/** @type {Record<string, unknown>} */ (entry))) {
+                contributingSources.add(key);
+              }
             }
           }
         }
@@ -232,6 +263,11 @@ export function sanitizePayloadForContractCheck(payload) {
 
 /**
  * Assert emitted keys are a subset of the contract field sets.
+ *
+ * Empty `signals` is intentionally not rejected here: the completion orchestrator
+ * already fails loud via `completion-no-signals` (and force-rescore skips empty
+ * artifacts) before push. Rejecting optional absent `sourceMetadata` is also
+ * forbidden — several adapters emit undefined metadata by design.
  *
  * @param {{ run?: Record<string, unknown>; signals?: unknown[] }} payload
  * @param {{

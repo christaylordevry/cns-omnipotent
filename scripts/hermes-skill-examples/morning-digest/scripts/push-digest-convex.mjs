@@ -397,7 +397,22 @@ export async function pushDigestToConvex(opts = {}) {
   }
 
   // OPS-2 AC5: validate against contract BEFORE any Convex write (zero partial writes).
-  const contractCheck = assertPayloadMatchesDigestSignalContract(payload, env);
+  // Catch load/parse throws (missing/malformed/hollow fieldSets) so they take the same
+  // failed path as field violations — OPS-1 alert wiring depends on formatPushResult.
+  /** @type {{ ok: true; contractPath: string } | { ok: false; contractPath?: string; violations?: string[]; message: string }} */
+  let contractCheck;
+  try {
+    contractCheck = assertPayloadMatchesDigestSignalContract(payload, env);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`push-digest-convex: ${message}`);
+    return formatPushResult({
+      status: 'failed',
+      signalsWritten: 0,
+      reason: message,
+      expectedCount: countValidSignals(payload.signals),
+    });
+  }
   if (!contractCheck.ok) {
     console.error(`push-digest-convex: ${contractCheck.message}`);
     return formatPushResult({

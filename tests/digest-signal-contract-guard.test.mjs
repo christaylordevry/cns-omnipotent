@@ -6,6 +6,9 @@
  * Never skip — manifest and producer both live in this repo.
  */
 import assert from 'node:assert/strict';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { COLLECT_ADAPTER_TASK_KEYS } from '../scripts/run-digest-convex-completion.mjs';
@@ -66,6 +69,32 @@ describe('OPS-2 digest-signal contract guard (AC3 fixture sweep)', () => {
     assert.ok(
       emitted.contributingSources.size > 0,
       'fixture must emit contributingSources entry keys',
+    );
+
+    // Lock a real merge — not pass-through fields dressed as coverage.
+    const merged = payload.signals.filter(
+      (signal) =>
+        signal &&
+        typeof signal === 'object' &&
+        /** @type {Record<string, unknown>} */ (signal).sourceMetadata &&
+        typeof /** @type {Record<string, unknown>} */ (signal).sourceMetadata === 'object' &&
+        Number(
+          /** @type {{ dedupClusterSize?: unknown }} */ (
+            /** @type {Record<string, unknown>} */ (signal).sourceMetadata
+          ).dedupClusterSize,
+        ) >= 2,
+    );
+    assert.ok(merged.length >= 1, 'fixture must produce at least one merged signal (dedupClusterSize >= 2)');
+    const mergeMeta = /** @type {{ contributingSources?: unknown; dedupClusterSize?: unknown }} */ (
+      /** @type {Record<string, unknown>} */ (merged[0]).sourceMetadata
+    );
+    assert.ok(
+      Number(mergeMeta.dedupClusterSize) >= 2,
+      `expected dedupClusterSize >= 2, got ${String(mergeMeta.dedupClusterSize)}`,
+    );
+    assert.ok(
+      Array.isArray(mergeMeta.contributingSources) && mergeMeta.contributingSources.length >= 2,
+      'merged signal must list >= 2 contributingSources',
     );
 
     const result = validatePayloadAgainstContract(payload, contract);
@@ -140,6 +169,79 @@ describe('OPS-2 digest-signal contract guard (AC4 new-adapter tripwire)', () => 
       missing.length,
       0,
       `new-adapter tripwire: fixture missing coverage for: ${missing.join(', ')}`,
+    );
+  });
+});
+
+describe('OPS-2 digest-signal contract guard (fail-loud contract shape)', () => {
+  it('hollow empty fieldSets entry throws (never vacuous-pass)', () => {
+    const contractPath = resolveDigestSignalContractPath();
+    const contract = loadDigestSignalContract(contractPath);
+    const hollow = {
+      ...contract,
+      fieldSets: {
+        ...contract.fieldSets,
+        sourceMetadata: [],
+      },
+    };
+    const tmpPath = join(tmpdir(), `ops2-hollow-fieldsets-${Date.now()}.json`);
+    writeFileSync(tmpPath, JSON.stringify(hollow));
+    try {
+      assert.throws(
+        () => loadDigestSignalContract(tmpPath),
+        /fieldSets\.sourceMetadata is empty/,
+      );
+    } finally {
+      unlinkSync(tmpPath);
+    }
+  });
+
+  it('non-array fieldSets entry throws (never character-Set allowlist)', () => {
+    const tmpPath = join(tmpdir(), `ops2-string-fieldsets-${Date.now()}.json`);
+    writeFileSync(
+      tmpPath,
+      JSON.stringify({
+        fieldSets: {
+          digestSignalInput: ['title'],
+          digestSignalScores: ['relevance'],
+          sourceMetadata: 'viewCount',
+          contributingSources: ['sourceType'],
+          peopleMatch: ['matched'],
+          digestRunInput: ['date'],
+          digestSourceOutcome: ['source'],
+        },
+      }),
+    );
+    try {
+      assert.throws(
+        () => loadDigestSignalContract(tmpPath),
+        /fieldSets\.sourceMetadata must be a non-empty array/,
+      );
+    } finally {
+      unlinkSync(tmpPath);
+    }
+  });
+
+  it('non-array contributingSources fails subset check (no silent skip)', () => {
+    const contract = loadDigestSignalContract(resolveDigestSignalContractPath());
+    const result = validatePayloadAgainstContract(
+      {
+        run: { date: '2026-06-20', ranAt: 1 },
+        signals: [
+          {
+            section: 'youtube',
+            sourceType: 'youtube',
+            title: 'x',
+            sourceMetadata: { contributingSources: { sourceType: 'rss' } },
+          },
+        ],
+      },
+      contract,
+    );
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.violations?.some((v) => v.includes('__non_array_contributingSources__')),
+      `expected non-array contributingSources violation, got: ${result.violations?.join(', ')}`,
     );
   });
 });

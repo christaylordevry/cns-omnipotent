@@ -1023,6 +1023,60 @@ describe('push-digest-convex.mjs', () => {
 		assert.match(String(result.error), /OPS-2 contract violation/);
 	});
 
+	it('OPS-2 AC5 — forceRescore + poison aborts before any Convex call (6dfc424 class)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const payload = basePayload({ scored: true });
+		payload.run = {
+			...payload.run,
+			digestRunId: 'run-force-rescore-poison',
+		};
+		payload.signals = payload.signals.map((signal, index) => ({
+			...signal,
+			digestSignalId: `sig-force-rescore-${index}`,
+			sourceMetadata: {
+				...(signal.sourceMetadata ?? {}),
+				...(index === 1 ? { notInContractEver: true } : {}),
+			},
+		}));
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			forceRescore: true,
+			fetchFn: async () => {
+				fetchCalls += 1;
+				throw new Error('AC5 forceRescore: Convex must not be called on contract violation');
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0, 'AC5 forceRescore: zero Convex calls when contract fails');
+		assert.match(String(result.error), /notInContractEver/);
+		assert.match(String(result.error), /OPS-2 contract violation/);
+	});
+
+	it('OPS-2 AC5 — missing contract returns failed (not uncaught throw)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const result = await pushDigestToConvex({
+			env: baseEnv({
+				DIGEST_SIGNAL_CONTRACT_PATH: join(tmpdir(), 'ops2-missing-contract-never.json'),
+			}),
+			fetchFn: async () => {
+				fetchCalls += 1;
+				return mockResponse(200, JSON.stringify({ status: 'success', value: 'should-not-run' }));
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0);
+		assert.match(String(result.error), /OPS-2 contract missing/);
+	});
+
 	it('OPS-2 AC5 — valid payload still reaches createDigestRun (pre-flight does not false-block)', async () => {
 		/** @type {string[]} */
 		const paths = [];

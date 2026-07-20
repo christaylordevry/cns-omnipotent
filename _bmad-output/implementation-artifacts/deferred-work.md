@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of OPS-2-digest-signal-schema-contract-guard.md (2026-07-20)
+
+- `ADAPTER_TASK_KEY_TO_SOURCE_TYPE` remains a hand-copied map beside the live `COLLECT_ADAPTER_TASK_KEYS` import. AC4 still fails if a new collect key lacks a map entry; mechanical derivation from producer `sourceType` constants would remove drift risk later.
+- `resolveContractRepoRoot` returns `dirname(DIGEST_SIGNAL_CONTRACT_PATH)` when that env is set — fine today because `resolveDigestSignalContractPath` returns the explicit file path, but any future caller that joins `DIGEST_SIGNAL_CONTRACT_RELATIVE_PATH` onto that “root” will point at the wrong directory.
+
 ## Deferred from: code review of OPS-1-digest-push-fail-loud.md (2026-07-20)
 
 - Concurrent alert + `writeDayOutcomeRecordAtomic` stamp race (check-then-act): two overlapping invocations could both post before either stamps. Pre-existing day-outcome file concurrency model; digest cron slots are hours apart. Revisit only if overlapping watchdog invocations become real.
