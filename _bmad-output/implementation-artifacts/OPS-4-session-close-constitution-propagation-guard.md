@@ -2,7 +2,7 @@
 story_id: OPS-4
 epic: ops-observability
 title: session-close-constitution-propagation-guard
-status: ready-for-dev
+status: review
 created: 2026-07-20
 design_gate: APPROVED_2026-07-20
 baseline_commit: 588e17c
@@ -14,7 +14,7 @@ do_not_run: /session-close until this ships ($3–5/run; re-spreads vault corrup
 
 # Story OPS-4: Session-close must validate the constitution before propagating it
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -206,30 +206,30 @@ A check that **cannot** run must never be reported as a check that **passed**. S
 
 ## Tasks / Subtasks
 
-- [ ] **Guard module** (AC: 1–4, 11) — `scripts/session-close/lib/agents-constitution-guard.mjs`
-  - [ ] Import `normalizeLf` from `sync-vault-modules.mjs` (87-2 reuse — no forked LF)
-  - [ ] Export `assertAgentsPropagationAllowed({ sourcePath, mirrorPath, sourceText, mirrorText, newVersion })` (or equivalent) returning/recording check statuses
-  - [ ] Structural: §2 row-once + §2∪§3 adjacent-token with allowlist
-  - [ ] Stale: compare header versions — **only when** `realpath(source) !== realpath(mirror)` and mirror readable
-  - [ ] Collision: changelog versions from **source ∪ mirror** — same applicability rule as stale
-  - [ ] Same-realpath: mark stale+collision `not_applicable` with loud path reason; structural still runs
-  - [ ] Mirror unreadable: throw fail-closed (`constitution-guard: mirror-unreadable:`) — never treat as empty/no-drift
-  - [ ] Loud error prefixes: `constitution-guard: structural|stale|version-collision|mirror-unreadable:`
-- [ ] **Wire into write path** (AC: 1, 6, 7, 11) — `scripts/session-close/apply-section8.mjs` `runApplySection8`
-  - [ ] After source read + mirror read attempt; **before** `applySection8ToAgentsText` and before any write/preview
-  - [ ] Persist `constitution_guard` / check statuses into close-report (incl. `not_applicable` reasons)
-  - [ ] On fail: `recordSection8Failure` when `!dryRun`; rethrow; exit 1 via existing CLI
-  - [ ] **Do not** change `applySection8ToAgentsText` transform logic
-- [ ] **Load-bearing test** (AC: 5) — corrupt source; assert both target files unchanged on disk
-- [ ] **Incident-shaped collision test** (AC: 4) — vault 2.1.57 / mirror 2.1.58 changelog union
-- [ ] **Stale + structural unit tests** (AC: 2–3)
-- [ ] **Vacuous-check tests** (AC: 11)
-  - [ ] Same realpath → stale/collision `not_applicable`, not passed; structural still enforced
-  - [ ] Mirror absent → refuse; both targets unchanged on disk
-- [ ] **Rollup test** (AC: 7)
-- [ ] **Verify-time parity** (AC: 8) — shared helper; skip-with-reason when no vault; structural on specs always
-- [ ] **Dual-copy record** (AC: 9) — paste `git diff --name-only`; negative or real cmp
-- [ ] **Verify** (AC: 10) — `bash scripts/verify.sh`
+- [x] **Guard module** (AC: 1–4, 11) — `scripts/session-close/lib/agents-constitution-guard.mjs`
+  - [x] Import `normalizeLf` from `sync-vault-modules.mjs` (87-2 reuse — no forked LF)
+  - [x] Export `assertAgentsPropagationAllowed({ sourcePath, mirrorPath, sourceText, mirrorText, newVersion })` (or equivalent) returning/recording check statuses
+  - [x] Structural: §2 row-once + §2∪§3 adjacent-token with allowlist
+  - [x] Stale: compare header versions — **only when** `realpath(source) !== realpath(mirror)` and mirror readable
+  - [x] Collision: changelog versions from **source ∪ mirror** — same applicability rule as stale
+  - [x] Same-realpath: mark stale+collision `not_applicable` with loud path reason; structural still runs
+  - [x] Mirror unreadable: throw fail-closed (`constitution-guard: mirror-unreadable:`) — never treat as empty/no-drift
+  - [x] Loud error prefixes: `constitution-guard: structural|stale|version-collision|mirror-unreadable:`
+- [x] **Wire into write path** (AC: 1, 6, 7, 11) — `scripts/session-close/apply-section8.mjs` `runApplySection8`
+  - [x] After source read + mirror read attempt; **before** `applySection8ToAgentsText` and before any write/preview
+  - [x] Persist `constitution_guard` / check statuses into close-report (incl. `not_applicable` reasons)
+  - [x] On fail: `recordSection8Failure` when `!dryRun`; rethrow; exit 1 via existing CLI
+  - [x] **Do not** change `applySection8ToAgentsText` transform logic
+- [x] **Load-bearing test** (AC: 5) — corrupt source; assert both target files unchanged on disk
+- [x] **Incident-shaped collision test** (AC: 4) — vault 2.1.57 / mirror 2.1.58 changelog union
+- [x] **Stale + structural unit tests** (AC: 2–3)
+- [x] **Vacuous-check tests** (AC: 11)
+  - [x] Same realpath → stale/collision `not_applicable`, not passed; structural still enforced
+  - [x] Mirror absent → refuse; both targets unchanged on disk
+- [x] **Rollup test** (AC: 7)
+- [x] **Verify-time parity** (AC: 8) — shared helper; skip-with-reason when no vault; structural on specs always
+- [x] **Dual-copy record** (AC: 9) — paste `git diff --name-only`; negative or real cmp
+- [x] **Verify** (AC: 10) — `bash scripts/verify.sh`
 
 ---
 
@@ -365,33 +365,50 @@ export function formatAgentsParityMessage(diff) { /* actionable */ }
 
 ### Agent Model Used
 
-_(fill on implementation)_
+Composer (Cursor agent router)
 
 ### Debug Log References
+
+- Adjacent-token check initially false-positive on clean specs (`pake_type` prose→table cross-line; `0.0` decimal split). Fixed: per-line check + decimal-aware tokenization. Still catches same-line `governed governed`.
+- AC4 incident fixture (Vs 2.1.57 / Vm 2.1.58) also matches AC3 stale. Collision is evaluated before stale so the incident fixture surfaces `version-collision` (union proof); pure stale uses Vs≪Vm with bump not in either changelog.
+- Token-gate fixtures needed §2–§4 sections so structural gate does not break SC-4 happy paths.
 
 ### Completion Notes List
 
 - Design gate approved 2026-07-20 with four operator decisions (story key, §2∪§3 doubled tokens + allowlist, collision = source ∪ mirror, verify-time parity in scope).
 - 2026-07-20 follow-up: **AC11** vacuous-check honesty (same-realpath → `not_applicable`; mirror missing → fail closed) — operator confirmed before dev.
 - Ultimate context engine analysis completed — comprehensive developer guide created.
-- **Before claiming done:** paste `git diff --name-only` and dual-copy disposition (negative vs real cmp).
+- Implemented `agents-constitution-guard.mjs`; wired into `runApplySection8` before `applySection8ToAgentsText` / any write or dry-run preview. Transform body untouched.
+- Load-bearing AC5 asserts disk bytes unchanged on both targets after refuse; AC4 incident union fixture (2.1.57→2.1.58 mirror-only) fails with `version-collision`; AC11a/b covered.
+- `bash scripts/verify.sh` → VERIFY PASSED (2026-07-20). No `/session-close` live run.
+- **Before claiming done:** paste `git diff --name-only` and dual-copy disposition (negative vs real cmp). — done below.
 
 ### File List
 
-_(fill on implementation — expected candidates)_
-
 - `scripts/session-close/lib/agents-constitution-guard.mjs` (NEW)
-- `scripts/session-close/apply-section8.mjs` (UPDATE wire)
-- `tests/session-close-pipeline.test.mjs` and/or new dedicated test file (AC5 load-bearing)
-- `tests/agents-constitution-parity.test.mjs` or extend vault-modules / constitution tests (AC8)
-- `tests/session-close-render-discord-reply.test.mjs` (AC7 if needed)
+- `scripts/session-close/apply-section8.mjs` (UPDATE wire + close-report constitution_guard)
+- `tests/agents-constitution-guard.test.mjs` (NEW — AC2–8, AC11)
+- `tests/session-close-pipeline.test.mjs` (SAMPLE_AGENTS gains §2–§4 for structural happy path)
+- `tests/session-close-token-gate.test.mjs` (same fixture structural sections)
+- `_bmad-output/implementation-artifacts/OPS-4-session-close-constitution-propagation-guard.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ### Dual-copy disposition (AC9 — fill after implement)
 
 ```
-# paste:
-git diff --name-only
-# then either:
-#   NEGATIVE: no scripts/hermes-skill-examples/ paths → OK (OPS-1 AC7 pattern)
-#   or REAL cmp output for each skill twin
+# git diff --name-only (+ untracked implementation files)
+_bmad-output/implementation-artifacts/OPS-4-session-close-constitution-propagation-guard.md
+_bmad-output/implementation-artifacts/sprint-status.yaml
+scripts/session-close/apply-section8.mjs
+scripts/session-close/lib/agents-constitution-guard.mjs
+tests/agents-constitution-guard.test.mjs
+tests/session-close-pipeline.test.mjs
+tests/session-close-token-gate.test.mjs
+
+# NEGATIVE: no scripts/hermes-skill-examples/ paths → OK (OPS-1 AC7 pattern)
+# Vacuous cmp forbidden; runtime scripts only under scripts/session-close/
 ```
+
+### Change Log
+
+- 2026-07-20: OPS-4 implemented — pre-write constitution propagation guard (structural / stale / union collision / vacuous honesty); verify-time AGENTS parity; verify.sh green.

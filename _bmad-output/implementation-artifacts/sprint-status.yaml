@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-20T17:20:00+10:00"
+last_updated: 2026-07-20
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -751,4 +751,4 @@ development_status:
   OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
   OPS-2-digest-signal-schema-contract-guard: done # Phase A reviewed+patched 2026-07-20 (cns-dashboard); Phase B reviewed+patched 2026-07-20 (hollow fieldSets throw, contributingSources type check, contract-load→failed path, forceRescore poison AC5 test, merge assertion lock); dual-copy cmp OK
   OPS-3-digest-push-in-run-retry: cancelled # CLOSED UNBUILT 2026-07-20 by operator decision on evidence: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither, and a naive retry can duplicate the run row (BD-2 delta corruption). Day-level retry already exists (push-digest-watchdog.mjs:435). REOPEN TRIGGER: a completion-convex-push-failed that self-heals on the next run without intervention. Story text retained — the analysis records why not to build this next time it looks obvious.
-  OPS-4-session-close-constitution-propagation-guard: ready-for-dev # design gate APPROVED 2026-07-20; refuse corrupt/stale/colliding AGENTS source before dual write; verify-time vault↔specs parity; do NOT run /session-close to test
+  OPS-4-session-close-constitution-propagation-guard: review # design gate APPROVED 2026-07-20; refuse corrupt/stale/colliding AGENTS source before dual write; verify-time vault↔specs parity; do NOT run /session-close to test
