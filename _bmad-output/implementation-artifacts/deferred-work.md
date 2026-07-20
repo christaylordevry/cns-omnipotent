@@ -1,5 +1,49 @@
 # Deferred work
 
+## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
+
+All **3 of 3** NotebookLM targets failed on session 24's `/session-close`. Hermes summarised it as
+"the usual pattern (intermittent timeouts)" with `failure_class: none`. The log does not support
+that reading — this is three distinct problems, none of them intermittent.
+
+**(a) Two are a deterministic timeout, not flakiness.** `~/.hermes/logs/session-close-drive-sync.log`:
+
+```
+07:47:43.992  start
+07:48:09.985  f037c741…  Command failed: nlm source sync …   → 25.99s
+07:48:10.286  dc6abf1a…  Command failed: nlm source sync …   → 26.29s
+```
+
+`NLM_EXEC_TIMEOUT_MS = 25_000` (`scripts/session-close/sync-vault-export-drive.mjs:18`). Both died
+within ~1s of the bound, syncing a **1.63 MB** source. This is the same budget-vs-duration class as
+58-3 (a 1.5 MB native-Doc conversion taking 134s against a ~60s budget), **moved from the write step
+to the sync step** as the export grew. Fix direction: raise the bound, or make it size-aware rather
+than a flat 25s.
+
+**(b) The third is not a timeout at all** — it is a config/state mismatch, masked by being lumped in:
+
+```
+981466f0…  no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID 1olnjZJMP7xa9adwt_DlQRHTcDEk1GxKM
+           and no google_docs / vault-export word_doc fallback source was available
+```
+
+Reported as `error_class: unknown`. Different failure, different fix — the doc ID does not resolve to
+any source in that notebook.
+
+**(c) The rollup hides a total failure.** `failure_class: none` while 3/3 targets failed is the exact
+silent-success pattern OPS-1 and OPS-2 removed from the digest pipeline on the same day. 58-4 (shipped
+2026-07-13) fixed the *stamping* — targets are now correctly marked failed instead of left unstamped —
+but the operator-facing summary still rolls up to `none`, so nothing surfaces. **All-targets-failed
+must not be able to report `failure_class: none`.**
+
+**Next session, first item.** Three separable pieces: (1) size-aware or raised sync bound, (2) resolve
+or re-point `NOTEBOOKLM_DRIVE_DOC_ID` for `981466f0`, (3) rollup correctness so a 3/3 failure is loud.
+Piece (3) is the cheapest and most valuable — it is the same lesson as OPS-1: *unknown or total
+failure is never success*. Note the drive-sync log was rotated on 2026-07-13, so it holds only session
+24; there is no history in it to distinguish "new regression" from "has been failing since 58-4" —
+check `session-close-drive-sync.log.bak-2026-07-13` and the session-close outcome records before
+assuming either.
+
 ## Deferred from: code review of OPS-2-digest-signal-schema-contract-guard.md (2026-07-20)
 
 - `ADAPTER_TASK_KEY_TO_SOURCE_TYPE` remains a hand-copied map beside the live `COLLECT_ADAPTER_TASK_KEYS` import. AC4 still fails if a new collect key lacks a map entry; mechanical derivation from producer `sourceType` constants would remove drift risk later.
