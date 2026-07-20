@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-20T00:15:00+10:00
+# last_updated: 2026-07-20T15:30:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-20T00:15:00+10:00"
+last_updated: "2026-07-20T14:45:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -743,3 +743,10 @@ development_status:
   # BD-4 blocks Obj 2.3 / Scenario 03.2 Trends Crossing — design gate PENDING operator approval before dev
   cns-redesign-build-deps: in-progress
   BD-4-stamp-matched-watchlist-topic: done # Phase A+B done; adversarial review patches + verify PASS 2026-07-20
+
+  # Ops observability — digest pipeline must fail loudly (incident 2026-07-20 Convex free-plan outage)
+  # A full day of signals was lost silently: action=completion-convex-push-failed … signalsWritten:0, exit=0
+  ops-observability: in-progress
+  OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
+  OPS-2-digest-signal-schema-contract-guard: draft # Cross-repo (Omnipotent.md producer x15 untyped sites + dedupe spread → cns-dashboard 1 strict validator, zero link). Closes the 2026-06-20 ArgumentValidationError class: PARTIAL WRITE, signalsWritten=11, 5x exit=0. b0a6a05 patched viewCount only — class still open; BD-4 topicSlug crossed the same boundary unguarded. Design gate OPEN (manifest location; producer-field enumeration). verify.sh:59-72 already runs both repos = no new CI.
+  OPS-3-digest-push-in-run-retry: draft-recommend-close # EVIDENCE 2026-07-20: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither. Day-level retry already exists (push-digest-watchdog.mjs:435). Recommend close unbuilt; reopen only if a push failure ever self-heals on the next run. Awaiting operator decision.
