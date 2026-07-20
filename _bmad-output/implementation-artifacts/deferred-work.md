@@ -1,5 +1,44 @@
 # Deferred work
 
+## 🚨 `/session-close` CORRUPTS AGENTS.md §2/§3 — do not re-run until fixed (found 2026-07-20, session 24)
+
+**Highest-priority item in this file.** AGENTS.md is the constitution loaded into every agent's
+context at session start, so corruption there is inherited by every future session on every surface.
+
+Session 24's `/session-close` wrote **outside §8**, which it is never supposed to touch:
+
+| Defect | Section | Detail |
+|---|---|---|
+| Duplicated table rows | **§2** | `HookSetNote` and `WeaponsCheckNote` each appear **twice** in the note-routing table |
+| Word duplication | **§3** | "applies to governed **governed** knowledge notes" in the PAKE Standard scope sentence |
+
+Both were written to **the canonical vault *and* the specs mirror** — `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
+(17:47) and `specs/cns-vault-contract/AGENTS.md`. Verified by marker counts: corrupt copies show
+`governed governed`=1, HookSetNote rows=2, WeaponsCheckNote rows=2; the last committed repo version
+shows 0/1/1.
+
+**Two further defects in the same run:**
+
+- **Version collision.** Hermes reported "AGENTS.md bumped to v2.1.58" but the file was *already*
+  2.1.58 from 2026-07-14. No bump occurred, and the changelog gained a second 2.1.58 row. This is the
+  known version-collision trap (memory `project_stale_agents_md_drift`).
+- **The regenerated §8 was itself wrong.** It marked Story 88.1 "in review" although Epic 88 closed
+  2026-07-13, *dropped* "Epic 58 closed", dropped the vault-recovery and 84-2/84-3 context, and
+  omitted the entire ops-observability epic (OPS-1/OPS-2) completed that same day. The regen moved
+  §8 backwards, not forwards.
+
+**Recovered 2026-07-20** by restoring the repo-committed v2.1.58 (clean §2/§3 + newest clean §8) to
+both copies; corrupt version preserved at `AI-Context/AGENTS.md.corrupt-2026-07-20.bak` as evidence.
+Note the vault's own git HEAD holds only v2.1.57 (07-10) — older §8 — so the **repo** commit, not the
+vault commit, is the correct recovery source.
+
+**⛔ Do not run `/session-close` again until the §2/§3 write path is found.** Each run costs $3–5 and
+re-corrupts the constitution. Start at the section-8 draft/apply path
+(`scripts/session-close/` → `gate-apply-section8`): the duplication pattern (a routing block appended
+rather than replaced, plus a token doubled mid-sentence) suggests a regex/anchor that matches a
+section boundary loosely and re-emits content instead of substituting it. A regression test should
+assert marker counts (`governed governed`=0, each pake_type row exactly once) on the rendered output.
+
 ## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
 
 All **3 of 3** NotebookLM targets failed on session 24's `/session-close`. Hermes summarised it as
