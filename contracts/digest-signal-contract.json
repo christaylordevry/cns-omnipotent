@@ -3,7 +3,7 @@
     "generated": true,
     "generatedFrom": "cns-dashboard/convex/validators.ts",
     "regenerateCommand": "npm run generate:digest-signal-contract  # from cns-dashboard; writes ../Omnipotent.md/contracts/digest-signal-contract.json",
-    "generatedAt": "2026-07-20T05:51:21.036Z"
+    "generatedAt": "1970-01-01T00:00:00.000Z"
   },
   "fieldSets": {
     "digestSignalInput": [

@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-20T16:15:00+10:00
+# last_updated: 2026-07-20T16:30:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -748,5 +748,5 @@ development_status:
   # A full day of signals was lost silently: action=completion-convex-push-failed … signalsWritten:0, exit=0
   ops-observability: in-progress
   OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
-  OPS-2-digest-signal-schema-contract-guard: review # Phase B (Omnipotent.md) complete 2026-07-20: AC3 fixture sweep ⊆ manifest + viewCount red-test; AC4 COLLECT_ADAPTER_TASK_KEYS tripwire; AC5 pre-flight in pushDigestToConvex (zero partial writes); AC6 OPS-1 interop (alert names field; AC2 zero-call spy preserved); AC7 dual-copy cmp OK + 60-1 covers morning-digest empirically; AC8 verify.sh PASS. Phase A (cns-dashboard) landed manifest at contracts/digest-signal-contract.json.
+  OPS-2-digest-signal-schema-contract-guard: done # code review patches applied 2026-07-20 (deterministic generatedAt, nested discovery, AC2 red-test, Array.isArray guard); Phase A+B complete
   OPS-3-digest-push-in-run-retry: draft-recommend-close # EVIDENCE 2026-07-20: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither. Day-level retry already exists (push-digest-watchdog.mjs:435). Recommend close unbuilt; reopen only if a push failure ever self-heals on the next run. Awaiting operator decision.

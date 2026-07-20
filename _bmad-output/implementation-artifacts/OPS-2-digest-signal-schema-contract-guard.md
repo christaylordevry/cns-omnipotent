@@ -2,7 +2,7 @@
 story_id: OPS-2
 epic: ops-observability
 title: cross-repo-digest-signal-schema-contract-guard
-status: review
+status: done
 baseline_commit: 5fd3e7d2e294d2f4f5f27b6c7deebbdb6340906d
 design_gate: APPROVED_2026-07-20
 sequencing: cns-dashboard half FIRST (generates manifest) → Omnipotent.md half (consumes)
@@ -16,7 +16,7 @@ supersedes_priority_of: OPS-3 (retry — recommended close-unbuilt)
 
 # Story OPS-2: Cross-repo digest-signal schema contract guard
 
-Status: **review — Phase B (Omnipotent.md) complete 2026-07-20**
+Status: **done — Phase A patches from code review applied 2026-07-20; Phase B complete**
 
 ## Design decisions — RESOLVED 2026-07-20 (these override the "Open Questions" section below)
 
@@ -299,3 +299,17 @@ Plus both red-test proofs (AC2, AC3) demonstrated and pasted into the Dev Agent 
 - 2026-07-20: OPS-2 Phase B — fixture sweep ⊆ manifest, new-adapter tripwire, pre-flight assertion (zero partial writes), OPS-1 interop, dual-copy parity. verify.sh PASS.
 
 ## Open Questions — closed (see Design decisions table at top)
+
+### Review Findings
+
+Phase A commit `ced8406` reviewed 2026-07-20 (cns-dashboard half). Focus: complete validator walk, skip trap, generator determinism.
+
+- [x] [Review][Patch] `generatedAt` breaks byte-identical regeneration — fixed via `resolveGeneratedAt()` / `DETERMINISTIC_GENERATED_AT` (+ `SOURCE_DATE_EPOCH`) [`scripts/lib/digest-signal-contract.ts`]
+- [x] [Review][Patch] Nested object walk is allowlisted, not discovered — fixed via `discoverNestedObjectFieldSets` / `isNestableObjectField` [`scripts/lib/digest-signal-contract.ts`]
+- [x] [Review][Patch] AC2 red-test / fail-path unproven in suite — added stale-manifest red-test + non-array fieldSets fail test [`tests/contracts/digest-signal-contract.test.ts`]
+- [x] [Review][Patch] Hand-copied `peopleMatch` field list in sanity test — replaced with mechanical `nestedObjectFieldNames` equality [`tests/contracts/digest-signal-contract.test.ts`]
+- [x] [Review][Patch] Non-array `fieldSets` values throw instead of returning `fail` — `Array.isArray` guard in `diffFieldSets` [`scripts/lib/digest-signal-contract.ts`]
+- [x] [Review][Defer] Convex validator introspection depends on undocumented `kind`/`fields`/`element` (+ `isOptional` flag) — deferred, inherent to mechanical approach; live Convex keeps optional as `kind=object|array` with `isOptional`, so current nests work; if Convex wraps as `kind=optional`, extractor throws (loud) not silent skip
+- [x] [Review][Defer] Sibling presence check is `package.json` only — deferred, soft false-positive risk if another Node tree sits at `OMNIPOTENT_ROOT`
+- [x] [Review][Defer] Generator writes into sibling repo without Omnipotent identity check / atomic write — deferred, operational; `OMNIPOTENT_ROOT` documented
+
