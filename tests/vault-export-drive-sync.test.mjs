@@ -23,10 +23,17 @@ import { mergeFanoutIntoCloseReport } from "../scripts/session-close/merge-noteb
 import { recordNotebooklmFanoutMode } from "../scripts/session-close/record-notebooklm-fanout-mode.mjs";
 import {
   appendDriveSyncFailureLogs,
+  applyDriveSyncRollup,
   matchGoogleDocsSourceFallback,
   matchWordDocVaultExportFallback,
-  NLM_EXEC_TIMEOUT_MS,
+  maybeEmitSyncCanary,
+  NLM_LIST_TIMEOUT_MS,
+  NLM_SYNC_CANARY_FRACTION,
+  NLM_SYNC_TIMEOUT_MS,
   parseNlmDriveSourceList,
+  resolveCanaryFractionEnv,
+  resolveNlmCallTimeoutMs,
+  resolvePositiveIntMsEnv,
   runSyncVaultExportDrive,
   syncNotebookDriveSource,
   VAULT_EXPORT_SOURCE_TITLE,
@@ -746,7 +753,9 @@ describe("sync-vault-export-drive (58-1)", () => {
     assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK));
     assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK_2));
     assert.ok(!PRODUCTION_NOTEBOOK_IDS.has(FIXTURE_NOTEBOOK_3));
-    assert.equal(NLM_EXEC_TIMEOUT_MS, 25_000);
+    assert.equal(NLM_LIST_TIMEOUT_MS, 25_000);
+    assert.equal(NLM_SYNC_TIMEOUT_MS, 120_000);
+    assert.equal(NLM_SYNC_CANARY_FRACTION, 0.5);
   });
 
   it("default drive-sync log path resolves into sandbox HOME (never real operator HOME)", async () => {
@@ -1029,6 +1038,343 @@ describe("sync-vault-export-drive (58-1)", () => {
     const saved = JSON.parse(await readFile(reportPath, "utf8"));
     assert.equal(saved.notebooklm_targets[0].fanout_status, "failed");
     assert.ok(typeof saved.drive_sync_phase?.finished_at === "string");
+    // Worker rejected after stamp — still N=1 with 0 ok → notebooklm, not no_targets.
+    assert.equal(saved.failure_class, "notebooklm");
+  });
+});
+
+describe("OPS-5 env validation + timeout split + canary + rollup", () => {
+  it("resolvePositiveIntMsEnv: unset / valid / non-numeric / zero / negative", () => {
+    assert.equal(resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, {}), 120_000);
+    assert.equal(
+      resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, { NLM_SYNC_TIMEOUT_MS: "90000" }),
+      90_000,
+    );
+    assert.equal(
+      resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "typo" }),
+      25_000,
+    );
+    assert.equal(
+      resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "" }),
+      25_000,
+    );
+    assert.equal(
+      resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, { NLM_SYNC_TIMEOUT_MS: "0" }),
+      120_000,
+    );
+    assert.equal(
+      resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, { NLM_SYNC_TIMEOUT_MS: "-5" }),
+      120_000,
+    );
+  });
+
+  it("resolveCanaryFractionEnv: unset / valid / invalid range", () => {
+    assert.equal(resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {}), 0.5);
+    assert.equal(
+      resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
+        NLM_SYNC_CANARY_FRACTION: "0.75",
+      }),
+      0.75,
+    );
+    assert.equal(
+      resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
+        NLM_SYNC_CANARY_FRACTION: "0",
+      }),
+      0.5,
+    );
+    assert.equal(
+      resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
+        NLM_SYNC_CANARY_FRACTION: "1.5",
+      }),
+      0.5,
+    );
+    assert.equal(
+      resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
+        NLM_SYNC_CANARY_FRACTION: "nope",
+      }),
+      0.5,
+    );
+  });
+
+  it("resolveNlmCallTimeoutMs picks list vs sync bounds independently", () => {
+    const env = {
+      NLM_LIST_TIMEOUT_MS: "25000",
+      NLM_SYNC_TIMEOUT_MS: "120000",
+    };
+    assert.equal(resolveNlmCallTimeoutMs(["source", "list", "nb"], env), 25_000);
+    assert.equal(resolveNlmCallTimeoutMs(["source", "sync", "nb", "-y"], env), 120_000);
+  });
+
+  it("invalid timeout env never resolves to NaN/0/negative for execFile", () => {
+    for (const bad of ["", "typo", "0", "-1", "12.5", "NaN"]) {
+      const listMs = resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", NLM_LIST_TIMEOUT_MS, {
+        NLM_LIST_TIMEOUT_MS: bad,
+      });
+      const syncMs = resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", NLM_SYNC_TIMEOUT_MS, {
+        NLM_SYNC_TIMEOUT_MS: bad,
+      });
+      assert.equal(listMs, NLM_LIST_TIMEOUT_MS);
+      assert.equal(syncMs, NLM_SYNC_TIMEOUT_MS);
+      assert.ok(Number.isInteger(listMs) && listMs > 0);
+      assert.ok(Number.isInteger(syncMs) && syncMs > 0);
+    }
+    assert.equal(resolveNlmCallTimeoutMs(["source", "list"], { NLM_LIST_TIMEOUT_MS: "bad" }), 25_000);
+    assert.equal(resolveNlmCallTimeoutMs(["source", "sync"], { NLM_SYNC_TIMEOUT_MS: "bad" }), 120_000);
+  });
+
+  it("maybeEmitSyncCanary fires at threshold and not below (injected)", () => {
+    /** @type {string[]} */
+    const lines = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = /** @type {typeof process.stderr.write} */ (
+      (chunk, encoding, cb) => {
+        lines.push(String(chunk));
+        if (typeof encoding === "function") {
+          encoding();
+          return true;
+        }
+        if (typeof cb === "function") {
+          cb();
+        }
+        return true;
+      }
+    );
+    try {
+      maybeEmitSyncCanary(59_999, 120_000, 0.5, 1_630_000);
+      assert.equal(lines.some((l) => l.includes("canary")), false);
+      maybeEmitSyncCanary(60_000, 120_000, 0.5, 1_630_000);
+      assert.ok(lines.some((l) => l.includes("canary") && l.includes("duration_ms=60000")));
+      assert.ok(lines.some((l) => l.includes("bound_ms=120000")));
+      assert.ok(lines.some((l) => l.includes("source_size_bytes=1630000")));
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it("sync canary uses injected clock against sync bound", async () => {
+    /** @type {string[]} */
+    const lines = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = /** @type {typeof process.stderr.write} */ (
+      (chunk, encoding, cb) => {
+        lines.push(String(chunk));
+        if (typeof encoding === "function") {
+          encoding();
+          return true;
+        }
+        if (typeof cb === "function") {
+          cb();
+        }
+        return true;
+      }
+    );
+    try {
+      let t = 1_000_000;
+      const now = () => {
+        const cur = t;
+        t += 60_000; // sync duration exactly at 0.5 * 120_000
+        return cur;
+      };
+      await syncNotebookDriveSource(
+        FIXTURE_NOTEBOOK,
+        FIXTURE_DRIVE_DOC,
+        async (_cmd, args) => {
+          if (args.includes("list")) {
+            return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+          }
+          return { stdout: "{}" };
+        },
+        {
+          now,
+          sourceSizeBytes: 42,
+          env: {
+            NLM_SYNC_TIMEOUT_MS: "120000",
+            NLM_SYNC_CANARY_FRACTION: "0.5",
+          },
+        },
+      );
+      assert.ok(lines.some((l) => l.includes("canary") && l.includes("duration_ms=60000")));
+      assert.ok(lines.some((l) => l.includes("source_size_bytes=42")));
+
+      lines.length = 0;
+      t = 2_000_000;
+      const nowBelow = () => {
+        const cur = t;
+        t += 59_999;
+        return cur;
+      };
+      await syncNotebookDriveSource(
+        FIXTURE_NOTEBOOK,
+        FIXTURE_DRIVE_DOC,
+        async (_cmd, args) => {
+          if (args.includes("list")) {
+            return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+          }
+          return { stdout: "{}" };
+        },
+        { now: nowBelow, sourceSizeBytes: 42, env: {} },
+      );
+      assert.equal(lines.some((l) => l.includes("canary")), false);
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it("rollup: 3/3 failed → failure_class notebooklm and ok:false", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-rollup-all-fail-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
+    const ids = [FIXTURE_NOTEBOOK, FIXTURE_NOTEBOOK_2, FIXTURE_NOTEBOOK_3];
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: ids.map((notebook_id, i) => ({
+          notebook_id,
+          title: `NB${i + 1}`,
+          export_path: "/tmp/export.md",
+        })),
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: logPath,
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        throw makeTimeoutError("nlm source sync timed out");
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.synced, 0);
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.failure_class, "notebooklm");
+  });
+
+  it("rollup: 1/3 failed → notebooklm_partial and ok:false", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-rollup-partial-"));
+    const reportPath = join(dir, "close-report.json");
+    const logPath = tmpDriveSyncLogPath(dir);
+    const ids = [FIXTURE_NOTEBOOK, FIXTURE_NOTEBOOK_2, FIXTURE_NOTEBOOK_3];
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: ids.map((notebook_id, i) => ({
+          notebook_id,
+          title: `NB${i + 1}`,
+          export_path: "/tmp/export.md",
+        })),
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: logPath,
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        if (args[2] === FIXTURE_NOTEBOOK_3) {
+          throw new Error("sync boom");
+        }
+        return { stdout: "{}" };
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.synced, 2);
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.failure_class, "notebooklm_partial");
+  });
+
+  it("rollup: N=0 → notebooklm_no_targets and never ok:true", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-rollup-zero-"));
+    const reportPath = join(dir, "close-report.json");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        notebooklm_targets: [],
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: tmpDriveSyncLogPath(dir),
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.synced, 0);
+    assert.equal(result.reason, "no-notebooklm-targets");
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.failure_class, "notebooklm_no_targets");
+  });
+
+  it("rollup never overwrites existing Phase A failure_class", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-rollup-preserve-"));
+    const reportPath = join(dir, "close-report.json");
+    await writeFile(
+      reportPath,
+      `${JSON.stringify({
+        failure_class: "tests",
+        steps: {
+          export: { status: "ok" },
+          drive_write: { status: "ok", message: "drive pdf overwritten" },
+        },
+        deterministic: { export_bytes: 100 },
+        notebooklm_targets: [
+          { notebook_id: FIXTURE_NOTEBOOK, title: "Test", export_path: "/tmp/export.md" },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    await runSyncVaultExportDrive(reportPath, {
+      driveDocId: FIXTURE_DRIVE_DOC,
+      driveSyncLogPath: tmpDriveSyncLogPath(dir),
+      runNlm: async (_cmd, args) => {
+        if (args.includes("list")) {
+          return { stdout: JSON.stringify(DRIVE_SOURCE_LIST_FIXTURE) };
+        }
+        throw makeTimeoutError("sync timeout");
+      },
+    });
+
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.failure_class, "tests");
+  });
+
+  it("applyDriveSyncRollup: all ok leaves failure_class null", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-rollup-ok-"));
+    const reportPath = join(dir, "close-report.json");
+    await writeFile(reportPath, `${JSON.stringify({ notebooklm_targets: [] })}\n`, "utf8");
+    const rollup = await applyDriveSyncRollup(reportPath, [
+      { status: "ok" },
+      { status: "ok" },
+    ]);
+    assert.equal(rollup.ok, true);
+    assert.equal(rollup.synced, 2);
+    assert.equal(rollup.failureClass, null);
+    const saved = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(saved.failure_class, undefined);
   });
 });
 

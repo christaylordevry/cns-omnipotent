@@ -91,6 +91,10 @@ the same lesson as OPS-1: unknown or invalid state is never success.
 
 ## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
 
+> **Status (2026-07-21):** pieces **(a)** and **(c)** being-fixed / fixed-by **OPS-5**
+> (`OPS-5-drive-sync-timeout-canary-and-rollup-honesty`). Measured evidence below is preserved.
+> Piece **(b)** remains operator UI (add PDF Drive source for `981466f0`) — out of OPS-5 scope.
+
 All **3 of 3** NotebookLM targets failed on session 24's `/session-close`. Hermes summarised it as
 "the usual pattern (intermittent timeouts)" with `failure_class: none`. The log does not support
 that reading — this is three distinct problems, none of them intermittent.
@@ -103,11 +107,11 @@ that reading — this is three distinct problems, none of them intermittent.
 07:48:10.286  dc6abf1a…  Command failed: nlm source sync …   → 26.29s
 ```
 
-`NLM_EXEC_TIMEOUT_MS = 25_000` (`scripts/session-close/sync-vault-export-drive.mjs:18`). Both died
-within ~1s of the bound, syncing a **1.63 MB** source. This is the same budget-vs-duration class as
-58-3 (a 1.5 MB native-Doc conversion taking 134s against a ~60s budget), **moved from the write step
-to the sync step** as the export grew. Fix direction: raise the bound, or make it size-aware rather
-than a flat 25s.
+Live remeasure 2026-07-21: `time nlm source sync …` → **real 0m41.2s** vs then-bound
+`NLM_EXEC_TIMEOUT_MS = 25_000`. Both died within ~1s of the bound, syncing a **1.63 MB** source.
+This is the same budget-vs-duration class as 58-3 (a 1.5 MB native-Doc conversion taking 134s
+against a ~60s budget), **moved from the write step to the sync step** as the export grew.
+**OPS-5:** split to `NLM_LIST_TIMEOUT_MS=25_000` / `NLM_SYNC_TIMEOUT_MS=120_000` + canary at 0.5× sync bound.
 
 **(b) The third is not a timeout at all** — it is a config/state mismatch, masked by being lumped in:
 
@@ -117,21 +121,19 @@ than a flat 25s.
 ```
 
 Reported as `error_class: unknown`. Different failure, different fix — the doc ID does not resolve to
-any source in that notebook.
+any source in that notebook. **Still open** (operator UI).
 
 **(c) The rollup hides a total failure.** `failure_class: none` while 3/3 targets failed is the exact
 silent-success pattern OPS-1 and OPS-2 removed from the digest pipeline on the same day. 58-4 (shipped
 2026-07-13) fixed the *stamping* — targets are now correctly marked failed instead of left unstamped —
 but the operator-facing summary still rolls up to `none`, so nothing surfaces. **All-targets-failed
-must not be able to report `failure_class: none`.**
+must not be able to report `failure_class: none`.** **OPS-5:** phase rollup stamps `notebooklm` /
+`notebooklm_partial` / `notebooklm_no_targets` and refuses `{ ok: true, synced: 0 }`.
 
-**Next session, first item.** Three separable pieces: (1) size-aware or raised sync bound, (2) resolve
-or re-point `NOTEBOOKLM_DRIVE_DOC_ID` for `981466f0`, (3) rollup correctness so a 3/3 failure is loud.
-Piece (3) is the cheapest and most valuable — it is the same lesson as OPS-1: *unknown or total
-failure is never success*. Note the drive-sync log was rotated on 2026-07-13, so it holds only session
-24; there is no history in it to distinguish "new regression" from "has been failing since 58-4" —
-check `session-close-drive-sync.log.bak-2026-07-13` and the session-close outcome records before
-assuming either.
+Note the drive-sync log was rotated on 2026-07-13, so it holds only session 24; there is no history
+in it to distinguish "new regression" from "has been failing since 58-4" — check
+`session-close-drive-sync.log.bak-2026-07-13` and the session-close outcome records before assuming
+either.
 
 ## Deferred from: code review of OPS-2-digest-signal-schema-contract-guard.md (2026-07-20)
 

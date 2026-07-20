@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -14,8 +14,175 @@ import { mergeFanoutUpdatesAtPath } from "./merge-notebooklm-fanout.mjs";
 
 const DRIVE_SYNC_LOG_BASENAME = "session-close-drive-sync.log";
 
-/** Per-call bound for `nlm source list` / `nlm source sync` (ms). */
-export const NLM_EXEC_TIMEOUT_MS = 25_000;
+/** Default per-call bound for `nlm source list` (ms). */
+export const NLM_LIST_TIMEOUT_MS = 25_000;
+/** Default per-call bound for `nlm source sync` (ms). */
+export const NLM_SYNC_TIMEOUT_MS = 120_000;
+/** Default canary fraction of sync bound (warn when duration ≥ fraction × bound). */
+export const NLM_SYNC_CANARY_FRACTION = 0.5;
+
+/**
+ * Resolve a positive integer ms timeout from env. Invalid values fall back to
+ * default with a loud WARNING — never return NaN/0/negative (Node execFile
+ * treats those as no timeout = unbounded hang).
+ *
+ * @param {string} name
+ * @param {number} defaultMs
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {number}
+ */
+export function resolvePositiveIntMsEnv(name, defaultMs, env = process.env) {
+  const raw = env[name];
+  if (raw === undefined || raw === "") {
+    return defaultMs;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    process.stderr.write(
+      `session-close: WARNING invalid ${name}=${JSON.stringify(raw)}; using default ${defaultMs}\n`,
+    );
+    return defaultMs;
+  }
+  return n;
+}
+
+/**
+ * Resolve canary fraction in (0, 1]. Invalid → default + WARNING.
+ *
+ * @param {string} name
+ * @param {number} defaultFraction
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {number}
+ */
+export function resolveCanaryFractionEnv(name, defaultFraction, env = process.env) {
+  const raw = env[name];
+  if (raw === undefined || raw === "") {
+    return defaultFraction;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 1) {
+    process.stderr.write(
+      `session-close: WARNING invalid ${name}=${JSON.stringify(raw)}; using default ${defaultFraction}\n`,
+    );
+    return defaultFraction;
+  }
+  return n;
+}
+
+/**
+ * Pick list vs sync timeout from argv (resolved at call time).
+ *
+ * @param {string[]} args
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {number}
+ */
+export function resolveNlmCallTimeoutMs(args, env = process.env) {
+  if (args.includes("sync")) {
+    return resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", NLM_SYNC_TIMEOUT_MS, env);
+  }
+  return resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", NLM_LIST_TIMEOUT_MS, env);
+}
+
+/**
+ * @param {number} durationMs
+ * @param {number} syncBoundMs
+ * @param {number} fraction
+ * @param {number | null | undefined} sourceSizeBytes
+ */
+export function maybeEmitSyncCanary(durationMs, syncBoundMs, fraction, sourceSizeBytes) {
+  if (!(durationMs >= fraction * syncBoundMs)) {
+    return;
+  }
+  const sizeLabel =
+    typeof sourceSizeBytes === "number" && Number.isFinite(sourceSizeBytes)
+      ? String(sourceSizeBytes)
+      : "unknown";
+  process.stderr.write(
+    `session-close: WARNING nlm source sync canary: duration_ms=${durationMs} bound_ms=${syncBoundMs} source_size_bytes=${sizeLabel}\n`,
+  );
+}
+
+/**
+ * Stamp `failure_class` only when currently null/empty (never overwrite Phase A).
+ *
+ * @param {string} reportPath
+ * @param {string} failureClass
+ */
+async function stampFailureClassIfEmpty(reportPath, failureClass) {
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  if (!isObject(report)) {
+    throw new Error("close-report invalid");
+  }
+  const existing = report.failure_class;
+  if (existing != null && existing !== "") {
+    return report;
+  }
+  report.failure_class = failureClass;
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  return report;
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {Promise<number | null>}
+ */
+async function resolveExportSourceBytes(report) {
+  const det = isObject(report.deterministic) ? report.deterministic : {};
+  if (typeof det.export_bytes === "number" && Number.isFinite(det.export_bytes)) {
+    return det.export_bytes;
+  }
+  if (typeof det.export_path === "string" && det.export_path.trim()) {
+    try {
+      const s = await stat(det.export_path);
+      return s.size;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply drive-sync phase rollup: honest ok + failure_class when null.
+ *
+ * @param {string} reportPath
+ * @param {Array<{ status: string }>} updates
+ * @param {(fn: () => Promise<unknown>) => Promise<unknown>} [withLock]
+ * @param {{ expectedCount?: number }} [opts] — authoritative N (notebook ids);
+ *   use when some workers rejected after stamp so `updates.length` undercounts.
+ * @returns {Promise<{ ok: boolean; synced: number; failureClass: string | null }>}
+ */
+export async function applyDriveSyncRollup(reportPath, updates, withLock, opts = {}) {
+  const synced = updates.filter((u) => u.status === "ok").length;
+  const n =
+    typeof opts.expectedCount === "number" && Number.isFinite(opts.expectedCount)
+      ? opts.expectedCount
+      : updates.length;
+  /** @type {string | null} */
+  let failureClass = null;
+  if (n === 0) {
+    failureClass = "notebooklm_no_targets";
+  } else if (synced === 0) {
+    failureClass = "notebooklm";
+  } else if (synced < n) {
+    failureClass = "notebooklm_partial";
+  }
+
+  if (failureClass) {
+    const stamp = () => stampFailureClassIfEmpty(reportPath, failureClass);
+    if (withLock) {
+      await withLock(stamp);
+    } else {
+      await stamp();
+    }
+  }
+
+  return {
+    ok: n > 0 && synced === n,
+    synced,
+    failureClass,
+  };
+}
 
 /**
  * Simple promise-chain mutex so concurrent notebook workers serialize
@@ -214,9 +381,18 @@ export function matchWordDocVaultExportFallback(sources) {
  * @param {string} notebookId
  * @param {string} driveDocId
  * @param {(cmd: string, args: string[]) => Promise<{ stdout: string }>} [runNlm]
+ * @param {{
+ *   env?: Record<string, string | undefined>;
+ *   now?: () => number;
+ *   sourceSizeBytes?: number | null;
+ *   execFile?: typeof execFileAsync;
+ * }} [opts]
  * @returns {Promise<SyncNotebookResult>}
  */
-export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
+export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm, opts = {}) {
+  const callEnv = opts.env ?? process.env;
+  const now = opts.now ?? (() => Date.now());
+  const sourceSizeBytes = opts.sourceSizeBytes;
   const nlmEnv = await resolveNlmEnv();
   const nlm = await resolveNlmCommand({ env: nlmEnv });
   if (!nlm) {
@@ -227,14 +403,16 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     };
   }
 
+  const execImpl = opts.execFile ?? execFileAsync;
   const runner =
     runNlm ??
     (async (cmd, args) => {
-      const { stdout } = await execFileAsync(cmd, args, {
+      const timeout = resolveNlmCallTimeoutMs(args, callEnv);
+      const { stdout } = await execImpl(cmd, args, {
         env: nlmEnv,
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
-        timeout: NLM_EXEC_TIMEOUT_MS,
+        timeout,
       });
       return { stdout };
     });
@@ -287,6 +465,17 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
     };
   }
 
+  const syncBoundMs = resolvePositiveIntMsEnv(
+    "NLM_SYNC_TIMEOUT_MS",
+    NLM_SYNC_TIMEOUT_MS,
+    callEnv,
+  );
+  const canaryFraction = resolveCanaryFractionEnv(
+    "NLM_SYNC_CANARY_FRACTION",
+    NLM_SYNC_CANARY_FRACTION,
+    callEnv,
+  );
+  const syncStarted = now();
   try {
     await runner(nlm, [
       "source",
@@ -296,8 +485,10 @@ export async function syncNotebookDriveSource(notebookId, driveDocId, runNlm) {
       matched.sourceId,
       "-y",
     ]);
+    maybeEmitSyncCanary(now() - syncStarted, syncBoundMs, canaryFraction, sourceSizeBytes);
     return { status: "ok", stderr: "", driveSourceId: matched.sourceId };
   } catch (err) {
+    maybeEmitSyncCanary(now() - syncStarted, syncBoundMs, canaryFraction, sourceSizeBytes);
     const stderr = formatExecError(err);
     if (isTimeoutError(err)) {
       return {
@@ -373,6 +564,8 @@ async function mergeDriveWriteFailure(
  *   runNlm?: (cmd: string, args: string[]) => Promise<{ stdout: string }>;
  *   driveSyncLogPath?: string;
  *   env?: Record<string, string | undefined>;
+ *   now?: () => number;
+ *   execFile?: typeof execFileAsync;
  * }} [opts]
  */
 export async function runSyncVaultExportDrive(reportPath, opts = {}) {
@@ -405,8 +598,16 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
 
   const targets = Array.isArray(report.notebooklm_targets) ? report.notebooklm_targets : [];
   if (targets.length === 0) {
-    process.stderr.write("session-close: sync-vault-export-drive no notebooklm_targets; continuing\n");
-    return { ok: true, synced: 0 };
+    process.stderr.write(
+      "session-close: sync-vault-export-drive no notebooklm_targets resolved (N=0); refusing vacuous success\n",
+    );
+    await stampFailureClassIfEmpty(reportPath, "notebooklm_no_targets");
+    return {
+      ok: false,
+      synced: 0,
+      reason: "no-notebooklm-targets",
+      failure_class: "notebooklm_no_targets",
+    };
   }
 
   await patchCloseReport(reportPath, {
@@ -434,6 +635,12 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     .filter((row) => isObject(row) && typeof row.notebook_id === "string")
     .map((row) => /** @type {string} */ (row.notebook_id));
 
+  // Re-read after mode patch so export_bytes / path are current.
+  report = JSON.parse(await readFile(reportPath, "utf8"));
+  const sourceSizeBytes = await resolveExportSourceBytes(
+    isObject(report) ? report : {},
+  );
+
   const mergeLock = createAsyncMutex();
 
   await mergeLock(async () =>
@@ -442,7 +649,12 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
 
   const settled = await Promise.allSettled(
     notebookIds.map(async (notebookId) => {
-      const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm);
+      const result = await syncNotebookDriveSource(notebookId, driveDocId, opts.runNlm, {
+        env,
+        now: opts.now,
+        sourceSizeBytes,
+        execFile: opts.execFile,
+      });
       const update = buildFanoutUpdate(notebookId, driveDocId, result);
       // Stamp first so a log-append IO failure cannot leave the row UNSTAMPED.
       await mergeLock(async () => mergeFanoutUpdatesAtPath(reportPath, [update]));
@@ -462,6 +674,11 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     .filter((row) => row.status === "fulfilled")
     .map((row) => /** @type {import('./merge-notebooklm-fanout.mjs').FanoutUpdate} */ (row.value));
   const rejected = settled.filter((row) => row.status === "rejected");
+
+  const rollup = await applyDriveSyncRollup(reportPath, updates, mergeLock, {
+    expectedCount: notebookIds.length,
+  });
+
   if (rejected.length > 0) {
     const first = rejected[0];
     const reason = first.status === "rejected" ? first.reason : undefined;
@@ -472,11 +689,11 @@ export async function runSyncVaultExportDrive(reportPath, opts = {}) {
     return {
       ok: false,
       reason: "partial-merge-failed",
-      synced: updates.filter((u) => u.status === "ok").length,
+      synced: rollup.synced,
     };
   }
 
-  return { ok: true, synced: updates.filter((u) => u.status === "ok").length };
+  return { ok: rollup.ok, synced: rollup.synced };
 }
 
 /**

@@ -34,7 +34,16 @@ The Drive source is a **Google Drive PDF** (media byte-swap), not a native Googl
 - Renders `deterministic.export_path` markdown → `vault-export-for-notebooklm.pdf` (beside the `.md`) via Playwright Chromium (`page.pdf`, extractable text).
 - Media-overwrites the same Drive PDF `fileId` (`Content-Type: application/pdf`). Typical wall-clock ≪ 60 s.
 - Sync only runs when `steps.drive_write.status === "ok"`.
-- Notebooks sync **concurrently** (`Promise.allSettled`); each `nlm` call is bounded by **25 s** (`NLM_EXEC_TIMEOUT_MS`).
+- Notebooks sync **concurrently** (`Promise.allSettled`); wall clock ≈ max(individual), not sum.
+- Per-call bounds (env-overridable; invalid values fall back to defaults with a WARNING — never disable the bound):
+  - `nlm source list` → **25 s** (`NLM_LIST_TIMEOUT_MS`, default `25_000`)
+  - `nlm source sync` → **120 s** (`NLM_SYNC_TIMEOUT_MS`, default `120_000`)
+- Canary: when a sync's measured duration ≥ `NLM_SYNC_CANARY_FRACTION` × sync bound (default **0.5** → 60 s), stderr WARNING includes duration, bound, and source size bytes.
+- Phase rollup (end of `runSyncVaultExportDrive`, only stamps when `failure_class` is null/empty):
+  - N==0 targets → `failure_class: notebooklm_no_targets`, `{ ok: false }` (never vacuous success)
+  - N≥1 all failed → `notebooklm`, `{ ok: false, synced: 0 }`
+  - N≥1 some failed → `notebooklm_partial`, `{ ok: false, synced: <ok-count> }`
+  - N≥1 all ok → leave `failure_class` null, `{ ok: true, synced: N }`
 - Per notebook (incremental merge under a mutex): `nlm source list <id> --drive --json --skip-freshness` → match cascade:
   1. `drive_doc_id` / id fields / URL parse (`matchDriveSourceByDocId`)
   2. first `type === "google_docs"` (legacy Doc)
@@ -60,8 +69,8 @@ The Drive source is a **Google Drive PDF** (media byte-swap), not a native Googl
 | Class | When |
 |-------|------|
 | `drive_write_error` | Drive PDF media overwrite failed (all targets failed with this class) |
-| `nlm_list_timeout` | `nlm source list` exceeded 25 s (explicit; wins over classifier) |
-| `nlm_sync_timeout` | `nlm source sync` exceeded 25 s (explicit; wins over classifier) |
+| `nlm_list_timeout` | `nlm source list` exceeded list bound (default 25 s / `NLM_LIST_TIMEOUT_MS`; explicit; wins over classifier) |
+| `nlm_sync_timeout` | `nlm source sync` exceeded sync bound (default 120 s / `NLM_SYNC_TIMEOUT_MS`; explicit; wins over classifier) |
 | `unknown` | No matching Drive source in notebook (operator must add PDF titled `vault-export-for-notebooklm` in UI) |
 | Others | Sync stderr via `classify-source-add-error.mjs` |
 
