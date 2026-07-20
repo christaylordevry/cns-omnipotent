@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of OPS-4-session-close-constitution-propagation-guard.md (2026-07-21)
+
+- Changelog version scan continues past `## Changelog` to EOF — a version-looking table row in a later section can spuriously collide; malformed real changelog rows are ignored. Bound the scan to the changelog section when tightening collision parsing.
+- `parseAgentsHeaderVersion` accepts the first `> Version:` substring and non-strict digit/dot shapes — sufficient for current AGENTS; harden if header format drifts.
+
 ## 🚨 `/session-close` PROPAGATES vault AGENTS.md corruption into the git mirror (found 2026-07-20, session 24)
 
 > **ROOT CAUSE CORRECTED 2026-07-20 (same day).** The first version of this entry claimed

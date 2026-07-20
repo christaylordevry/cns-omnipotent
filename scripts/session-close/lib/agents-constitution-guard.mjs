@@ -5,7 +5,7 @@
  */
 import { existsSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { readSessionCloseEnvVar } from "./load-session-close-env.mjs";
 import { normalizeLf } from "./sync-vault-modules.mjs";
@@ -22,7 +22,24 @@ export const PAKE_ROUTING_TYPES = Object.freeze([
 
 export const ADJACENT_TOKEN_ALLOWLIST = new Set(["had had", "that that"]);
 
+/** Sentinel so table-cell / row boundaries never count as adjacent tokens. */
+const TOKEN_BOUNDARY = "\u0000";
+
 /** @typedef {"passed" | "failed" | "not_applicable"} GuardCheckStatus */
+
+/**
+ * @param {string} text
+ * @param {string} headingPrefix e.g. "## 2."
+ * @param {number} [fromIndex]
+ * @returns {number}
+ */
+function findLineHeadingIndex(text, headingPrefix, fromIndex = 0) {
+  const escaped = headingPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}`, "gm");
+  re.lastIndex = fromIndex;
+  const match = re.exec(text);
+  return match ? match.index : -1;
+}
 
 /**
  * @param {string} text
@@ -31,13 +48,17 @@ export const ADJACENT_TOKEN_ALLOWLIST = new Set(["had had", "that that"]);
  * @returns {string}
  */
 export function extractSectionRange(text, startHeading, endHeading) {
-  const start = text.indexOf(startHeading);
+  const start = findLineHeadingIndex(text, startHeading);
   if (start === -1) {
     throw new Error(
       `constitution-guard: structural: missing heading ${startHeading}`,
     );
   }
-  const end = text.indexOf(endHeading, start + startHeading.length);
+  const end = findLineHeadingIndex(
+    text,
+    endHeading,
+    start + startHeading.length,
+  );
   if (end === -1 || end <= start) {
     throw new Error(
       `constitution-guard: structural: missing end heading ${endHeading} after ${startHeading}`,
@@ -69,19 +90,85 @@ export function assertRoutingRowsOnce(section2Text) {
 }
 
 /**
- * Tokenize a line for adjacent-duplicate detection.
+ * Tokenize text for adjacent-duplicate detection.
  * Keeps decimal literals (e.g. 0.0) as one token so `0.0 to 1.0` is not `0 0`.
- * @param {string} line
+ * @param {string} text
  * @returns {string[]}
  */
-function tokenizeLine(line) {
-  return line.match(/\d+\.\d+|\b[A-Za-z0-9_]+\b/g) ?? [];
+function tokenizeText(text) {
+  return text.match(/\d+\.\d+|\b[A-Za-z0-9_]+\b/g) ?? [];
+}
+
+/**
+ * Drop fenced code so §3 yaml/markdown examples cannot false-positive.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripFencedCode(text) {
+  return text.replace(/```[\s\S]*?```/g, "\n");
+}
+
+/**
+ * Replace wikilinks with the target path only (drop display alias).
+ * `[[Note|Note]]` → one token stream from `Note`, not `Note Note`.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripWikilinkAliases(text) {
+  // Keep target (and optional #heading); drop |display alias so [[A|A]] is one token.
+  return text.replace(
+    /\[\[([^\]|#]+)(?:#[^|\]]+)?(?:\|[^\]]+)?\]\]/g,
+    " $1 ",
+  );
+}
+
+/**
+ * Build a token stream across the whole §2–§3 span (cross-line), after
+ * fence/wikilink softening. Table cells are tokenized independently so
+ * adjacent cells with the same value are not adjacent in the stream.
+ * @param {string} section2And3Text
+ * @returns {string[]}
+ */
+export function buildAdjacentTokenStream(section2And3Text) {
+  const cleaned = stripWikilinkAliases(stripFencedCode(section2And3Text));
+  /** @type {string[]} */
+  const tokens = [];
+
+  /** @param {string[]} next */
+  const pushSegment = (next) => {
+    if (next.length === 0) {
+      return;
+    }
+    if (tokens.length > 0 && tokens[tokens.length - 1] !== TOKEN_BOUNDARY) {
+      tokens.push(TOKEN_BOUNDARY);
+    }
+    tokens.push(...next);
+  };
+
+  for (const line of cleaned.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|")) {
+      const cells = trimmed.split("|").slice(1, -1);
+      for (const cell of cells) {
+        pushSegment(tokenizeText(cell));
+      }
+      if (tokens.length > 0 && tokens[tokens.length - 1] !== TOKEN_BOUNDARY) {
+        tokens.push(TOKEN_BOUNDARY);
+      }
+      continue;
+    }
+    // Prose: append into the continuous cross-line stream (no boundary).
+    tokens.push(...tokenizeText(line));
+  }
+
+  return tokens;
 }
 
 /**
  * Case-insensitive adjacent duplicate tokens within §2∪§3, with allowlist.
- * Checked per line (not cross-line) so prose→table header `pake_type` is not a hit,
- * while same-line corruption like `governed governed` still fails closed.
+ * Softened for fences / wikilink aliases / per-cell tables, then scanned as one
+ * span including across line breaks (OPS-4 review: coupled soften + cross-line).
+ * Allowlist permits exactly one adjacent pair (`had had`), not a triple run.
  * @param {string} section2And3Text
  * @param {Set<string>} [allowlist]
  */
@@ -89,23 +176,35 @@ export function assertNoDoubledAdjacentTokens(
   section2And3Text,
   allowlist = ADJACENT_TOKEN_ALLOWLIST,
 ) {
+  const tokens = buildAdjacentTokenStream(section2And3Text);
   /** @type {string[]} */
   const hits = [];
-  for (const line of section2And3Text.split("\n")) {
-    const tokens = tokenizeLine(line);
-    for (let i = 0; i < tokens.length - 1; i += 1) {
-      const a = tokens[i];
-      const b = tokens[i + 1];
-      if (a.toLowerCase() !== b.toLowerCase()) {
-        continue;
-      }
-      const key = `${a.toLowerCase()} ${b.toLowerCase()}`;
-      if (allowlist.has(key)) {
-        continue;
-      }
-      hits.push(`${a} ${b}`);
+
+  let i = 0;
+  while (i < tokens.length) {
+    if (tokens[i] === TOKEN_BOUNDARY) {
+      i += 1;
+      continue;
     }
+    let j = i + 1;
+    while (
+      j < tokens.length &&
+      tokens[j] !== TOKEN_BOUNDARY &&
+      tokens[j].toLowerCase() === tokens[i].toLowerCase()
+    ) {
+      j += 1;
+    }
+    const runLen = j - i;
+    if (runLen >= 2) {
+      const key = `${tokens[i].toLowerCase()} ${tokens[i].toLowerCase()}`;
+      const allowOnePair = runLen === 2 && allowlist.has(key);
+      if (!allowOnePair) {
+        hits.push(`${tokens[i]} ${tokens[i]}`);
+      }
+    }
+    i = j;
   }
+
   if (hits.length > 0) {
     const unique = [...new Set(hits)];
     throw new Error(
@@ -134,7 +233,7 @@ export function parseAgentsHeaderVersion(text) {
  * @returns {string[]}
  */
 export function listChangelogVersions(text) {
-  const idx = text.indexOf("## Changelog");
+  const idx = findLineHeadingIndex(text, "## Changelog");
   if (idx === -1) {
     return [];
   }
@@ -185,7 +284,7 @@ function resolveRealpath(path) {
   try {
     return realpathSync(path);
   } catch {
-    return path;
+    return resolve(path);
   }
 }
 
@@ -252,9 +351,16 @@ export function assertAgentsPropagationAllowed({
 
   // Collision before stale so the AC4 incident fixture (Vs 2.1.57 / Vm 2.1.58,
   // bump 2.1.58 already on mirror) surfaces version-collision (union), not only stale.
+  const sourceChangelog = listChangelogVersions(sourceNorm);
+  const mirrorChangelog = listChangelogVersions(mirrorNorm);
+  if (sourceChangelog.length === 0 || mirrorChangelog.length === 0) {
+    throw new Error(
+      "constitution-guard: version-collision: empty or missing changelog on source or mirror (cannot validate union)",
+    );
+  }
   const changelogVersions = new Set([
-    ...listChangelogVersions(sourceNorm),
-    ...listChangelogVersions(mirrorNorm),
+    ...sourceChangelog,
+    ...mirrorChangelog,
   ]);
   if (changelogVersions.has(newVersion)) {
     throw new Error(

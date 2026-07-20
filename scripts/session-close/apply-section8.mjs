@@ -6,6 +6,7 @@
  * The script adds `## 8. Current Focus`, bumps patch version, inserts changelog row,
  * and byte-syncs specs mirror + vault canonical copy.
  */
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -161,7 +162,21 @@ export async function runApplySection8(opts) {
   let agentsText;
   try {
     agentsText = await readFile(paths.constitutionAgentsPath, "utf8");
-  } catch {
+  } catch (err) {
+    // Absent vault (fresh clone) → fall back to mirror (AC11a).
+    // Exists but unreadable → refuse; unknown state is never success (AC11).
+    if (existsSync(paths.constitutionAgentsPath)) {
+      const message = `constitution-guard: source-unreadable: ${paths.constitutionAgentsPath}`;
+      if (!dryRun) {
+        await recordSection8Failure(paths.closeReportPath, message, {
+          structural: "not_applicable",
+          stale: "not_applicable",
+          collision: "not_applicable",
+          reason: message,
+        });
+      }
+      throw new Error(message, { cause: err });
+    }
     agentsText = await readFile(paths.repoAgentsPath, "utf8");
     sourcePath = paths.repoAgentsPath;
   }
@@ -204,14 +219,24 @@ export async function runApplySection8(opts) {
     /** @type {Record<string, unknown>} */
     const failedGuard = {
       structural: message.includes("structural:") ? "failed" : "passed",
-      stale: message.includes(": stale:") ? "failed" : "unknown",
-      collision: message.includes("version-collision:") ? "failed" : "unknown",
+      stale: "not_applicable",
+      collision: "not_applicable",
       reason: message,
     };
-    if (message.includes("mirror-unreadable:")) {
-      failedGuard.structural = "unknown";
-      failedGuard.stale = "failed";
+    if (message.includes("mirror-unreadable:") || message.includes("source-unreadable:")) {
+      failedGuard.structural = "not_applicable";
+      failedGuard.stale = "not_applicable";
+      failedGuard.collision = "not_applicable";
+    } else if (message.includes("version-collision:")) {
       failedGuard.collision = "failed";
+      // Stale not evaluated — collision runs first.
+      failedGuard.stale = "not_applicable";
+    } else if (message.includes(": stale:")) {
+      failedGuard.stale = "failed";
+      // Collision already passed when stale is evaluated.
+      failedGuard.collision = "passed";
+    } else if (message.includes("structural:")) {
+      failedGuard.structural = "failed";
     }
     if (!dryRun) {
       await recordSection8Failure(paths.closeReportPath, message, failedGuard);

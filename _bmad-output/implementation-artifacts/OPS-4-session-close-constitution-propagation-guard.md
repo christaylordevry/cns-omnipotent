@@ -2,7 +2,7 @@
 story_id: OPS-4
 epic: ops-observability
 title: session-close-constitution-propagation-guard
-status: review
+status: done
 created: 2026-07-20
 design_gate: APPROVED_2026-07-20
 baseline_commit: 588e17c
@@ -14,7 +14,7 @@ do_not_run: /session-close until this ships ($3–5/run; re-spreads vault corrup
 
 # Story OPS-4: Session-close must validate the constitution before propagating it
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -66,7 +66,7 @@ Full analysis: `_bmad-output/implementation-artifacts/deferred-work.md` (top ent
 | # | Decision | Binding rule |
 |---|----------|--------------|
 | 1 | Story key **OPS-4**; reopen **ops-observability** | Epic 87 stays closed — different concern (mirror dedup). This is fail-loud / refuse-unvalidated-state, same theme as OPS-1/OPS-2. |
-| 2 | Doubled-token scope = **entire §2 and §3** | Case-insensitive adjacent-token match; small allowlist (`had had`, `that that`). False positives fail closed (safe). |
+| 2 | Doubled-token scope = **entire §2 and §3** (cross-line) | Soften first: skip fenced code, tokenize table cells independently, strip wikilink aliases — then scan the whole `## 2.`…`## 4.` span including across line breaks. Allowlist (`had had`, `that that`) permits **exactly one** adjacent pair, not a triple. Remaining false positives fail closed. |
 | 3 | Collision scope = **source ∪ mirror** | **Not optional.** Source-only **fails to catch the observed bug** (vault 2.1.57 → bump 2.1.58 already in *mirror* changelog). Union is the only variant that catches the motivating incident — ACs must state this so it cannot be "simplified" later. |
 | 4 | Verify-time AGENTS vault↔specs parity **in scope** | Same guard helper. Shortens detection window; would have flagged vault drift between 07-14 and 07-20 without a paid close. |
 | 5 | Dual-copy | **Verify via `git diff --name-only`**, not the plan. If only `scripts/session-close/lib/*` → negative assertion (no `hermes-skill-examples/` touch). If skill tree touched → real `cmp` vs `~/.hermes/skills/cns/session-close/`. OPS-1 gate (b) trap. |
@@ -92,7 +92,8 @@ Full analysis: `_bmad-output/implementation-artifacts/deferred-work.md` (top ent
 **When** validating  
 **Then** each of these §2 routing-table row labels appears **exactly once**:  
 `SourceNote`, `InsightNote`, `SynthesisNote`, `WorkflowNote`, `ValidationNote`, `HookSetNote`, `WeaponsCheckNote`  
-**And** within the text spanning `## 2.` … `## 4.` (entire §2 **and** §3), no case-insensitive adjacent duplicate tokens except an explicit allowlist including at least `had had` and `that that`  
+**And** within the text spanning `## 2.` … `## 4.` (entire §2 **and** §3), no case-insensitive adjacent duplicate tokens except an explicit allowlist including at least `had had` and `that that` (allowlist = **exactly one** pair; a triple run refuses)  
+**And** before that scan: strip fenced code blocks, tokenize markdown table cells independently (no cross-cell adjacency), and strip wikilink display aliases — then scan the cleaned span **including across line breaks**  
 **And** on violation: refuse both targets; loud message prefixed `constitution-guard: structural:`
 
 ### AC3 — Stale-source refuse
@@ -127,13 +128,19 @@ A **source-only** collision check **passes** that fixture. That is a story failu
 **Given** a temp vault+repo fixture where:
 
 - source (vault) AGENTS is deliberately corrupt (§2 duplicate HookSetNote/WeaponsCheckNote rows **and** `governed governed` in §3)
-- both write targets are pre-seeded with **known clean** bytes
+- both write targets exist on disk before the call (repo mirror + vault path)
 
 **When** `runApplySection8({ dryRun: false, … })` runs with a valid draft  
 **Then** it throws  
-**And** reading both target paths from disk yields **byte-identical** content to the pre-seeded clean bytes  
+**And** reading both target paths from disk yields **byte-identical** content to the pre-call snapshots (zero writes on refusal)
 
-Marker-count-only tests on clean transform output do **not** satisfy this AC.
+> **Architecture note (AC correction 2026-07-21, code-review decision — not post-hoc softening):**
+> Vault `AI-Context/AGENTS.md` is both the constitution **source** and a **write target**.
+> A fixture that requires “both targets pre-seeded clean **while** source is corrupt” is
+> unsatisfiable at one path. The load-bearing requirement is **zero writes on refusal**:
+> snapshot both targets before the call; after refuse, bytes are unchanged. Repo starts
+> clean and stays clean; vault starts corrupt and stays corrupt (not replaced by patched
+> output). Marker-count-only tests on clean transform output do **not** satisfy this AC.
 
 ### AC6 — Clean path still works
 
@@ -202,6 +209,16 @@ A check that **cannot** run must never be reported as a check that **passed**. S
 
 > Catching ENOENT and proceeding as “no drift” is the exact silent-success pattern this epic forbids. Unknown mirror state is never success.
 
+#### (c) VAULT SOURCE EXISTS BUT UNREADABLE → FAIL CLOSED
+
+**Given** `constitutionAgentsPath` exists on disk but `readFile` fails (EACCES / EPERM / etc.)  
+**When** the apply path would otherwise catch and fall back to the mirror  
+**Then** that fallback is **forbidden**  
+**And** refuse with `constitution-guard: source-unreadable: …` naming the path  
+**And** only genuine absence (path does not exist) may fall back to the mirror (AC11a)
+
+> Unknown vault state is never success. A transient I/O error must not disable stale/collision by collapsing source onto the mirror.
+
 ---
 
 ## Tasks / Subtasks
@@ -231,6 +248,21 @@ A check that **cannot** run must never be reported as a check that **passed**. S
 - [x] **Dual-copy record** (AC: 9) — paste `git diff --name-only`; negative or real cmp
 - [x] **Verify** (AC: 10) — `bash scripts/verify.sh`
 
+### Review Findings
+
+- [x] [Review][Decision] Adjacent-token false-positive policy + cross-line scan — **resolved 2026-07-21 as coupled 2/2:** soften (skip fences, per-cell tables, strip wikilink aliases) **then** whole-span cross-line scan. Softening is what makes cross-line safe; §3 guarantees fences/wikilinks; §2 is a routing table.
+- [x] [Review][Patch] Softened + cross-line adjacent-token scanner [`scripts/session-close/lib/agents-constitution-guard.mjs`]
+- [x] [Review][Patch] Empty or missing changelog must not report collision `passed` — refuse [`scripts/session-close/lib/agents-constitution-guard.mjs`]
+- [x] [Review][Patch] Line-anchor section headings (`^## 2\.` etc.) [`scripts/session-close/lib/agents-constitution-guard.mjs`]
+- [x] [Review][Patch] `failedGuard` status honesty (stale-after-collision-pass; mirror/source-unreadable → `not_applicable`) [`scripts/session-close/apply-section8.mjs`]
+- [x] [Review][Patch] `realpathSync` failure → `path.resolve` before same-path compare [`scripts/session-close/lib/agents-constitution-guard.mjs`]
+- [x] [Review][Patch] Vault exists-but-unreadable → `source-unreadable` refuse (ENOENT still falls back) [`scripts/session-close/apply-section8.mjs`]
+- [x] [Review][Patch] Allowlist permits exactly one pair (`had had had` refuses) [`scripts/session-close/lib/agents-constitution-guard.mjs`]
+- [x] [Review][Decision] AC5 fixture wording — **AC correction 2026-07-21:** literal “both targets clean while source corrupt” unsatisfiable (vault is source and target); snapshot-unchanged is the requirement. See AC5 architecture note.
+- [x] [Review][Dismiss] AC10 verify red (Auditor) — **dismissed; verified by exit code 2026-07-21:** `npx eslint scripts/session-close/apply-section8.mjs` → 0; `bash scripts/verify.sh` → 0 (`VERIFY PASSED`). Auditor pipeline had masked a non-reproducing lint claim.
+- [x] [Review][Defer] Changelog version scan continues past `## Changelog` to EOF [`scripts/session-close/lib/agents-constitution-guard.mjs`] — deferred, low urgency
+- [x] [Review][Defer] `parseAgentsHeaderVersion` accepts first `> Version:` substring / non-strict shapes [`scripts/session-close/lib/agents-constitution-guard.mjs`] — deferred, pre-existing
+
 ---
 
 ## Dev Notes
@@ -242,21 +274,23 @@ A check that **cannot** run must never be reported as a check that **passed**. S
 3. **Do not invent** a second LF/compare stack — reuse `normalizeLf` (+ compare/refuse style) from 87-2.
 4. **Collision = union** — source-only is a known false green for the motivating incident.
 5. **Assert disk bytes** on the corrupt-source / mirror-missing tests — not only that the function threw.
-6. **Vacuous ≠ passed** — same-realpath stale/collision must be `not_applicable` (loud); missing mirror must refuse. Never catch ENOENT and proceed as no-drift.
+6. **Vacuous ≠ passed** — same-realpath stale/collision must be `not_applicable` (loud); missing mirror must refuse; empty changelog must refuse (never collision `passed`); vault **exists but unreadable** must refuse (`source-unreadable`) — only genuine absence falls back to mirror. Never catch ENOENT-on-mirror and proceed as no-drift.
 7. No new npm packages unless >14 days old and justified (prefer hand-rolled three-part semver compare).
 8. WriteGate: AGENTS mutation remains filesystem via apply path, not Vault IO mutators.
 
 ### Gate placement (canonical)
 
 ```text
-read source (constitutionAgentsPath → fallback repoAgentsPath)
+read source (constitutionAgentsPath)
+  ├─ exists but unreadable → REFUSE source-unreadable (AC11) — zero writes
+  └─ absent (ENOENT) → fallback repoAgentsPath (AC11a)
 attempt read mirror (repoAgentsPath)
         │
         ▼
 realpath(source) vs realpath(mirror)
   ├─ mirror unreadable → REFUSE (AC11b) — zero writes
   ├─ same realpath → stale/collision = not_applicable (loud); structural still runs
-  └─ distinct paths → stale + collision ∪ as AC3/AC4
+  └─ distinct paths → empty changelog REFUSE; else collision ∪ then stale as AC3/AC4
         │
         ▼
 assertAgentsPropagationAllowed(...)   ← structural fail OR stale/collision fail = zero writes
@@ -369,9 +403,12 @@ Composer (Cursor agent router)
 
 ### Debug Log References
 
-- Adjacent-token check initially false-positive on clean specs (`pake_type` prose→table cross-line; `0.0` decimal split). Fixed: per-line check + decimal-aware tokenization. Still catches same-line `governed governed`.
+- Adjacent-token check: review 2026-07-21 coupled decision — soften (fences / per-cell tables / wikilink aliases) then whole-span cross-line scan; allowlist = exactly one pair. Catches `governed\ngoverned`; live specs AGENTS still passes.
 - AC4 incident fixture (Vs 2.1.57 / Vm 2.1.58) also matches AC3 stale. Collision is evaluated before stale so the incident fixture surfaces `version-collision` (union proof); pure stale uses Vs≪Vm with bump not in either changelog.
 - Token-gate fixtures needed §2–§4 sections so structural gate does not break SC-4 happy paths.
+- Vault read: exists-but-unreadable → `source-unreadable` refuse; genuine absence still falls back (AC11a).
+- AC5 wording corrected 2026-07-21 — snapshot-unchanged (vault is source and target).
+- AC10 Auditor false red dismissed — eslint + verify.sh exit code 0 (2026-07-21).
 
 ### Completion Notes List
 
@@ -412,3 +449,4 @@ tests/session-close-token-gate.test.mjs
 ### Change Log
 
 - 2026-07-20: OPS-4 implemented — pre-write constitution propagation guard (structural / stale / union collision / vacuous honesty); verify-time AGENTS parity; verify.sh green.
+- 2026-07-21: Code-review patches — softened+cross-line token scan; empty-changelog refuse; source-unreadable vs absent; line-anchored headings; failedGuard honesty; allowlist one-pair; AC5 AC-correction; AC10 exit-code dismiss.

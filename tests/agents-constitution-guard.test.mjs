@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -279,6 +279,67 @@ describe("OPS-4 agents constitution guard unit helpers", () => {
       "Operators had had that that confirmation already.",
     );
     assert.doesNotThrow(() => assertAgentsStructuralInvariants(text));
+  });
+
+  it("AC2 structural: cross-line adjacent tokens refuse after soften", () => {
+    const text = CLEAN_MINIMAL_AGENTS.replace(
+      "This PAKE Standard applies to governed knowledge notes.",
+      "This PAKE Standard applies to governed\ngoverned knowledge notes.",
+    );
+    assert.throws(
+      () => assertAgentsStructuralInvariants(text),
+      /adjacent duplicate tokens.*governed/,
+    );
+  });
+
+  it("AC2 structural: tables / wikilinks / fences do not false-positive", () => {
+    const text = CLEAN_MINIMAL_AGENTS.replace(
+      "This PAKE Standard applies to governed knowledge notes.",
+      [
+        "See [[Note Title]] and [[path/to/note|Display Text]].",
+        "",
+        "| field | field | notes |",
+        "|-------|-------|-------|",
+        "| alpha | alpha | ok |",
+        "",
+        "```yaml",
+        "confidence_score: [0.0 to 1.0]",
+        "governed governed",
+        "```",
+        "",
+        "This PAKE Standard applies to governed knowledge notes.",
+      ].join("\n"),
+    );
+    assert.doesNotThrow(() => assertAgentsStructuralInvariants(text));
+  });
+
+  it("AC2 structural: allowlist permits exactly one pair, not a triple", () => {
+    const text = CLEAN_MINIMAL_AGENTS.replace(
+      "This PAKE Standard applies to governed knowledge notes.",
+      "Operators had had had confirmation already.",
+    );
+    assert.throws(
+      () => assertAgentsStructuralInvariants(text),
+      /adjacent duplicate tokens.*had/,
+    );
+  });
+
+  it("AC4/AC11: empty changelog refuses (never collision passed)", () => {
+    const noChangelog = CLEAN_MINIMAL_AGENTS.replace(
+      /## Changelog[\s\S]*/,
+      "## Changelog\n\n",
+    );
+    assert.throws(
+      () =>
+        assertAgentsPropagationAllowed({
+          sourcePath: "/tmp/vault-agents.md",
+          mirrorPath: "/tmp/specs-agents.md",
+          sourceText: noChangelog,
+          mirrorText: noChangelog,
+          newVersion: "9.9.10",
+        }),
+      /constitution-guard: version-collision: empty or missing changelog/,
+    );
   });
 
   it("AC3 stale: source version below mirror refuses", () => {
@@ -567,6 +628,41 @@ describe("OPS-4 runApplySection8 propagation gate", () => {
       assert.equal(await readFile(repoAgents, "utf8"), beforeRepo);
       assert.equal(await readFile(vaultAgents, "utf8"), beforeVault);
     } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("vault exists but unreadable → source-unreadable refuse (no mirror fallback)", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ops4-src-unreadable-"));
+    const vault = join(root, "vault");
+    const { draftPath, repoAgents, vaultAgents, closeReportPath } = await seedApplyFixture(
+      root,
+      vault,
+      {
+        sourceAgents: CLEAN_MINIMAL_AGENTS,
+        mirrorAgents: CLEAN_MINIMAL_AGENTS,
+      },
+    );
+    const beforeRepo = await readFile(repoAgents, "utf8");
+    await chmod(vaultAgents, 0o000);
+    try {
+      await assert.rejects(
+        () =>
+          runApplySection8({
+            draftPath,
+            dryRun: false,
+            repoRoot: root,
+            vaultRoot: vault,
+            dateStr: "2026-07-20",
+          }),
+        /constitution-guard: source-unreadable:/,
+      );
+      assert.equal(await readFile(repoAgents, "utf8"), beforeRepo);
+      const report = JSON.parse(await readFile(closeReportPath, "utf8"));
+      assert.equal(report.failure_class, "section8");
+      assert.match(String(report.constitution_guard?.reason ?? ""), /source-unreadable/);
+    } finally {
+      await chmod(vaultAgents, 0o644).catch(() => {});
       await rm(root, { recursive: true, force: true });
     }
   });
