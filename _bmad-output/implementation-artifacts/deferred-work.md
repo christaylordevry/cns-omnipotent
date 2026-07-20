@@ -1,5 +1,19 @@
 # Deferred work
 
+## Open Design — wire Hermes MCP (deferred 2026-07-16)
+
+Open Design (`nexu-io/open-design`) was installed system-wide 2026-07-16 (see memory `reference_open_design_install`). MCP wired into **claude / cursor / codex** via `od mcp install <agent>`; **Hermes deliberately skipped** — `od mcp install hermes` only prints a manual block because "Hermes config format is unverified," and `~/.hermes/config.yaml` is a governed CNS surface (WriteGate / non-negotiable #4). Defer until there's a concrete need for Hermes to drive OD design generation (e.g. a Discord "design a landing page with the CNS Instrument system" skill).
+
+**To wire it** — add under `mcp_servers:` in `~/.hermes/config.yaml` (via the proper Hermes flow, not a raw edit; back up first, then restart the gateway):
+```yaml
+  open-design:
+    command: "/home/christ/.nvm/versions/node/v24.14.0/bin/node"
+    args: ["/home/christ/tools/open-design/apps/daemon/dist/cli.js","mcp","--daemon-url","http://127.0.0.1:7456"]
+    env:
+      OD_DATA_DIR: "/home/christ/tools/open-design/.od"
+```
+Daemon must be running (`systemctl --user status open-design`). Verify: Hermes lists an `open-design` MCP with tools `list_projects`, `get_artifact`, `create_artifact`, etc. This is substrate, not revenue — build only when a real Hermes→OD use case lands ([[project_strategic_bottleneck_deploy_not_build]]).
+
 ## 58-2 WatchedSurface Tier-2 multi-surface — ✅ CLOSED 2026-07-13, NO-GO / cancelled
 
 Reserved in 58-1 for additional watched NotebookLM sources beyond the single vault-export Drive PDF (candidates: per-PARA exports, CNS-Daily-Rhythm.md, sprint-status.yaml, AGENTS.md §8). Product brief `_bmad-output/planning-artifacts/briefs/brief-CNS-2026-07-13/brief.md` settled **NO-GO**: no concrete recurring operator decision measurably fails on the Tier-1 single-PDF fan-out; origin was reservation-without-pain; building would add duplication + sync failure modes after 58-3/58-4 hardening. Export scope is `01-Projects` + `03-Resources` by design (`export-vault-for-notebooklm.sh`); coverage gaps without a failing query do not earn a build. Operator bottleneck is revenue, not NotebookLM surface coverage.
@@ -103,7 +117,7 @@ Resolved in one patch commit: stale `@param repoRoot` JSDoc removed, `deriveProj
 
 **Surfaced by:** Post-incident cleanup after the session-14 MEMORY.md/AGENTS.md drift incident (see `HANDOFF-2026-07-05-session14-hermes-consolidation.md`). Root cause of the AGENTS.md pollution was fixed this session (Story 86-1: `readProjectStatusLine` now derives from `sprint-status.yaml` SSOT, not stale `CLAUDE.md` Phase Status). Remaining items:
 
-- **Vault `AI-Context/MEMORY.md` is orphaned and stale — delete it** — the current session-close router (`SKILL.md` v1.0.16) has no MEMORY.md regeneration step (that logic lives only in `references/task-prompt.legacy.md`, which the router explicitly skips). No live consumer reads it: hermes-agent code and `config.yaml` greps are empty, the NotebookLM export excludes `AI-Context/`, and constitution §6.5's cold-start budget maps to the Hermes native memory dir (`~/.hermes/memories/{USER,MEMORY}.md`), which IS live and clean. Superseded by the Hermes native memory system. **Action:** operator-direct delete (WriteGate-owned path).
+- **Vault `AI-Context/MEMORY.md` is orphaned and stale — RESOLVED 2026-07-14 (Session 4)** — quarantined to `04-Archive/ai-context-orphans-2026-07-14/MEMORY.md` (operator FS; WriteGate path). Session-close router has no MEMORY.md regeneration step; Hermes native `~/.hermes/memories/{USER,MEMORY}.md` remains SSOT.
 
 - **Test-fixture-shaped corruption of a live file — root cause still unconfirmed** — before session 14 the vault MEMORY.md had been overwritten with unit-test fixture content ("AGENTS v9.9.10", "Epics: 48 in-progress", "Tests: skipped (dry-run)"), matching `tests/session-close-pipeline.test.mjs` SC-4 fixtures. That test only does in-memory string transforms (no real file write), so how fixture data reached a production path is unexplained. Lower stakes now that the file is orphaned/being-deleted, but the write-path leak is a real latent bug worth a dedicated trace before writing any new artifact through the same helpers.
 
@@ -1255,3 +1269,54 @@ Windows Hermes Desktop app already installed at `%LOCALAPPDATA%\hermes\hermes-ag
 - Once a real reply is generated, confirm TTS (`Read Responses Aloud`) actually plays back — that half of the round-trip is still unverified.
 
 Story 78-1 AC#4 remains `PARTIAL` — this session made real progress (proved a packaged/dev-launched Desktop app connects to the real WSL backend, and that STT genuinely works) but did not close the AC.
+
+## Deferred from: Ras Mic system-design video review — unify signal-pipeline context (2026-07-19)
+
+Surfaced while reviewing Ras Mic's "System Design Overview" video (youtu.be/4jy0T98dYoI) against the CNS architecture during the CNS-redesign initiative. Verdict: the video mostly VALIDATES the existing stack (cns-dashboard is already SvelteKit + Convex + Vercel = his exact recommendation; Convex already the control-plane/source-of-truth). Only one idea has real teeth for CNS, and it is deferred on purpose.
+
+**The idea — co-locate the digest scorer into Convex (lightweight version of his "monorepo / durable-processes-inside-Convex" argument):**
+- Today the `rankScore` scorer lives in external Node scripts on Hermes cron (`~/.hermes/scripts/score-digest-signals.mjs`, `computeRankScore()` at :1625), which push into Convex `digestSignals` over HTTP (`push-digest-convex.mjs` → `digest:addDigestSignal`). The scorer is in a DIFFERENT repo from the schema it writes (cns-dashboard `convex/validators.ts`) and the UI that reads it.
+- **Proven pain (this session):** answering "where does rankScore come from" required chasing the value across FOUR repos — cns-dashboard → Omnipotent.md → NEXUS → ~/.hermes — precisely because scorer, schema, and display are fragmented. That is the exact "separated contexts" cost Ras Mic's monorepo argument targets.
+- **Candidate fix:** move the scorer into Convex as an action/workflow so scorer + schema + display are co-located and agent-buildable, without a full monorepo merge. His "durable processes / put long-running work inside Convex workflow components" point is the relevant pattern (replaces external cron).
+
+**Why DEFERRED, not scheduled:** collides head-on with the strategic frame ([[project_strategic_bottleneck_deploy_not_build]]) — CNS/infra is already mature/over-built; bottleneck is revenue/deploy, not delivery; re-architecting a working pipeline is "sophisticated procrastination." The fragmentation cost is felt ~once per session, not continuously. **Only revisit if cross-repo hunting becomes a recurring, real drag.** Do NOT bundle into the redesign (that is frontend trust/IA work — a different axis).
+
+**Explicitly NOT adopting from the video** (Pluto-specific multi-tenant SaaS, pure scope-inflation for a single-operator internal instrument): WorkOS enterprise auth, Autumn credit-billing, Daytona agent sandboxes, Expo/Electron mobile+desktop surfaces, iMessage service.
+
+## Deferred from: Milanote-style per-case evidence canvas — CNS redesign (2026-07-19)
+
+Surfaced during CNS-redesign Scenario 03 (Eric's Dig and Deepen) when the operator asked for a Milanote-like investigation workspace. Perplexity deep-research + a codebase grounding pass produced a sound target architecture. **Deferred deliberately — see "Why deferred."**
+
+### Target architecture (validated, build this later)
+**Hybrid, with the seam at `investigating`:**
+- **Upstream of the seam (triage / global view):** keep the structured 4-column Kanban + Convex as the authoritative state machine and source of truth. Never store signal state on a canvas.
+- **Downstream of the seam (deep work on 1–3 cases):** each card in `investigating` opens a per-case freeform canvas for evidence reasoning.
+- Rationale: pure Kanban underserves "follow the evidence"; pure canvas underserves "triage and commit/discard"; pure DB underserves human sense-making.
+
+### What ALREADY EXISTS (verified in cns-dashboard, 2026-07-19) — reuse, don't rebuild
+- **4-column Kanban is fully built:** `investigationBoardItems.column` = `triage | investigating | waiting | resolved` (`convex/validators.ts:374`); mutations `addToInvestigationBoard` (:70), `moveBoardItem` (:106, fires a Hermes awareness push on promotion to `investigating`), `removeBoardItem`, `updateBoardItemNote`; query `listInvestigationBoard`. UI: `NexusInvestigationBoard.svelte`, `NexusInvestigationBoardCard.svelte`, `NexusInvestigationPanel.svelte`. Rendered at `/nexus/investigate`.
+- **Freeform canvas ENGINE is fully built:** `ResearchCanvasView.svelte` (433 lines) — drag, x/y positions, clamping, debounced persistence — backed by `canvasLayouts` table + `getCanvasLayout` / `saveCanvasLayout` (`convex/canvasLayouts.ts`). Spatial placement + persistence is SOLVED machinery.
+
+### What is NEW build (the actual gap)
+1. **Per-case scoping** — the existing canvas is a SINGLE GLOBAL canvas (the exact "global dumping ground" anti-pattern the research says to reject). Needs keying to a board item / case.
+2. **Wrong object type** — the canvas places **topic cards keyed by slug** (`canvasSlugs`, `TOPIC_CARD_WIDTH`, sparklines); the Kanban holds **`digestSignalId`** refs. A case canvas must place signals/entities/evidence, not topics. This is why it is NOT a re-point.
+3. **Connectors / arrows** — no edge/arrow logic exists anywhere. Research flagged connectors as LOAD-BEARING for evidence graphs (support/contradict relations).
+4. **Mixed columns-on-canvas** — "Supporting / Contradicting / Unknown / Leads" buckets sitting on the freeform surface.
+
+### Also adopt when built (from the research)
+Board-per-case opened from the card · collapse/expand with card counts · case-board templates · lightweight note/link annotation cards layered over pipeline data · `triage` already serves the "unsorted inbox" pattern.
+
+### Explicitly REJECT (do not cargo-cult Milanote)
+Deep nested board hierarchies as primary IA · boards as the data store for signals (state stays in Convex) · Milanote-style shallow global search / "home board" metaphor (need faceted metadata filtering instead) · aesthetic per-case art direction (color/icon only for severity/state/type) · a long-lived GLOBAL canvas holding all signals.
+
+### Why DEFERRED (do not build now)
+- **The operator has never run a single investigation.** Baseline is non-adoption (`cns-dashboard/_bmad-output/A-Product-Brief/baseline-capture.md`). Designing an evidence graph — connectors, supporting/contradicting buckets, per-case boards — for a workflow never once performed is designing for an imagined user. What the canvas must hold is unknown until real digs happen.
+- Research's own caveat: **spatial memory only pays off when the item set is stable and few.** No data yet on what real dig sets look like.
+- **Collides with Obj 3.3** (stay bounded — Nexus + Trends only, zero scope inflation). A per-case canvas with connectors is a NEW FEATURE, not a redesign of an existing surface.
+- **Deferring is cheap:** the drag/position/persist engine already exists, so building later costs barely more than building now — and by then real digs will have revealed the actual requirements.
+
+### Revisit trigger
+After the operator has worked enough real digs through `triage → investigating → resolved` to know what evidence he actually needs to arrange, and whether spatial arrangement helps his reasoning at all.
+
+### NOT in the current redesign
+Scenario 03's sunshine path uses the existing Kanban with its real column semantics; `/trends/canvas` stays where it is, OFF the sunshine path. No Milanote work ships in this redesign.
