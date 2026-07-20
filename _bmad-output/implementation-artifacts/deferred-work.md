@@ -1,11 +1,43 @@
 # Deferred work
 
-## 🚨 `/session-close` CORRUPTS AGENTS.md §2/§3 — do not re-run until fixed (found 2026-07-20, session 24)
+## 🚨 `/session-close` PROPAGATES vault AGENTS.md corruption into the git mirror (found 2026-07-20, session 24)
+
+> **ROOT CAUSE CORRECTED 2026-07-20 (same day).** The first version of this entry claimed
+> session-close *created* the §2/§3 corruption. **That was wrong.** Empirical test: feeding a clean
+> AGENTS.md through `applySection8ToAgentsText` produces clean output (`governed governed`=0, each
+> pake_type row exactly once). The transform is sound. The corruption was **already present in the
+> vault working copy** before the close ran. Session-close read it, version-bumped it, and wrote it
+> over the clean git-tracked mirror. It is the **amplifier**, not the origin. Corrected before any
+> fix was attempted — do not chase the transform.
 
 **Highest-priority item in this file.** AGENTS.md is the constitution loaded into every agent's
 context at session start, so corruption there is inherited by every future session on every surface.
 
-Session 24's `/session-close` wrote **outside §8**, which it is never supposed to touch:
+### What actually happened
+
+`apply-section8.mjs:121-126` reads the constitution from **one** source and writes the patched
+result to **two** targets:
+
+```js
+try   { agentsText = await readFile(paths.constitutionAgentsPath, "utf8"); }  // → vault copy
+catch { agentsText = await readFile(paths.repoAgentsPath, "utf8"); }
+// ...then writes `patched` to BOTH specs/cns-vault-contract/AGENTS.md AND the vault copy
+```
+
+`constitutionAgentsPath` resolves to the **vault** copy (`lib/paths.mjs:113-114`). So a dirty vault
+working copy is propagated, unvalidated, over the git-tracked mirror. There is **no drift check on
+this path** despite 87-2 existing as a specs↔vault sync-drift gate.
+
+**Evidence chain:** pre-recovery vault git HEAD (`227b490`) was v2.1.57 and clean (0/1/1); the repo
+mirror was v2.1.58 (07-14) and clean; the vault *working copy* was `M` (dirty vs its own HEAD); the
+close's output was v2.1.58 — exactly `bumpPatchVersion(2.1.57)` — and corrupt. Since the transform is
+provably clean, the input carried the duplication.
+
+**Origin of the vault-side corruption is still UNKNOWN** — some write between 2026-07-14 and
+2026-07-20. Worth finding, but the propagation defect below is exploitable by *any* such corruption
+and is the thing to fix first.
+
+### The corruption that got spread
 
 | Defect | Section | Detail |
 |---|---|---|
@@ -32,12 +64,25 @@ both copies; corrupt version preserved at `AI-Context/AGENTS.md.corrupt-2026-07-
 Note the vault's own git HEAD holds only v2.1.57 (07-10) — older §8 — so the **repo** commit, not the
 vault commit, is the correct recovery source.
 
-**⛔ Do not run `/session-close` again until the §2/§3 write path is found.** Each run costs $3–5 and
-re-corrupts the constitution. Start at the section-8 draft/apply path
-(`scripts/session-close/` → `gate-apply-section8`): the duplication pattern (a routing block appended
-rather than replaced, plus a token doubled mid-sentence) suggests a regex/anchor that matches a
-section boundary loosely and re-emits content instead of substituting it. A regression test should
-assert marker counts (`governed governed`=0, each pake_type row exactly once) on the rendered output.
+**⛔ Do not run `/session-close` again until the propagation gate exists.** Each run costs $3–5 and
+re-spreads whatever the vault copy currently holds.
+
+### Fix direction (three separable pieces, in priority order)
+
+1. **Validate before propagating (the real fix).** Before writing the patched constitution to either
+   target, assert the *source* is sane and not stale: (a) structural invariants — each `pake_type`
+   routing row appears exactly once, no doubled tokens; (b) the source version is **>=** the version
+   already in the git-tracked mirror. Refuse to write on violation, and fail loudly. Reuse 87-2's
+   drift-gate logic rather than inventing a second one.
+2. **Version-collision guard.** `bumpPatchVersion` on a stale source produced 2.1.58 when the mirror
+   was *already* 2.1.58, yielding two identical changelog rows. Refuse to emit a version that already
+   exists in the changelog.
+3. **Rollup honesty** (shared with the drive-sync entry below): the run reported
+   `agents_sync: synced` and `failure_class: none` while doing all of the above.
+
+A regression test should assert marker counts on the rendered output **and** that a deliberately
+corrupt source is *rejected* rather than propagated — the latter is the one that matters, and it is
+the same lesson as OPS-1: unknown or invalid state is never success.
 
 ## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
 
