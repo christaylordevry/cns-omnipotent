@@ -993,4 +993,59 @@ describe('push-digest-convex.mjs', () => {
 			convexDeployKey: 'key|123',
 		});
 	});
+
+	it('OPS-2 AC5 — contract violation aborts before any Convex write (zero partial writes)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const payload = basePayload();
+		payload.signals[1] = {
+			...payload.signals[1],
+			sourceMetadata: {
+				...(payload.signals[1].sourceMetadata ?? {}),
+				viewCount: 523_806,
+				notInContractEver: true,
+			},
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async () => {
+				fetchCalls += 1;
+				return mockResponse(200, JSON.stringify({ status: 'success', value: 'should-not-run' }));
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0, 'AC5: must not call Convex when contract fails');
+		assert.match(String(result.error), /notInContractEver/);
+		assert.match(String(result.error), /OPS-2 contract violation/);
+	});
+
+	it('OPS-2 AC5 — valid payload still reaches createDigestRun (pre-flight does not false-block)', async () => {
+		/** @type {string[]} */
+		const paths = [];
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				paths.push(body.path);
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-ops2-ok' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: 'digestSignals:sig-ops2' }),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.ok(paths.includes('digest:createDigestRun'));
+		assert.ok(paths.includes('digest:addDigestSignal'));
+	});
 });

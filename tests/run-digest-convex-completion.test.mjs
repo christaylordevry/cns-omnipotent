@@ -16,6 +16,7 @@ import {
   unwrapAdapterResult,
 } from '../scripts/run-digest-convex-completion.mjs';
 import { resolveDayOutcomeFilePath } from '../scripts/lib/digest-run-outcome.mjs';
+import { pushDigestToConvex } from '../scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 
 describe('run-digest-convex-completion (Story 68-10)', () => {
   it('formatSydneyDate uses Australia/Sydney by default', () => {
@@ -1457,6 +1458,8 @@ describe('OPS-1 fail-loud on non-success digest push', () => {
 
     /** @type {string[]} */
     const alerts = [];
+    /** @type {number} */
+    let alertCalls = 0;
     const result = await runDigestConvexCompletion({
       env: {
         CRON_TZ: 'Australia/Sydney',
@@ -1470,17 +1473,107 @@ describe('OPS-1 fail-loud on non-success digest push', () => {
       collectFn: async () => {
         throw new Error('collect must not run on skipped-already-pushed');
       },
+      pushFn: async () => {
+        throw new Error('push must not run on skipped-already-pushed');
+      },
       fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      alertFn: async (_env, message) => {
+        alertCalls += 1;
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.overall, 'success');
+    assert.equal(result.action, 'skipped-already-pushed');
+    assert.equal(alertCalls, 0, 'OPS-1 AC2: skipped-already-pushed must stay silent (zero-call spy)');
+    assert.equal(alerts.length, 0, 'AC2: alert spy must have zero calls');
+  });
+
+  it('OPS-2 AC6 — contract violation → overall failed, exit 1, alert names offending field', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops2-contract-fail-'));
+    /** @type {string[]} */
+    const alerts = [];
+    /** @type {number} */
+    let convexFetchCalls = 0;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        youtube: {
+          success: true,
+          data: {
+            videos: [
+              {
+                title: 'viewCount drift',
+                url: 'https://www.youtube.com/watch?v=ops2',
+                viewCount: 523_806,
+              },
+            ],
+          },
+        },
+      }),
+      // Real pre-flight: poison one signal with an off-contract field, then call pushDigestToConvex.
+      pushFn: async (payload, env) => {
+        const signals = Array.isArray(payload.signals) ? payload.signals : [];
+        const poisoned = {
+          ...payload,
+          signals: signals.map((signal, index) => {
+            if (index !== 0 || !signal || typeof signal !== 'object') {
+              return signal;
+            }
+            const row = /** @type {Record<string, unknown>} */ (signal);
+            const meta =
+              row.sourceMetadata && typeof row.sourceMetadata === 'object'
+                ? { .../** @type {Record<string, unknown>} */ (row.sourceMetadata) }
+                : {};
+            meta.notInContractEver = true;
+            return { ...row, sourceMetadata: meta };
+          }),
+        };
+        return pushDigestToConvex({
+          env: {
+            ...env,
+            DIGEST_PUSH_JSON: JSON.stringify(poisoned),
+            CONVEX_URL: 'https://test.convex.cloud',
+            CONVEX_DEPLOY_KEY: 'deploy-key-test',
+          },
+          fetchFn: async () => {
+            convexFetchCalls += 1;
+            throw new Error('AC5/AC6: Convex must not be called on contract violation');
+          },
+        });
+      },
+      fetchFn: convexStatusFetchFn('2026-06-20', null),
       alertFn: async (_env, message) => {
         alerts.push(message);
         return true;
       },
     });
 
-    assert.equal(result.action, 'skipped-already-pushed');
-    assert.equal(result.overall, 'success');
-    assert.equal(result.exitCode, 0);
-    assert.equal(alerts.length, 0, 'AC2: alert spy must have zero calls');
+    assert.equal(result.action, 'completion-convex-push-failed');
+    assert.equal(result.overall, 'failed');
+    assert.equal(result.exitCode, 1);
+    assert.equal(convexFetchCalls, 0, 'AC5/AC6: zero Convex writes on contract violation');
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /notInContractEver/);
+    assert.match(alerts[0], /overall=failed/);
+    assert.match(alerts[0], /completion-convex-push-failed/);
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-convex-push-failed.*exit=1/);
+    assert.match(logRaw, /notInContractEver/);
   });
 
   it('3 — skipped-already-pushed + missing Convex row → exit 1, alert fired', async () => {
