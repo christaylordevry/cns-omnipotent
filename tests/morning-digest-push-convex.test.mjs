@@ -43,6 +43,7 @@ function basePayload({ scored = false } = {}) {
 				disposition: 'priority',
 				normalizedEngagement: 61,
 				rankScore: 78,
+				topicSlug: 'ai-agents',
 			}
 		: {
 				section: 'hackernews',
@@ -638,10 +639,79 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(scoredSignal.args.signal.disposition, 'priority');
 		assert.equal(scoredSignal.args.signal.normalizedEngagement, 61);
 		assert.equal(scoredSignal.args.signal.rankScore, 78);
+		assert.equal(scoredSignal.args.signal.topicSlug, 'ai-agents');
 		assert.deepEqual(scoredSignal.args.signal.sourceMetadata, {
 			points: 142,
 			commentCount: 38,
 		});
+	});
+
+	it('passes topicSlug through to addDigestSignal when present (BD-4)', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = basePayload({ scored: true });
+		payload.signals[1].topicSlug = 'mcp-protocol';
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-slug' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({
+							status: 'success',
+							value: `digestSignals:sig-${body.args?.signal?.externalId ?? 'x'}`,
+						}),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
+		assert.ok(scoredSignal);
+		assert.equal(scoredSignal.args.signal.topicSlug, 'mcp-protocol');
+	});
+
+	it('omits topicSlug on addDigestSignal when unmatched (BD-4)', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = basePayload({ scored: true });
+		delete payload.signals[1].topicSlug;
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-noslug' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({
+							status: 'success',
+							value: `digestSignals:sig-${body.args?.signal?.externalId ?? 'x'}`,
+						}),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
+		assert.ok(scoredSignal);
+		assert.equal(Object.hasOwn(scoredSignal.args.signal, 'topicSlug'), false);
 	});
 
 	it('preserves pre-sorted rankScore descending order in addDigestSignal mutation calls (FR-14)', async () => {
