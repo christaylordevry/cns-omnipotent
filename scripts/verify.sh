@@ -10,6 +10,41 @@ echo "==> Factory verify gate (repo: ${REPO_ROOT})"
 
 ran_any=0
 
+# sprint-status.yaml is the project-status SSOT that /session-close reads (86-1).
+# It broke unnoticed on 2026-07-21 — a mangled `last_updated` line left the file
+# unparseable, and nothing in this gate would have caught it. A tracker that
+# throws is worse than a stale one, so assert it early: this runs in ~1s and
+# fails before the expensive suites.
+SPRINT_STATUS="_bmad-output/implementation-artifacts/sprint-status.yaml"
+echo "==> tracker YAML gate (${SPRINT_STATUS})"
+if [[ ! -f "${SPRINT_STATUS}" ]]; then
+  echo "FATAL: ${SPRINT_STATUS} is missing — it is the project-status SSOT read by /session-close."
+  exit 1
+fi
+python3 - "${SPRINT_STATUS}" <<'PY' || { echo "TRACKER YAML gate failed"; exit 1; }
+import sys
+import yaml
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as handle:
+        doc = yaml.safe_load(handle)
+except Exception as exc:  # noqa: BLE001 - surface the raw parser message
+    sys.exit(f"FATAL: {path} does not parse as YAML: {exc}")
+
+if not isinstance(doc, dict):
+    sys.exit(f"FATAL: {path} did not parse to a mapping (got {type(doc).__name__}).")
+
+status = doc.get("development_status")
+if not isinstance(status, dict) or not status:
+    sys.exit(
+        f"FATAL: {path} has no non-empty development_status mapping — "
+        "tracker is truncated or malformed."
+    )
+
+print(f"    ok: parses, {len(status)} story/epic keys")
+PY
+
 # True if package.json defines scripts.<name> with a non-empty string.
 # Note: `npm pkg get scripts.missing` can print "{}"; do not treat that as a script.
 npm_has_script() {
