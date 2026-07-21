@@ -2,7 +2,7 @@
 story_id: 89-1
 epic: 89
 title: digest-stage-a-github-store-max-widen
-status: review
+status: done
 created: 2026-07-21
 operator_brief: 2026-07-21
 design_gate: GO
@@ -17,7 +17,7 @@ supersedes_filename: 89-1-digest-stage-a-github-pool-and-polymarket-exclusion.md
 
 # Story 89.1: Stage A — GitHub STORE_MAX widen (write-all into digestSignals)
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
 
@@ -268,6 +268,13 @@ Illustrative (`ABS_FLOOR=100`, `PCT_THRESH=0.1%` — **not** real thresholds):
   - [x] `bash scripts/verify.sh`
 - [x] **T5 — Warm-up note**
   - [x] Track toward 89-2: 7 digests with github rows stored ≥30
+
+### Review Findings
+
+- [x] [Review][Defer] NexusDigestSignalFeed + Convex read ceiling silently drop rows above 100 [`cns-dashboard/.../NexusDigestSignalFeed.svelte:29` / `convex/digest.ts:337`] — deferred, pre-existing display clamp; ~133 total signals after github 5→40 crosses it; Stage B reads stored `digestSignals` rows and is unaffected
+- [x] [Review][Defer] validate-epic-68-digest SIGNALS_LIMIT=100 undercounts widened runs [`scripts/validate-epic-68-digest.mjs:18`] — deferred, audit/read path only; warns when truncated
+- [x] [Review][Defer] Discord digest gains ~+1 chunk (~1620 chars from +35 GitHub bullets) [`post-digest-discord.mjs:7,181-197`] — deferred, noisier post only; no message-count / rate-limit hold at ~+1 sequential chunk
+- [x] [Review][Defer] Shared 45s Convex push timeout headroom shrinks with ~+35 sequential addDigestSignal [`push-digest-convex.mjs:25,523-533`] — deferred, monitor first widened live push; no evidenced failure; not a write-path cap
 
 ## Dev Notes
 

@@ -221,8 +221,28 @@ live fetch still returned 40 — the defaults do reach `loadGithubConfig()`.
 - `tests/morning-digest-github-adapter.test.mjs` — **17 pass / 0 fail, exit 0**
 - `verify.sh` — exit 0
 
-⏭️ **NEXT: `/bmad-code-review` on 89.1** — not yet run. It touches the write path Stage B
-depends on; worth the adversarial pass before the story leaves review.
+**Code review: COMPLETE — status `done`.** 0 decision-needed, 0 patches, 4 deferred,
+~12 dismissed. **Nothing blocks 40 GitHub rows/day reaching `digestSignals`** —
+`push-digest-convex.mjs:523` loops the full `payload.signals` with no count ceiling, and
+`dedupeReposByUrl` is URL-dedupe + STORE_MAX only.
+
+**Confirmed downstream regression (display only, NOT a 89-1 reopen):** with github at 40,
+a run builds ~133 signals and three consumers truncate at 100 —
+`NexusDigestSignalFeed.svelte:29-39` (`DIGEST_SIGNAL_LIMIT=100`, drops the ~33 lowest
+`rankScore`), `cns-dashboard/convex/digest.ts:337` (hard clamp `min(…, 100)`, applied after
+`.collect()`), and `validate-epic-68-digest.mjs:18` (warns).
+
+> **Deliberately NOT fixed yet.** The 133-row feed is a *secondary intake surface*; the
+> cockpit target is 5–10 items. Raising the limit now optimises a surface the redesign is
+> about to replace. Revisit only if the feed survives Phase 4 IA in its current form.
+
+Other review results: Discord impact is **+1** 2000-char chunk (not a flood); GitHub API
+still **12** search requests/run (`per_page` 3→5 adds no calls, well inside the ~30/min
+authenticated budget); the OPS-2 contract guard is **count-agnostic** (field-set only); the
+N→N test is non-trivial (would fail on a write-loop `slice(0,5)`).
+
+⚠️ **Pre-existing, unchanged by this commit, worth knowing:** a single `http-429` aborts the
+**entire** GitHub source. Same silent-failure shape this epic has been removing.
 
 **Stage B warm-up clock starts on the next digests storing ≥30 github rows each (target 7
 consecutive).** First one is tomorrow's 07:00.

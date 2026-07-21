@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-21T16:45:00+10:00"
+last_updated: "2026-07-21T17:20:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -760,6 +760,6 @@ development_status:
   # 89-2 Stage B: velocity rank + threshold from accumulated distribution
   # 89-3 Selection rules (SHORTLIST_MAX + Polymarket type-exclusion) — blocked until shortlist exists
   epic-89: in-progress
-  89-1-digest-stage-a-github-store-max-widen: review # STORE_MAX=40/PER_QUERY=5 in-code defaults; write-all; verify exit 0
+  89-1-digest-stage-a-github-store-max-widen: done # code-review 2026-07-21: no Stage B storage hold; display ceilings deferred
   89-2-digest-stage-b-github-velocity-rank: backlog
   89-3-judgment-shortlist-github-cap-and-polymarket-exclusion: backlog # blocked: no shortlist selector in code yet

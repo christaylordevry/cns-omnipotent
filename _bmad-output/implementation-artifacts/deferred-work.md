@@ -1,5 +1,12 @@
 # Deferred work
 
+## Deferred from: code review of 89-1-digest-stage-a-github-store-max-widen.md (2026-07-21)
+
+- **NexusDigestSignalFeed `DIGEST_SIGNAL_LIMIT=100` + `getDigestSignalsForRun` hard clamp 100** — after STORE_MAX 5→40, ~98→~133 signals/run silently drops ~33 lowest-`rankScore` rows in the feed (no error). Storage write-all is fine; Stage B history is unaffected. Follow-up: raise/paginate feed limit (dashboard story), not a 89-1 reopen.
+- **`validate-epic-68-digest.mjs` `SIGNALS_LIMIT=100`** — audit fetch can undercount widened runs (already warns when truncated). Raise limit or paginate when next touching that validator.
+- **Discord `DISCORD_MAX_CONTENT=2000`** — +35 GitHub bullets ≈ +1620 chars ≈ +1 chunk; sequential posts stay well under bot channel rate limits. Materially noisier GitHub section in `#hermes` only.
+- **`DIGEST_PUSH_TIMEOUT_MS=45_000` over sequential `addDigestSignal`** — ~+35 mutations shrink headroom; monitor first live widened push wall-clock. Not a count ceiling; no failure evidenced in review.
+
 ## 🚦 BLOCKING VERIFICATION CHORES — trend ingest fix (2026-07-21) — do these BEFORE any redesign work
 
 > **Context:** the trend-ingest env had five unquoted space-separated values, so those variables
@@ -31,8 +38,8 @@ edge noise rather than centre stage.
 
 **Upstream follow-on (storyed 2026-07-21):** curated queries alone do **not** fix GitHub level-bias
 or Polymarket always-on markets. **89-1** (`89-1-digest-stage-a-github-store-max-widen`) —
-STORE_MAX=40 / PER_QUERY=5 **write-all** into `digestSignals` (data accumulation only; awaiting
-operator go). **89-3** holds GitHub SHORTLIST_MAX=5 + Polymarket **type-exclusion** (not a score
+STORE_MAX=40 / PER_QUERY=5 **write-all** into `digestSignals` (**done** 2026-07-21; Stage B warm-up
+clock starts on next digests with ≥30 github rows). **89-3** holds GitHub SHORTLIST_MAX=5 + Polymarket **type-exclusion** (not a score
 penalty) until a judgment shortlist selector exists (none in code 2026-07-21). **89-2** Stage B
 velocity after 7 digests with ≥30 GitHub rows stored.
 
