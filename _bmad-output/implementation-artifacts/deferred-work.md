@@ -29,8 +29,15 @@ still contaminated. After the next clean run measure: top-5 composition (curated
 AI repos/markets), stamp density (BD-5), cross-source corroboration, and whether emoji tweets are
 edge noise rather than centre stage.
 
+**Upstream follow-on (storyed 2026-07-21):** curated queries alone do **not** fix GitHub level-bias
+or Polymarket always-on markets. **89-1** (`89-1-digest-stage-a-github-store-max-widen`) —
+STORE_MAX=40 / PER_QUERY=5 **write-all** into `digestSignals` (data accumulation only; awaiting
+operator go). **89-3** holds GitHub SHORTLIST_MAX=5 + Polymarket **type-exclusion** (not a score
+penalty) until a judgment shortlist selector exists (none in code 2026-07-21). **89-2** Stage B
+velocity after 7 digests with ≥30 GitHub rows stored.
+
 **Do NOT commit to** a cluster layer, a scoring rebuild, or a feed-vs-analyst premise decision
-until both land. Full write-up + north-star reframe:
+until CHORE 1/2 land. Full write-up + north-star reframe:
 `cns-dashboard/_bmad-output/planning-artifacts/curation-selection-research-2026-07-21.md`.
 
 ---

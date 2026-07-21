@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-21T11:30:00+10:00
+# last_updated: 2026-07-21T16:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-21T11:30:00+10:00"
+last_updated: "2026-07-21T16:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -754,3 +754,13 @@ development_status:
   OPS-3-digest-push-in-run-retry: cancelled # CLOSED UNBUILT 2026-07-20 by operator decision on evidence: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither, and a naive retry can duplicate the run row (BD-2 delta corruption). Day-level retry already exists (push-digest-watchdog.mjs:435). REOPEN TRIGGER: a completion-convex-push-failed that self-heals on the next run without intervention. Story text retained — the analysis records why not to build this next time it looks obvious.
   OPS-4-session-close-constitution-propagation-guard: done # code-review patches 2026-07-21 (soften+cross-line, source-unreadable, empty changelog, AC5 correction); eslint+verify exit 0
   OPS-5-drive-sync-timeout-canary-and-rollup-honesty: done # code-review 2026-07-21: NLM_TIMEOUT_MS_CAP=240_000 (not 300k), canary disk-first, empty-env WARNING; verify.sh exit 0 post-patch
+
+  # Epic 89 — Digest source-shaping (level→delta) for always-alive cockpit
+  # 89-1 Stage A: STORE_MAX=40 / PER_QUERY=5 write-all into digestSignals (data accumulation only)
+  # 89-2 Stage B: velocity rank + threshold from accumulated distribution
+  # 89-3 Selection rules (SHORTLIST_MAX + Polymarket type-exclusion) — blocked until shortlist exists
+  # STOP GATE 2026-07-21: narrowed 89-1 awaiting operator go
+  epic-89: in-progress
+  89-1-digest-stage-a-github-store-max-widen: ready-for-dev # awaiting operator go; write-all only
+  89-2-digest-stage-b-github-velocity-rank: backlog
+  89-3-judgment-shortlist-github-cap-and-polymarket-exclusion: backlog # blocked: no shortlist selector in code yet

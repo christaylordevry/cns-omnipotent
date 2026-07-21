@@ -1,5 +1,9 @@
 # HANDOFF 2026-07-21 — ops-observability closed; next = NotebookLM 981466f0 source fix
 
+> ⛔ **SUPERSEDED by `HANDOFF-2026-07-21-intake-diagnosis-and-redesign-reboot.md`** (same day,
+> later session). Its NotebookLM task is **DONE**. Read the newer handoff first; keep this one
+> only for the OPS-1…OPS-5 detail, which is still accurate.
+
 **Read this first, then `_bmad-output/implementation-artifacts/deferred-work.md` (top entries).**
 Supersedes `HANDOFF-2026-07-20-redesign-scenarios-and-bd4.md`.
 
