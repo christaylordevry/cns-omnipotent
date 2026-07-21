@@ -1,5 +1,40 @@
 # Deferred work
 
+## 🚦 BLOCKING VERIFICATION CHORES — trend ingest fix (2026-07-21) — do these BEFORE any redesign work
+
+> **Context:** the trend-ingest env had five unquoted space-separated values, so those variables
+> resolved to **unset** (`FOO=a b c` sets `FOO=a` for a command named `b`). GitHub / YouTube /
+> Polymarket / Pinterest queries were never delivered; `pytrends` was also missing so Google
+> Trends errored hourly. **Fixed 2026-07-21 14:46** (backup: `~/.hermes/trend-ingest.env.bak-20260721-144626`).
+> Immediately after: `watchlistKeywords` 1 → 14, `trendTopics` 5 → 19, ingest `httpStatus 200 / ok`.
+> The pre-existing 5 topics carried `lastUpdated` of **1103.8 h (46 days)** — the continuous layer
+> had been dead since early June while its crons ran every 15 minutes.
+>
+> **All redesign evidence gathered before this fix is contaminated.** Specifically, the
+> "top 5 is garbage" finding (`langchain` #1, three Polymarket bets) is explained by unset
+> GitHub queries and `POLYMARKET_KEYWORDS` collapsed to `AI`. The claim that `rankScore` has
+> structurally bad taste is **NOT supported** by that evidence and must be re-tested.
+
+**CHORE 1 — does the hourly `runAnalyticsPass` populate the trend layer?**
+As of the fix, all 19 topics still read `momentum: 0`, `lifecycleStage: None`, empty
+`sourceBreakdown`; `trends:getTopicBySlug` returns identity only. After an hourly tick, check:
+non-zero `momentum`? any `lifecycleStage` off `None`? `sourceBreakdown` filling with per-source
+entries? recent `trendScores.computedAt` / `trendAnomalies.detectedAt`?
+**If yes** — the always-alive substrate is real; build the cockpit on the trend layer with the
+digest as a morning-orient lens. **If no** — there is another broken link upstream of any design.
+
+**CHORE 2 — does the digest shortlist improve on corrected sources?**
+`MORNING_DIGEST_*` feeds the 07:00 batch; the 2026-07-21 run predates the fix, so its 75 rows are
+still contaminated. After the next clean run measure: top-5 composition (curated topics vs generic
+AI repos/markets), stamp density (BD-5), cross-source corroboration, and whether emoji tweets are
+edge noise rather than centre stage.
+
+**Do NOT commit to** a cluster layer, a scoring rebuild, or a feed-vs-analyst premise decision
+until both land. Full write-up + north-star reframe:
+`cns-dashboard/_bmad-output/planning-artifacts/curation-selection-research-2026-07-21.md`.
+
+---
+
 ## Deferred from: code review of OPS-5-drive-sync-timeout-canary-and-rollup-honesty.md (2026-07-21)
 
 - Uncaught throw before `allSettled` rollup (`patchCloseReport` / report re-read / `drive_sync_phase` markers) leaves `failure_class` unset; CLI `main().catch` still returns `{ ok: false }` but does not stamp `notebooklm`. Pre-existing pattern; not the vacuous `ok:true` class OPS-5 closed. Wrap setup+workers in try/finally stamp if tightening.
