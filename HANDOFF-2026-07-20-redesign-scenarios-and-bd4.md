@@ -29,11 +29,19 @@ BD-4's matcher was rewritten during code review (IDF-weighted, `WATCHLIST_MATCH_
 
 **Check:** query the newest digest run's signals and confirm `langchain`-style signals no longer resolve to `biotech-ai`, and that stamps are semantically sane. Two-minute job:
 ```bash
+# 1) newest run id
 curl -s -X POST 'https://amiable-ox-862.convex.cloud/api/query' \
   -H 'Content-Type: application/json' \
   -d '{"path":"digest:getRecentDigestRuns","args":{},"format":"json"}'
-# then getDigestSignalsForRun with the newest _id; inspect topicSlug values
+
+# 2) signals for that run — arg is digestRunId (NOT runId); pass limit:100
+#    (default limit ?? 50 truncates full morning runs, which are ~75 signals)
+curl -s -X POST 'https://amiable-ox-862.convex.cloud/api/query' \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"digest:getDigestSignalsForRun","args":{"digestRunId":"<newest _id>","limit":100},"format":"json"}'
 ```
+Stamp-density grounding (usable content stamps vs trends self-matches) and **BD-5** live in
+`cns-dashboard/_bmad-output/C-UX-Scenarios/03-eric-dig-and-deepen/grounding-verdict.md`.
 
 ### 2. Confirm the digest is still writing
 The plan-limit outage silently killed a full day of pushes. Confirm today's run has `signalsWritten > 0` in `~/.hermes/logs/push-digest-watchdog.log` and that a run row exists in Convex for today's date.
@@ -63,6 +71,8 @@ Coverage 7/7. **Each has a `grounding-verdict.md`** — these are the highest-va
 - **BD-2 OPEN** — status-band run-over-run delta query (new derivation; joinable via `externalId`).
 - **BD-3 RESOLVED** — entity Confidence computable from `sourceTypes` + `evidence` signalRefs + `mentionCount`.
 - **BD-4 SHIPPED** — see above.
+- **BD-5 OPEN** — usable content stamp density too low for high-IA Trends Crossing (03.2);
+  demote IA weight in Phase 4. Details in S03 `grounding-verdict.md` (2026-07-21).
 
 ---
 
