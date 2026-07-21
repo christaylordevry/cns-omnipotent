@@ -95,9 +95,10 @@ the same lesson as OPS-1: unknown or invalid state is never success.
 
 ## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
 
-> **Status (2026-07-21):** pieces **(a)** and **(c)** being-fixed / fixed-by **OPS-5**
-> (`OPS-5-drive-sync-timeout-canary-and-rollup-honesty`). Measured evidence below is preserved.
-> Piece **(b)** remains operator UI (add PDF Drive source for `981466f0`) — out of OPS-5 scope.
+> **Status (2026-07-21): CLOSED.** Pieces **(a)** and **(c)** fixed by **OPS-5**
+> (`OPS-5-drive-sync-timeout-canary-and-rollup-honesty`). Piece **(b)** resolved by operator UI
+> action — see (b) below. Measured evidence preserved. **All 3/3 targets verified green
+> 2026-07-21** by hand-running the exact session-close argv; no `/session-close` spend required.
 
 All **3 of 3** NotebookLM targets failed on session 24's `/session-close`. Hermes summarised it as
 "the usual pattern (intermittent timeouts)" with `failure_class: none`. The log does not support
@@ -125,7 +126,26 @@ against a ~60s budget), **moved from the write step to the sync step** as the ex
 ```
 
 Reported as `error_class: unknown`. Different failure, different fix — the doc ID does not resolve to
-any source in that notebook. **Still open** (operator UI).
+any source in that notebook.
+
+**RESOLVED 2026-07-21 (operator UI).** Root cause: the 58-3 PDF migration **never covered this
+notebook**, despite the record below claiming "all 3 notebooks" (that line is now corrected).
+`981466f0` still held the pre-migration source `vault-export-for-notebooklm**.md**` of type
+`generated_text` — a frozen legacy paste with no Drive linkage. The two working notebooks hold
+`vault-export-for-notebooklm` (no extension) of type `word_doc`; only that type satisfies
+`matchWordDocVaultExportFallback` (`sync-vault-export-drive.mjs:379`).
+
+Fix = attach the Drive PDF as a source in the NotebookLM UI. **No code change; matcher untouched.**
+Widening the matcher to accept `generated_text` was explicitly rejected — such a source has no Drive
+linkage, so `nlm source sync` would refresh nothing, converting a loud failure into a silent no-op.
+
+Verified: new source `43663c0f-b944-429c-a258-6f0bea4b010c`, type `word_doc`;
+`nlm source sync … -y` → **exit 0**.
+
+**Env thread closed:** `NOTEBOOKLM_DRIVE_DOC_ID` lives in **`~/.hermes/session-close.env:14`** — a
+third file, which is why grepping `.env.live-chain` and `~/.hermes/.env` came back empty. The value
+is **not stale**: `1olnj…` is a live 2.99 MB PDF titled `vault-export-for-notebooklm`, modified
+2026-07-20 (i.e. the upload half of drive-sync works). The stale-doc-ID hypothesis is dead.
 
 **(c) The rollup hides a total failure.** `failure_class: none` while 3/3 targets failed is the exact
 silent-success pattern OPS-1 and OPS-2 removed from the digest pipeline on the same day. 58-4 (shipped
@@ -271,7 +291,8 @@ Resolved in one patch commit: stale `@param repoRoot` JSDoc removed, `deriveProj
 
 - **§7 Active Modules registration — RESOLVED 2026-07-09 (AGENTS v2.1.52).** Operator-direct edit registered all 6 previously-unregistered canonical modules in AGENTS.md §7 (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook), so §7 now matches the 11-module canonical set (Epic 87). Applied identically to all three AGENTS copies (real vault SSOT, `specs/`, `_bmad-output/planning-artifacts/`); `constitution.test.mjs` green (budget 450/500, planning==specs parity). Next session-close `apply-section8` keeps them in sync.
 
-- **NotebookLM drive-sync 60s write timeout on large exports** — **RESOLVED by Story 58-3 — VERIFIED LIVE 2026-07-09** (`58-3-session-close-notebooklm-pdf-source-fix.md`): session-close writes vault export as Drive PDF via media upload (≪ 60 s) instead of Docs `insertText` (~134 s). Write path confirmed on live `/session-close` (no more `drive_write_error`; PDF on Drive). Operator migration done (all 3 notebooks on the `word_doc` PDF source, env `NOTEBOOKLM_DRIVE_DOC_ID=1olnj…`).
+- **NotebookLM drive-sync 60s write timeout on large exports** — **RESOLVED by Story 58-3 — VERIFIED LIVE 2026-07-09** (`58-3-session-close-notebooklm-pdf-source-fix.md`): session-close writes vault export as Drive PDF via media upload (≪ 60 s) instead of Docs `insertText` (~134 s). Write path confirmed on live `/session-close` (no more `drive_write_error`; PDF on Drive). Operator migration done (~~all 3 notebooks~~ **2 of 3** — see correction) on the `word_doc` PDF source, env `NOTEBOOKLM_DRIVE_DOC_ID=1olnj…`.
+  - ⚠️ **Correction 2026-07-21:** the "all 3 notebooks" claim was **false**. `981466f0` was never migrated and kept its `generated_text` source; only `dc6abf1a` and `f037c741` got the `word_doc` PDF. The unverified claim is why the gap survived from 07-09 to 07-21 — the 07-20 failure looked like a new bug rather than an incomplete migration. Now fixed (see Epic 58 residual, piece (b)). **Lesson: a migration record should state what was checked, not what was intended.**
 
 - **⚠️ WATCH NEXT SESSION-CLOSE — drive-sync PHASE 90s wall-clock (gate FIRED / being-fixed by 58-4)** — both 2026-07-09 and 2026-07-10 closes left all 3 `notebooklm_targets` **UNSTAMPED** (no `fanout_status`) despite `steps.drive_write` ok. Corrected diagnosis (not "just raise 90s"): (1) all-or-nothing merge after the full sequential 3-notebook loop — wall-clock kill lost every stamp; (2) no per-call `timeout` on `nlm source list` (the slow call); (3) sequential ×3 under ~90 s Hermes budget; (4) no `drive_sync_phase` start/end markers (killed vs never-invoked undiagnosable). **Do not** treat raising the 90 s budget as the fix. Story **58-4** hardens: incremental per-notebook merge + merge mutex, concurrent `Promise.allSettled`, 25 s `NLM_EXEC_TIMEOUT_MS` with `nlm_list_timeout` / `nlm_sync_timeout`, and `drive_sync_phase.{started_at,finished_at}`. Separate integrity note: unit tests had been appending fake `Google OAuth token refresh failed` lines into `~/.hermes/logs/session-close-drive-sync.log` (382 lines; rotated to `.bak-2026-07-13` on 2026-07-13) — not live auth failure. See `58-4-drive-sync-phase-hardening-and-diagnostics-integrity.md`.
 

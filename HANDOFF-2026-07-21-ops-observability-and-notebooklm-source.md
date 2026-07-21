@@ -23,7 +23,15 @@ Supersedes `HANDOFF-2026-07-20-redesign-scenarios-and-bd4.md`.
 
 ---
 
-## ⏭️ NEXT TASK — NotebookLM notebook `981466f0` cannot drive-sync
+## ~~⏭️ NEXT TASK~~ — ✅ RESOLVED 2026-07-21 — NotebookLM notebook `981466f0` cannot drive-sync
+
+> **CLOSED.** Fixed exactly as predicted below: operator attached the Drive PDF, no code change.
+> 3/3 targets now sync green. The diagnosis below held up; kept for the record.
+> **Two corrections it did not have:**
+> 1. `NOTEBOOKLM_DRIVE_DOC_ID` comes from **`~/.hermes/session-close.env:14`** (a third env file),
+>    and it is **not stale** — it resolves to a live 2.99 MB PDF modified 2026-07-20.
+> 2. Real root cause: the 58-3 PDF migration only ever covered **2 of 3** notebooks, though its
+>    record claimed all 3. This was an incomplete migration, not a new fault.
 
 ### The diagnosis is already done. Do not re-investigate.
 
@@ -118,7 +126,11 @@ expensive suites. Both red paths exercised.
 
 ## Still open
 
-1. **`981466f0` source fix** — above. Until done, expect **2/3** drive-sync targets green, not 3/3.
+1. ~~**`981466f0` source fix**~~ — ✅ **DONE 2026-07-21.** Drive PDF attached in the NotebookLM UI;
+   new source `43663c0f-b944-429c-a258-6f0bea4b010c`, type `word_doc`. **All 3/3 targets verified
+   green** by hand-running the exact session-close argv (`nlm source sync <nb> --source-ids <id> -y`)
+   — no `/session-close` spend needed. No code change; matcher untouched, as called.
+   Full write-up in `deferred-work.md` → "Epic 58 residual", piece (b).
 2. **Vault-corruption origin** — some write between 07-14 and 07-20 dirtied `AI-Context/AGENTS.md`.
    OPS-4 contains the blast radius but does not explain the cause. Corrupt copy preserved at
    `AI-Context/AGENTS.md.corrupt-2026-07-20.bak`.
