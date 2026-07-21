@@ -18,13 +18,25 @@ const DRIVE_SYNC_LOG_BASENAME = "session-close-drive-sync.log";
 export const NLM_LIST_TIMEOUT_MS = 25_000;
 /** Default per-call bound for `nlm source sync` (ms). */
 export const NLM_SYNC_TIMEOUT_MS = 120_000;
+/**
+ * Hard ceiling for list/sync timeout env overrides (ms).
+ * Must stay below Hermes `terminal: timeout: 300` so the *inner* execFile bound
+ * fires first and preserves `nlm_list_timeout` / `nlm_sync_timeout` classification.
+ * Do not "simplify" to 300_000 — that is parity with the outer kill and makes the
+ * inner bound unreachable (opaque terminal kill instead of nlm_*_timeout).
+ * Arithmetic: concurrent syncs → wall ≈ max(sync)+list+report ≈ 240+25 ≈ 265s,
+ * ~35s margin inside 300s. Measured live sync is 41.2s; >240s implies ~9 MB export
+ * and needs a design revisit, not a bigger number.
+ */
+export const NLM_TIMEOUT_MS_CAP = 240_000;
 /** Default canary fraction of sync bound (warn when duration ≥ fraction × bound). */
 export const NLM_SYNC_CANARY_FRACTION = 0.5;
 
 /**
  * Resolve a positive integer ms timeout from env. Invalid values fall back to
  * default with a loud WARNING — never return NaN/0/negative (Node execFile
- * treats those as no timeout = unbounded hang).
+ * treats those as no timeout = unbounded hang). Values above
+ * {@link NLM_TIMEOUT_MS_CAP} clamp to the cap with a loud WARNING (never silent).
  *
  * @param {string} name
  * @param {number} defaultMs
@@ -33,7 +45,7 @@ export const NLM_SYNC_CANARY_FRACTION = 0.5;
  */
 export function resolvePositiveIntMsEnv(name, defaultMs, env = process.env) {
   const raw = env[name];
-  if (raw === undefined || raw === "") {
+  if (raw === undefined) {
     return defaultMs;
   }
   const n = Number(raw);
@@ -42,6 +54,12 @@ export function resolvePositiveIntMsEnv(name, defaultMs, env = process.env) {
       `session-close: WARNING invalid ${name}=${JSON.stringify(raw)}; using default ${defaultMs}\n`,
     );
     return defaultMs;
+  }
+  if (n > NLM_TIMEOUT_MS_CAP) {
+    process.stderr.write(
+      `session-close: WARNING ${name}=${JSON.stringify(raw)} exceeds cap ${NLM_TIMEOUT_MS_CAP}; using ${NLM_TIMEOUT_MS_CAP} (preserves nlm_sync_timeout / nlm_list_timeout inside Hermes terminal budget 300s — do not raise cap to 300000)\n`,
+    );
+    return NLM_TIMEOUT_MS_CAP;
   }
   return n;
 }
@@ -56,7 +74,7 @@ export function resolvePositiveIntMsEnv(name, defaultMs, env = process.env) {
  */
 export function resolveCanaryFractionEnv(name, defaultFraction, env = process.env) {
   const raw = env[name];
-  if (raw === undefined || raw === "") {
+  if (raw === undefined) {
     return defaultFraction;
   }
   const n = Number(raw);
@@ -123,14 +141,15 @@ async function stampFailureClassIfEmpty(reportPath, failureClass) {
 }
 
 /**
+ * Prefer on-disk size of the vault-export file (AC4). Missing/unreadable → null
+ * so the canary prints `source_size_bytes=unknown`. Metadata `export_bytes` is
+ * fallback only when `export_path` is absent.
+ *
  * @param {Record<string, unknown>} report
  * @returns {Promise<number | null>}
  */
-async function resolveExportSourceBytes(report) {
+export async function resolveExportSourceBytes(report) {
   const det = isObject(report.deterministic) ? report.deterministic : {};
-  if (typeof det.export_bytes === "number" && Number.isFinite(det.export_bytes)) {
-    return det.export_bytes;
-  }
   if (typeof det.export_path === "string" && det.export_path.trim()) {
     try {
       const s = await stat(det.export_path);
@@ -138,6 +157,9 @@ async function resolveExportSourceBytes(report) {
     } catch {
       return null;
     }
+  }
+  if (typeof det.export_bytes === "number" && Number.isFinite(det.export_bytes)) {
+    return det.export_bytes;
   }
   return null;
 }

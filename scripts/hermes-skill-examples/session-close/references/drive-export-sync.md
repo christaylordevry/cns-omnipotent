@@ -38,7 +38,8 @@ The Drive source is a **Google Drive PDF** (media byte-swap), not a native Googl
 - Per-call bounds (env-overridable; invalid values fall back to defaults with a WARNING — never disable the bound):
   - `nlm source list` → **25 s** (`NLM_LIST_TIMEOUT_MS`, default `25_000`)
   - `nlm source sync` → **120 s** (`NLM_SYNC_TIMEOUT_MS`, default `120_000`)
-- Canary: when a sync's measured duration ≥ `NLM_SYNC_CANARY_FRACTION` × sync bound (default **0.5** → 60 s), stderr WARNING includes duration, bound, and source size bytes.
+  - Hard ceiling **240 s** (`NLM_TIMEOUT_MS_CAP = 240_000`) for both overrides. Values above the cap clamp with a WARNING. Cap sits below Hermes `terminal: timeout: 300` so the **inner** bound fires first and preserves `nlm_list_timeout` / `nlm_sync_timeout`. Do **not** raise to 300_000 — that is outer-kill parity and loses clean classification. Concurrent wall ≈ max(sync)+list ≈ 240+25 ≈ 265s (~35s margin). Measured sync 41.2s; needing >240s implies ~9 MB export and a design revisit.
+- Canary: when a sync's measured duration ≥ `NLM_SYNC_CANARY_FRACTION` × sync bound (default **0.5** → 60 s), stderr WARNING includes duration, bound, and source size bytes from the vault-export file on disk (`stat(export_path)`; missing → `unknown`).
 - Phase rollup (end of `runSyncVaultExportDrive`, only stamps when `failure_class` is null/empty):
   - N==0 targets → `failure_class: notebooklm_no_targets`, `{ ok: false }` (never vacuous success)
   - N≥1 all failed → `notebooklm`, `{ ok: false, synced: 0 }`

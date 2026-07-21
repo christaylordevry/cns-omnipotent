@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of OPS-5-drive-sync-timeout-canary-and-rollup-honesty.md (2026-07-21)
+
+- Uncaught throw before `allSettled` rollup (`patchCloseReport` / report re-read / `drive_sync_phase` markers) leaves `failure_class` unset; CLI `main().catch` still returns `{ ok: false }` but does not stamp `notebooklm`. Pre-existing pattern; not the vacuous `ok:true` class OPS-5 closed. Wrap setup+workers in try/finally stamp if tightening.
+
 ## Deferred from: code review of OPS-4-session-close-constitution-propagation-guard.md (2026-07-21)
 
 - Changelog version scan continues past `## Changelog` to EOF — a version-looking table row in a later section can spuriously collide; malformed real changelog rows are ignored. Bound the scan to the changelog section when tightening collision parsing.

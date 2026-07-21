@@ -2,7 +2,7 @@
 story_id: OPS-5
 epic: ops-observability
 title: drive-sync-timeout-canary-and-rollup-honesty
-status: review
+status: done
 created: 2026-07-21
 design_gate: APPROVED_2026-07-21
 baseline_commit: ac987ca
@@ -14,7 +14,7 @@ do_not_run: /session-close to validate this story (unit tests + measured 41.2s o
 
 # Story OPS-5: Drive-sync must not fail deterministically, and total failure must not report success
 
-Status: review
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -194,6 +194,13 @@ Same vacuous class: empty `notebooklm_targets` currently returns `{ ok: true, sy
 - [x] AC6 — Update `drive-export-sync.md` + `fanout-diagnostics.md`; twin cmp; `verify.sh` exit 0
 - [x] AC7 — Annotate `deferred-work.md` Epic 58 residual; leave sprint-status for workflow
 
+### Review Findings
+
+- [x] [Review][Decision] Cap `resolvePositiveIntMsEnv` at **240_000** ms (not 300_000) — Resolved **B**. Cap must sit below Hermes `terminal: timeout: 300` so the **inner** `execFile` bound fires first and preserves `nlm_list_timeout` / `nlm_sync_timeout`. Capping at 300_000 is outer-kill parity and recreates the opaque-kill failure the cap exists to prevent. Arithmetic: concurrent wall ≈ max(sync)+list+report ≈ 240+25 ≈ 265s (~35s margin inside 300s). 240s is absurdly generous vs measured 41.2s; needing more implies ~9 MB export → revisit synchronous-sync design. Clamp is loud WARNING (var, requested value, cap, why). `NLM_TIMEOUT_MS_CAP` exported; do not "simplify" back to 300_000.
+- [x] [Review][Patch] Canary size prefers disk `stat(export_path)` over `export_bytes` [`scripts/session-close/sync-vault-export-drive.mjs`] — missing/unreadable → `null` / `unknown`; metadata only when path absent.
+- [x] [Review][Patch] Empty-string env override warns + defaults [`resolvePositiveIntMsEnv` / `resolveCanaryFractionEnv`] — AC3.
+- [x] [Review][Defer] Uncaught throw before `allSettled` rollup leaves `failure_class` unset [`scripts/session-close/sync-vault-export-drive.mjs:613-670`] — deferred, pre-existing; `patchCloseReport` / re-read / phase-marker IO can throw before rollup; `main().catch` still emits `{ ok: false }` but does not stamp `notebooklm`. Not the silent `ok:true` class OPS-5 closed.
+
 ---
 
 ## Dev Notes
@@ -305,18 +312,19 @@ Composer (Cursor agent router)
 ### Debug Log References
 
 - Measured adequacy proof (locked): live sync 41.2s < NLM_SYNC_TIMEOUT_MS 120s; canary threshold 60s so today's export does not warn.
-- `bash scripts/verify.sh` → exit code 0 (VERIFY PASSED). No `/session-close` run.
+- `bash scripts/verify.sh` → **exit code 0** after code-review patches (2026-07-21). Claimed from process exit status only (not piped/truncated output). No `/session-close` run.
 
 ### Completion Notes List
 
 - AC5 (priority 1): `runSyncVaultExportDrive` rollup stamps `notebooklm` / `notebooklm_partial` / `notebooklm_no_targets` when `failure_class` is null/empty; returns ok:false for total/partial/zero-target failure. Vacuous ok:true with synced:0 eliminated for N>=1 failures and N==0.
 - AC1: Removed `NLM_EXEC_TIMEOUT_MS`; exported `NLM_LIST_TIMEOUT_MS=25000`, `NLM_SYNC_TIMEOUT_MS=120000`, `NLM_SYNC_CANARY_FRACTION=0.5`. Default runner picks timeout via `resolveNlmCallTimeoutMs(args)`.
-- AC3 / addition B: `resolvePositiveIntMsEnv` + `resolveCanaryFractionEnv` — invalid env falls back + WARNING; never NaN/0/negative into execFile timeout.
+- AC3 / addition B: `resolvePositiveIntMsEnv` + `resolveCanaryFractionEnv` — invalid/empty env falls back + WARNING; never NaN/0/negative into execFile timeout. **Review patch:** `NLM_TIMEOUT_MS_CAP=240_000` clamps oversized overrides with WARNING (preserves nlm_*_timeout inside 300s terminal budget — must not equal 300_000).
 - AC2: Existing list/sync timeout class tests retained; bounds independent via helpers.
-- AC4: Canary WARNING with duration/bound/source_size_bytes; injected clock tests at/below threshold.
-- AC6 dual-copy: Updated `drive-export-sync.md` + `fanout-diagnostics.md`; install script; cmp both twins exit 0.
+- AC4: Canary WARNING with duration/bound/source_size_bytes; **review patch:** size from `stat(export_path)` first (missing → unknown); injected clock tests at/below threshold.
+- AC6 dual-copy: Updated `drive-export-sync.md` + `fanout-diagnostics.md`; install script; cmp both twins exit 0 (cap rationale in drive-export-sync).
 - AC7: Epic 58 residual annotated fixed-by OPS-5 (41.2s evidence preserved); piece (b) left open.
 - Rollup uses `expectedCount: notebookIds.length` so rejected-after-stamp workers are not misclassified as `notebooklm_no_targets`.
+- Code review patches 2026-07-21 applied; `bash scripts/verify.sh` re-run after patches — exit code recorded below.
 
 #### Dual-copy cmp paste
 
@@ -342,11 +350,12 @@ cmp fanout-diagnostics.md twin → exit: 0
 ### Change Log
 
 - 2026-07-21: Implemented OPS-5 — split list/sync timeouts, env validation, sync canary, rollup honesty; dual-copy skill docs; verify.sh exit 0.
+- 2026-07-21: Code-review patches — `NLM_TIMEOUT_MS_CAP=240_000` (loud clamp; must stay below 300s terminal), canary `stat(export_path)` first, empty-env WARNING; verify.sh exit 0 post-patch.
 
 ---
 
 ## Story completion status
 
-- Status: **review**
+- Status: **done**
 - Design gate: **APPROVED_2026-07-21** (constants 25k/120k/0.5; failure_class names; rollup site; remove `NLM_EXEC_TIMEOUT_MS`; additions A zero-targets + B env validation)
-- Completion note: Implementation complete; ready for code-review. verify.sh exit 0.
+- Code review 2026-07-21: decision B (`NLM_TIMEOUT_MS_CAP=240_000`), canary disk-first, empty-env WARNING; defer pre-rollup throw; `verify.sh` re-run post-patch by exit code.

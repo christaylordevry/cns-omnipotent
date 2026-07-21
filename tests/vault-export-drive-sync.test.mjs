@@ -30,8 +30,10 @@ import {
   NLM_LIST_TIMEOUT_MS,
   NLM_SYNC_CANARY_FRACTION,
   NLM_SYNC_TIMEOUT_MS,
+  NLM_TIMEOUT_MS_CAP,
   parseNlmDriveSourceList,
   resolveCanaryFractionEnv,
+  resolveExportSourceBytes,
   resolveNlmCallTimeoutMs,
   resolvePositiveIntMsEnv,
   runSyncVaultExportDrive,
@@ -1043,20 +1045,59 @@ describe("sync-vault-export-drive (58-1)", () => {
   });
 });
 
+/**
+ * @param {() => void} fn
+ * @returns {string[]}
+ */
+function captureStderr(fn) {
+  /** @type {string[]} */
+  const lines = [];
+  const origWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = /** @type {typeof process.stderr.write} */ (
+    (chunk, encoding, cb) => {
+      lines.push(String(chunk));
+      if (typeof encoding === "function") {
+        encoding();
+        return true;
+      }
+      if (typeof cb === "function") {
+        cb();
+      }
+      return true;
+    }
+  );
+  try {
+    fn();
+  } finally {
+    process.stderr.write = origWrite;
+  }
+  return lines;
+}
+
 describe("OPS-5 env validation + timeout split + canary + rollup", () => {
-  it("resolvePositiveIntMsEnv: unset / valid / non-numeric / zero / negative", () => {
+  it("resolvePositiveIntMsEnv: unset / valid / non-numeric / empty / zero / negative", () => {
     assert.equal(resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, {}), 120_000);
     assert.equal(
       resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, { NLM_SYNC_TIMEOUT_MS: "90000" }),
       90_000,
     );
-    assert.equal(
-      resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "typo" }),
-      25_000,
-    );
-    assert.equal(
-      resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "" }),
-      25_000,
+    const typoLines = captureStderr(() => {
+      assert.equal(
+        resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "typo" }),
+        25_000,
+      );
+    });
+    assert.ok(typoLines.some((l) => l.includes("WARNING") && l.includes("NLM_LIST_TIMEOUT_MS")));
+    const emptyLines = captureStderr(() => {
+      assert.equal(
+        resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, { NLM_LIST_TIMEOUT_MS: "" }),
+        25_000,
+      );
+    });
+    assert.ok(
+      emptyLines.some(
+        (l) => l.includes("WARNING") && l.includes("NLM_LIST_TIMEOUT_MS") && l.includes('""'),
+      ),
     );
     assert.equal(
       resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, { NLM_SYNC_TIMEOUT_MS: "0" }),
@@ -1068,13 +1109,81 @@ describe("OPS-5 env validation + timeout split + canary + rollup", () => {
     );
   });
 
-  it("resolveCanaryFractionEnv: unset / valid / invalid range", () => {
+  it("resolvePositiveIntMsEnv: cap 240_000 accepted; above and 1e21 clamp with WARNING", () => {
+    assert.equal(NLM_TIMEOUT_MS_CAP, 240_000);
+    const atCapLines = captureStderr(() => {
+      assert.equal(
+        resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, {
+          NLM_SYNC_TIMEOUT_MS: "240000",
+        }),
+        240_000,
+      );
+    });
+    assert.equal(atCapLines.some((l) => l.includes("WARNING")), false);
+
+    const defaultLines = captureStderr(() => {
+      assert.equal(resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, {}), 120_000);
+    });
+    assert.equal(defaultLines.length, 0);
+
+    const overLines = captureStderr(() => {
+      assert.equal(
+        resolvePositiveIntMsEnv("NLM_SYNC_TIMEOUT_MS", 120_000, {
+          NLM_SYNC_TIMEOUT_MS: "240001",
+        }),
+        240_000,
+      );
+    });
+    assert.ok(
+      overLines.some(
+        (l) =>
+          l.includes("WARNING") &&
+          l.includes("NLM_SYNC_TIMEOUT_MS") &&
+          l.includes("240001") &&
+          l.includes("240000") &&
+          l.includes("nlm_sync_timeout"),
+      ),
+    );
+
+    const hugeLines = captureStderr(() => {
+      assert.equal(
+        resolvePositiveIntMsEnv("NLM_LIST_TIMEOUT_MS", 25_000, {
+          NLM_LIST_TIMEOUT_MS: "1e21",
+        }),
+        240_000,
+      );
+    });
+    assert.ok(
+      hugeLines.some(
+        (l) =>
+          l.includes("WARNING") &&
+          l.includes("NLM_LIST_TIMEOUT_MS") &&
+          l.includes("1e21") &&
+          l.includes("240000"),
+      ),
+    );
+  });
+
+  it("resolveCanaryFractionEnv: unset / valid / empty / invalid range", () => {
     assert.equal(resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {}), 0.5);
     assert.equal(
       resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
         NLM_SYNC_CANARY_FRACTION: "0.75",
       }),
       0.75,
+    );
+    const emptyFrac = captureStderr(() => {
+      assert.equal(
+        resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
+          NLM_SYNC_CANARY_FRACTION: "",
+        }),
+        0.5,
+      );
+    });
+    assert.ok(
+      emptyFrac.some(
+        (l) => l.includes("WARNING") && l.includes("NLM_SYNC_CANARY_FRACTION") && l.includes('""'),
+      ),
     );
     assert.equal(
       resolveCanaryFractionEnv("NLM_SYNC_CANARY_FRACTION", 0.5, {
@@ -1094,6 +1203,30 @@ describe("OPS-5 env validation + timeout split + canary + rollup", () => {
       }),
       0.5,
     );
+  });
+
+  it("resolveExportSourceBytes prefers disk size; missing file → null (not stale metadata)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sync-drive-export-bytes-"));
+    const exportPath = join(dir, "vault-export-for-notebooklm.md");
+    const body = "x".repeat(1234);
+    await writeFile(exportPath, body, "utf8");
+    const fromDisk = await resolveExportSourceBytes({
+      deterministic: { export_path: exportPath, export_bytes: 999_999 },
+    });
+    assert.equal(fromDisk, Buffer.byteLength(body, "utf8"));
+
+    const missing = await resolveExportSourceBytes({
+      deterministic: {
+        export_path: join(dir, "does-not-exist.md"),
+        export_bytes: 999_999,
+      },
+    });
+    assert.equal(missing, null);
+
+    const metaOnly = await resolveExportSourceBytes({
+      deterministic: { export_bytes: 42 },
+    });
+    assert.equal(metaOnly, 42);
   });
 
   it("resolveNlmCallTimeoutMs picks list vs sync bounds independently", () => {
