@@ -2,10 +2,10 @@
 story_id: 89-1
 epic: 89
 title: digest-stage-a-github-store-max-widen
-status: ready-for-dev
+status: review
 created: 2026-07-21
 operator_brief: 2026-07-21
-design_gate: PENDING_OPERATOR_GO
+design_gate: GO
 baseline_commit: 024f2ec
 predecessors: 65-1, 65-8, OPS-2
 related: deferred-work.md CHORE 2, curation-selection-research-2026-07-21.md
@@ -17,12 +17,9 @@ supersedes_filename: 89-1-digest-stage-a-github-pool-and-polymarket-exclusion.md
 
 # Story 89.1: Stage A — GitHub STORE_MAX widen (write-all into digestSignals)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed — comprehensive developer guide created. -->
-
-> [!warning] STOP GATE — NO `bmad-dev-story` UNTIL OPERATOR SAYS GO
-> Scope narrowed 2026-07-21. Do **not** implement until the operator replies **go**.
 
 > [!abstract] Stage A is data accumulation, not a UX improvement
 > This story only widens what is **written** to `digestSignals`. It does **not** build a
@@ -255,22 +252,22 @@ Illustrative (`ABS_FLOOR=100`, `PCT_THRESH=0.1%` — **not** real thresholds):
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Operator says go** (blocking)
-- [ ] **T1 — Fetcher defaults** (AC: #1, #2)
-  - [ ] `MAX_REPOS_DEFAULT=40`, `PER_QUERY_DEFAULT=5` (or env-driven with those defaults)
-  - [ ] Document in `config-snippet.md`; quote guidance
-  - [ ] Keep `sort=stars` (no API change)
-- [ ] **T2 — Confirm write-all** (AC: #1)
-  - [ ] Do not add a truncate in `build-digest-push-payload.mjs` GitHub loop
-  - [ ] Test: N fetched repos → N github signals in payload
-- [ ] **T3 — Ops env** (AC: #2)
-  - [ ] Set `MORNING_DIGEST_GITHUB_MAX_REPOS=40` and `_PER_QUERY=5` in `~/.hermes/trend-ingest.env`
-  - [ ] Hermes skill install/sync if example paths require it
-- [ ] **T4 — Tests + verify** (AC: #4)
-  - [ ] Extend `tests/morning-digest-github-adapter.test.mjs`
-  - [ ] `bash scripts/verify.sh`
-- [ ] **T5 — Warm-up note**
-  - [ ] Track toward 89-2: 7 digests with github rows stored ≥30
+- [x] **T0 — Operator says go** (blocking)
+- [x] **T1 — Fetcher defaults** (AC: #1, #2)
+  - [x] `MAX_REPOS_DEFAULT=40`, `PER_QUERY_DEFAULT=5` (or env-driven with those defaults)
+  - [x] Document in `config-snippet.md`; quote guidance
+  - [x] Keep `sort=stars` (no API change)
+- [x] **T2 — Confirm write-all** (AC: #1)
+  - [x] Do not add a truncate in `build-digest-push-payload.mjs` GitHub loop
+  - [x] Test: N fetched repos → N github signals in payload
+- [x] **T3 — Ops env** (AC: #2)
+  - [x] Set `MORNING_DIGEST_GITHUB_MAX_REPOS=40` and `_PER_QUERY=5` in `~/.hermes/trend-ingest.env`
+  - [x] Hermes skill install/sync if example paths require it
+- [x] **T4 — Tests + verify** (AC: #4)
+  - [x] Extend `tests/morning-digest-github-adapter.test.mjs`
+  - [x] `bash scripts/verify.sh`
+- [x] **T5 — Warm-up note**
+  - [x] Track toward 89-2: 7 digests with github rows stored ≥30
 
 ## Dev Notes
 
@@ -313,17 +310,37 @@ pushAll(repos); // ≤40 digestSignals with sourceMetadata.stars
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (Cursor agent router)
 
 ### Debug Log References
 
+- Live fetch: `/tmp/89-1-github-fetch.json` — `repo_count=40`, `distinct_urls=40`
+- Long-tail markers present: `llm-d/llm-d-router` (261), `CodingWithCalvin/VS-MCPServer` (64)
+- Write-path: `write_path_fetched=40` → `write_path_github_signals=40` (1:1)
+- Option (a) stripped-env live fetch still returned 40 (in-code defaults reach `loadGithubConfig`)
+- `bash scripts/verify.sh` → **VERIFY_EXIT_CODE=0**
+
 ### Completion Notes List
 
-- Narrowed 2026-07-21: STORE_MAX write-all + env only; selection ACs cut to 89-3
-- Awaiting operator **go**
+- **Defaults choice: (a)** raised `MAX_REPOS_DEFAULT=40` / `PER_QUERY_DEFAULT=5` so Stage A accumulates history without depending on operator-local env alone. Env pins still set in `~/.hermes/trend-ingest.env` as belt-and-suspenders; Stage B warm-up clock can start on next successful digests.
+- Why not (b): documenting/env-only would ship the silent-no-op this epic removes — code defaults would keep writing 5 mega-repos.
+- No truncate added to `build-digest-push-payload.mjs` GitHub loop; write-all test covers N→N with `sourceMetadata.stars` + `externalId`.
+- No SHORTLIST_MAX / EMIT_MAX / Polymarket / velocity / schema / matcher / dashboard work.
+- Warm-up toward 89-2: need **7 consecutive digests** each with `sourceType === 'github'` count **≥30** (target 40) after this ship.
 
 ### File List
 
+- `scripts/hermes-skill-examples/morning-digest/scripts/fetch-github-signals.mjs`
+- `scripts/hermes-skill-examples/morning-digest/references/config-snippet.md`
+- `scripts/hermes-skill-examples/morning-digest/references/task-prompt.md`
+- `tests/morning-digest-github-adapter.test.mjs`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/89-1-digest-stage-a-github-store-max-widen.md`
+
+### Change Log
+
+- 2026-07-21 — Raised GitHub STORE_MAX/PER_QUERY in-code defaults to 40/5; documented env pins + quote guidance; write-all unit test; ops env + skill sync; verify exit 0.
+
 ---
 
-**After operator says go:** `bmad-dev-story` on this narrowed story only.
+**Stage B warm-up (T5):** Clock starts with the next successful morning-digest runs that store ≥30 github `digestSignals` rows each.

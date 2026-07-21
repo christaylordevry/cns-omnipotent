@@ -232,7 +232,7 @@ Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
 4. Else if `Array.isArray(gh_json.repos) && gh_json.repos.length > 0`:
    - Read **`gh_json.repos`** (`repos[]` stdout array key) only — each item uses `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
-   - Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
+   - Emit up to **N** repos (default **40**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`; per-query default **5** via `MORNING_DIGEST_GITHUB_PER_QUERY`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled. Write **all** returned repos into §9 `digestSignals` (Stage A STORE_MAX / Story 89-1 — no write-time truncate).
    - For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks` where `<title>` is `repos[].title` (owner/repo string).
 5. Else → failure (empty `repos`, invalid shape, or parse error).
 6. On failure: section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 8.

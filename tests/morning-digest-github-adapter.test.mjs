@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, it } from 'node:test';
 
+import { buildDigestPushPayload } from '../scripts/hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import {
   dedupeReposByUrl,
   isGithubEnabled,
@@ -212,13 +213,33 @@ describe('fetch-github-signals.mjs runGithubFetch', () => {
 });
 
 describe('loadGithubConfig', () => {
-  it('defaults maxRepos and perQuery when unset or invalid', () => {
+  it('defaults maxRepos and perQuery when unset or invalid (Story 89-1 STORE_MAX)', () => {
     const config = loadGithubConfig({
       MORNING_DIGEST_GITHUB_QUERIES: 'agents, llm',
     });
-    assert.equal(config.maxRepos, 5);
-    assert.equal(config.perQuery, 3);
+    assert.equal(config.maxRepos, 40);
+    assert.equal(config.perQuery, 5);
     assert.deepEqual(config.queries, ['agents', 'llm']);
+  });
+
+  it('honors env overrides for STORE_MAX and PER_QUERY', () => {
+    const config = loadGithubConfig({
+      MORNING_DIGEST_GITHUB_QUERIES: 'agents',
+      MORNING_DIGEST_GITHUB_MAX_REPOS: '40',
+      MORNING_DIGEST_GITHUB_PER_QUERY: '5',
+    });
+    assert.equal(config.maxRepos, 40);
+    assert.equal(config.perQuery, 5);
+  });
+
+  it('falls back to defaults when env values are unparseable', () => {
+    const config = loadGithubConfig({
+      MORNING_DIGEST_GITHUB_QUERIES: 'agents',
+      MORNING_DIGEST_GITHUB_MAX_REPOS: 'nope',
+      MORNING_DIGEST_GITHUB_PER_QUERY: '0',
+    });
+    assert.equal(config.maxRepos, 40);
+    assert.equal(config.perQuery, 5);
   });
 
   it('isGithubEnabled treats empty as enabled', () => {
@@ -229,5 +250,36 @@ describe('loadGithubConfig', () => {
 
   it('parseGithubQueries trims and drops empty segments', () => {
     assert.deepEqual(parseGithubQueries(' agents , , llm '), ['agents', 'llm']);
+  });
+});
+
+describe('buildDigestPushPayload GitHub write-all (Story 89-1)', () => {
+  it('writes every fetched repo as a github digestSignal with stars + externalId', () => {
+    const repoCount = 40;
+    const repos = Array.from({ length: repoCount }, (_, index) => ({
+      title: `owner/repo-${index}`,
+      url: `https://github.com/owner/repo-${index}`,
+      stars: 1000 - index,
+      forks: index,
+      publishedAt: '2026-07-21T00:00:00.000Z',
+    }));
+
+    const payload = buildDigestPushPayload({
+      date: '2026-07-21',
+      ranAt: 1_784_582_400_000,
+      github: { repos },
+      runMeta: { topTrend: 'AI agents' },
+    });
+
+    const githubSignals = payload.signals.filter((row) => row.sourceType === 'github');
+    assert.equal(githubSignals.length, repoCount);
+    for (const [index, signal] of githubSignals.entries()) {
+      assert.equal(signal.title, repos[index].title);
+      assert.equal(signal.url, repos[index].url);
+      assert.equal(signal.sourceMetadata?.stars, repos[index].stars);
+      assert.equal(signal.sourceMetadata?.forks, repos[index].forks);
+      assert.equal(typeof signal.externalId, 'string');
+      assert.equal(signal.externalId.length, 16);
+    }
   });
 });

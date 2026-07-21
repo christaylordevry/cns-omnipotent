@@ -148,16 +148,31 @@ MORNING_DIGEST_HN_ENABLED=1
 
 When disabled, the fetch script returns `{"error":"hackernews disabled"}`.
 
-## GitHub repository search (Story 65-1)
+## GitHub repository search (Story 65-1, STORE_MAX Story 89-1)
 
 Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as NewsAPI is fine).
+
+**Stage A (89-1)** widens the fetch/store pool so `digestSignals.sourceMetadata.stars` accumulates history for Stage B velocity. The push path writes **every** repo the fetcher returns — there is no write-time shortlist cap.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `MORNING_DIGEST_GITHUB_QUERIES` | Comma-separated GitHub search strings | required when enabled |
-| `MORNING_DIGEST_GITHUB_MAX_REPOS` | Max repos to return | `5` |
+| `MORNING_DIGEST_GITHUB_MAX_REPOS` | Max distinct repos after URL dedupe (STORE_MAX) | `40` |
+| `MORNING_DIGEST_GITHUB_PER_QUERY` | Max repos parsed per search query (`per_page`) | `5` |
 | `MORNING_DIGEST_GITHUB_ENABLED` | Set `0` or `false` to disable | enabled |
 | `GITHUB_TOKEN` | Optional — raises API rate limits | — |
+
+Example operator setup (in-code defaults already match; set env for explicit ops pin):
+
+```bash
+# In ~/.hermes/trend-ingest.env
+# Values with spaces MUST be double-quoted (FOO=a b c silently breaks).
+MORNING_DIGEST_GITHUB_MAX_REPOS=40
+MORNING_DIGEST_GITHUB_PER_QUERY=5
+MORNING_DIGEST_GITHUB_ENABLED=1
+```
+
+**Not introduced:** `SHORTLIST_MAX` / `MORNING_DIGEST_GITHUB_SHORTLIST_MAX` / `EMIT_MAX` — selection caps belong to 89-3 when a judgment shortlist exists.
 
 ## Reddit top listings (Story 67-2)
 
