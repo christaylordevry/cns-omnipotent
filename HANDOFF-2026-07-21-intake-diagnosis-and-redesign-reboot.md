@@ -205,7 +205,30 @@ the shortlist or trend layer. Don't aim for "all sources up."
 
 ## 7. Epic 89 — stories
 
-### 89.1 — GitHub STORE_MAX widen — **GREENLIT, ready for `bmad-dev-story`**
+### 89.1 — GitHub STORE_MAX widen — ✅ **SHIPPED `3d3c73e`** (status: review)
+
+Implemented via option **(a)**: in-code defaults raised to `MAX_REPOS_DEFAULT = 40` /
+`PER_QUERY_DEFAULT = 5`, so the widen is real **without** depending on operator-local env.
+Env pins were also set in `~/.hermes/trend-ingest.env` as belt-and-suspenders. A stripped-env
+live fetch still returned 40 — the defaults do reach `loadGithubConfig()`.
+
+**Proofs (independently re-verified):**
+- fetcher: `repo_count=40`, `distinct_urls=40`; long tail present —
+  `llm-d/llm-d-router` (261 ★), `CodingWithCalvin/VS-MCPServer` (64 ★)
+- write path: 40 fetched → 40 `github` digestSignals, 1:1, all with `stars` + `externalId`
+- **`build-digest-push-payload.mjs` is absent from the diff** — no cap was added to the
+  write loop, which was the load-bearing requirement
+- `tests/morning-digest-github-adapter.test.mjs` — **17 pass / 0 fail, exit 0**
+- `verify.sh` — exit 0
+
+⏭️ **NEXT: `/bmad-code-review` on 89.1** — not yet run. It touches the write path Stage B
+depends on; worth the adversarial pass before the story leaves review.
+
+**Stage B warm-up clock starts on the next digests storing ≥30 github rows each (target 7
+consecutive).** First one is tomorrow's 07:00.
+
+<details>
+<summary>Original story scope (as approved)</summary>
 `_bmad-output/implementation-artifacts/89-1-digest-stage-a-github-store-max-widen.md`
 
 Stage A is **data accumulation, not a UX win** — label retained deliberately.
@@ -221,14 +244,17 @@ surface a long tail previously discarded — `llm-d/llm-d-router` (261 ★), `ya
 `Netxeo/skill-file-security` (69), `CodingWithCalvin/VS-MCPServer` (64). **Emergence is
 undetectable without this** — you cannot spot a rising repo you never fetch.
 
-Current defaults: `MAX_REPOS_DEFAULT = 5`, `PER_QUERY_DEFAULT = 3`
+Pre-89.1 defaults were `MAX_REPOS_DEFAULT = 5`, `PER_QUERY_DEFAULT = 3`
 (`fetch-github-signals.mjs:10-11`), neither set in env → 12 queries × 3 = 36 fetched,
-**31 discarded**.
+**31 discarded**. Now 40 / 5.
 
 ⚠️ **Write-all is load-bearing.** `build-digest-push-payload.mjs:200` turns every returned repo
 into a `digestSignals` row; there is no separate store. `digestSignals.sourceMetadata.stars`
 **is** the star history. Capping writes at 5 would make the warm-up gate unreachable and
 Stage B impossible — and would look fine for a week before anyone noticed.
+*(Verified post-implementation: no cap was added — the file is absent from `3d3c73e`.)*
+
+</details>
 
 ### 89-3 — shortlist rules — **BACKLOG, blocked**
 `_bmad-output/implementation-artifacts/89-3-judgment-shortlist-github-cap-and-polymarket-exclusion.md`
