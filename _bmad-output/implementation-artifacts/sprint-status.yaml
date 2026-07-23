@@ -771,7 +771,7 @@ development_status:
   # Epic 90 — Intake health (Reddit restore + YouTube honesty / dedupe / quality)
   # 90-1: app-free Atom RSS both layers (OAuth/JSON+UA DROPPED). Do NOT touch credit-exhausted social.
   # Sequencing: 90-2 (obs) → 90-4 (dedupe retune) → 90-3 (youtube quality).
-  epic-90: in-progress
+  epic-90: done # closed 2026-07-23: 90-1..90-5 all done + retro (ea0a8a3); D1 closed by 90-5
   90-1-restore-reddit-intake: done # 2026-07-23 RSS both layers; review patches (partial+budget, word-boundary); verify green
   90-2-youtube-silent-drop-observability: done # 2026-07-23 obs only; review Option1 yt-stage on youtube key; verify green
   90-4-dedupe-over-collapse-retune: done # R1(canon v=)+R2(prop≥0.5)+R4(stderr wipe/heavy-absorb K=5); SKIP cap8; code-review patches applied 2026-07-23

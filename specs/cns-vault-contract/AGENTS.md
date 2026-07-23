@@ -283,14 +283,14 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 - Epic 78: in-progress
 - Epic 89: in-progress
-- Epic 90: in-progress
-- 81 epics done; 3 in-progress (78, 89, 90)
+- Epic 90: done (closed 2026-07-23)
+- 82 epics done; 2 in-progress (78, 89)
 
 ### Current Priorities
 
-1. Advance Epic 90: Story 90.3 (YouTube quality), 90.4 (dedupe retune), and 90.5 (entity-match anti-opposition guard) all done — identify and ship next Epic 90 story.
-2. Advance Epic 89: review open stories and push toward closure.
-3. Keep Epic 78 moving: finish or explicitly park 78-1 (Desktop Electron deferred); then 78-3 operator guide or close the epic.
+1. Advance Epic 89: review open stories and push toward closure.
+2. Keep Epic 78 moving: finish or explicitly park 78-1 (Desktop Electron deferred); then 78-3 operator guide or close the epic.
+3. Epic 90 (intake health) is closed — 90-1..90-5 shipped and retro'd. Do not open new 90 stories; the infra backlog is empty and the standing bottleneck is revenue/deployment, not delivery.
 
 ### Recent Session Context
 
