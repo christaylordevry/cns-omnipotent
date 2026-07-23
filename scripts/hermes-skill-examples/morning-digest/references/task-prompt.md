@@ -411,11 +411,13 @@ Stdout shape (YouTube only — do not confuse with Sources 5, 7, 8, 9, 10, 11, o
 4. Else if `Array.isArray(yt_json.videos) && yt_json.videos.length > 0`:
    - Read **`yt_json.videos`** (`videos[]` stdout array key) only — each item uses `title`, `url`, `channelTitle`, `viewCount`, `likeCount`, `commentCount` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `videos[].viewCount` → `sourceMetadata.viewCount`, `videos[].likeCount` → `sourceMetadata.likes`, `videos[].commentCount` → `sourceMetadata.commentCount`; map `videos[].channelTitle` → `sourceMetadata.author`; map `videos[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `videos[].title` → `summary`.
-   - Emit up to **N** videos (default **25**, hard max **50**, configurable via `MORNING_DIGEST_YOUTUBE_MAX_VIDEOS`); two-phase API flow (`search.list` then `videos.list` batch enrich).
+   - Emit up to **N** videos (default **12** keep-N after quality floor + view-velocity rank, hard max **50**, via `MORNING_DIGEST_YOUTUBE_MAX_VIDEOS`); over-fetch candidates (`PER_QUERY` default 10, lookback 72h, `CANDIDATE_MAX` 100) → `videos.list` enrich → floor (min views 200 AND likes 5) → velocity rank → keep-N (Story 90-3).
    - For Discord **YouTube**, list each video as `- <title> — <viewCount> views, <likeCount> likes` (use `title` text; `url` for §9 only — no bare URL link previews).
-5. Else → failure (empty `videos`, invalid shape, or parse error).
-6. On failure: section header **YouTube** + `- (source unavailable: <short reason>)` and **continue** to Source 14.
-7. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `headlines[]`, `launches[]`, or `entries[]` from YouTube stdout — those keys belong to other sources only.
+5. Else if `Array.isArray(yt_json.videos) && yt_json.videos.length === 0`:
+   - Treat as **success with no high-signal videos** (quality floor wiped the pool — Story 90-3 precision-over-recall). Discord: section header **YouTube** + `- (no high-signal videos today)`; §9 `youtube: []`. Do **not** treat as source unavailable.
+6. Else → failure (invalid shape or parse error).
+7. On failure: section header **YouTube** + `- (source unavailable: <short reason>)` and **continue** to Source 14.
+8. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `headlines[]`, `launches[]`, or `entries[]` from YouTube stdout — those keys belong to other sources only.
 
 ## Source 14 — TikTok
 

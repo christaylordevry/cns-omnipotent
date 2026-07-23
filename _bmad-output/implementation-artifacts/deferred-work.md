@@ -1,5 +1,16 @@
 # Deferred work
 
+## Deferred from: code review of 90-3-youtube-quality-selection.md (2026-07-23)
+
+- **Digest-layer floor-wipe visibility** — operator 2026-07-23: keep adapter `{videos:[]}` (QUIET, not `{error}`); optional later enhancement to surface persistent floor-starve in digest outcomes / ops dashboards without polluting `errors_by_source`. Not in 90-3 PR.
+- **Quota warn only after search** — estimate uses actual candidate N; pre-flight worst-case (`queries*100+ceil(candidateMax/50)`) not required by AC5.
+- **First-come `dedupeVideosById` under `candidateMax`** — early queries can exhaust the enrich cap; round-robin fairness not in ship package.
+- **No stable final tie-break** — equal velocity/views/likes order is unstable at keep-N boundary; P4 only specifies views then likes.
+- **Invalid `SEARCH_ORDER` silent → `date`** — AC2 intentional; no misconfig log.
+- **`title`/`videoCount` remain in search-order allowlist** — valid YouTube enum; odd with `type=video`.
+- **Unbounded `velocityMinAgeHours` / no `candidateMax < keepN` reject** — ops misconfig edges only.
+- **Always-on stderr select stats on healthy runs** — may look like cron failure noise; keeps 90-2-style visibility.
+
 ## Deferred from: code review of 90-4-dedupe-over-collapse-retune.md (2026-07-23)
 
 - **Entity-match over-clusters short opposite-topic titles** — e.g. `Nvidia Chip Shortage` × `Nvidia Chip Surplus` (shared/min ≈ 0.67–1.0). Bounded (2-item clusters, no source wipe). Intended fix: shared nouns must include the distinguishing token / anti-opposition guard; **MUST re-simulate the polymarket cluster before shipping**. Do not raise `shared≥3` blindly. Not in 90-4 PR.
