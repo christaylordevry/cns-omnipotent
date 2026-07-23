@@ -20,6 +20,7 @@ import {
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/build-entity-mention-payload.mjs';
 import { assertEntityMentionRowViaDashboard } from '../scripts/lib/entity-mention-validator-bridge.mjs';
 import { invokePostPushEntityStage } from '../scripts/run-digest-convex-completion.mjs';
+import { createHungAbortFetchMock } from './helpers/abort-mock.mjs';
 
 function mockResponse(status, body = '{}') {
   return {
@@ -397,22 +398,10 @@ describe('analyze-entity-intelligence.mjs (Story 73-4)', () => {
       },
       timeoutMs: 5,
       // AbortSignal.timeout unrefs its timer — keepalive until abort so the loop cannot drain
-      // before the real timeoutMs→AbortSignal.timeout path fires (OPS-6 H1).
-      fetchFn: async (_url, init) =>
-        new Promise((_resolve, reject) => {
-          const signal = init.signal;
-          const keepalive = globalThis.setInterval(() => {}, 1);
-          const done = () => {
-            globalThis.clearInterval(keepalive);
-            reject(signal.reason);
-          };
-          if (signal.aborted) {
-            done();
-            return;
-          }
-          signal.addEventListener('abort', done, { once: true });
-        }),
+      // before the real timeoutMs→AbortSignal.timeout path fires (OPS-6 H1 / OPS-7 helper).
+      fetchFn: createHungAbortFetchMock(),
     });
+
 
     assert.equal(result.ok, false);
     assert.match(result.error, /timed out|timeout/i);

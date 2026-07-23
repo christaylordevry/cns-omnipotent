@@ -9,6 +9,7 @@ import {
   resolveBrainEmbedder,
 } from "../../src/brain/resolve-embedder.js";
 import { StubEmbedder } from "../../src/brain/embedder.js";
+import { hungUntilAbort } from "../helpers/abort-mock.mjs";
 
 function mockFetchOk(embedding: number[]): typeof fetch {
   return (async () =>
@@ -111,10 +112,9 @@ describe("PortalEmbedder", () => {
     const fetchFn = ((async (_url: string | URL | Request, init?: RequestInit) => {
       if (init?.signal instanceof AbortSignal) {
         signals.push(init.signal);
+        return await hungUntilAbort(init.signal);
       }
-      return await new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
-      });
+      throw new TypeError("expected init.signal");
     }) as unknown) as typeof fetch;
     const embedder = new PortalEmbedder({
       baseUrl: "http://127.0.0.1:8645/v1",

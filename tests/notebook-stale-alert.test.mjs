@@ -7,6 +7,7 @@ import {
   checkStaleNotebooks,
   resolveStaleThreshold,
 } from "../scripts/session-close/lib/notebook-stale-alert.mjs";
+import { hungUntilAbort } from "./helpers/abort-mock.mjs";
 
 const MS_PER_DAY = 86_400_000;
 const NOW_MS = Date.parse("2026-05-30T00:00:00Z");
@@ -301,13 +302,21 @@ describe("alertStaleNotebooks", () => {
 
   it("aborts a stalled Discord request and resolves", async () => {
     let receivedSignal;
-    const fetchFn = (_url, init) =>
-      new Promise((_resolve, reject) => {
-        receivedSignal = init?.signal;
-        init?.signal?.addEventListener("abort", () => {
-          reject(new Error("aborted"));
-        });
-      });
+    // Map abort reason → Error("aborted") so stderr assertion stays byte-identical.
+    const fetchFn = async (_url, init) => {
+      receivedSignal = init?.signal;
+      if (!(init?.signal instanceof globalThis.AbortSignal)) {
+        throw new TypeError("expected init.signal");
+      }
+      try {
+        await hungUntilAbort(init.signal);
+      } catch (err) {
+        // Remap abort → Error("aborted") for byte-identical stderr; rethrow
+        // anything else so helper bugs are not masked as abort (OPS-7 review).
+        if (!init.signal.aborted) throw err;
+        throw new Error("aborted", { cause: err });
+      }
+    };
 
     const stderr = await captureStderr(async () => {
       await alertStaleNotebooks([makeEntry()], {
@@ -325,3 +334,4 @@ describe("alertStaleNotebooks", () => {
     assert.equal(stderr, "[stale-alerts] Discord post error: aborted\n");
   });
 });
+

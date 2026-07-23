@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-23T19:50:00+10:00
+# last_updated: 2026-07-23T21:23:30+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-23T18:55:00+10:00"
+last_updated: "2026-07-23T21:05:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -745,17 +745,19 @@ development_status:
   BD-4-stamp-matched-watchlist-topic: done # Phase A+B done; adversarial review patches + verify PASS 2026-07-20
 
   # Ops observability — fail loudly on unvalidated state (digest push + constitution propagation + drive-sync rollup)
-  # Reopened 2026-07-23: OPS-6 verify.sh non-determinism (73-4/73-7 AbortSignal.timeout unref + hung mocks)
+  # Reopened 2026-07-23: OPS-7 shared abort-mock helper + lint ban (closes both OPS-6 deferrals; coupled)
+  # Prior reopen 2026-07-23: OPS-6 verify.sh non-determinism (73-4/73-7 AbortSignal.timeout unref + hung mocks)
   # Prior reopen 2026-07-21: OPS-5 drive-sync deterministic timeout + canary + rollup honesty (Epic 58 residual)
   # Prior reopen 2026-07-20: closed prematurely after OPS-3; OPS-4 constitution propagation guard
   # Original: 2026-07-20 Convex free-plan outage — signalsWritten:0, exit=0
-  ops-observability: done # OPS-1/2/4/5/6 done; OPS-3 cancelled-unbuilt; OPS-6 code-review clean 2026-07-23
+  ops-observability: done # OPS-7 done 2026-07-23 (code-review harden+patches); OPS-1/2/4/5/6 done; OPS-3 cancelled-unbuilt
   OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
   OPS-2-digest-signal-schema-contract-guard: done # Phase A reviewed+patched 2026-07-20 (cns-dashboard); Phase B reviewed+patched 2026-07-20 (hollow fieldSets throw, contributingSources type check, contract-load→failed path, forceRescore poison AC5 test, merge assertion lock); dual-copy cmp OK
   OPS-3-digest-push-in-run-retry: cancelled # CLOSED UNBUILT 2026-07-20 by operator decision on evidence: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither, and a naive retry can duplicate the run row (BD-2 delta corruption). Day-level retry already exists (push-digest-watchdog.mjs:435). REOPEN TRIGGER: a completion-convex-push-failed that self-heals on the next run without intervention. Story text retained — the analysis records why not to build this next time it looks obvious.
   OPS-4-session-close-constitution-propagation-guard: done # code-review patches 2026-07-21 (soften+cross-line, source-unreadable, empty changelog, AC5 correction); eslint+verify exit 0
   OPS-5-drive-sync-timeout-canary-and-rollup-honesty: done # code-review 2026-07-21: NLM_TIMEOUT_MS_CAP=240_000 (not 300k), canary disk-first, empty-env WARNING; verify.sh exit 0 post-patch
-  OPS-6-verify-gate-async-timeout-determinism: done # code-review 2026-07-23: Fix B keepalive mocks; AC1–6 OK; 0 patch; 2 defer (shared helper + suite lint ban)
+  OPS-6-verify-gate-async-timeout-determinism: done # code-review 2026-07-23: Fix B keepalive mocks; AC1–6 OK; 0 patch; 2 defer → closed by OPS-7
+  OPS-7-shared-abort-mock-helper-and-lint-ban: done # code-review 2026-07-23: onabort selector harden; file-level allowlist kept+rationale; notebook fail-loud catch; AC5 pastes; lint clean
 
   # Epic 89 — Digest source-shaping (level→delta) for always-alive cockpit
   # 89-1 Stage A: STORE_MAX=40 / PER_QUERY=5 write-all into digestSignals (data accumulation only)

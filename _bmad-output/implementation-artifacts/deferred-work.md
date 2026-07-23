@@ -1,9 +1,17 @@
 # Deferred work
 
+## Deferred from: code review of OPS-7-shared-abort-mock-helper-and-lint-ban.md (2026-07-23)
+
+- ~~**`onabort` / non-`addEventListener` hung patterns bypass ban**~~ — **CLOSED by OPS-7 review harden (2026-07-23):** shipped `AssignmentExpression[left.property.name='onabort']`. Residual: other EventTarget APIs (e.g. `once('abort')`) remain out of selector contract.
+- **`hungUntilAbort` TOCTOU** — abort between `signal.aborted` pre-check and `addEventListener` can leave the promise unsettled with keepalive still running. Same order as OPS-6 Fix B / suggested helper shape; timeout tests abort after the mock starts so practical risk is low.
+- **`hungUntilAbort` lacks input validation** — `setInterval` runs before a non-`AbortSignal` would throw on property access; keepalive may never clear. Current call sites (`createHungAbortFetchMock`, notebook-stale, portal-embedder) all validate first.
+- **Dual `.mjs` / `.d.ts` signature drift** — co-located type surface is not mechanically synced to the implementation SSOT.
+- **No dedicated helper unit tests** — critical branches covered only via the four migrated call-site suites, not a direct helper suite.
+
 ## Deferred from: code review of OPS-6-verify-gate-async-timeout-determinism.md (2026-07-23)
 
-- **Shared Fix B hung-abort mock helper** — identical keepalive + `signal.aborted` pre-check duplicated in `analyze-entity-intelligence` and `render-digest-entity-section` timeout tests. Spec open question #2; extract only if a third copy appears.
-- **Suite-wide lint/grep ban on listener-only hung mocks** — optional follow-up to prevent recurrence of AbortSignal.timeout unref flakes; out of OPS-6 blast radius.
+- **Shared Fix B hung-abort mock helper** — identical keepalive + `signal.aborted` pre-check duplicated in `analyze-entity-intelligence` and `render-digest-entity-section` timeout tests. Spec open question #2; extract only if a third copy appears. **CLOSED by OPS-7** (2026-07-23) — `tests/helpers/abort-mock.mjs`; all four call sites migrated.
+- **Suite-wide lint/grep ban on listener-only hung mocks** — optional follow-up to prevent recurrence of AbortSignal.timeout unref flakes; out of OPS-6 blast radius. **CLOSED by OPS-7** (2026-07-23) — `no-restricted-syntax` on `tests/**/*.{mjs,ts}`; helper allowlisted only.
 
 ## Deferred from: code review of 90-5-entity-match-anti-opposition-guard.md (2026-07-23)
 
