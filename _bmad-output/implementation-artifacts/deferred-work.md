@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of OPS-6-verify-gate-async-timeout-determinism.md (2026-07-23)
+
+- **Shared Fix B hung-abort mock helper** — identical keepalive + `signal.aborted` pre-check duplicated in `analyze-entity-intelligence` and `render-digest-entity-section` timeout tests. Spec open question #2; extract only if a third copy appears.
+- **Suite-wide lint/grep ban on listener-only hung mocks** — optional follow-up to prevent recurrence of AbortSignal.timeout unref flakes; out of OPS-6 blast radius.
+
 ## Deferred from: code review of 90-5-entity-match-anti-opposition-guard.md (2026-07-23)
 
 - **Sentence-case / lowercase decisive antonyms invisible to entity arm** — `extractProperNounTokens` (pre-90-5) only keeps Title-Case tokens; G7 antonym-always only sees those. Long opposite-topic titles with mid-sentence polarity words can still entity-merge. Fixing requires tokenizer policy change, not a silent lexicon tweak.

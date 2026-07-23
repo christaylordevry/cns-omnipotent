@@ -248,9 +248,21 @@ describe('render-digest-entity-section (Story 73-7)', () => {
   });
 
   it('fetchEntityIntelligence aborts a stalled query at its configured timeout', async () => {
+    // AbortSignal.timeout unrefs its timer — keepalive until abort so the loop cannot drain
+    // before the real timeoutMs→AbortSignal.timeout path fires (OPS-6 H1).
     const fetchFn = async (_url, init) =>
-      await new Promise((_, reject) => {
-        init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+      new Promise((_resolve, reject) => {
+        const signal = init.signal;
+        const keepalive = globalThis.setInterval(() => {}, 1);
+        const done = () => {
+          globalThis.clearInterval(keepalive);
+          reject(signal.reason);
+        };
+        if (signal.aborted) {
+          done();
+          return;
+        }
+        signal.addEventListener('abort', done, { once: true });
       });
 
     await assert.rejects(
