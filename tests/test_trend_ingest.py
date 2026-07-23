@@ -211,7 +211,7 @@ class CliTests(unittest.TestCase):
             wl.write_text("version: 1\nkeywords:\n  - test topic\n", encoding="utf-8")
             cache_path = Path(tmp) / "cache.json"
             with patch.object(trend_ingest, "_default_norm_cache_path", return_value=cache_path):
-                with patch.object(trend_ingest, "_praw", object()):
+                with patch.object(trend_ingest, "REDDIT_COLLECTION_METHOD", trend_ingest.REDDIT_COLLECTION_METHOD):
                     with patch.object(
                         trend_ingest,
                         "collect_reddit",
@@ -936,7 +936,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
         self.assertEqual(events[0]["metadata"]["normalisationMethod"], "reddit_7d_minmax")
         self.assertEqual(
             events[0]["metadata"]["collectionMethod"],
-            "reddit_search_day_cap_100",
+            "reddit_rss_top_day_title_content_match",
         )
         self.assertEqual(events[0]["metadata"]["rawValue"], 20.0)
         self.assertEqual(events[0]["value"], 20.0)
@@ -1059,7 +1059,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
                         trend_ingest, "_default_norm_cache_path", return_value=cache_path
                     ):
                         with patch.object(trend_ingest, "_TrendReq", object()):
-                            with patch.object(trend_ingest, "_praw", object()):
+                            with patch.object(trend_ingest, "REDDIT_COLLECTION_METHOD", trend_ingest.REDDIT_COLLECTION_METHOD):
                                 with patch.object(
                                     trend_ingest,
                                     "collect_reddit",
@@ -1127,7 +1127,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
                     with patch.object(
                         trend_ingest, "_default_norm_cache_path", return_value=cache_path
                     ):
-                        with patch.object(trend_ingest, "_praw", object()):
+                        with patch.object(trend_ingest, "REDDIT_COLLECTION_METHOD", trend_ingest.REDDIT_COLLECTION_METHOD):
                             with patch.object(
                                 trend_ingest, "collect_reddit", side_effect=fail_reddit
                             ):
@@ -1171,7 +1171,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
                     with patch.object(
                         trend_ingest, "_default_norm_cache_path", return_value=cache_path
                     ):
-                        with patch.object(trend_ingest, "_praw", object()):
+                        with patch.object(trend_ingest, "REDDIT_COLLECTION_METHOD", trend_ingest.REDDIT_COLLECTION_METHOD):
                             with patch.object(
                                 trend_ingest,
                                 "collect_reddit",
@@ -1185,7 +1185,8 @@ class RedditNewsCollectorTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertFalse(cache_path.exists())
 
-    def test_missing_praw_still_runs_news(self) -> None:
+    def test_missing_reddit_subreddits_still_runs_news(self) -> None:
+        """Reddit errors on missing MORNING_DIGEST_REDDIT_SUBREDDITS; news continues."""
         WatchlistEntry = trend_ingest.WatchlistEntry
         news_patch = trend_ingest.build_signal_source_patch(
             "news",
@@ -1206,6 +1207,11 @@ class RedditNewsCollectorTests(unittest.TestCase):
             window_hours=trend_ingest.REDDIT_NEWS_WINDOW_HOURS,
         )
 
+        def fail_reddit(*_a: object, **_k: object) -> tuple[list, dict]:
+            raise ValueError(
+                "MORNING_DIGEST_REDDIT_SUBREDDITS is required in trend-ingest.env for reddit"
+            )
+
         with tempfile.TemporaryDirectory() as tmp:
             wl = Path(tmp) / "watchlist.yaml"
             wl.write_text("version: 1\nkeywords:\n  - B\n", encoding="utf-8")
@@ -1219,7 +1225,9 @@ class RedditNewsCollectorTests(unittest.TestCase):
                     with patch.object(
                         trend_ingest, "_default_norm_cache_path", return_value=cache_path
                     ):
-                        with patch.object(trend_ingest, "_praw", None):
+                        with patch.object(
+                            trend_ingest, "collect_reddit", side_effect=fail_reddit
+                        ):
                             with patch.object(
                                 trend_ingest,
                                 "collect_news",
@@ -1257,7 +1265,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
             ingest_run_id="run-1",
             collected_at_ms=1,
             window_hours=trend_ingest.REDDIT_NEWS_WINDOW_HOURS,
-            collection_method="reddit_search_day_cap_100",
+            collection_method="reddit_rss_top_day_title_content_match",
         )
 
         def fail_news(*_a: object, **_k: object) -> tuple[list, dict]:
@@ -1276,7 +1284,7 @@ class RedditNewsCollectorTests(unittest.TestCase):
                     with patch.object(
                         trend_ingest, "_default_norm_cache_path", return_value=cache_path
                     ):
-                        with patch.object(trend_ingest, "_praw", object()):
+                        with patch.object(trend_ingest, "REDDIT_COLLECTION_METHOD", trend_ingest.REDDIT_COLLECTION_METHOD):
                             with patch.object(
                                 trend_ingest,
                                 "collect_reddit",
@@ -1703,43 +1711,188 @@ class IngestLogTests(unittest.TestCase):
         for key in (
             "CONVEX_URL",
             "CONVEX_DEPLOY_KEY",
-            "REDDIT_CLIENT_ID",
-            "REDDIT_CLIENT_SECRET",
-            "REDDIT_USER_AGENT",
+            "MORNING_DIGEST_REDDIT_SUBREDDITS",
             "NEWSAPI_API_KEY",
         ):
             self.assertIn(key, example)
+        self.assertIn("REDDIT_CLIENT_ID", example)  # deprecated, still documented
         self.assertIn("chmod 600", example)
+        self.assertIn("unused for reddit after 90-1", example)
 
-    def test_collect_reddit_reuses_single_praw_client(self) -> None:
+    def test_collect_reddit_fetches_each_subreddit_once(self) -> None:
+        """Shared RSS corpus: one fetch per subreddit, keyword counts against corpus."""
         entries = [
-            trend_ingest.WatchlistEntry("alpha", "alpha", "us", 1),
-            trend_ingest.WatchlistEntry("beta", "beta", "us", 2),
+            trend_ingest.WatchlistEntry("alpha", "moe", "us", 1),
+            trend_ingest.WatchlistEntry("beta", "openreview", "us", 2),
         ]
-        fake_reddit = object()
-        env = {
-            "REDDIT_CLIENT_ID": "id",
-            "REDDIT_CLIENT_SECRET": "secret",
-            "REDDIT_USER_AGENT": "test-agent",
-        }
-        with patch.object(
-            trend_ingest, "create_reddit_client", return_value=fake_reddit
-        ) as mock_create:
-            with patch.object(
-                trend_ingest, "fetch_reddit_mention_count", return_value=5.0
-            ) as mock_fetch:
-                events, patch_doc = trend_ingest.collect_reddit(
-                    entries,
-                    ingest_run_id="run-1",
-                    norm_cache={"version": 1, "entries": {}},
-                    env=env,
-                )
-        mock_create.assert_called_once_with(env)
-        self.assertEqual(mock_fetch.call_count, 2)
-        for call in mock_fetch.call_args_list:
-            self.assertIs(call.kwargs["reddit"], fake_reddit)
+        fixture = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>SkewAdam MoE optimizer</title>
+    <content type="html">mixture of experts</content>
+    <id>t3_a</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/a/"/>
+  </entry>
+  <entry>
+    <title>Happy openreview refresh day</title>
+    <content type="html">paper review</content>
+    <id>t3_b</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/b/"/>
+  </entry>
+</feed>"""
+        env = {"MORNING_DIGEST_REDDIT_SUBREDDITS": "MachineLearning,LocalLLaMA"}
+        fetches: list[str] = []
+
+        def fetch_xml(sub: str) -> str:
+            fetches.append(sub)
+            return fixture
+
+        sleeps: list[float] = []
+
+        events, patch_doc = trend_ingest.collect_reddit(
+            entries,
+            ingest_run_id="run-1",
+            norm_cache={"version": 1, "entries": {}},
+            env=env,
+            collected_at_ms=1_746_000_000_000,
+            pace_sec=2.0,
+            sleep_fn=lambda s: sleeps.append(s),
+            fetch_xml=fetch_xml,
+        )
+        self.assertEqual(fetches, ["MachineLearning", "LocalLLaMA"])
+        self.assertEqual(sleeps, [2.0])
         self.assertEqual(len(events), 2)
+        by_slug = {e["topicSlug"]: e for e in events}
+        # moe matches title in both subreddit feeds (corpus doubled)
+        self.assertEqual(by_slug["alpha"]["metadata"]["rawValue"], 2.0)
+        self.assertEqual(by_slug["beta"]["metadata"]["rawValue"], 2.0)
+        self.assertEqual(
+            by_slug["alpha"]["metadata"]["collectionMethod"],
+            "reddit_rss_top_day_title_content_match",
+        )
         self.assertEqual(patch_doc["name"], "reddit")
+        self.assertEqual(patch_doc["status"], "ok")
+
+    def test_parse_reddit_atom_matches_title_and_content(self) -> None:
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Unrelated title</title>
+    <content type="html">discussion of mixture-of-experts training</content>
+    <id>t3_c</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/c/"/>
+  </entry>
+</feed>"""
+        entries = trend_ingest.parse_reddit_atom_entries(xml)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("mixture-of-experts", entries),
+            1.0,
+        )
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("unrelated", entries),
+            1.0,
+        )
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("missing", entries),
+            0.0,
+        )
+
+    def test_count_keyword_uses_word_boundaries(self) -> None:
+        entries = [
+            {
+                "title": "AI agents and MoE routing",
+                "content": "chair email detail",
+                "url": "https://example.com/a",
+                "id": "1",
+            }
+        ]
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("ai", entries),
+            1.0,
+        )
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("MoE", entries),
+            1.0,
+        )
+        self.assertEqual(
+            trend_ingest.count_keyword_in_reddit_entries("ai", [
+                {"title": "chair", "content": "email detail", "url": "", "id": "2"}
+            ]),
+            0.0,
+        )
+
+    def test_parse_reddit_subreddits_dedupes(self) -> None:
+        self.assertEqual(
+            trend_ingest.parse_reddit_subreddits(
+                "MachineLearning, r/machinelearning ,LocalLLaMA"
+            ),
+            ["MachineLearning", "LocalLLaMA"],
+        )
+
+    def test_parse_reddit_atom_wraps_parse_error(self) -> None:
+        with self.assertRaises(trend_ingest.CollectorKeywordError) as ctx:
+            trend_ingest.parse_reddit_atom_entries("<not-atom")
+        self.assertIn("parse error", str(ctx.exception).lower())
+
+    def test_load_reddit_rss_corpus_skips_failed_subreddit(self) -> None:
+        fixture = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>SkewAdam MoE optimizer</title>
+    <content type="html">ok</content>
+    <id>t3_a</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/a/"/>
+  </entry>
+</feed>"""
+
+        def fetch_xml(sub: str) -> str:
+            if sub == "Blocked":
+                raise trend_ingest.CollectorKeywordError("reddit RSS HTTP 429 for r/Blocked")
+            return fixture
+
+        corpus = trend_ingest.load_reddit_rss_corpus(
+            ["Blocked", "MachineLearning"],
+            pace_sec=0,
+            budget_sec=45,
+            fetch_xml=fetch_xml,
+        )
+        self.assertEqual(len(corpus), 1)
+        self.assertEqual(corpus[0]["title"], "SkewAdam MoE optimizer")
+
+    def test_load_reddit_rss_corpus_respects_budget(self) -> None:
+        fixture = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Only first</title>
+    <content type="html">x</content>
+    <id>t3_a</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/a/"/>
+  </entry>
+</feed>"""
+        fetches: list[str] = []
+        clock = {"t": 0.0}
+
+        def fetch_xml(sub: str) -> str:
+            fetches.append(sub)
+            return fixture
+
+        corpus = trend_ingest.load_reddit_rss_corpus(
+            ["MachineLearning", "LocalLLaMA", "artificial"],
+            pace_sec=10.0,
+            budget_sec=5.0,
+            sleep_fn=lambda s: clock.__setitem__("t", clock["t"] + s),
+            fetch_xml=fetch_xml,
+            monotonic_fn=lambda: clock["t"],
+        )
+        self.assertEqual(fetches, ["MachineLearning"])
+        self.assertEqual(len(corpus), 1)
+
+    def test_require_reddit_subreddits_errors_clearly(self) -> None:
+        with self.assertRaises(ValueError) as ctx:
+            trend_ingest.require_reddit_subreddits({})
+        self.assertIn("MORNING_DIGEST_REDDIT_SUBREDDITS", str(ctx.exception))
+        self.assertIn("REDDIT_CLIENT_*", str(ctx.exception))
 
 
 if __name__ == "__main__":

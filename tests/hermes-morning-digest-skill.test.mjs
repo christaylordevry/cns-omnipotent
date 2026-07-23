@@ -382,7 +382,9 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(source8.includes("hermes-run-reddit.sh"));
     assert.ok(source8.includes("**Reddit**"));
     assert.ok(source8.includes("posts[]"));
-    assert.ok(source8.includes("sourceMetadata.upvotes"));
+    assert.ok(source8.includes("top/.rss"));
+    assert.ok(source8.includes("omit") || source8.includes("Omit"));
+    assert.ok(source8.includes("upvotes"));
     assert.ok(source8.includes("continue** to Source 9"));
 
     const source9End = taskBody.indexOf("## Source 10");
@@ -1209,7 +1211,7 @@ describe("Story 49-6 Hermes morning-digest skill mirror", () => {
     assert.ok(body.includes("after Source 19"));
     assert.ok(body.includes("Source 3 terminal-fire gate"));
     assert.ok(outputTemplate.includes("**GitHub** (trending repos)"));
-    assert.ok(outputTemplate.includes("**Reddit** (hot posts)"));
+    assert.ok(outputTemplate.includes("**Reddit** (top posts via Atom RSS)"));
     assert.ok(outputTemplate.includes("**Newsletters / RSS**"));
     assert.ok(outputTemplate.includes("**Product Hunt** (daily launches)"));
     assert.ok(outputTemplate.includes("**X / Twitter**"));

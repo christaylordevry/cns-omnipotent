@@ -5,15 +5,17 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, it } from 'node:test';
 
+import { buildDigestPushPayload } from '../scripts/hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import {
+  REDDIT_USER_AGENT,
   absoluteRedditUrl,
   buildRedditPublicTopUrl,
   dedupePostsByUrl,
   fetchRedditPublicTop,
   isRedditEnabled,
   loadRedditConfig,
-  mapRedditListingToPosts,
-  mapRedditPostItem,
+  mapRedditAtomItem,
+  mapRedditAtomToPosts,
   parseSubreddits,
   runRedditFetch,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/fetch-reddit-signals.mjs';
@@ -25,82 +27,67 @@ import {
   trendProxyForSignal,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
 
-/**
- * Mirrors task-prompt §9 Reddit assembly: nest posts[] engagement under sourceMetadata.
- *
- * @param {{ title: string, url: string, upvotes: number, commentCount?: number, publishedAt?: string }} post
- * @param {number} rank
- */
-function redditPostToDigestSignal(post, rank) {
-  /** @type {Record<string, unknown>} */
-  const sourceMetadata = { upvotes: post.upvotes };
-  if (post.commentCount !== undefined) {
-    sourceMetadata.commentCount = post.commentCount;
-  }
-  if (post.publishedAt) {
-    sourceMetadata.publishedAt = post.publishedAt;
-  }
-  return {
-    section: 'reddit',
-    sourceType: 'reddit',
-    title: post.title,
-    url: post.url,
-    rank,
-    sourceMetadata,
-  };
-}
-
 const execFileAsync = promisify(execFile);
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fetchScript = join(
   repoRoot,
   'scripts/hermes-skill-examples/morning-digest/scripts/fetch-reddit-signals.mjs',
 );
+const TREND_PROXY_REDDIT = 42;
 
-const FIXTURE_LISTING = {
-  data: {
-    children: [
-      {
-        data: {
-          title: 'Example ML post',
-          score: 420,
-          num_comments: 37,
-          permalink: '/r/MachineLearning/comments/abc123/example/',
-          created_utc: 1717920000,
-        },
-      },
-      {
-        data: {
-          title: 'Duplicate URL post',
-          score: 100,
-          num_comments: 5,
-          permalink: '/r/MachineLearning/comments/abc123/example/',
-          created_utc: 1717920100,
-        },
-      },
-      {
-        data: {
-          title: 'LocalLLaMA highlight',
-          score: 900,
-          num_comments: 120,
-          permalink: '/r/LocalLLaMA/comments/def456/llm/',
-          created_utc: 1717930000,
-        },
-      },
-    ],
-  },
-};
+/** Minimal Atom feed shaped like Reddit …/top/.rss (no score/num_comments). */
+const FIXTURE_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>top scoring links in MachineLearning</title>
+  <entry>
+    <author><name>/u/Kooky-Ad-4124</name></author>
+    <id>t3_1v38k1m</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/1v38k1m/skewadam/"/>
+    <updated>2026-07-22T07:04:40+00:00</updated>
+    <title>SkewAdam: MoE optimizer [R]</title>
+    <content type="html">discussion of mixture-of-experts training</content>
+  </entry>
+  <entry>
+    <author><name>/u/Due_Highlight_9341</name></author>
+    <id>t3_1v2xktw</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/1v2xktw/snake_ai/"/>
+    <updated>2026-07-21T22:33:50+00:00</updated>
+    <title>Looking for feedback on Snake AI [P]</title>
+  </entry>
+  <entry>
+    <author><name>/u/GuestCheap9405</name></author>
+    <id>t3_1v3enzq</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/1v3enzq/openreview/"/>
+    <updated>2026-07-22T12:25:54+00:00</updated>
+    <title>Happy openreview refresh day [D]</title>
+  </entry>
+  <entry>
+    <author><name>/u/dup</name></author>
+    <id>t3_dup</id>
+    <link href="https://www.reddit.com/r/MachineLearning/comments/1v38k1m/skewadam/"/>
+    <updated>2026-07-22T08:00:00+00:00</updated>
+    <title>Duplicate URL post</title>
+  </entry>
+</feed>`;
 
-describe('fetch-reddit-signals.mjs parsing', () => {
-  it('maps public JSON listing fields to stdout post shape', () => {
-    const mapped = mapRedditPostItem(FIXTURE_LISTING.data.children[0].data);
-    assert.deepEqual(mapped, {
-      title: 'Example ML post',
-      url: 'https://www.reddit.com/r/MachineLearning/comments/abc123/example/',
-      upvotes: 420,
-      commentCount: 37,
-      publishedAt: new Date(1717920000 * 1000).toISOString(),
+describe('fetch-reddit-signals.mjs Atom mapping', () => {
+  it('maps Atom entry fields and omits upvotes/commentCount', () => {
+    const mapped = mapRedditAtomItem({
+      title: 'SkewAdam: MoE optimizer [R]',
+      link: 'https://www.reddit.com/r/MachineLearning/comments/1v38k1m/skewadam/',
+      id: 't3_1v38k1m',
+      isoDate: '2026-07-22T07:04:40.000Z',
+      creator: '/u/Kooky-Ad-4124',
     });
+    assert.deepEqual(mapped, {
+      title: 'SkewAdam: MoE optimizer [R]',
+      url: 'https://www.reddit.com/r/MachineLearning/comments/1v38k1m/skewadam/',
+      publishedAt: '2026-07-22T07:04:40.000Z',
+      author: '/u/Kooky-Ad-4124',
+      externalId: 't3_1v38k1m',
+    });
+    assert.equal(Object.hasOwn(mapped, 'upvotes'), false);
+    assert.equal(Object.hasOwn(mapped, 'commentCount'), false);
   });
 
   it('absoluteRedditUrl prefixes relative permalinks', () => {
@@ -114,28 +101,32 @@ describe('fetch-reddit-signals.mjs parsing', () => {
     );
   });
 
-  it('mapRedditListingToPosts caps at per-subreddit limit', () => {
-    const posts = mapRedditListingToPosts(FIXTURE_LISTING, 2);
+  it('mapRedditAtomToPosts caps at per-subreddit limit', async () => {
+    const Parser = (await import('rss-parser')).default;
+    const feed = await new Parser().parseString(FIXTURE_ATOM);
+    const posts = mapRedditAtomToPosts(feed, 2);
     assert.equal(posts.length, 2);
-    assert.equal(posts[0].title, 'Example ML post');
-    assert.equal(posts[1].title, 'Duplicate URL post');
+    assert.equal(posts[0].title, 'SkewAdam: MoE optimizer [R]');
+    assert.equal(posts[1].title, 'Looking for feedback on Snake AI [P]');
   });
 
-  it('dedupePostsByUrl keeps first occurrence and respects maxPosts', () => {
-    const posts = mapRedditListingToPosts(FIXTURE_LISTING, 3);
+  it('dedupePostsByUrl keeps first occurrence and respects maxPosts', async () => {
+    const Parser = (await import('rss-parser')).default;
+    const feed = await new Parser().parseString(FIXTURE_ATOM);
+    const posts = mapRedditAtomToPosts(feed, 10);
     const deduped = dedupePostsByUrl(posts, 5);
-    assert.equal(deduped.length, 2);
-    assert.equal(deduped[0].url, 'https://www.reddit.com/r/MachineLearning/comments/abc123/example/');
+    assert.equal(deduped.length, 3);
+    assert.equal(
+      deduped[0].url,
+      'https://www.reddit.com/r/MachineLearning/comments/1v38k1m/skewadam/',
+    );
   });
 });
 
 describe('fetch-reddit-signals.mjs buildRedditPublicTopUrl', () => {
-  it('builds top.json URL with t=day, limit=25, and raw_json=1', () => {
+  it('builds top/.rss URL with t=day', () => {
     const url = buildRedditPublicTopUrl('MachineLearning');
-    assert.equal(
-      url,
-      'https://www.reddit.com/r/MachineLearning/top.json?t=day&limit=25&raw_json=1',
-    );
+    assert.equal(url, 'https://www.reddit.com/r/MachineLearning/top/.rss?t=day');
   });
 });
 
@@ -150,8 +141,8 @@ describe('fetch-reddit-signals.mjs fetchRedditPublicTop', () => {
       capturedInit = init;
       return {
         ok: true,
-        async json() {
-          return FIXTURE_LISTING;
+        async text() {
+          return FIXTURE_ATOM;
         },
       };
     };
@@ -159,23 +150,21 @@ describe('fetch-reddit-signals.mjs fetchRedditPublicTop', () => {
     const result = await fetchRedditPublicTop('MachineLearning', 3, mockFetch);
 
     assert.deepEqual(result.ok, true);
-    assert.equal(
-      capturedUrl,
-      'https://www.reddit.com/r/MachineLearning/top.json?t=day&limit=25&raw_json=1',
-    );
+    assert.equal(capturedUrl, 'https://www.reddit.com/r/MachineLearning/top/.rss?t=day');
     const headers = /** @type {Record<string, string>} */ (capturedInit?.headers);
-    assert.equal(headers['User-Agent'], 'CNS-morning-digest/1.0');
+    assert.equal(headers['User-Agent'], REDDIT_USER_AGENT);
     assert.equal(headers.Authorization, undefined);
+    assert.match(String(headers.Accept ?? ''), /atom\+xml/);
   });
 
-  it('uses fixtureJson without network', async () => {
+  it('uses fixtureXml without network', async () => {
     const result = await fetchRedditPublicTop(
       'MachineLearning',
       3,
       async () => {
         throw new Error('should not fetch');
       },
-      FIXTURE_LISTING,
+      FIXTURE_ATOM,
     );
     assert.equal(result.ok, true);
     assert.equal(result.posts.length, 3);
@@ -187,14 +176,41 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
     MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning',
   };
 
-  it('returns posts from fixture without credentials', async () => {
+  it('returns posts from Atom fixture without credentials or upvotes', async () => {
     const payload = await runRedditFetch(baseEnv, {
-      fixtureJson: FIXTURE_LISTING,
+      fixtureXml: FIXTURE_ATOM,
+      paceMs: 0,
     });
     assert.ok(Array.isArray(payload.posts));
-    assert.equal(payload.posts.length, 2);
-    assert.equal(payload.posts[0].upvotes, 420);
-    assert.equal(payload.posts[0].commentCount, 37);
+    assert.equal(payload.posts.length, 3);
+    for (const post of payload.posts) {
+      assert.equal(Object.hasOwn(post, 'upvotes'), false);
+      assert.equal(Object.hasOwn(post, 'commentCount'), false);
+      assert.equal(post.upvotes, undefined);
+    }
+  });
+
+  it('paces between subreddits (~2s default; injectable)', async () => {
+    /** @type {number[]} */
+    const sleeps = [];
+    const payload = await runRedditFetch(
+      {
+        MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning,LocalLLaMA',
+        MORNING_DIGEST_REDDIT_MAX_POSTS: '10',
+      },
+      {
+        fixtureXmlBySubreddit: {
+          MachineLearning: FIXTURE_ATOM,
+          LocalLLaMA: FIXTURE_ATOM,
+        },
+        paceMs: 2000,
+        sleep: async (ms) => {
+          sleeps.push(ms);
+        },
+      },
+    );
+    assert.ok(payload.posts);
+    assert.deepEqual(sleeps, [2000]);
   });
 
   it('returns reddit disabled when enabled flag is false', async () => {
@@ -219,24 +235,74 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
         MORNING_DIGEST_REDDIT_PER_SUBREDDIT: '3',
       },
       {
-        fixtureJsonBySubreddit: {
-          MachineLearning: FIXTURE_LISTING,
-          LocalLLaMA: FIXTURE_LISTING,
+        fixtureXmlBySubreddit: {
+          MachineLearning: FIXTURE_ATOM,
+          LocalLLaMA: FIXTURE_ATOM,
         },
+        paceMs: 0,
       },
     );
-    assert.equal(payload.posts?.length, 2);
+    assert.equal(payload.posts?.length, 3);
   });
 
   it('returns error JSON on public fetch failure', async () => {
     const failingFetch = async () => ({ ok: false, status: 429 });
-    const payload = await runRedditFetch(baseEnv, { fetch: failingFetch });
+    const payload = await runRedditFetch(baseEnv, { fetch: failingFetch, paceMs: 0 });
     assert.deepEqual(payload, { error: 'http-429' });
+  });
+
+  it('skips a 429 subreddit and returns posts from successful siblings', async () => {
+    const payload = await runRedditFetch(
+      {
+        MORNING_DIGEST_REDDIT_SUBREDDITS: 'Blocked,MachineLearning',
+        MORNING_DIGEST_REDDIT_MAX_POSTS: '5',
+        MORNING_DIGEST_REDDIT_PER_SUBREDDIT: '3',
+      },
+      {
+        fixtureXmlBySubreddit: {
+          MachineLearning: FIXTURE_ATOM,
+        },
+        fetch: async () => ({ ok: false, status: 429 }),
+        paceMs: 0,
+      },
+    );
+    assert.equal(payload.error, undefined);
+    assert.ok(Array.isArray(payload.posts));
+    assert.equal(payload.posts?.length, 3);
+  });
+
+  it('stops the subreddit loop before pace would exceed adapter budget', async () => {
+    let t = 0;
+    /** @type {number[]} */
+    const sleeps = [];
+    const payload = await runRedditFetch(
+      {
+        MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning,LocalLLaMA,artificial',
+        MORNING_DIGEST_REDDIT_MAX_POSTS: '10',
+        MORNING_DIGEST_REDDIT_PER_SUBREDDIT: '3',
+      },
+      {
+        fixtureXmlBySubreddit: {
+          MachineLearning: FIXTURE_ATOM,
+          LocalLLaMA: FIXTURE_ATOM,
+          artificial: FIXTURE_ATOM,
+        },
+        paceMs: 10_000,
+        budgetMs: 5_000,
+        nowMs: () => t,
+        sleep: async (ms) => {
+          sleeps.push(ms);
+          t += ms;
+        },
+      },
+    );
+    assert.deepEqual(sleeps, []);
+    assert.equal(payload.posts?.length, 3);
   });
 
   it('returns http-403 on forbidden response', async () => {
     const failingFetch = async () => ({ ok: false, status: 403 });
-    const payload = await runRedditFetch(baseEnv, { fetch: failingFetch });
+    const payload = await runRedditFetch(baseEnv, { fetch: failingFetch, paceMs: 0 });
     assert.deepEqual(payload, { error: 'http-403' });
   });
 
@@ -261,52 +327,94 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
     const cli = JSON.parse(stdout.trim());
     assert.deepEqual(cli, { error: 'missing-subreddits' });
   });
+});
 
-  it('fetch stdout → sourceMetadata assembly → normalizeEngagement round-trip (§6.1)', async () => {
-    const payload = await runRedditFetch(baseEnv, {
-      fixtureJson: FIXTURE_LISTING,
-    });
-    assert.ok(Array.isArray(payload.posts) && payload.posts.length > 0);
-
-    for (const [index, post] of payload.posts.entries()) {
-      const signal = redditPostToDigestSignal(post, index + 1);
-      const norm = normalizeEngagement(signal);
-      assert.ok(
-        norm !== null && norm >= 0 && norm <= 100,
-        `expected non-null engagement for ${post.title}`,
-      );
-      assert.equal(signal.sourceMetadata.upvotes, post.upvotes);
-      if (post.commentCount !== undefined) {
-        assert.equal(signal.sourceMetadata.commentCount, post.commentCount);
-      }
+describe('RSS reddit → build → score Path B survival (Story 90-1)', () => {
+  it('RSS posts carry no upvotes key; scored payload rankScore>0 via no-engagement path', async () => {
+    const adapter = await runRedditFetch(
+      { MORNING_DIGEST_REDDIT_SUBREDDITS: 'MachineLearning' },
+      { fixtureXml: FIXTURE_ATOM, paceMs: 0 },
+    );
+    assert.ok(Array.isArray(adapter.posts) && adapter.posts.length === 3);
+    for (const post of adapter.posts) {
+      assert.equal('upvotes' in post, false);
+      assert.equal(post.upvotes, undefined);
     }
 
-    const rootLevelUpvotes = {
+    const built = buildDigestPushPayload({
+      date: '2026-07-22',
+      ranAt: '2026-07-22T14:00:00.000Z',
+      reddit: { posts: adapter.posts },
+    });
+    assert.equal(built.signals.length, 3);
+    for (const signal of built.signals) {
+      assert.equal(signal.sourceType, 'reddit');
+      assert.equal(signal.sourceMetadata?.upvotes, undefined);
+      assert.equal(Object.hasOwn(signal.sourceMetadata ?? {}, 'upvotes'), false);
+      assert.equal(normalizeEngagement(signal), null);
+    }
+
+    const ctx = {
+      domainTokens: ['moe', 'optimizer', 'gpu', 'openreview', 'snake'],
+      personalTokens: [],
+      epicNumericTokens: [],
+      noveltyHistoryEntries: [],
+      runAt: Date.parse('2026-07-22T14:00:00Z'),
+      watchlistMissing: false,
+    };
+    const scored = scoreDigestSignals(built.signals, ctx);
+    assert.equal(scored.length, 3);
+    for (const row of scored) {
+      assert.equal(row.normalizedEngagement, undefined);
+      assert.equal(row.scores.momentum, 42);
+      assert.ok(Number.isFinite(row.rankScore) && row.rankScore > 0);
+      assert.notEqual(row.disposition, 'ignore');
+    }
+  });
+
+  it('anti-regression: upvotes:0 is Path A poison, not the RSS contract', () => {
+    const poisoned = {
       section: 'reddit',
       sourceType: 'reddit',
-      title: payload.posts[0].title,
-      url: payload.posts[0].url,
+      title: 'Poisoned zero upvotes',
+      url: 'https://www.reddit.com/r/test/comments/x/',
       rank: 1,
-      upvotes: payload.posts[0].upvotes,
-      commentCount: payload.posts[0].commentCount,
+      sourceMetadata: { upvotes: 0, commentCount: 0 },
     };
-    assert.equal(normalizeEngagement(rootLevelUpvotes), null);
-  });
+    const norm = normalizeEngagement(poisoned);
+    assert.notEqual(norm, null);
+    assert.ok(norm !== null && norm < 20);
 
-  it('cap fixture upvotes/comments → normalizedEngagement 100', () => {
-    const norm = normalizeEngagement({
+    const rssShaped = {
+      section: 'reddit',
       sourceType: 'reddit',
-      title: 'cap post',
-      sourceMetadata: { upvotes: 10000, commentCount: 2000 },
-    });
-    assert.equal(norm, 100);
+      title: 'RSS omit upvotes',
+      url: 'https://www.reddit.com/r/test/comments/y/',
+      rank: 1,
+      sourceMetadata: { publishedAt: '2026-07-22T12:00:00.000Z' },
+    };
+    assert.equal(normalizeEngagement(rssShaped), null);
+    const ctx = {
+      domainTokens: [],
+      personalTokens: [],
+      epicNumericTokens: [],
+      noveltyHistoryEntries: [],
+      runAt: Date.parse('2026-07-22T14:00:00Z'),
+      watchlistMissing: false,
+    };
+    const scored = scoreDigestSignals([rssShaped], ctx);
+    assert.equal(scored[0].scores.momentum, TREND_PROXY_REDDIT);
   });
 
-  it('adapter-shaped reddit row drives Path A momentum via scoreDigestSignals', () => {
-    const signal = redditPostToDigestSignal(
-      { title: 'Momentum post', url: 'https://www.reddit.com/r/test/comments/1/x/', upvotes: 500, commentCount: 50 },
-      1,
-    );
+  it('finite upvotes still take Path A (deferred Firecrawl enrich)', () => {
+    const signal = {
+      section: 'reddit',
+      sourceType: 'reddit',
+      title: 'Enriched post',
+      url: 'https://www.reddit.com/r/test/comments/1/x/',
+      rank: 1,
+      sourceMetadata: { upvotes: 500, commentCount: 50 },
+    };
     const norm = normalizeEngagement(signal);
     assert.ok(norm !== null && norm >= 0 && norm <= 100);
 
@@ -324,20 +432,10 @@ describe('fetch-reddit-signals.mjs runRedditFetch', () => {
     assert.ok(scored[0].scores.momentum > 0);
 
     const momentum = scoreMomentum(signal, norm, ctx);
-    assert.ok(momentum > 0);
     assert.equal(
       momentum,
       clamp(Math.round(0.75 * norm + 0.25 * trendProxyForSignal(signal)), 0, 100),
     );
-  });
-
-  it('mandatory integration assertion from architecture §10', () => {
-    const norm = normalizeEngagement({
-      sourceType: 'reddit',
-      title: 'test post',
-      sourceMetadata: { upvotes: 500, commentCount: 50 },
-    });
-    assert.ok(norm !== null && norm >= 0 && norm <= 100);
   });
 });
 
@@ -368,5 +466,24 @@ describe('loadRedditConfig', () => {
       'artificial',
     ]);
     assert.deepEqual(parseSubreddits('R/bar, baz'), ['bar', 'baz']);
+  });
+
+  it('parseSubreddits dedupes case-insensitively', () => {
+    assert.deepEqual(parseSubreddits('MachineLearning, r/machinelearning ,LocalLLaMA'), [
+      'MachineLearning',
+      'LocalLLaMA',
+    ]);
+  });
+
+  it('mapRedditAtomItem accepts link objects with href', () => {
+    const mapped = mapRedditAtomItem({
+      title: 'Object link post',
+      link: { href: '/r/MachineLearning/comments/xyz/object_link/' },
+      id: 't3_xyz',
+    });
+    assert.equal(
+      mapped?.url,
+      'https://www.reddit.com/r/MachineLearning/comments/xyz/object_link/',
+    );
   });
 });

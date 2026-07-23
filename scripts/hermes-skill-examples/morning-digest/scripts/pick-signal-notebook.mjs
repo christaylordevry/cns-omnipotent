@@ -195,16 +195,34 @@ export function extractGithubSignals(githubList) {
 }
 
 /**
- * @param {Array<{ title?: string, upvotes?: number }>} redditList
+ * Prefer upvotes when present; otherwise publishedAt desc (RSS has no engagement).
+ *
+ * @param {Array<{ title?: string, upvotes?: number, publishedAt?: string }>} redditList
  * @returns {string[]}
  */
 export function extractRedditSignals(redditList) {
   if (!Array.isArray(redditList)) {
     return [];
   }
-  const sorted = [...redditList].sort(
-    (a, b) => (Number(b?.upvotes) || 0) - (Number(a?.upvotes) || 0),
+  const hasAnyUpvotes = redditList.some(
+    (entry) => typeof entry?.upvotes === 'number' && Number.isFinite(entry.upvotes),
   );
+  const sorted = [...redditList].sort((a, b) => {
+    if (hasAnyUpvotes) {
+      const aUp =
+        typeof a?.upvotes === 'number' && Number.isFinite(a.upvotes) ? a.upvotes : Number.NEGATIVE_INFINITY;
+      const bUp =
+        typeof b?.upvotes === 'number' && Number.isFinite(b.upvotes) ? b.upvotes : Number.NEGATIVE_INFINITY;
+      if (bUp !== aUp) {
+        return bUp - aUp;
+      }
+    }
+    const aMs = Date.parse(String(a?.publishedAt ?? ''));
+    const bMs = Date.parse(String(b?.publishedAt ?? ''));
+    const aOk = Number.isFinite(aMs) ? aMs : 0;
+    const bOk = Number.isFinite(bMs) ? bMs : 0;
+    return bOk - aOk;
+  });
   /** @type {string[]} */
   const out = [];
   for (const entry of sorted.slice(0, MAX_REDDIT_SIGNALS)) {

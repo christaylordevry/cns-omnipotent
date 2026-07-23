@@ -174,9 +174,9 @@ MORNING_DIGEST_GITHUB_ENABLED=1
 
 **Not introduced:** `SHORTLIST_MAX` / `MORNING_DIGEST_GITHUB_SHORTLIST_MAX` / `EMIT_MAX` — selection caps belong to 89-3 when a judgment shortlist exists.
 
-## Reddit top listings (Story 67-2)
+## Reddit top listings (Story 67-2 → 90-1 RSS)
 
-Public JSON — no OAuth credentials. User-Agent (`CNS-morning-digest/1.0`) is set inside the adapter. Set in `~/.hermes/trend-ingest.env`.
+App-free Atom RSS (`…/top/.rss?t=day`) — no OAuth. User-Agent (`linux:cns-morning-digest:1.0 (by /u/cns_operator)`) is hardcoded in the adapter. Set subreddit list in `~/.hermes/trend-ingest.env`.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
@@ -185,7 +185,7 @@ Public JSON — no OAuth credentials. User-Agent (`CNS-morning-digest/1.0`) is s
 | `MORNING_DIGEST_REDDIT_PER_SUBREDDIT` | Max posts per subreddit | `3` |
 | `MORNING_DIGEST_REDDIT_ENABLED` | Set `0` or `false` to disable | enabled |
 
-**Note:** `REDDIT_CLIENT_*` in this file is for Epic 44 trend-ingest (PRAW) only — not morning-digest Source 8.
+**Transport (Story 90-1):** `https://www.reddit.com/r/{sub}/top/.rss?t=day` (Atom). No OAuth. No `REDDIT_CLIENT_*`. Omit `upvotes`/`commentCount` on stdout (never default to `0`). Same subreddit env feeds trend-ingest reddit RSS. `REDDIT_CLIENT_*` is **deprecated/unused** for both digest and trend.
 
 ## Newsletters / RSS (Story 65-4)
 
