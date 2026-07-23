@@ -347,6 +347,108 @@ function signalPublishedAtMs(signal) {
 const ENTITY_MATCH_PROPORTION = 0.5;
 
 /**
+ * Short-title entity disable (Story 90-5 G7): when either side has ≤ this many
+ * proper-noun tokens, entity-match returns false (URL/canon/Jaccard still apply).
+ */
+const ENTITY_MATCH_SHORT_MAX = 3;
+
+/**
+ * Lowercase antonym pairs for exclusive-token opposition (Story 90-5 G7).
+ * Must be lowercase — extractProperNounTokens only emits Title-Case tokens
+ * lowercased. Mid-headline sentence-case antonyms never reach this map; that
+ * is an inherent Title-Case filter limit, not a missing lexicon entry.
+ * Plurals/inflections are explicit pairs (no stemmer / trailing-'s' strip).
+ * @type {ReadonlyArray<readonly [string, string]>}
+ */
+const ANTONYM_PAIRS = [
+  // Seed singular (G7 ship)
+  ['shortage', 'surplus'],
+  ['rise', 'fall'],
+  ['up', 'down'],
+  ['gain', 'loss'],
+  ['buy', 'sell'],
+  ['bull', 'bear'],
+  ['win', 'loss'],
+  ['hike', 'cut'],
+  ['increase', 'decrease'],
+  ['boom', 'bust'],
+  ['surge', 'slump'],
+  ['rally', 'crash'],
+  // Seed plural / inflected variants (review B1 — exact-token match only)
+  ['shortages', 'surpluses'],
+  ['rises', 'falls'],
+  ['gains', 'losses'],
+  ['buys', 'sells'],
+  ['wins', 'losses'],
+  ['hikes', 'cuts'],
+  ['increases', 'decreases'],
+  ['booms', 'busts'],
+  ['surges', 'slumps'],
+  ['rallies', 'crashes'],
+  // Finance / tech expansion + variants (review B2)
+  ['inflow', 'outflow'],
+  ['inflows', 'outflows'],
+  ['soar', 'plunge'],
+  ['soars', 'plunges'],
+  ['jump', 'drop'],
+  ['jumps', 'drops'],
+  ['upgrade', 'downgrade'],
+  ['upgrades', 'downgrades'],
+  ['approve', 'reject'],
+  ['approves', 'rejects'],
+  ['approval', 'rejection'],
+  ['approvals', 'rejections'],
+  ['hawkish', 'dovish'],
+  ['bullish', 'bearish'],
+  ['beat', 'miss'],
+  ['beats', 'misses'],
+];
+
+/** @type {Map<string, Set<string>>} */
+const ANTONYM_OF = (() => {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const [left, right] of ANTONYM_PAIRS) {
+    if (!map.has(left)) {
+      map.set(left, new Set());
+    }
+    if (!map.has(right)) {
+      map.set(right, new Set());
+    }
+    map.get(left)?.add(right);
+    map.get(right)?.add(left);
+  }
+  return map;
+})();
+
+/**
+ * True when exclusive proper-noun tokens (A−B vs B−A) form a known antonym pair.
+ * Shared antonym words (present on both titles) do not fire.
+ *
+ * @param {string[]} nounsA
+ * @param {string[]} nounsB
+ * @returns {boolean}
+ */
+function hasAntonymOpposition(nounsA, nounsB) {
+  const setA = new Set(nounsA);
+  const setB = new Set(nounsB);
+  const exclusiveA = nounsA.filter((n) => !setB.has(n));
+  const exclusiveB = new Set(nounsB.filter((n) => !setA.has(n)));
+  for (const token of exclusiveA) {
+    const opposites = ANTONYM_OF.get(token);
+    if (!opposites) {
+      continue;
+    }
+    for (const opposite of opposites) {
+      if (exclusiveB.has(opposite)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * @param {Record<string, unknown>} a
  * @param {Record<string, unknown>} b
  * @returns {boolean}
@@ -369,6 +471,13 @@ export function crossTitleEntityMatch(a, b) {
   }
   const denom = Math.min(nounsA.length, nounsB.length);
   if (denom === 0 || shared / denom < ENTITY_MATCH_PROPORTION) {
+    return false;
+  }
+  // Story 90-5 G7: antonym exclusive-token guard (always) + short-title entity disable.
+  if (hasAntonymOpposition(nounsA, nounsB)) {
+    return false;
+  }
+  if (Math.min(nounsA.length, nounsB.length) <= ENTITY_MATCH_SHORT_MAX) {
     return false;
   }
   const pubA = signalPublishedAtMs(a);

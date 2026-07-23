@@ -1,0 +1,24 @@
+=== 90-5 GUARD PROPOSAL SIM (2026-07-22 reconstructed) ===
+RECOMMENDED: G7 = antonym ALWAYS + short entity disable (min nouns <= 3)
+
+FIXTURE (no inject) under G7:
+  yt=22 polymarket=5 btc=3 importAI=2 primaries=129
+
+OPPOSITE/SHORT INJECT (6) under each mode:
+  baseline               legit_ok=true  opposite_ok=false injectPrimaries=2 nvidia=false btc=false claude=false
+  g1_antonym             legit_ok=true  opposite_ok=false injectPrimaries=3 nvidia=true btc=false claude=false
+  g3_short_shared3       legit_ok=true  opposite_ok=true  injectPrimaries=6 nvidia=true btc=true claude=true
+  g3_short_prop075       legit_ok=true  opposite_ok=false injectPrimaries=3 nvidia=true btc=false claude=false
+  g4_hybrid_subset       legit_ok=true  opposite_ok=false injectPrimaries=5 nvidia=true btc=false claude=true
+  g7_recommended         legit_ok=true  opposite_ok=true  injectPrimaries=6 nvidia=true btc=true claude=true
+  shared3_global         legit_ok=false opposite_ok=true  injectPrimaries=6 nvidia=true btc=true claude=true
+
+SUCCESS (G7):
+  opposite_pairs_separate=true
+  legit_clusters_survive=true
+
+REJECTED:
+  shared>=3 global — breaks polymarket (Anthropic↔Which shared=2)
+  company-name stopwords — breaks polymarket glue tokens
+  G1 antonym-only — misses Bitcoin ETF⊂Rally and Claude Tips
+  G4 subset hybrid — Rally still absorbs into fixture Bitcoin ETF Flows

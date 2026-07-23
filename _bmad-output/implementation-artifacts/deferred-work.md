@@ -1,5 +1,9 @@
 # Deferred work
 
+## Deferred from: code review of 90-5-entity-match-anti-opposition-guard.md (2026-07-23)
+
+- **Sentence-case / lowercase decisive antonyms invisible to entity arm** — `extractProperNounTokens` (pre-90-5) only keeps Title-Case tokens; G7 antonym-always only sees those. Long opposite-topic titles with mid-sentence polarity words can still entity-merge. Fixing requires tokenizer policy change, not a silent lexicon tweak.
+
 ## Deferred from: code review of 90-3-youtube-quality-selection.md (2026-07-23)
 
 - **Digest-layer floor-wipe visibility** — operator 2026-07-23: keep adapter `{videos:[]}` (QUIET, not `{error}`); optional later enhancement to surface persistent floor-starve in digest outcomes / ops dashboards without polluting `errors_by_source`. Not in 90-3 PR.
@@ -13,7 +17,7 @@
 
 ## Deferred from: code review of 90-4-dedupe-over-collapse-retune.md (2026-07-23)
 
-- **Entity-match over-clusters short opposite-topic titles** — e.g. `Nvidia Chip Shortage` × `Nvidia Chip Surplus` (shared/min ≈ 0.67–1.0). Bounded (2-item clusters, no source wipe). Intended fix: shared nouns must include the distinguishing token / anti-opposition guard; **MUST re-simulate the polymarket cluster before shipping**. Do not raise `shared≥3` blindly. Not in 90-4 PR.
+- ~~**Entity-match over-clusters short opposite-topic titles**~~ — **CLOSED by 90-5 (2026-07-23):** shipped G7 (antonym-always + short-title entity disable `min(|A|,|B|)≤3`). Polymarket fixture cluster size **5** preserved; Fed Hike×Cut long-antonym regression proves G7 > G3a. Short geo FNs (Austin×Miami) accepted.
 - **youtu.be/ID vs youtube.com/watch?v=ID distinct canon keys** — R1 embeds `v=` on watch hosts only; path-form youtu.be stays `youtu.be/<id>`. Same video across forms does not URL-cluster. Bridging belongs with invert-normalize backlog, not a silent R1 expand.
 - **Empty/missing `v=` watch URLs** — still fall through to query-stripping fallback and can collide on `youtube.com/watch`.
 - **`list=`-only watch URLs without `v=`** — can still collapse to `youtube.com/watch`; out of R1 scope.

@@ -325,6 +325,305 @@ describe('shouldClusterSignals helpers', () => {
   });
 });
 
+describe('Story 90-5 G7 entity-match anti-opposition / short-title guard', () => {
+  const pub = { publishedAt: '2026-07-22T12:00:00.000Z' };
+
+  it('rejects three short opposite / extension pairs (AC: oppose)', () => {
+    assert.equal(
+      crossTitleEntityMatch(
+        { title: 'Nvidia Chip Shortage', sourceMetadata: pub },
+        { title: 'Nvidia Chip Surplus', sourceMetadata: pub },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        { title: 'Bitcoin ETF', sourceMetadata: pub },
+        { title: 'Bitcoin ETF Rally', sourceMetadata: pub },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        { title: 'Claude Tips', sourceMetadata: pub },
+        { title: 'Claude Tips for beginners', sourceMetadata: pub },
+      ),
+      false,
+    );
+  });
+
+  it('still matches OpenAI GPT-5 Release Event × Developer Preview (denom=4, non-antonym)', () => {
+    const a = {
+      title: 'OpenAI GPT-5 Release Event',
+      sourceMetadata: { publishedAt: '2026-06-11T08:00:00.000Z' },
+    };
+    const b = {
+      title: 'OpenAI GPT-5 Developer Preview',
+      sourceMetadata: { publishedAt: '2026-06-11T20:00:00.000Z' },
+    };
+    assert.equal(crossTitleEntityMatch(a, b), true);
+  });
+
+  it('rejects long antonym pair Fed Hike × Cut (G7 > G3a regression)', () => {
+    // min(|A|,|B|)=7 > 3 → short disable does not fire; antonym-always must.
+    // G3a (short shared≥3 only) would wrongly keep this merge.
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Federal Reserve Interest Rate Hike Meeting Decision',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Federal Reserve Interest Rate Cut Meeting Decision',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+  });
+
+  it('does not fire antonym guard when both titles share the same antonym word', () => {
+    // "Hike" is shared → not exclusive on either side; exclusive tokens are non-antonym.
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Federal Reserve Rate Hike Meeting Decision Preview',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Federal Reserve Rate Hike Policy Briefing Update',
+          sourceMetadata: pub,
+        },
+      ),
+      true,
+    );
+  });
+
+  it('rejects plural seed antonyms Hikes×Cuts and Gains×Losses (review B1)', () => {
+    // min(|A|,|B|)>3 so short disable does not fire; plural lexicon must.
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Federal Reserve Interest Rate Hikes Decision Today',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Federal Reserve Interest Rate Cuts Decision Today',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Tesla Stock Market Gains Quarterly Report',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Tesla Stock Market Losses Quarterly Report',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+  });
+
+  it('rejects B2 finance/tech antonym pairs (singular + plural forms)', () => {
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Bitcoin ETF Inflows Weekly Report Update',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Bitcoin ETF Outflows Weekly Report Update',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Nvidia Stock Price Soars Trading Session',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Nvidia Stock Price Plunges Trading Session',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'OpenAI Model Upgrade Release Notes Brief',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'OpenAI Model Downgrade Release Notes Brief',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'FDA Drug Application Approve Decision Today',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'FDA Drug Application Reject Decision Today',
+          sourceMetadata: pub,
+        },
+      ),
+      false,
+    );
+  });
+
+  it('false-fire guard: Launch×Preview and shared Hike still match', () => {
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Anthropic Claude Opus Model Launch Event',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Anthropic Claude Opus Model Preview Event',
+          sourceMetadata: pub,
+        },
+      ),
+      true,
+    );
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'Fed Rate Hike Powell Speech Today',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'Fed Rate Hike Powell Press Conference',
+          sourceMetadata: pub,
+        },
+      ),
+      true,
+    );
+  });
+
+  it('short-title boundary: min=3 rejects; min=4 non-antonym still matches', () => {
+    // Three proper-noun tokens each → short disable (ENTITY_MATCH_SHORT_MAX=3).
+    assert.equal(
+      crossTitleEntityMatch(
+        { title: 'OpenAI GPT Event', sourceMetadata: pub },
+        { title: 'OpenAI GPT Preview', sourceMetadata: pub },
+      ),
+      false,
+    );
+    // Four tokens, non-antonym exclusives → entity-match may still fire.
+    assert.equal(
+      crossTitleEntityMatch(
+        {
+          title: 'OpenAI GPT-5 Release Event',
+          sourceMetadata: pub,
+        },
+        {
+          title: 'OpenAI GPT-5 Developer Preview',
+          sourceMetadata: pub,
+        },
+      ),
+      true,
+    );
+  });
+
+  it('fixture+6 inject: opposite/short URLs remain primaries; legit clusters survive', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const fixturePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../_bmad-output/implementation-artifacts/90-4-reconstructed-pre-dedupe-2026-07-22.json',
+    );
+    const signals = JSON.parse(await readFile(fixturePath, 'utf8'));
+    const publishedAt = '2026-07-22T12:00:00.000Z';
+    const inject = [
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Nvidia Chip Shortage',
+        url: 'https://example.com/90-5/nvidia-shortage',
+        sourceMetadata: { publishedAt },
+      },
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Nvidia Chip Surplus',
+        url: 'https://example.com/90-5/nvidia-surplus',
+        sourceMetadata: { publishedAt },
+      },
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Bitcoin ETF',
+        url: 'https://example.com/90-5/btc-etf',
+        sourceMetadata: { publishedAt },
+      },
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Bitcoin ETF Rally',
+        url: 'https://example.com/90-5/btc-etf-rally',
+        sourceMetadata: { publishedAt },
+      },
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Claude Tips',
+        url: 'https://example.com/90-5/claude-tips',
+        sourceMetadata: { publishedAt },
+      },
+      {
+        section: 'rss',
+        sourceType: 'rss',
+        title: 'Claude Tips for beginners',
+        url: 'https://example.com/90-5/claude-tips-beginners',
+        sourceMetadata: { publishedAt },
+      },
+    ];
+    const deduped = dedupeDigestSignals([...signals, ...inject]);
+    const primaryUrls = new Set(deduped.map((s) => String(s.url ?? '')));
+    const nvidiaBoth =
+      primaryUrls.has('https://example.com/90-5/nvidia-shortage') &&
+      primaryUrls.has('https://example.com/90-5/nvidia-surplus');
+    const btcBoth =
+      primaryUrls.has('https://example.com/90-5/btc-etf') &&
+      primaryUrls.has('https://example.com/90-5/btc-etf-rally');
+    const claudeBoth =
+      primaryUrls.has('https://example.com/90-5/claude-tips') &&
+      primaryUrls.has('https://example.com/90-5/claude-tips-beginners');
+    assert.ok(nvidiaBoth && btcBoth && claudeBoth, 'all six inject URLs must remain primaries');
+
+    const ytPrimaries = deduped.filter((s) => s.sourceType === 'youtube').length;
+    assert.ok(ytPrimaries >= 18, `expected ≥18 youtube primaries, got ${ytPrimaries}`);
+
+    const anth = deduped.find((s) =>
+      /anthropic|Which company has best AI model/i.test(String(s.title ?? '')),
+    );
+    assert.ok(anth);
+    assert.equal(anth.sourceMetadata?.dedupClusterSize, 5);
+
+    const btc = deduped.find((s) =>
+      /Bitcoin ETF Flows/i.test(String(s.title ?? '')),
+    );
+    assert.ok(btc);
+    assert.equal(btc.sourceMetadata?.dedupClusterSize, 3);
+
+    const importAi = deduped.find((s) => /Import AI 465/i.test(String(s.title ?? '')));
+    assert.ok(importAi);
+    assert.equal(importAi.sourceMetadata?.dedupClusterSize, 2);
+  });
+});
+
 describe('CLI contract', () => {
   it('reads DIGEST_SIGNALS_JSON and writes deduped stdout', async () => {
     const input = [
