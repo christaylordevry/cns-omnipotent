@@ -1,5 +1,13 @@
 # Deferred work
 
+## 89-2 REQUIRED AC (from cns-dashboard S01 gate, 2026-07-23)
+
+> **Pick up at create-story** for `89-2-digest-stage-b-github-velocity-rank` (backlog; no story file yet).
+
+- **When github velocity rank ships, the Nexus judgment-queue UI copy MUST swap in the SAME story** to claim movement ordering. Until 89-2 lands, the queue orders by change-gate class (escalated before new) with stored `rankScore` as a **TEMPORARY** tie-break only, and the copy must **not** claim "ranked by movement". Without this AC the temporary tie-break becomes permanent and the level-bias the redesign exists to fix returns wearing honest wording.
+- **Source:** cns-dashboard `_bmad-output/C-UX-Scenarios/01-eric-morning-orient/s01-review-decision-sheet.md` (B5).
+- **Explicitly forbidden** in that decision: any frontend blend mixing level `rankScore` into a fake movement score.
+
 ## Deferred from: code review of OPS-7-shared-abort-mock-helper-and-lint-ban.md (2026-07-23)
 
 - ~~**`onabort` / non-`addEventListener` hung patterns bypass ban**~~ — **CLOSED by OPS-7 review harden (2026-07-23):** shipped `AssignmentExpression[left.property.name='onabort']`. Residual: other EventTarget APIs (e.g. `once('abort')`) remain out of selector contract.
