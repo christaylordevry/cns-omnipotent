@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-21T16:00:00+10:00
+# last_updated: 2026-07-23T12:20:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-21T17:20:00+10:00"
+last_updated: "2026-07-23T12:20:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -763,3 +763,12 @@ development_status:
   89-1-digest-stage-a-github-store-max-widen: done # code-review 2026-07-21: no Stage B storage hold; display ceilings deferred
   89-2-digest-stage-b-github-velocity-rank: backlog
   89-3-judgment-shortlist-github-cap-and-polymarket-exclusion: backlog # blocked: no shortlist selector in code yet
+
+  # Epic 90 — Intake health (Reddit restore + YouTube honesty / dedupe / quality)
+  # 90-1: app-free Atom RSS both layers (OAuth/JSON+UA DROPPED). Do NOT touch credit-exhausted social.
+  # Sequencing: 90-2 (obs) → 90-4 (dedupe retune) → 90-3 (youtube quality).
+  epic-90: in-progress
+  90-1-restore-reddit-intake: done # 2026-07-23 RSS both layers; review patches (partial+budget, word-boundary); verify green
+  90-2-youtube-silent-drop-observability: done # 2026-07-23 obs only; review Option1 yt-stage on youtube key; verify green
+  90-4-dedupe-over-collapse-retune: ready-for-dev # design APPROVED 2026-07-23 — R1(canon v=)+R2(prop)+R4(K=5); SKIP cap8; review impl before merge
+  90-3-youtube-quality-selection: backlog # blocked on 90-4

@@ -20,8 +20,12 @@ import {
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 import {
+  countSourceSignalStats,
+  formatYoutubeStageLine,
+  resolveAdapterFetchCount,
   resolveDigestMarkdownFromPayload,
   resolveSourceOutcomes,
+  shouldEmitYoutubeStageLine,
 } from './hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 import {
@@ -655,11 +659,30 @@ async function scoreWriteAndPush(
   forceRescore = false,
 ) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
+  const buildSignals = signals;
   try {
     signals = await dedupeSignals(signals, env);
     payload.signals = signals;
+    const dedupeSignalsSnapshot = signals;
     signals = await scoreSignals(signals, ranAt, env);
     payload.signals = signals;
+
+    // Always-on youtube stage line when youtube ran (key present) — including collect=0 (90-2; retune is 90-4).
+    if (shouldEmitYoutubeStageLine(adapterResults)) {
+      const collect = resolveAdapterFetchCount(adapterResults, 'youtube');
+      const build = buildSignals.filter((s) => s?.sourceType === 'youtube').length;
+      const dedupeStats = countSourceSignalStats(dedupeSignalsSnapshot, 'youtube');
+      const scoreStats = countSourceSignalStats(signals, 'youtube');
+      console.error(
+        formatYoutubeStageLine({
+          collect,
+          build,
+          dedupePrimary: dedupeStats.storedPrimaryCount,
+          dedupeContrib: dedupeStats.contributedCount,
+          scorePrimary: scoreStats.storedPrimaryCount,
+        }),
+      );
+    }
   } catch (err) {
     const detail =
       err && typeof err === 'object' && 'message' in err

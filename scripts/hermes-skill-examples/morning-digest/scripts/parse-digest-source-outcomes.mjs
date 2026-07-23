@@ -5,6 +5,10 @@
 import { URL } from 'node:url';
 
 import {
+	countAdapterPayloadItems,
+	unwrapAdapterResult,
+} from './adapter-result.mjs';
+import {
 	trimEntityBlockForDigestAppend,
 } from './render-digest-entity-section.mjs';
 
@@ -370,48 +374,133 @@ export function parseSourceOutcomesFromArtifact(markdown) {
 }
 
 /**
+ * Count post-dedupe primary vs contributor appearances for one source.
+ *
+ * @param {Array<Record<string, unknown>>} signals
+ * @param {string} sourceKey
+ * @returns {{ storedPrimaryCount: number; contributedCount: number }}
+ */
+export function countSourceSignalStats(signals, sourceKey) {
+	let storedPrimaryCount = 0;
+	let contributedCount = 0;
+	for (const signal of signals) {
+		const sourceType = typeof signal?.sourceType === 'string' ? signal.sourceType : null;
+		if (sourceType === sourceKey) {
+			storedPrimaryCount += 1;
+		}
+		const contributors = signal?.sourceMetadata?.contributingSources;
+		if (!Array.isArray(contributors)) {
+			continue;
+		}
+		for (const contributor of contributors) {
+			const contributorKey =
+				typeof contributor?.sourceType === 'string' ? contributor.sourceType : null;
+			// Count only non-primary contributor slots (cross-source absorptions).
+			if (!contributorKey || contributorKey !== sourceKey || contributorKey === sourceType) {
+				continue;
+			}
+			contributedCount += 1;
+		}
+	}
+	return { storedPrimaryCount, contributedCount };
+}
+
+/**
+ * Fetch-oriented adapter array length for a source key (pre-dedupe).
+ *
+ * @param {Record<string, unknown>} adapterResults
+ * @param {string} sourceKey
+ * @returns {number}
+ */
+export function resolveAdapterFetchCount(adapterResults, sourceKey) {
+	const adapterKey =
+		sourceKey === 'google_trends'
+			? 'trends'
+			: sourceKey === 'newsapi'
+				? 'newsapi'
+				: sourceKey === 'deep_signal'
+					? 'deepSignal'
+					: sourceKey;
+	const adapterPayload = adapterResults[adapterKey];
+	if (!adapterPayload || typeof adapterPayload !== 'object') {
+		return 0;
+	}
+	return countAdapterPayloadItems(unwrapAdapterResult(adapterPayload));
+}
+
+/**
+ * Always-on youtube stage stderr line (Story 90-2). Confirms the known dedupe cliff.
+ *
+ * @param {{
+ *   collect: number;
+ *   build: number;
+ *   dedupePrimary: number;
+ *   dedupeContrib: number;
+ *   scorePrimary: number;
+ * }} counts
+ * @returns {string}
+ */
+export function formatYoutubeStageLine(counts) {
+	return (
+		`yt-stage collect=${counts.collect} build=${counts.build}` +
+		` dedupe_primary=${counts.dedupePrimary} dedupe_contrib=${counts.dedupeContrib}` +
+		` score_primary=${counts.scorePrimary}`
+	);
+}
+
+/**
+ * Emit yt-stage when youtube ran (collect key present), including all-zero collect=0.
+ * Not gated on any-stage > 0 (Story 90-2 review decision).
+ *
+ * @param {Record<string, unknown> | null | undefined} adapterResults
+ * @returns {boolean}
+ */
+export function shouldEmitYoutubeStageLine(adapterResults) {
+	return Boolean(
+		adapterResults && typeof adapterResults === 'object' && 'youtube' in adapterResults,
+	);
+}
+
+/**
  * @param {{
  *   run?: Record<string, unknown>;
  *   signals?: Array<Record<string, unknown>>;
  *   adapterResults?: Record<string, unknown>;
  * }} ctx
- * @returns {Array<{ sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>}
+ * @returns {Array<{
+ *   sourceKey: string;
+ *   status: 'fired' | 'unavailable' | 'error';
+ *   signalCount?: number;
+ *   fetchCount?: number;
+ *   storedPrimaryCount?: number;
+ *   contributedCount?: number;
+ *   reason?: string;
+ * }>}
  */
 export function buildSourceOutcomesFromPayload(ctx = {}) {
 	const run = ctx.run ?? {};
 	const signals = Array.isArray(ctx.signals) ? ctx.signals : [];
 	const adapterResults = ctx.adapterResults ?? {};
 
-	/** @type {Map<string, { sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} */
+	/** @type {Map<string, {
+	 *   sourceKey: string;
+	 *   status: 'fired' | 'unavailable' | 'error';
+	 *   signalCount?: number;
+	 *   fetchCount?: number;
+	 *   storedPrimaryCount?: number;
+	 *   contributedCount?: number;
+	 *   reason?: string;
+	 * }>} */
 	const outcomes = new Map();
-
-	const signalCounts = new Map();
-	for (const signal of signals) {
-		const sourceType = typeof signal?.sourceType === 'string' ? signal.sourceType : null;
-		if (sourceType) {
-			signalCounts.set(sourceType, (signalCounts.get(sourceType) ?? 0) + 1);
-		}
-		const contributors = signal?.sourceMetadata?.contributingSources;
-		if (Array.isArray(contributors)) {
-			for (const contributor of contributors) {
-				const contributorKey =
-					typeof contributor?.sourceType === 'string' ? contributor.sourceType : null;
-				if (!contributorKey || contributorKey === sourceType) {
-					continue;
-				}
-				signalCounts.set(
-					contributorKey,
-					(signalCounts.get(contributorKey) ?? 0) + 1,
-				);
-			}
-		}
-	}
 
 	for (const entry of DIGEST_SOURCE_SECTION_MAP) {
 		const { sourceKey } = entry;
 		let status = /** @type {'fired' | 'unavailable' | 'error' | null} */ (null);
 		let reason;
-		let signalCount = signalCounts.get(sourceKey) ?? 0;
+		const { storedPrimaryCount, contributedCount } = countSourceSignalStats(signals, sourceKey);
+		const fetchCount = resolveAdapterFetchCount(adapterResults, sourceKey);
+		// Legacy signalCount = stored primaries only — never inflate with contrib (90-2 honesty).
+		const signalCount = storedPrimaryCount;
 
 		if (sourceKey === 'google_trends' && String(run.topTrend ?? '').trim()) {
 			status = 'fired';
@@ -419,7 +508,7 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
 			status = 'fired';
 		} else if (sourceKey === 'notebook' && String(run.notebookId ?? '').trim()) {
 			status = 'fired';
-		} else if (signalCount > 0) {
+		} else if (storedPrimaryCount > 0 || contributedCount > 0) {
 			status = 'fired';
 		}
 
@@ -461,10 +550,19 @@ export function buildSourceOutcomesFromPayload(ctx = {}) {
 		}
 
 		if (status) {
+			const hasTriple =
+				fetchCount > 0 || storedPrimaryCount > 0 || contributedCount > 0 || status === 'fired';
 			outcomes.set(sourceKey, {
 				sourceKey,
 				status,
 				signalCount: signalCount > 0 ? signalCount : undefined,
+				...(hasTriple
+					? {
+							fetchCount,
+							storedPrimaryCount,
+							contributedCount,
+						}
+					: {}),
 				reason,
 			});
 		}
@@ -488,8 +586,74 @@ function isHardSourceOutcomeStatus(status) {
 	return status === 'error' || status === 'unavailable';
 }
 
+/**
+ * Prefer payload triple-count honesty over markdown bullet inflation (Story 90-2).
+ *
+ * @param {{
+ *   sourceKey: string;
+ *   status: 'fired' | 'unavailable' | 'error';
+ *   signalCount?: number;
+ *   fetchCount?: number;
+ *   storedPrimaryCount?: number;
+ *   contributedCount?: number;
+ *   reason?: string;
+ * }} base
+ * @param {{
+ *   sourceKey: string;
+ *   status: 'fired' | 'unavailable' | 'error';
+ *   signalCount?: number;
+ *   fetchCount?: number;
+ *   storedPrimaryCount?: number;
+ *   contributedCount?: number;
+ *   reason?: string;
+ * }} overlay
+ * @returns {{
+ *   sourceKey: string;
+ *   status: 'fired' | 'unavailable' | 'error';
+ *   signalCount?: number;
+ *   fetchCount?: number;
+ *   storedPrimaryCount?: number;
+ *   contributedCount?: number;
+ *   reason?: string;
+ * }}
+ */
+function mergeOutcomeCountFields(base, overlay) {
+	const fetchCount = base.fetchCount ?? overlay.fetchCount;
+	const storedPrimaryCount = base.storedPrimaryCount ?? overlay.storedPrimaryCount;
+	const contributedCount = base.contributedCount ?? overlay.contributedCount;
+	const hasTriple =
+		fetchCount !== undefined ||
+		storedPrimaryCount !== undefined ||
+		contributedCount !== undefined;
+	/** @type {number | undefined} */
+	let signalCount = overlay.signalCount ?? base.signalCount;
+	if (storedPrimaryCount !== undefined) {
+		// Never let markdown invent a lone high count that hides storedPrimaryCount=0.
+		signalCount = storedPrimaryCount > 0 ? storedPrimaryCount : undefined;
+	}
+	return {
+		...overlay,
+		...(hasTriple
+			? {
+					fetchCount: fetchCount ?? 0,
+					storedPrimaryCount: storedPrimaryCount ?? 0,
+					contributedCount: contributedCount ?? 0,
+				}
+			: {}),
+		signalCount,
+	};
+}
+
 export function mergeSourceOutcomeRows(payloadRows, markdownRows) {
-	/** @type {Map<string, { sourceKey: string; status: 'fired' | 'unavailable' | 'error'; signalCount?: number; reason?: string }>} */
+	/** @type {Map<string, {
+	 *   sourceKey: string;
+	 *   status: 'fired' | 'unavailable' | 'error';
+	 *   signalCount?: number;
+	 *   fetchCount?: number;
+	 *   storedPrimaryCount?: number;
+	 *   contributedCount?: number;
+	 *   reason?: string;
+	 * }>} */
 	const merged = new Map(payloadRows.map((row) => [row.sourceKey, row]));
 	for (const markdownRow of markdownRows) {
 		const existing = merged.get(markdownRow.sourceKey);
@@ -498,20 +662,23 @@ export function mergeSourceOutcomeRows(payloadRows, markdownRows) {
 			continue;
 		}
 		if (markdownRow.status === 'unavailable') {
-			merged.set(markdownRow.sourceKey, markdownRow);
+			merged.set(markdownRow.sourceKey, mergeOutcomeCountFields(existing, markdownRow));
 			continue;
 		}
 		if (
 			isHardSourceOutcomeStatus(existing.status) &&
 			markdownRow.status === 'fired'
 		) {
-			merged.set(markdownRow.sourceKey, {
-				...existing,
-				signalCount: markdownRow.signalCount ?? existing.signalCount,
-			});
+			merged.set(
+				markdownRow.sourceKey,
+				mergeOutcomeCountFields(existing, {
+					...existing,
+					signalCount: markdownRow.signalCount ?? existing.signalCount,
+				}),
+			);
 			continue;
 		}
-		merged.set(markdownRow.sourceKey, markdownRow);
+		merged.set(markdownRow.sourceKey, mergeOutcomeCountFields(existing, markdownRow));
 	}
 	return DIGEST_SOURCE_SECTION_MAP.map((entry) => merged.get(entry.sourceKey)).filter(Boolean);
 }

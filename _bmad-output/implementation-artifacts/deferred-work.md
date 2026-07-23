@@ -1,5 +1,18 @@
 # Deferred work
 
+## Deferred from: code review of 90-2-youtube-silent-drop-observability.md (2026-07-23)
+
+- **`digestSourceOutcomeValidator` numeric looseness** — new optional `fetchCount` / `storedPrimaryCount` / `contributedCount` use `v.optional(v.number())` like legacy `signalCount`; negatives/fractionals can persist.
+- **`countAdapterPayloadItems` first-array-wins** — returns length of first recognized key in `ADAPTER_PAYLOAD_ARRAY_KEYS`; multi-array payloads undercount (relocated helper, prior behavior).
+- **Non-error unknown adapter stdout → empty** — `buildSourcesFromAdapterOutputs` still treats unrecognized bare objects/scalars as `empty` (exit-0 contract); only bare `{error}` was in 90-2 Defect A scope.
+
+## Deferred from: code review of 90-1-restore-reddit-intake.md (2026-07-23)
+
+- **Empty Atom feed → false-zero mention counts** — HTTP 200 with zero entries currently yields ok/zero rather than an explicit empty-corpus signal.
+- **Cross-subreddit double-count in trend corpus** — flat extend without id/url dedupe; fixture tests expect multi-sub inflation.
+- **Weak `REDDIT_COLLECTION_METHOD` no-op test patches** — former `_praw` readiness gates replaced with identity patches; strengthen when next touching trend tests.
+- **`externalId` continuity / dedupe** — Atom `<id>` preferred over URL-hash; digest URL dedupe still ignores `externalId`.
+
 ## Deferred from: code review of 89-1-digest-stage-a-github-store-max-widen.md (2026-07-21)
 
 - **NexusDigestSignalFeed `DIGEST_SIGNAL_LIMIT=100` + `getDigestSignalsForRun` hard clamp 100** — after STORE_MAX 5→40, ~98→~133 signals/run silently drops ~33 lowest-`rankScore` rows in the feed (no error). Storage write-all is fine; Stage B history is unaffected. Follow-up: raise/paginate feed limit (dashboard story), not a 89-1 reopen.

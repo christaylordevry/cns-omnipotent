@@ -55,6 +55,14 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.equal(line, 'collect: trends=ok twitter=fail:invalid-json');
   });
 
+  it('summarizeAdapterCollection classifies bare {error} as fail (Story 90-2 Defect A)', () => {
+    const line = summarizeAdapterCollection({
+      youtube: { error: 'quota-exceeded' },
+      twitter: { success: true, data: { posts: [] } },
+    });
+    assert.equal(line, 'collect: youtube=fail:quota-exceeded twitter=ok');
+  });
+
   it('buildErrorsBySource lists only failed wrapped sources', () => {
     assert.deepEqual(
       buildErrorsBySource({
@@ -62,6 +70,16 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
         reddit: { success: false, error: 'timeout' },
       }),
       { reddit: 'timeout' },
+    );
+  });
+
+  it('buildErrorsBySource records bare {error} without pre-wrap (Story 90-2 Defect A)', () => {
+    assert.deepEqual(
+      buildErrorsBySource({
+        youtube: { error: 'quota-exceeded' },
+        trends: { success: true, data: { events: [] } },
+      }),
+      { youtube: 'quota-exceeded' },
     );
   });
 

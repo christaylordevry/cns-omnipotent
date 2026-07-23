@@ -78,6 +78,9 @@ export function summarizeAdapterCollection(results) {
       } else {
         parts.push(`${key}=fail:${String(row.error ?? 'unknown')}`);
       }
+    } else if (isAdapterErrorPayload(result)) {
+      const row = /** @type {{ error?: unknown }} */ (result);
+      parts.push(`${key}=fail:${String(row.error ?? 'unknown')}`);
     } else {
       parts.push(`${key}=ok`);
     }
@@ -99,7 +102,30 @@ export function buildErrorsBySource(results) {
         const sourceKey = COLLECT_KEY_TO_SOURCE_KEY[key] ?? key;
         errors[sourceKey] = String(row.error ?? 'unknown');
       }
+    } else if (isAdapterErrorPayload(result)) {
+      const sourceKey = COLLECT_KEY_TO_SOURCE_KEY[key] ?? key;
+      const row = /** @type {{ error?: unknown }} */ (result);
+      errors[sourceKey] = String(row.error ?? 'unknown');
     }
   }
   return Object.keys(errors).length > 0 ? errors : undefined;
+}
+
+/**
+ * Count items in an unwrapped adapter payload (videos[] / posts[] / …).
+ * @param {Record<string, unknown> | unknown} data
+ * @returns {number}
+ */
+export function countAdapterPayloadItems(data) {
+  if (!data || typeof data !== 'object') {
+    return 0;
+  }
+  const row = /** @type {Record<string, unknown>} */ (data);
+  for (const key of ADAPTER_PAYLOAD_ARRAY_KEYS) {
+    const value = row[key];
+    if (Array.isArray(value)) {
+      return value.length;
+    }
+  }
+  return 0;
 }

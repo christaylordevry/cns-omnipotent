@@ -94,10 +94,13 @@
       "workspaceId"
     ],
     "digestSourceOutcome": [
+      "contributedCount",
+      "fetchCount",
       "reason",
       "signalCount",
       "sourceKey",
-      "status"
+      "status",
+      "storedPrimaryCount"
     ]
   }
 }

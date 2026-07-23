@@ -140,6 +140,14 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.google_trends.count, 1);
   });
 
+  it('classifies bare {error} adapter stdout as sources.error not empty (Story 90-2)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      youtube: { error: 'quota-exceeded' },
+    });
+    assert.equal(sources.youtube.status, 'error');
+    assert.equal(sources.youtube.count, 0);
+  });
+
   it('counts youtube videos[] for outcome sources.youtube (72-2)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       youtube: {
