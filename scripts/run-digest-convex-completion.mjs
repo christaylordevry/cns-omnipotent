@@ -20,6 +20,7 @@ import {
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 import {
+  collectPrimaryAbsorbAlarmWarnings,
   countSourceSignalStats,
   formatYoutubeStageLine,
   resolveAdapterFetchCount,
@@ -622,6 +623,10 @@ function attachSourceOutcomes(payload, adapterResults) {
   });
   if (outcomes.length > 0) {
     payload.run = { ...payload.run, sourceOutcomes: outcomes };
+    // Story 90-4 R4 — stderr-only wipe / heavy-absorb (yt-stage posture; no Convex field).
+    for (const line of collectPrimaryAbsorbAlarmWarnings(outcomes)) {
+      console.error(line);
+    }
   }
 }
 

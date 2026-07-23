@@ -1,0 +1,1599 @@
+[
+  {
+    "title": "langchain-ai/langchain",
+    "url": "https://github.com/langchain-ai/langchain",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 142264,
+      "forks": 23662,
+      "publishedAt": "2026-07-21T19:38:36Z"
+    }
+  },
+  {
+    "title": "headroomlabs-ai/headroom",
+    "url": "https://github.com/headroomlabs-ai/headroom",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 60995,
+      "forks": 4584,
+      "publishedAt": "2026-07-21T17:37:58Z"
+    }
+  },
+  {
+    "title": "zylon-ai/private-gpt",
+    "url": "https://github.com/zylon-ai/private-gpt",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 57355,
+      "forks": 7602,
+      "publishedAt": "2026-07-21T16:27:33Z"
+    }
+  },
+  {
+    "title": "Which company has best AI model end of July? Trading Odds &amp; Predictions 2026 | Polymarket",
+    "url": "https://polymarket.com/market/will-google-have-the-best-ai-model-at-the-end-of-july-2026",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T00:00:00Z"
+    }
+  },
+  {
+    "title": "Will Anthropic have the best AI model at the end of July 2026?",
+    "url": "https://polymarket.com/market/will-anthropic-have-the-best-ai-model-at-the-end-of-july-2026",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T00:00:00Z"
+    }
+  },
+  {
+    "title": "Which company has best AI model end of July? Trading Odds &amp; Predictions 2026 | Polymarket",
+    "url": "https://polymarket.com/market/will-openai-have-the-best-ai-model-at-the-end-of-july-2026",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T00:00:00Z"
+    }
+  },
+  {
+    "title": "Which company has best AI model end of July? Trading Odds &amp; Predictions 2026 | Polymarket",
+    "url": "https://polymarket.com/market/will-alibaba-have-the-best-ai-model-at-the-end-of-july-2026",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T00:00:00Z"
+    }
+  },
+  {
+    "title": "Which company has best AI model end of July? Trading Odds &amp; Predictions 2026 | Polymarket",
+    "url": "https://polymarket.com/market/will-zai-have-the-best-ai-model-at-the-end-of-july-2026",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T00:00:00Z"
+    }
+  },
+  {
+    "title": "[untitled:polymarket] https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-jul",
+    "url": "https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-july-31-2026-20260709185050343-272-345-875",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-31T23:59:00Z"
+    }
+  },
+  {
+    "title": "One pattern I find useful for working with LLMs is a nice long ramble session. Sometimes the LLM needs more bits to understand what you're trying to achieve, but you're too lazy to type them. In these cases I like to lean back, switch to /voice and just ramble for like 10 minute…",
+    "url": "https://x.com/karpathy/status/2079610838143623371",
+    "sourceType": "twitter",
+    "summary": "One pattern I find useful for working with LLMs is a nice long ramble session. Sometimes the LLM needs more bits to understand what you're trying to achieve, but you're too lazy to type them. In these",
+    "sourceMetadata": {
+      "likes": 20526,
+      "reposts": 1511,
+      "replies": 1305,
+      "quotes": 0,
+      "authorHandle": "karpathy",
+      "publishedAt": "2026-07-21T16:53:55.000Z",
+      "peopleMatch": {
+        "personName": "Andrej Karpathy",
+        "matchedHandle": "karpathy",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "deepset-ai/haystack",
+    "url": "https://github.com/deepset-ai/haystack",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 25970,
+      "forks": 2945,
+      "publishedAt": "2026-07-21T14:33:58Z"
+    }
+  },
+  {
+    "title": "Will the next Claude Opus model be released by July 24, 2026?",
+    "url": "https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-july-24-2026-231",
+    "sourceType": "polymarket",
+    "summary": "No 57.5% · vol $11,531 · liq $7,045",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.425,
+        0.575
+      ],
+      "leadingOutcome": "No",
+      "leadingProbability": 0.575,
+      "volumeUsd": 60337.13854099996,
+      "upvotes": 11530.846212999997,
+      "liquidityUsd": 7045.1581,
+      "publishedAt": "2026-07-24T23:59:00Z"
+    }
+  },
+  {
+    "title": "Will the next Claude Opus model be released by August 31, 2026?",
+    "url": "https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-august-31-2026-20260701204710233-223-869-558",
+    "sourceType": "polymarket",
+    "summary": "Yes 94.6% · vol $5,678 · liq $14,529",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.946,
+        0.054
+      ],
+      "leadingOutcome": "Yes",
+      "leadingProbability": 0.946,
+      "volumeUsd": 21950.644108999997,
+      "upvotes": 5678.217937,
+      "liquidityUsd": 14529.38548,
+      "publishedAt": "2026-08-31T23:59:00Z"
+    }
+  },
+  {
+    "title": "crewAIInc/crewAI",
+    "url": "https://github.com/crewAIInc/crewAI",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 55908,
+      "forks": 7907,
+      "publishedAt": "2026-07-21T19:25:09Z"
+    }
+  },
+  {
+    "title": "langgenius/dify",
+    "url": "https://github.com/langgenius/dify",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 149656,
+      "forks": 23583,
+      "publishedAt": "2026-07-21T20:31:28Z"
+    }
+  },
+  {
+    "title": "obra/superpowers",
+    "url": "https://github.com/obra/superpowers",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 258734,
+      "forks": 23059,
+      "publishedAt": "2026-07-21T04:29:13Z"
+    }
+  },
+  {
+    "title": "modelcontextprotocol/python-sdk",
+    "url": "https://github.com/modelcontextprotocol/python-sdk",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 23677,
+      "forks": 3682,
+      "publishedAt": "2026-07-21T18:39:18Z"
+    }
+  },
+  {
+    "title": "we had a significant security incident during evaluation of our models. we are sharing what we have learned so far. thanks to @huggingface for the partnership on this.\n\nhttps://t.co/2o2VfR6PIa",
+    "url": "https://x.com/sama/status/2079661132302995790",
+    "sourceType": "twitter",
+    "summary": "we had a significant security incident during evaluation of our models. we are sharing what we have learned so far. thanks to @huggingface for the partnership on this.\n\nhttps://t.co/2o2VfR6PIa",
+    "sourceMetadata": {
+      "likes": 2471,
+      "reposts": 221,
+      "replies": 377,
+      "quotes": 0,
+      "authorHandle": "sama",
+      "publishedAt": "2026-07-21T20:13:46.000Z",
+      "peopleMatch": {
+        "personName": "Sam Altman",
+        "matchedHandle": "sama",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "Will the next Claude Opus model be released by December 31, 2026?",
+    "url": "https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-december-31-2026-20260701204710235-479-775-943",
+    "sourceType": "polymarket",
+    "summary": "Yes 98.5% · vol $999 · liq $10,511",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.985,
+        0.015
+      ],
+      "leadingOutcome": "Yes",
+      "leadingProbability": 0.985,
+      "volumeUsd": 3140.686971999998,
+      "upvotes": 998.991,
+      "liquidityUsd": 10510.76766,
+      "publishedAt": "2026-12-31T23:59:00Z"
+    }
+  },
+  {
+    "title": "labring/FastGPT",
+    "url": "https://github.com/labring/FastGPT",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 29058,
+      "forks": 7232,
+      "publishedAt": "2026-07-21T13:27:35Z"
+    }
+  },
+  {
+    "title": "modelcontextprotocol/inspector",
+    "url": "https://github.com/modelcontextprotocol/inspector",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 10427,
+      "forks": 1428,
+      "publishedAt": "2026-07-21T16:30:10Z"
+    }
+  },
+  {
+    "title": "microsoft/mcp-for-beginners",
+    "url": "https://github.com/microsoft/mcp-for-beginners",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 16803,
+      "forks": 5477,
+      "publishedAt": "2026-07-20T11:13:30Z"
+    }
+  },
+  {
+    "title": "logseq/logseq",
+    "url": "https://github.com/logseq/logseq",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 44003,
+      "forks": 2732,
+      "publishedAt": "2026-07-21T14:13:29Z"
+    }
+  },
+  {
+    "title": "CursorTouch/Windows-MCP",
+    "url": "https://github.com/CursorTouch/Windows-MCP",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 6471,
+      "forks": 787,
+      "publishedAt": "2026-07-20T16:36:30Z"
+    }
+  },
+  {
+    "title": "modelcontextprotocol/typescript-sdk",
+    "url": "https://github.com/modelcontextprotocol/typescript-sdk",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 12909,
+      "forks": 1997,
+      "publishedAt": "2026-07-21T13:39:39Z"
+    }
+  },
+  {
+    "title": "DouyinFE/semi-design",
+    "url": "https://github.com/DouyinFE/semi-design",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 10163,
+      "forks": 822,
+      "publishedAt": "2026-07-20T07:44:00Z"
+    }
+  },
+  {
+    "title": "@DavidSHolz It's interesting/amusing how their self-awareness gradually builds up and falls out from pretraining on tokens of us talking about them, but it's laggy and a bit incomplete. But I think e.g. it's starting to \"get\" what I mean when I inform it I'm about to /compact it…",
+    "url": "https://x.com/karpathy/status/2079645572047548608",
+    "sourceType": "twitter",
+    "summary": "@DavidSHolz It's interesting/amusing how their self-awareness gradually builds up and falls out from pretraining on tokens of us talking about them, but it's laggy and a bit incomplete. But I think e.",
+    "sourceMetadata": {
+      "likes": 426,
+      "reposts": 5,
+      "replies": 28,
+      "quotes": 0,
+      "authorHandle": "karpathy",
+      "publishedAt": "2026-07-21T19:11:56.000Z",
+      "peopleMatch": {
+        "personName": "Andrej Karpathy",
+        "matchedHandle": "karpathy",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "jnMetaCode/agency-agents-zh",
+    "url": "https://github.com/jnMetaCode/agency-agents-zh",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 18042,
+      "forks": 3022,
+      "publishedAt": "2026-07-20T03:45:32Z"
+    }
+  },
+  {
+    "title": "raullenchai/Rapid-MLX",
+    "url": "https://github.com/raullenchai/Rapid-MLX",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 3309,
+      "forks": 391,
+      "publishedAt": "2026-07-21T20:59:37Z"
+    }
+  },
+  {
+    "title": "0x4m4/hexstrike-ai",
+    "url": "https://github.com/0x4m4/hexstrike-ai",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 10420,
+      "forks": 2170,
+      "publishedAt": "2026-04-27T08:56:07Z"
+    }
+  },
+  {
+    "title": "it is good now!",
+    "url": "https://x.com/sama/status/2079258683884917013",
+    "sourceType": "twitter",
+    "summary": "it is good now!",
+    "sourceMetadata": {
+      "likes": 3318,
+      "reposts": 151,
+      "replies": 539,
+      "quotes": 0,
+      "authorHandle": "sama",
+      "publishedAt": "2026-07-20T17:34:35.000Z",
+      "peopleMatch": {
+        "personName": "Sam Altman",
+        "matchedHandle": "sama",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "This is an interesting experiment (and I am glad that I have always written my own posts!)",
+    "url": "https://x.com/emollick/status/2079639676713922678",
+    "sourceType": "twitter",
+    "summary": "This is an interesting experiment (and I am glad that I have always written my own posts!)",
+    "sourceMetadata": {
+      "likes": 117,
+      "reposts": 7,
+      "replies": 15,
+      "quotes": 0,
+      "authorHandle": "emollick",
+      "publishedAt": "2026-07-21T18:48:31.000Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "vllm-project/semantic-router",
+    "url": "https://github.com/vllm-project/semantic-router",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 5003,
+      "forks": 766,
+      "publishedAt": "2026-07-21T14:18:08Z"
+    }
+  },
+  {
+    "title": "theopenco/llmgateway",
+    "url": "https://github.com/theopenco/llmgateway",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 1434,
+      "forks": 159,
+      "publishedAt": "2026-07-21T20:31:34Z"
+    }
+  },
+  {
+    "title": "ZSeven-W/openpencil",
+    "url": "https://github.com/ZSeven-W/openpencil",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 4289,
+      "forks": 417,
+      "publishedAt": "2026-07-21T13:50:25Z"
+    }
+  },
+  {
+    "title": "design to code AI",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "grab/cursor-talk-to-figma-mcp",
+    "url": "https://github.com/grab/cursor-talk-to-figma-mcp",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 6920,
+      "forks": 750,
+      "publishedAt": "2026-04-29T11:05:19Z"
+    }
+  },
+  {
+    "title": "FoundationAgents/MetaGPT",
+    "url": "https://github.com/FoundationAgents/MetaGPT",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 69460,
+      "forks": 8854,
+      "publishedAt": "2026-01-21T10:12:33Z"
+    }
+  },
+  {
+    "title": "microsoft/autogen",
+    "url": "https://github.com/microsoft/autogen",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 59878,
+      "forks": 9013,
+      "publishedAt": "2026-04-15T11:59:09Z"
+    }
+  },
+  {
+    "title": "llm-d/llm-d-router",
+    "url": "https://github.com/llm-d/llm-d-router",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 261,
+      "forks": 282,
+      "publishedAt": "2026-07-21T17:03:08Z"
+    }
+  },
+  {
+    "title": "modelcontextprotocol/servers",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 88724,
+      "forks": 11266,
+      "publishedAt": "2026-07-10T03:30:19Z"
+    }
+  },
+  {
+    "title": "hangwin/mcp-chrome",
+    "url": "https://github.com/hangwin/mcp-chrome",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 12181,
+      "forks": 1099,
+      "publishedAt": "2026-01-06T13:05:39Z"
+    }
+  },
+  {
+    "title": "Fuzzy AI",
+    "url": "https://www.producthunt.com/products/fuzzy-ai-2?utm_campaign=producthunt-api&utm_medium=api-v2&utm_source=Application%3A+CNS+Morning+Digest+%28ID%3A+287577%29",
+    "sourceType": "producthunt",
+    "summary": "We warm your prospects before reaching out",
+    "sourceMetadata": {
+      "upvotes": 617,
+      "publishedAt": "2026-07-20T07:01:00Z"
+    }
+  },
+  {
+    "title": "Nautis",
+    "url": "https://www.producthunt.com/products/nautis?utm_campaign=producthunt-api&utm_medium=api-v2&utm_source=Application%3A+CNS+Morning+Digest+%28ID%3A+287577%29",
+    "sourceType": "producthunt",
+    "summary": "The AI-native Operating System for founders.",
+    "sourceMetadata": {
+      "upvotes": 483,
+      "publishedAt": "2026-07-20T07:01:00Z"
+    }
+  },
+  {
+    "title": "Lev8",
+    "url": "https://www.producthunt.com/products/lev8?utm_campaign=producthunt-api&utm_medium=api-v2&utm_source=Application%3A+CNS+Morning+Digest+%28ID%3A+287577%29",
+    "sourceType": "producthunt",
+    "summary": "Find, research, and reach the right people",
+    "sourceMetadata": {
+      "upvotes": 409,
+      "publishedAt": "2026-07-21T07:01:00Z"
+    }
+  },
+  {
+    "title": "@AndrewCurran_ 🤬😡",
+    "url": "https://x.com/ylecun/status/2079228439182156094",
+    "sourceType": "twitter",
+    "summary": "@AndrewCurran_ 🤬😡",
+    "sourceMetadata": {
+      "likes": 618,
+      "reposts": 31,
+      "replies": 25,
+      "quotes": 0,
+      "authorHandle": "ylecun",
+      "publishedAt": "2026-07-20T15:34:24.000Z",
+      "peopleMatch": {
+        "personName": "Yann LeCun",
+        "matchedHandle": "ylecun",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "@MosesSternstein @PitchBook Can you link to the research? \n\n(Also Pitchbook: those captions are so obviously AI written)",
+    "url": "https://x.com/emollick/status/2079647171830309073",
+    "sourceType": "twitter",
+    "summary": "@MosesSternstein @PitchBook Can you link to the research? \n\n(Also Pitchbook: those captions are so obviously AI written)",
+    "sourceMetadata": {
+      "likes": 4,
+      "reposts": 0,
+      "replies": 2,
+      "quotes": 0,
+      "authorHandle": "emollick",
+      "publishedAt": "2026-07-21T19:18:18.000Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "Will the next Claude Opus model be released by October 31, 2026?",
+    "url": "https://polymarket.com/market/will-the-next-claude-opus-model-be-released-by-october-31-2026-20260701204710234-454-314-831",
+    "sourceType": "polymarket",
+    "summary": "Yes 97.9% · vol $56 · liq $4,190",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.979,
+        0.021
+      ],
+      "leadingOutcome": "Yes",
+      "leadingProbability": 0.979,
+      "volumeUsd": 6993.429601,
+      "upvotes": 55.547776,
+      "liquidityUsd": 4190.00714,
+      "publishedAt": "2026-10-31T23:59:00Z"
+    }
+  },
+  {
+    "title": "Fed rate cut by July 2026 meeting?",
+    "url": "https://polymarket.com/market/fed-rate-cut-by-july-2026-meeting-577",
+    "sourceType": "polymarket",
+    "summary": "No 99.7% · vol $8,323 · liq $73,860",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.0035,
+        0.9965
+      ],
+      "leadingOutcome": "No",
+      "leadingProbability": 0.9965,
+      "volumeUsd": 508070.9699579997,
+      "upvotes": 8323.141078999999,
+      "liquidityUsd": 73860.23646,
+      "publishedAt": "2026-06-17T00:00:00Z"
+    }
+  },
+  {
+    "title": "AI marketing tools",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "OpenAI and Hugging Face partner to address security incident",
+    "url": "https://openai.com/index/hugging-face-model-evaluation-security-incident/",
+    "sourceType": "hackernews",
+    "sourceMetadata": {
+      "points": 130,
+      "commentCount": 50
+    }
+  },
+  {
+    "title": "humanlayer/12-factor-agents",
+    "url": "https://github.com/humanlayer/12-factor-agents",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 24615,
+      "forks": 1863,
+      "publishedAt": "2025-09-21T14:37:40Z"
+    }
+  },
+  {
+    "title": "TabbyML/tabby",
+    "url": "https://github.com/TabbyML/tabby",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 33780,
+      "forks": 1777,
+      "publishedAt": "2026-06-30T20:38:02Z"
+    }
+  },
+  {
+    "title": "nyldn/claude-octopus",
+    "url": "https://github.com/nyldn/claude-octopus",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 3865,
+      "forks": 362,
+      "publishedAt": "2026-07-20T19:24:49Z"
+    }
+  },
+  {
+    "title": "Nativ: Run AI models locally on your Mac",
+    "url": "https://simonwillison.net/2026/Jul/21/nativ/#atom-everything",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T14:22:27.000Z"
+    }
+  },
+  {
+    "title": "A Fireside Chat with Cat and Thariq from the Claude Code team",
+    "url": "https://simonwillison.net/2026/Jul/21/cat-and-thariq/#atom-everything",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T12:54:02.000Z"
+    }
+  },
+  {
+    "title": "I got some really useful Claude prompting tips from @_catwu and @trq212 - it's time to stop overloading our prompts with examples and lists of things not to do, Fable works better without those\n\nClaude Code's own system prompt recently shrunk by 80%!",
+    "url": "https://x.com/simonw/status/2079553486568800405",
+    "sourceType": "twitter",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T13:06:02.000Z",
+      "likes": 1048
+    }
+  },
+  {
+    "title": "Ethan Mollick on X: &quot;At the moment that everyone is talking about switching models often for cost or sovereignty or optionality or whatever, the most advanced models are growing more and more different from each other. Fable responds very differently than Kimi K3 or Sol, you can&#x27;t just plu",
+    "url": "https://x.com/emollick/status/2079631873299320915",
+    "sourceType": "twitter",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T18:17:30.000Z",
+      "likes": 125
+    }
+  },
+  {
+    "title": "Ethan Mollick on X: &quot;“Geologists communicated in English; and they could name things in a manner that sent shivers through the bones&quot; Not a whiff of LLM feel, despite the em-dashes &amp;amp; period-separated lists. We focus too much on the surface stuff of what makes AI-writing samey, rath",
+    "url": "https://x.com/emollick/status/2079563390729466332",
+    "sourceType": "twitter",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T13:45:23.000Z",
+      "likes": 12
+    }
+  },
+  {
+    "title": "@simonwillison.net on Bluesky",
+    "url": "https://bsky.app/profile/simonwillison.net/post/3mr5ucqec2s24",
+    "sourceType": "bluesky",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T12:57:43.264Z",
+      "likes": 39
+    }
+  },
+  {
+    "title": "@simonwillison.net on Bluesky",
+    "url": "https://bsky.app/profile/simonwillison.net/post/3mr5ufq3y5k24",
+    "sourceType": "bluesky",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T12:59:20.976Z",
+      "likes": 15
+    }
+  },
+  {
+    "title": "@emollick.bsky.social on Bluesky",
+    "url": "https://bsky.app/profile/emollick.bsky.social/post/3mr5wzfi7sc2d",
+    "sourceType": "bluesky",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T13:46:30.968Z",
+      "likes": 12
+    }
+  },
+  {
+    "title": "I tested GPT-5.6 Sol, Luna, and Terra across 4 different agent harnesses.",
+    "url": "https://www.youtube.com/watch?v=x3r7coukSKk",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:51:58Z",
+      "viewCount": 1,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Want to 10X Your Business With AI? Do This FIRST! #shorts",
+    "url": "https://www.youtube.com/watch?v=aKEQ0wRoRW0",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:45:27Z",
+      "viewCount": 17,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Temporal Teardown + Daily AI News | Atlas Studios — Daily Agent Affairs",
+    "url": "https://www.youtube.com/watch?v=Sqltu1xopSs",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:50:03Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Así es como debes usar Claude Code (si eres un buen developer)👀 - #developer #claude #ia",
+    "url": "https://www.youtube.com/watch?v=fqyoxyP_514",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:58:33Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Claude Code enables free multi-model AI coding via #claudecode #openrouter #aicodevelopment",
+    "url": "https://www.youtube.com/watch?v=RCa53OVhjnA",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:58:22Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Claude Code integrates Notebook LM API for advanced research #ClaudeCode #NotebookLMAPI #AIresearch",
+    "url": "https://www.youtube.com/watch?v=U16BACHHGKk",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:59:06Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "giving carolverses cloud a rulebook",
+    "url": "https://www.youtube.com/watch?v=ZsTeEkiqZPY",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:43:41Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Object-Centric Petri Nets for Multi-Agent AI (Agent Governance Layer, Ep 16)",
+    "url": "https://www.youtube.com/watch?v=zbxp7tRxVTw",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:20:34Z",
+      "viewCount": 2,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "The Future of Real Estate Is Agentic AI: What Every Agent Needs to Know",
+    "url": "https://www.youtube.com/watch?v=yUfuTOkvwqQ",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:06:42Z",
+      "viewCount": 1,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Simple RAG system on Proxmox LXC — a local LLM via docker, Ollama, Vector DB, FastAPI backend.",
+    "url": "https://www.youtube.com/watch?v=Zz2dDjiTUcY",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T18:00:36Z",
+      "viewCount": 8,
+      "likes": 2,
+      "commentCount": 1
+    }
+  },
+  {
+    "title": "Working Of Vector-DB",
+    "url": "https://www.youtube.com/watch?v=kl69u0jHe2w",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T17:34:42Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "How to download Pinecone and automate vector search for apps - Beginner Guide",
+    "url": "https://www.youtube.com/watch?v=-i8zQecM0m0",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T17:24:04Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "[untitled:youtube] https://www.youtube.com/watch?v=_6NUH9fLqtI",
+    "url": "https://www.youtube.com/watch?v=_6NUH9fLqtI",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:49:14Z",
+      "viewCount": 1,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "[untitled:youtube] https://www.youtube.com/watch?v=dvhvwzb-iIg",
+    "url": "https://www.youtube.com/watch?v=dvhvwzb-iIg",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:11:31Z",
+      "viewCount": 8,
+      "likes": 0,
+      "commentCount": 1
+    }
+  },
+  {
+    "title": "[untitled:youtube] https://www.youtube.com/watch?v=wTq6AL15D3M",
+    "url": "https://www.youtube.com/watch?v=wTq6AL15D3M",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:11:23Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 1
+    }
+  },
+  {
+    "title": "How Kimi Runs a 2,800B LLM on a Laptop (Run AI Locally) | Kimi K3 Free | Kimi K3 vs Fable 5 &vert",
+    "url": "https://www.youtube.com/watch?v=b2BITlVeblk",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T21:00:33Z",
+      "viewCount": 2,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "palantirbuildhealthcare",
+    "url": "https://www.youtube.com/watch?v=mpyxWMoXNaY",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:43:34Z",
+      "viewCount": 28,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Nativ Just Made Any LLM Run Locally on Mac — $0 API Bill",
+    "url": "https://www.youtube.com/watch?v=KSDhfU1nEQo",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:31:10Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "AI Writes 41% of the World's Code… So What Happens to Developers?",
+    "url": "https://www.youtube.com/watch?v=V15sYIJ86zs",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:35:16Z",
+      "viewCount": 4,
+      "likes": 4,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "💥 Why Your AI Agent Gets Dumber the Longer You Talk to It. | #subashpalvel | #SubashPalvel |",
+    "url": "https://www.youtube.com/watch?v=ZD4b2CD_K_k",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T18:30:24Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "The AI Developer Secret That Replaces Multiple AI Subscriptions 🔥 #github #aimodel #repository",
+    "url": "https://www.youtube.com/watch?v=GKSCU-h0ImA",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T18:00:21Z",
+      "viewCount": 2,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Ep. 124: AI Literacy, Prompt Engineering & the Future of Legal Education with Sean Harrington",
+    "url": "https://www.youtube.com/watch?v=PFFWxQIx1HA",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:32:00Z",
+      "viewCount": 0,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "ChatGPT : Le Guide Complet – Maîtrisez l'IA et le Prompt Engineering de A à Z #ChatGPT #IA",
+    "url": "https://www.youtube.com/watch?v=RUAlQTPKC2s",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:28:59Z",
+      "viewCount": 1,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "AI SEO Series V1: This AI Prompt Filtered 2,255 Keywords into the Best 24 SEO Keywords #shorts",
+    "url": "https://www.youtube.com/watch?v=z_2YpCg84VI",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T19:07:51Z",
+      "viewCount": 12,
+      "likes": 0,
+      "commentCount": 1
+    }
+  },
+  {
+    "title": "Open Interpreter rebuilds for open models, Stack Overflow shrinks, and more — Jul 20",
+    "url": "https://www.youtube.com/watch?v=xQAFTwcancg",
+    "sourceType": "youtube",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T20:14:54Z",
+      "viewCount": 1,
+      "likes": 0,
+      "commentCount": 0
+    }
+  },
+  {
+    "title": "Loova Ads Studio",
+    "url": "https://www.producthunt.com/products/loova-agents?utm_campaign=producthunt-api&utm_medium=api-v2&utm_source=Application%3A+CNS+Morning+Digest+%28ID%3A+287577%29",
+    "sourceType": "producthunt",
+    "summary": "Create AI ads that convert, not just look good",
+    "sourceMetadata": {
+      "upvotes": 484,
+      "publishedAt": "2026-07-20T07:01:00Z"
+    }
+  },
+  {
+    "title": "This makes complete sense, as models do longer and longer tasks that require more and more judgement decisions that add up, small differences in models result in very different kinds of outcomes.",
+    "url": "https://x.com/emollick/status/2079632371356250335",
+    "sourceType": "twitter",
+    "summary": "This makes complete sense, as models do longer and longer tasks that require more and more judgement decisions that add up, small differences in models result in very different kinds of outcomes.",
+    "sourceMetadata": {
+      "likes": 26,
+      "reposts": 2,
+      "replies": 2,
+      "quotes": 0,
+      "authorHandle": "emollick",
+      "publishedAt": "2026-07-21T18:19:29.000Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "Advertise in ChatGPT",
+    "url": "https://ads.openai.com/",
+    "sourceType": "hackernews",
+    "sourceMetadata": {
+      "points": 179,
+      "commentCount": 194
+    }
+  },
+  {
+    "title": "@HedgieMarkets 😱",
+    "url": "https://x.com/ylecun/status/2079482655842705437",
+    "sourceType": "twitter",
+    "summary": "@HedgieMarkets 😱",
+    "sourceMetadata": {
+      "likes": 67,
+      "reposts": 4,
+      "replies": 3,
+      "quotes": 0,
+      "authorHandle": "ylecun",
+      "publishedAt": "2026-07-21T08:24:34.000Z",
+      "peopleMatch": {
+        "personName": "Yann LeCun",
+        "matchedHandle": "ylecun",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "I have been searching for the most anti-Fable writing. I feel like I need to…",
+    "url": "https://bsky.app/profile/emollick.bsky.social/post/3mr4p5eq3ks2v",
+    "sourceType": "bluesky",
+    "summary": "I have been searching for the most anti-Fable writing. I feel like I need to…",
+    "sourceMetadata": {
+      "likes": 79,
+      "reposts": 5,
+      "replies": 6,
+      "quotes": 1,
+      "authorHandle": "emollick.bsky.social",
+      "publishedAt": "2026-07-21T01:52:33.165Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick.bsky.social",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "AI funding rounds",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "'VPNs are lawful technical tools,' says EU Court in landmark copyright ruling",
+    "url": "https://www.techradar.com/vpn/vpn-privacy-security/vpns-are-lawful-technical-tools-says-eu-court-in-landmark-anne-frank-copyright-ruling",
+    "sourceType": "hackernews",
+    "sourceMetadata": {
+      "points": 98,
+      "commentCount": 13
+    }
+  },
+  {
+    "title": "AgriciDaniel/claude-obsidian",
+    "url": "https://github.com/AgriciDaniel/claude-obsidian",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 9751,
+      "forks": 1138,
+      "publishedAt": "2026-05-28T00:42:43Z"
+    }
+  },
+  {
+    "title": "@anshuc 😂😂😂",
+    "url": "https://x.com/ylecun/status/2079227689001734347",
+    "sourceType": "twitter",
+    "summary": "@anshuc 😂😂😂",
+    "sourceMetadata": {
+      "likes": 299,
+      "reposts": 2,
+      "replies": 2,
+      "quotes": 0,
+      "authorHandle": "ylecun",
+      "publishedAt": "2026-07-20T15:31:25.000Z",
+      "peopleMatch": {
+        "personName": "Yann LeCun",
+        "matchedHandle": "ylecun",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "“The greatest arrogance was the stealing of the sun. The second-greatest…",
+    "url": "https://bsky.app/profile/emollick.bsky.social/post/3mr4pjuxpcs2v",
+    "sourceType": "bluesky",
+    "summary": "“The greatest arrogance was the stealing of the sun. The second-greatest…",
+    "sourceMetadata": {
+      "likes": 27,
+      "reposts": 3,
+      "replies": 1,
+      "quotes": 0,
+      "authorHandle": "emollick.bsky.social",
+      "publishedAt": "2026-07-21T01:59:31.374Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick.bsky.social",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "Bitcoin ETF Flows on July 23? Trading Odds &amp; Predictions (Jul. 23, 2026) | Polymarket",
+    "url": "https://polymarket.com/market/bitcoin-etf-flows-on-july-23",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-23T22:00:00Z"
+    }
+  },
+  {
+    "title": "Bitcoin ETF Flows on July 22? Trading Odds &amp; Predictions (Jul. 22, 2026) | Polymarket",
+    "url": "https://polymarket.com/market/bitcoin-etf-flows-on-july-22",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-22T22:00:00Z"
+    }
+  },
+  {
+    "title": "Bitcoin ETF Flows on July 21?",
+    "url": "https://polymarket.com/market/bitcoin-etf-flows-on-july-21",
+    "sourceType": "polymarket",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-21T22:00:00Z"
+    }
+  },
+  {
+    "title": "AI agents",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "MCP protocol",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "nexu-io/html-video",
+    "url": "https://github.com/nexu-io/html-video",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 4122,
+      "forks": 512,
+      "publishedAt": "2026-06-21T16:18:31Z"
+    }
+  },
+  {
+    "title": "Because Wharton professors have a sense of fun and whimsy.",
+    "url": "https://bsky.app/profile/emollick.bsky.social/post/3mr4lubebps2v",
+    "sourceType": "bluesky",
+    "summary": "Because Wharton professors have a sense of fun and whimsy.",
+    "sourceMetadata": {
+      "likes": 0,
+      "reposts": 0,
+      "replies": 1,
+      "quotes": 0,
+      "authorHandle": "emollick.bsky.social",
+      "publishedAt": "2026-07-21T00:53:44.374Z",
+      "peopleMatch": {
+        "personName": "Ethan Mollick",
+        "matchedHandle": "emollick.bsky.social",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "open-compress/claw-compactor",
+    "url": "https://github.com/open-compress/claw-compactor",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 2188,
+      "forks": 208,
+      "publishedAt": "2026-04-01T08:31:20Z"
+    }
+  },
+  {
+    "title": "Kimi K3: The open-weights escalation - by Nathan Lambert",
+    "url": "https://www.interconnects.ai/p/kimi-k3-the-open-weights-escalation",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-20T15:48:28.000Z"
+    }
+  },
+  {
+    "title": "Import AI 465: Open vs closed gaps; Kimi K3; Demis’ big policy plan",
+    "url": "https://jack-clark.net/2026/07/20/import-ai-465-open-vs-closed-gaps-kimi-k3-demis-big-policy-plan/",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-20T12:31:45.000Z"
+    }
+  },
+  {
+    "title": "Replay QA",
+    "url": "https://www.producthunt.com/products/replayio?utm_campaign=producthunt-api&utm_medium=api-v2&utm_source=Application%3A+CNS+Morning+Digest+%28ID%3A+287577%29",
+    "sourceType": "producthunt",
+    "summary": "Replay QA tells you what is broken before your users do",
+    "sourceMetadata": {
+      "upvotes": 417,
+      "publishedAt": "2026-07-20T07:01:00Z"
+    }
+  },
+  {
+    "title": "Fed rate cut by September 2026 meeting?",
+    "url": "https://polymarket.com/market/fed-rate-cut-by-september-2026-meeting-264-382",
+    "sourceType": "polymarket",
+    "summary": "No 96.5% · vol $476 · liq $95,818",
+    "sourceMetadata": {
+      "outcomes": [
+        "Yes",
+        "No"
+      ],
+      "outcomePrices": [
+        0.035,
+        0.965
+      ],
+      "leadingOutcome": "No",
+      "leadingProbability": 0.965,
+      "volumeUsd": 193270.6019779999,
+      "upvotes": 476.10526300000004,
+      "liquidityUsd": 95818.28342,
+      "publishedAt": "2026-06-17T00:00:00Z"
+    }
+  },
+  {
+    "title": "Import AI 464: Fables writes GPU kernels; AI automation; and analog computation",
+    "url": "https://jack-clark.net/2026/07/06/import-ai-464-fables-writes-gpu-kernels-ai-automation-and-analog-computation/",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-06T12:31:05.000Z",
+      "author": "Jack Clark"
+    }
+  },
+  {
+    "title": "Here's my full write-up of our conversation - or jump straight to 21:24 in the YouTube video here: https://t.co/B3mykO62ff",
+    "url": "https://x.com/simonw/status/2079553716492091426",
+    "sourceType": "twitter",
+    "summary": "Here's my full write-up of our conversation - or jump straight to 21:24 in the YouTube video here: https://t.co/B3mykO62ff",
+    "sourceMetadata": {
+      "likes": 103,
+      "reposts": 2,
+      "replies": 7,
+      "quotes": 0,
+      "authorHandle": "simonw",
+      "publishedAt": "2026-07-21T13:06:56.000Z"
+    }
+  },
+  {
+    "title": "remote work trends",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "swarmclawai/swarmvault",
+    "url": "https://github.com/swarmclawai/swarmvault",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 621,
+      "forks": 77,
+      "publishedAt": "2026-06-30T20:28:43Z"
+    }
+  },
+  {
+    "title": "I got a fun photo last night of a California Brown Pelican surrounded by…",
+    "url": "https://bsky.app/profile/simonwillison.net/post/3mr4pqpbhb22y",
+    "sourceType": "bluesky",
+    "summary": "I got a fun photo last night of a California Brown Pelican surrounded by…",
+    "sourceMetadata": {
+      "likes": 55,
+      "reposts": 4,
+      "replies": 6,
+      "quotes": 0,
+      "authorHandle": "simonwillison.net",
+      "publishedAt": "2026-07-21T02:03:31.268Z"
+    }
+  },
+  {
+    "title": "LLM infrastructure",
+    "sourceType": "google_trends",
+    "sourceMetadata": {}
+  },
+  {
+    "title": "@german_who @_catwu @trq212 Good call, so it does https://t.co/CKoBO2W8Vj https://t.co/D2YJOjHvIC",
+    "url": "https://x.com/simonw/status/2079556638126874914",
+    "sourceType": "twitter",
+    "summary": "@german_who @_catwu @trq212 Good call, so it does https://t.co/CKoBO2W8Vj https://t.co/D2YJOjHvIC",
+    "sourceMetadata": {
+      "likes": 47,
+      "reposts": 1,
+      "replies": 1,
+      "quotes": 0,
+      "authorHandle": "simonw",
+      "publishedAt": "2026-07-21T13:18:33.000Z"
+    }
+  },
+  {
+    "title": "@MaxBedw1 @_catwu @trq212 I rarely run into problems like that myself, but that is probably because I mostly run coding agents in my existing repos or repos I create from a template\n\nThey pick up my own personal style very reliably which seems to keep them in line",
+    "url": "https://x.com/simonw/status/2079558098298212368",
+    "sourceType": "twitter",
+    "summary": "@MaxBedw1 @_catwu @trq212 I rarely run into problems like that myself, but that is probably because I mostly run coding agents in my existing repos or repos I create from a template\n\nThey pick up my o",
+    "sourceMetadata": {
+      "likes": 5,
+      "reposts": 1,
+      "replies": 1,
+      "quotes": 0,
+      "authorHandle": "simonw",
+      "publishedAt": "2026-07-21T13:24:21.000Z"
+    }
+  },
+  {
+    "title": "@pentagoniac @anshuc 😂😂😂",
+    "url": "https://x.com/ylecun/status/2079227661604340112",
+    "sourceType": "twitter",
+    "summary": "@pentagoniac @anshuc 😂😂😂",
+    "sourceMetadata": {
+      "likes": 2,
+      "reposts": 0,
+      "replies": 0,
+      "quotes": 0,
+      "authorHandle": "ylecun",
+      "publishedAt": "2026-07-20T15:31:19.000Z",
+      "peopleMatch": {
+        "personName": "Yann LeCun",
+        "matchedHandle": "ylecun",
+        "bonusPoints": 20,
+        "matchType": "handle"
+      }
+    }
+  },
+  {
+    "title": "The Price of Happiness",
+    "url": "https://happiness-science.org/price-of-happiness/",
+    "sourceType": "hackernews",
+    "sourceMetadata": {
+      "points": 21,
+      "commentCount": 8
+    }
+  },
+  {
+    "title": "Reverse-engineering is cheap now",
+    "url": "https://simonwillison.net/2026/Jul/20/cheap-reverse-engineering/#atom-everything",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-20T19:24:05.000Z"
+    }
+  },
+  {
+    "title": "Import AI 463: Self-improving robots; a 10k Chinese GPU cluster; and an elegiac essay for the human era",
+    "url": "https://jack-clark.net/2026/06/29/import-ai-463-self-improving-robots-a-10k-chinese-gpu-cluster-and-an-elegiac-essay-for-the-human-era/",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-06-29T13:03:27.000Z",
+      "author": "Jack Clark"
+    }
+  },
+  {
+    "title": "Arbitrary musing and perambulations",
+    "url": "https://latentspace.substack.com/p/coming-soon",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2021-07-13T01:28:20.000Z",
+      "author": "Pushkar Ghanekar"
+    }
+  },
+  {
+    "title": "Slater – Low-memory graphdb designed for read-heavy graphs",
+    "url": "https://github.com/Hikari-Systems/slater",
+    "sourceType": "hackernews",
+    "sourceMetadata": {
+      "points": 14,
+      "commentCount": 6
+    }
+  },
+  {
+    "title": "yagil/ChatIDE",
+    "url": "https://github.com/yagil/ChatIDE",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 222,
+      "forks": 25,
+      "publishedAt": "2024-08-14T04:44:23Z"
+    }
+  },
+  {
+    "title": "alejandroll10/idea-evaluation-pipeline",
+    "url": "https://github.com/alejandroll10/idea-evaluation-pipeline",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 138,
+      "forks": 46,
+      "publishedAt": "2026-03-12T18:15:06Z"
+    }
+  },
+  {
+    "title": "@VarunGodbole @_catwu @trq212 Looks like it is",
+    "url": "https://x.com/simonw/status/2079562038175760626",
+    "sourceType": "twitter",
+    "summary": "@VarunGodbole @_catwu @trq212 Looks like it is",
+    "sourceMetadata": {
+      "likes": 4,
+      "reposts": 0,
+      "replies": 1,
+      "quotes": 0,
+      "authorHandle": "simonw",
+      "publishedAt": "2026-07-21T13:40:00.000Z"
+    }
+  },
+  {
+    "title": "CodingWithCalvin/VS-MCPServer",
+    "url": "https://github.com/CodingWithCalvin/VS-MCPServer",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 64,
+      "forks": 18,
+      "publishedAt": "2026-07-08T13:43:29Z"
+    }
+  },
+  {
+    "title": "wikibonsai/wikibonsai",
+    "url": "https://github.com/wikibonsai/wikibonsai",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 103,
+      "forks": 3,
+      "publishedAt": "2026-06-22T22:05:35Z"
+    }
+  },
+  {
+    "title": "Latest open artifacts (#22): Zyphra, Cohere, and Poolside are expanding the breadth of the ecosystem",
+    "url": "https://www.interconnects.ai/p/artifacts-22-zyphra-cohere-and-poolside",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-06-28T17:03:07.000Z",
+      "author": "Florian Brand"
+    }
+  },
+  {
+    "title": "Netxeo/skill-file-security",
+    "url": "https://github.com/Netxeo/skill-file-security",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 69,
+      "forks": 9,
+      "publishedAt": "2026-06-22T15:36:42Z"
+    }
+  },
+  {
+    "title": "zeitstein/brimm",
+    "url": "https://github.com/zeitstein/brimm",
+    "sourceType": "github",
+    "sourceMetadata": {
+      "stars": 110,
+      "forks": 0,
+      "publishedAt": "2025-08-16T16:08:38Z"
+    }
+  },
+  {
+    "title": "Design and Validation of a Lightweight 1D CNN for Affective Touch Classification in Soft Plush Companions",
+    "url": "https://arxiv.org/abs/2607.16196",
+    "sourceType": "arxiv",
+    "summary": "Soft, sensorized companions offer a physically safe and emotionally intuitive interface for socially assistive technologies, yet their deformability and multichannel tactile sensing complicate the",
+    "sourceMetadata": {
+      "categories": [
+        "cs.AI"
+      ]
+    }
+  },
+  {
+    "title": "Some Large Language Models Exhibit Consistent Risk Attitudes",
+    "url": "https://arxiv.org/abs/2607.16197",
+    "sourceType": "arxiv",
+    "summary": "As artificial intelligence systems are deployed in open-ended, high-stakes settings, a critical dimension remains unmeasured: how perceived risk is translated into action. We test whether large",
+    "sourceMetadata": {
+      "categories": [
+        "cs.AI"
+      ]
+    }
+  },
+  {
+    "title": "DocOCR-Eval: A Correction-Based Framework for OCR Tool Selection Without Ground Truth",
+    "url": "https://arxiv.org/abs/2607.16203",
+    "sourceType": "arxiv",
+    "summary": "Document parsing is a foundational step for document understanding tasks such as visual question answering and key information extraction, as it transforms unstructured scanned images into structured",
+    "sourceMetadata": {
+      "categories": [
+        "cs.LG"
+      ]
+    }
+  },
+  {
+    "title": "Fully-sensorized smart-eyewear platform for on-device Machine Learning",
+    "url": "https://arxiv.org/abs/2607.16222",
+    "sourceType": "arxiv",
+    "summary": "This paper presents ARGO, a smart eyewear platform designed to bridge ergonomic comfort, high computational throughput, and energy efficiency. Unlike cloud-dependent solutions, ARGO leverages the",
+    "sourceMetadata": {
+      "categories": [
+        "cs.LG"
+      ]
+    }
+  },
+  {
+    "title": "Lipschitz Continuity in Deep Learning: A Systematic Review of Theoretical Foundations, Estimation Methods, Regularization Approaches, and Certifiable Robustness",
+    "url": "https://arxiv.org/abs/2607.16329",
+    "sourceType": "arxiv",
+    "summary": "Lipschitz continuity is a fundamental property of neural networks that characterizes their sensitivity to input perturbations. It plays a pivotal role in deep learning, governing \\textbf{robustness},",
+    "sourceMetadata": {
+      "categories": [
+        "stat.ML"
+      ]
+    }
+  },
+  {
+    "title": "6 months to live for open models",
+    "url": "https://www.interconnects.ai/p/6-months-to-live-for-open-models",
+    "sourceType": "rss",
+    "sourceMetadata": {
+      "publishedAt": "2026-07-12T16:47:42.000Z",
+      "author": "Nathan Lambert"
+    }
+  },
+  {
+    "title": "Rater State Bias in RLHF Preference Data: An Audit Framework",
+    "url": "https://arxiv.org/abs/2607.16195",
+    "sourceType": "arxiv",
+    "summary": "We identify a structured confound in Reinforcement Learning from Human Feedback (RLHF). Pairwise preference labels are intended to reflect the compared outputs, but they may also reflect the rater's",
+    "sourceMetadata": {
+      "categories": [
+        "cs.AI"
+      ]
+    }
+  },
+  {
+    "title": "Reinforcement Learning-Guided NSGA-II Enhanced with Gray Relational Coefficient for Multi-Objective Optimization: Application to NASDAQ Portfolio Optimization",
+    "url": "https://arxiv.org/abs/2607.16194",
+    "sourceType": "arxiv",
+    "summary": "In modern financial markets, decision-makers increasingly rely on quantitative methods to navigate complex trade-offs among multiple, often conflicting objectives. This paper addresses constrained",
+    "sourceMetadata": {
+      "categories": [
+        "cs.LG"
+      ]
+    }
+  },
+  {
+    "title": "MTSSL: Meta-Thresholding Semi-Supervised Learning",
+    "url": "https://arxiv.org/abs/2607.16363",
+    "sourceType": "arxiv",
+    "summary": "A large body of Semi-supervised Learning~(SSL) algorithms encounter the threshold $\\tau$ to select pseudo-labels. The value of $\\tau$ across different SSL algorithms can vary depending on the",
+    "sourceMetadata": {
+      "categories": [
+        "stat.ML"
+      ]
+    }
+  },
+  {
+    "title": "Backpropagation-Free Trunk Training via the Split Forward Gradients",
+    "url": "https://arxiv.org/abs/2607.16612",
+    "sourceType": "arxiv",
+    "summary": "Backpropagation makes training deep networks memory intensive because it must store intermediate activations. Forward-mode methods avoid this cost, but their gradient estimates become increasingly",
+    "sourceMetadata": {
+      "categories": [
+        "stat.ML"
+      ]
+    }
+  }
+]

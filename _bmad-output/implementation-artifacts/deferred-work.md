@@ -1,5 +1,20 @@
 # Deferred work
 
+## Deferred from: code review of 90-4-dedupe-over-collapse-retune.md (2026-07-23)
+
+- **Entity-match over-clusters short opposite-topic titles** — e.g. `Nvidia Chip Shortage` × `Nvidia Chip Surplus` (shared/min ≈ 0.67–1.0). Bounded (2-item clusters, no source wipe). Intended fix: shared nouns must include the distinguishing token / anti-opposition guard; **MUST re-simulate the polymarket cluster before shipping**. Do not raise `shared≥3` blindly. Not in 90-4 PR.
+- **youtu.be/ID vs youtube.com/watch?v=ID distinct canon keys** — R1 embeds `v=` on watch hosts only; path-form youtu.be stays `youtu.be/<id>`. Same video across forms does not URL-cluster. Bridging belongs with invert-normalize backlog, not a silent R1 expand.
+- **Empty/missing `v=` watch URLs** — still fall through to query-stripping fallback and can collide on `youtube.com/watch`.
+- **`list=`-only watch URLs without `v=`** — can still collapse to `youtube.com/watch`; out of R1 scope.
+- **No m./music./nocookie host-variant unit tests** — production special-cases them; coverage gap only.
+- **`classifyPrimaryAbsorbAlarm` negative storedPrimaryCount → heavy-absorb** — trusted 90-2 counters are non-negative integers in practice.
+- **`attachSourceOutcomes` console.error unwired in tests** — helpers unit-tested; completion-script loop matches yt-stage posture.
+- **Reddit inject test not coupled to R4 alarm collection** — wipe/heavy-absorb covered in `parse-digest-source-outcomes` suite separately.
+
+## Deferred from: 90-4-dedupe-over-collapse-retune (2026-07-23)
+
+- **Invert normalize/canon identity policy** — today hosts special-case identity params (HN `id`, YouTube `v=`). Backlog: strip tracking-only (`utm_*`, `fbclid`, `gclid`, `ref`) and **preserve identity params by default** for all hosts. Explicitly out of 90-4 ship package.
+
 ## Deferred from: code review of 90-2-youtube-silent-drop-observability.md (2026-07-23)
 
 - **`digestSourceOutcomeValidator` numeric looseness** — new optional `fetchCount` / `storedPrimaryCount` / `contributedCount` use `v.optional(v.number())` like legacy `signalCount`; negatives/fractionals can persist.

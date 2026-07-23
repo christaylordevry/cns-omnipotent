@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-07-23T12:20:00+10:00
+# last_updated: 2026-07-23T14:00:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-07-23T12:20:00+10:00"
+last_updated: "2026-07-23T14:00:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
@@ -770,5 +770,5 @@ development_status:
   epic-90: in-progress
   90-1-restore-reddit-intake: done # 2026-07-23 RSS both layers; review patches (partial+budget, word-boundary); verify green
   90-2-youtube-silent-drop-observability: done # 2026-07-23 obs only; review Option1 yt-stage on youtube key; verify green
-  90-4-dedupe-over-collapse-retune: ready-for-dev # design APPROVED 2026-07-23 — R1(canon v=)+R2(prop)+R4(K=5); SKIP cap8; review impl before merge
+  90-4-dedupe-over-collapse-retune: done # R1(canon v=)+R2(prop≥0.5)+R4(stderr wipe/heavy-absorb K=5); SKIP cap8; code-review patches applied 2026-07-23
   90-3-youtube-quality-selection: backlog # blocked on 90-4

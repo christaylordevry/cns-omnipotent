@@ -1,0 +1,1377 @@
+{
+  "discovery": {
+    "youtube_url_normalize_bug": "normalizeDigestUrl strips ALL query params (except HN id). All watch?v=* → youtube.com/watch — C(25,2)=300 false URL edges. Same bug class HN already special-cased.",
+    "implication": "90-4 must treat youtube v= preservation as restoring TRUE url-arm semantics, not changing arm philosophy. Entity-match tightening alone is insufficient while this bug remains."
+  },
+  "reconstructed": {
+    "n": 141,
+    "youtube": 25
+  },
+  "winner_nouns": {
+    "title": "I got some really useful Claude prompting tips from @_catwu and @trq212 - it's time to stop overloading our prompts with",
+    "raw": [
+      "claude",
+      "fable",
+      "code"
+    ],
+    "distinctive": [
+      "fable"
+    ]
+  },
+  "fixed_url_mega": {
+    "size": 14,
+    "byType": {
+      "rss": 1,
+      "twitter": 1,
+      "youtube": 12
+    },
+    "edgeReasons": {
+      "entity": 13
+    }
+  },
+  "variants": {
+    "prod_broken_url_baseline": {
+      "name": "prod_broken_url_baseline",
+      "youtube_primaries": 0,
+      "reddit_primaries": 0,
+      "twitter_primaries": 16,
+      "total_clusters": 104,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 30,
+        "byType": {
+          "rss": 2,
+          "twitter": 3,
+          "youtube": 25
+        }
+      },
+      "multi": [
+        {
+          "size": 30,
+          "byType": {
+            "rss": 2,
+            "twitter": 3,
+            "youtube": 25
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_baseline_entity": {
+      "name": "fixed_url_baseline_entity",
+      "youtube_primaries": 10,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 115,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 14,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 12
+        }
+      },
+      "multi": [
+        {
+          "size": 14,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 12
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_no_entity": {
+      "name": "fixed_url_no_entity",
+      "youtube_primaries": 25,
+      "reddit_primaries": 0,
+      "twitter_primaries": 18,
+      "total_clusters": 137,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "rss_import_ai": {
+        "size": 1,
+        "byType": {
+          "rss": 1
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        }
+      ]
+    },
+    "fixed_url_cap8": {
+      "name": "fixed_url_cap8",
+      "youtube_primaries": 11,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 116,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 6,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 4
+        }
+      },
+      "multi": [
+        {
+          "size": 8,
+          "byType": {
+            "youtube": 8
+          },
+          "head": "youtube:Want to 10X Your Business With AI? Do This FIRST! #shor"
+        },
+        {
+          "size": 6,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 4
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_cap6": {
+      "name": "fixed_url_cap6",
+      "youtube_primaries": 12,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 117,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 6,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 4
+        }
+      },
+      "multi": [
+        {
+          "size": 6,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 4
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 6,
+          "byType": {
+            "youtube": 6
+          },
+          "head": "youtube:Want to 10X Your Business With AI? Do This FIRST! #shor"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Ep. 124: AI Literacy, Prompt Engineering & the Future o"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_cap12_srcfrac0.4": {
+      "name": "fixed_url_cap12_srcfrac0.4",
+      "youtube_primaries": 16,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 123,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 2,
+        "byType": {
+          "polymarket": 2
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 4,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 2
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 2
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Want to 10X Your Business With AI? Do This FIRST! #shor"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Temporal Teardown + Daily AI News | Atlas Studios — Dai"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:The Future of Real Estate Is Agentic AI: What Every Age"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Ep. 124: AI Literacy, Prompt Engineering & the Future o"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "polymarket": 2
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_distinctive": {
+      "name": "fixed_url_distinctive",
+      "youtube_primaries": 22,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 129,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_prop0.5": {
+      "name": "fixed_url_prop0.5",
+      "youtube_primaries": 18,
+      "reddit_primaries": 0,
+      "twitter_primaries": 18,
+      "total_clusters": 124,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 6,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 4
+        }
+      },
+      "multi": [
+        {
+          "size": 6,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 4
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_dist_prop0.5": {
+      "name": "fixed_url_dist_prop0.5",
+      "youtube_primaries": 22,
+      "reddit_primaries": 0,
+      "twitter_primaries": 18,
+      "total_clusters": 131,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 1,
+            "youtube": 1
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "twitter": 1,
+            "youtube": 1
+          },
+          "head": "twitter:Ethan Mollick on X: &quot;At the moment that everyone i"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    },
+    "fixed_url_cap8_distinctive": {
+      "name": "fixed_url_cap8_distinctive",
+      "youtube_primaries": 22,
+      "reddit_primaries": 0,
+      "twitter_primaries": 17,
+      "total_clusters": 129,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ]
+    }
+  },
+  "reddit_stress_fixed_url": {
+    "baseline_entity": {
+      "name": "baseline",
+      "youtube_primaries": 10,
+      "reddit_primaries": 1,
+      "twitter_primaries": 17,
+      "total_clusters": 116,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 24,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 12,
+          "reddit": 10
+        }
+      },
+      "multi": [
+        {
+          "size": 24,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 12,
+            "reddit": 10
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Local LLM setup guide 2"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ],
+      "reddit_absorbed_in_size8plus": 10,
+      "reddit_fetch": 15
+    },
+    "no_entity": {
+      "name": "off",
+      "youtube_primaries": 25,
+      "reddit_primaries": 6,
+      "twitter_primaries": 18,
+      "total_clusters": 143,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "rss_import_ai": {
+        "size": 1,
+        "byType": {
+          "rss": 1
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Why AI agents fail in prod 1"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "reddit": 4
+          },
+          "head": "reddit:Claude Code tips thread 0"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "reddit": 3
+          },
+          "head": "reddit:Local LLM setup guide 2"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        }
+      ],
+      "reddit_absorbed_in_size8plus": 0,
+      "reddit_fetch": 15
+    },
+    "cap8": {
+      "name": "baseline",
+      "youtube_primaries": 11,
+      "reddit_primaries": 3,
+      "twitter_primaries": 17,
+      "total_clusters": 119,
+      "polymarket_anthropic": {
+        "size": 5,
+        "byType": {
+          "polymarket": 5
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 7,
+        "byType": {
+          "rss": 1,
+          "twitter": 1,
+          "youtube": 4,
+          "reddit": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 8,
+          "byType": {
+            "youtube": 8
+          },
+          "head": "youtube:Want to 10X Your Business With AI? Do This FIRST! #shor"
+        },
+        {
+          "size": 7,
+          "byType": {
+            "rss": 1,
+            "twitter": 1,
+            "youtube": 4,
+            "reddit": 1
+          },
+          "head": "rss:A Fireside Chat with Cat and Thariq from the Claude Cod"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "polymarket": 5
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Why AI agents fail in prod 1"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Local LLM setup guide 2"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "reddit": 4
+          },
+          "head": "reddit:Claude Code tips thread 0"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ],
+      "reddit_absorbed_in_size8plus": 0,
+      "reddit_fetch": 15
+    },
+    "distinctive": {
+      "name": "distinctive",
+      "youtube_primaries": 22,
+      "reddit_primaries": 6,
+      "twitter_primaries": 17,
+      "total_clusters": 135,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Why AI agents fail in prod 1"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "reddit": 4
+          },
+          "head": "reddit:Claude Code tips thread 0"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "reddit": 3
+          },
+          "head": "reddit:Local LLM setup guide 2"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ],
+      "reddit_absorbed_in_size8plus": 0,
+      "reddit_fetch": 15
+    },
+    "cap8_distinctive": {
+      "name": "distinctive",
+      "youtube_primaries": 22,
+      "reddit_primaries": 6,
+      "twitter_primaries": 17,
+      "total_clusters": 135,
+      "polymarket_anthropic": {
+        "size": 1,
+        "byType": {
+          "polymarket": 1
+        }
+      },
+      "polymarket_btc": {
+        "size": 3,
+        "byType": {
+          "polymarket": 3
+        }
+      },
+      "rss_import_ai": {
+        "size": 2,
+        "byType": {
+          "rss": 2
+        }
+      },
+      "twitter_claude_tips": {
+        "size": 1,
+        "byType": {
+          "twitter": 1
+        }
+      },
+      "multi": [
+        {
+          "size": 5,
+          "byType": {
+            "rss": 1,
+            "twitter": 2,
+            "youtube": 2
+          },
+          "head": "rss:Nativ: Run AI models locally on your Mac"
+        },
+        {
+          "size": 5,
+          "byType": {
+            "reddit": 5
+          },
+          "head": "reddit:Why AI agents fail in prod 1"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "polymarket": 4
+          },
+          "head": "polymarket:Which company has best AI model end of July? Trading Od"
+        },
+        {
+          "size": 4,
+          "byType": {
+            "reddit": 4
+          },
+          "head": "reddit:Claude Code tips thread 0"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "polymarket": 3
+          },
+          "head": "polymarket:Bitcoin ETF Flows on July 23? Trading Odds &amp; Predic"
+        },
+        {
+          "size": 3,
+          "byType": {
+            "reddit": 3
+          },
+          "head": "reddit:Local LLM setup guide 2"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "bluesky": 2
+          },
+          "head": "bluesky:@simonwillison.net on Bluesky"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "youtube": 2
+          },
+          "head": "youtube:Simple RAG system on Proxmox LXC — a local LLM via dock"
+        },
+        {
+          "size": 2,
+          "byType": {
+            "rss": 2
+          },
+          "head": "rss:Kimi K3: The open-weights escalation - by Nathan Lamber"
+        }
+      ],
+      "reddit_absorbed_in_size8plus": 0,
+      "reddit_fetch": 15
+    }
+  },
+  "success_checklist": {
+    "break_twitter_youtube_vacuum": "twitter_claude_tips.size should drop; youtube_primaries >> 0",
+    "keep_polymarket_anthropic": "size should stay ~5 (or close)",
+    "keep_polymarket_btc": "size should stay ~3",
+    "keep_rss_import_or_kimi": "near-dup rss should stay collapsed if Jaccard/URL"
+  }
+}

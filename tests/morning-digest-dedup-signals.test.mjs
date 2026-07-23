@@ -56,6 +56,17 @@ describe('normalizeDigestUrl', () => {
       normalizeDigestUrl('https://news.ycombinator.com/item?id=222'),
     );
   });
+
+  it('preserves distinct YouTube watch v= ids after normalization (Story 90-4 R1)', () => {
+    assert.equal(
+      normalizeDigestUrl('https://www.youtube.com/watch?v=x3r7coukSKk&utm_source=digest'),
+      'https://youtube.com/watch?v=x3r7coukSKk',
+    );
+    assert.notEqual(
+      normalizeDigestUrl('https://youtube.com/watch?v=x3r7coukSKk'),
+      normalizeDigestUrl('https://youtube.com/watch?v=aKEQ0wRoRW0'),
+    );
+  });
 });
 
 describe('titleFingerprintJaccard', () => {
@@ -266,7 +277,28 @@ describe('shouldClusterSignals helpers', () => {
     );
   });
 
-  it('detects cross-title entity match within 24h', () => {
+  it('embeds youtube v= in canonicalDomainPath so distinct watches stay distinct (Story 90-4 R1)', () => {
+    const a = canonicalDomainPath('https://www.youtube.com/watch?v=x3r7coukSKk');
+    const b = canonicalDomainPath('https://youtube.com/watch?v=aKEQ0wRoRW0');
+    assert.equal(a, 'youtube.com/watch?v=x3r7coukSKk');
+    assert.equal(b, 'youtube.com/watch?v=aKEQ0wRoRW0');
+    assert.notEqual(a, b);
+    // AC: must fail if only normalizeDigestUrl is fixed but canon still returns youtube.com/watch
+    assert.notEqual(a, 'youtube.com/watch');
+    assert.ok(a.includes('v=x3r7coukSKk'));
+  });
+
+  it('yields 25 distinct canon keys for 25 distinct youtube watch URLs (Story 90-4 R1)', () => {
+    const urls = Array.from(
+      { length: 25 },
+      (_, i) => `https://www.youtube.com/watch?v=videoId${String(i).padStart(2, '0')}xx`,
+    );
+    const canons = urls.map((url) => canonicalDomainPath(url));
+    assert.equal(new Set(canons).size, 25);
+    assert.ok(canons.every((key) => key.startsWith('youtube.com/watch?v=')));
+  });
+
+  it('detects cross-title entity match within 24h when proportion ≥ 0.5 (Story 90-4 R2)', () => {
     const a = {
       title: 'OpenAI GPT-5 Release Event',
       sourceMetadata: { publishedAt: '2026-06-11T08:00:00.000Z' },
@@ -277,6 +309,19 @@ describe('shouldClusterSignals helpers', () => {
     };
     assert.equal(crossTitleEntityMatch(a, b), true);
     assert.equal(shouldClusterSignals(a, b), true);
+  });
+
+  it('rejects entity match when shared≥2 but proportion < 0.5 (Story 90-4 R2)', () => {
+    const a = {
+      title: 'Claude Prompting Tips Fable Code Agents Workflow Context Windows Memory',
+      sourceMetadata: { publishedAt: '2026-07-22T10:00:00.000Z' },
+    };
+    const b = {
+      title: 'Claude Prompting Tips Local Bakery Wins Award Ceremony Today',
+      sourceMetadata: { publishedAt: '2026-07-22T11:00:00.000Z' },
+    };
+    // shared: claude, prompting, tips (=3) but min noun set is large → proportion < 0.5
+    assert.equal(crossTitleEntityMatch(a, b), false);
   });
 });
 
@@ -329,5 +374,106 @@ describe('jaccard and fingerprint utilities', () => {
     const tokens = titleFingerprintTokens('Hello, World! — Test');
     assert.ok(tokens.includes('hello'));
     assert.ok(tokens.includes('world'));
+  });
+});
+
+describe('Story 90-4 fixture regression (2026-07-22 reconstructed)', () => {
+  it('R1+R2: 25 distinct yt canons, ≥18 yt primaries, legit clusters still collapse', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const fixturePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../_bmad-output/implementation-artifacts/90-4-reconstructed-pre-dedupe-2026-07-22.json',
+    );
+    const signals = JSON.parse(await readFile(fixturePath, 'utf8'));
+    assert.equal(signals.filter((s) => s.sourceType === 'youtube').length, 25);
+
+    const ytCanons = signals
+      .filter((s) => s.sourceType === 'youtube')
+      .map((s) => canonicalDomainPath(String(s.url ?? '')));
+    assert.equal(new Set(ytCanons).size, 25, 'R1: prod 25→1 must become 25 distinct canon keys');
+
+    const deduped = dedupeDigestSignals(signals);
+    const ytPrimaries = deduped.filter((s) => s.sourceType === 'youtube').length;
+    assert.ok(ytPrimaries >= 18, `expected ≥18 youtube primaries, got ${ytPrimaries}`);
+
+    const anth = deduped.find((s) =>
+      /anthropic|Which company has best AI model/i.test(String(s.title ?? '')),
+    );
+    assert.ok(anth, 'anthropic/best-AI-model cluster winner missing');
+    assert.equal(anth.sourceMetadata?.dedupClusterSize, 5, 'polymarket anthropic family must stay collapsed');
+
+    const btc = deduped.find((s) => /Bitcoin ETF/i.test(String(s.title ?? '')));
+    assert.ok(btc, 'Bitcoin ETF cluster winner missing');
+    assert.equal(btc.sourceMetadata?.dedupClusterSize, 3, 'Bitcoin ETF family must stay collapsed');
+
+    const importAi = deduped.find((s) => /Import AI 465/i.test(String(s.title ?? '')));
+    assert.ok(importAi, 'Import AI 465 cluster winner missing');
+    assert.equal(importAi.sourceMetadata?.dedupClusterSize, 2, 'Import AI 465 near-dup must stay collapsed');
+  });
+
+  it('R2 reconstructed+inject keeps ≥50% reddit primaries (AC: reddit)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const fixturePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../_bmad-output/implementation-artifacts/90-4-reconstructed-pre-dedupe-2026-07-22.json',
+    );
+    const reconstructed = JSON.parse(await readFile(fixturePath, 'utf8'));
+    const publishedAt = '2026-07-22T12:00:00.000Z';
+
+    // Diversified inject on reconstructed corpus (not a fragile full-SSOT snapshot).
+    // Titles are distinct so same-source Jaccard/entity does not self-wipe the inject;
+    // R4 heavy-absorb line is primary < 50% fetch — AC locks the complementary floor.
+    const injectTitles = [
+      'Homelab Rack Cable Management Checklist',
+      'Pottery Wheel Centering Drill Routine',
+      'Sailboat Standing Rigging Inspection',
+      'Beekeeping Spring Expansion Notes',
+      'Trail Running Shoe Rotation Log',
+      'Espresso Dialing Temperature Ladder',
+      'Reef Aquarium Alkalinity Stability',
+      'Vinyl Record Pressing Warpage Fixes',
+      'Dovetail Joint Layout Practice Board',
+      'Lunar Sketch Observing Session Log',
+      'Sourdough Starter Hydration Schedule',
+      'Climbing Knot Efficiency Practice',
+      'Darkroom Print Dodging Notes',
+      'Kayak Hull Repair Fiberglass Patch',
+      'Mycology Grain Spawn Colonization',
+    ];
+    const inject = injectTitles.map((title, i) => ({
+      section: 'reddit',
+      sourceType: 'reddit',
+      title,
+      url: `https://www.reddit.com/r/LocalLLaMA/comments/r904inj${i}/`,
+      sourceMetadata: { publishedAt, upvotes: 50 + i },
+    }));
+
+    const twitterMega = reconstructed.find(
+      (s) =>
+        s.sourceType === 'twitter' && /Claude prompting tips/i.test(String(s.title ?? '')),
+    );
+    assert.ok(twitterMega, 'reconstructed fixture must include Claude prompting tips twitter');
+    const threat = {
+      section: 'reddit',
+      sourceType: 'reddit',
+      title: 'Local Bakery Wins Award Claude Prompting Tips Homelab',
+      url: 'https://www.reddit.com/r/LocalLLaMA/comments/r904threat/',
+      sourceMetadata: { publishedAt, upvotes: 11 },
+    };
+    assert.equal(
+      crossTitleEntityMatch(twitterMega, threat),
+      false,
+      'proportion gate must block sparse noun overlap into the twitter mega title',
+    );
+
+    const allInject = [...inject, threat];
+    const injectUrls = new Set(allInject.map((s) => s.url));
+    const deduped = dedupeDigestSignals([...reconstructed, ...allInject]);
+    const redditPrimaries = deduped.filter((s) => injectUrls.has(s.url)).length;
+    const minKeep = Math.ceil(0.5 * allInject.length);
+    assert.ok(
+      redditPrimaries >= minKeep,
+      `reddit inject primaries ${redditPrimaries} must be ≥50% of injected (${minKeep}/${allInject.length})`,
+    );
   });
 });

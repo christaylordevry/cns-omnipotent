@@ -124,8 +124,64 @@ function isHnRedirectorUrl(url) {
 }
 
 /**
+ * YouTube watch hosts that identify videos via `v=` query (not path).
+ * youtu.be /shorts /embed keep identity in the path — no special case needed.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isYoutubeWatchHost(hostname) {
+  const host = String(hostname ?? '')
+    .replace(/^www\./i, '')
+    .toLowerCase();
+  return (
+    host === 'youtube.com' ||
+    host === 'm.youtube.com' ||
+    host === 'music.youtube.com' ||
+    host === 'youtube-nocookie.com'
+  );
+}
+
+/**
+ * @param {string} urlString
+ * @returns {boolean}
+ */
+function isYoutubeWatchUrl(urlString) {
+  try {
+    const u = new URL(urlString);
+    if (!isYoutubeWatchHost(u.hostname)) {
+      return false;
+    }
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    return path === '/watch';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Preserve `v=` identity the same way HN preserves `id` (Story 90-4 R1).
+ *
+ * @param {string} urlString
+ * @returns {string}
+ */
+function normalizeYoutubeWatchUrl(urlString) {
+  try {
+    const u = new URL(urlString);
+    const videoId = u.searchParams.get('v');
+    if (!videoId || !videoId.trim()) {
+      return normalizeHttpUrlStringFallback(urlString);
+    }
+    return `https://youtube.com/watch?v=${encodeURIComponent(videoId.trim())}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Inline port of src/ingest/duplicate.ts normalizeSourceUriForDedup + utm/fbclid strip.
  * HN item URLs preserve `id` so unrelated stories do not collapse to /item.
+ * YouTube watch URLs preserve `v=` so distinct videos do not collapse to /watch (Story 90-4).
  *
  * @param {string} uri
  * @returns {string}
@@ -141,6 +197,9 @@ export function normalizeDigestUrl(uri) {
   if (isHnRedirectorUrl(withoutTracking)) {
     return normalizeHnItemUrl(withoutTracking);
   }
+  if (isYoutubeWatchUrl(withoutTracking)) {
+    return normalizeYoutubeWatchUrl(withoutTracking);
+  }
   if (/^https?:\/\//i.test(withoutTracking)) {
     return normalizeHttpUrlStringFallback(withoutTracking);
   }
@@ -152,6 +211,10 @@ export function normalizeDigestUrl(uri) {
 }
 
 /**
+ * Domain+path key for cross-source clustering.
+ * YouTube `/watch` embeds `v=<id>` so distinct videos stay distinct (Story 90-4 R1).
+ * Patching only `normalizeDigestUrl` is insufficient — this arm dropped `u.search`.
+ *
  * @param {string} url
  * @returns {string}
  */
@@ -164,6 +227,14 @@ export function canonicalDomainPath(url) {
     const u = new URL(normalized);
     const host = u.hostname.replace(/^www\./i, '').toLowerCase();
     const path = u.pathname.replace(/\/+$/, '') || '/';
+    if (isYoutubeWatchHost(host) && path === '/watch') {
+      const videoId = u.searchParams.get('v');
+      if (videoId && videoId.trim()) {
+        // Collapse m./music./nocookie variants onto youtube.com for identity.
+        // Encode like normalizeYoutubeWatchUrl so both arms agree on identity.
+        return `youtube.com/watch?v=${encodeURIComponent(videoId.trim())}`;
+      }
+    }
     return `${host}${path}`;
   } catch {
     return '';
@@ -272,6 +343,9 @@ function signalPublishedAtMs(signal) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** Minimum shared/min(|A|,|B|) for entity-match (Story 90-4 R2). */
+const ENTITY_MATCH_PROPORTION = 0.5;
+
 /**
  * @param {Record<string, unknown>} a
  * @param {Record<string, unknown>} b
@@ -291,6 +365,10 @@ export function crossTitleEntityMatch(a, b) {
     }
   }
   if (shared < 2) {
+    return false;
+  }
+  const denom = Math.min(nounsA.length, nounsB.length);
+  if (denom === 0 || shared / denom < ENTITY_MATCH_PROPORTION) {
     return false;
   }
   const pubA = signalPublishedAtMs(a);

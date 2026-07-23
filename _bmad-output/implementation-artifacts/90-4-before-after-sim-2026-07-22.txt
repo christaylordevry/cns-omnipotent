@@ -1,0 +1,11 @@
+=== BEFORE/AFTER SIM (2026-07-22 reconstructed) ===
+R1 canon: prod unique yt keys=1 → R1 unique yt keys=25
+  sample prod: youtube.com/watch
+  sample R1: youtube.com/watch?v=x3r7coukSKk, youtube.com/watch?v=aKEQ0wRoRW0, youtube.com/watch?v=Sqltu1xopSs
+SHIP R1+R2: youtube_primaries=18 (target ≥18)
+  polymarket anth cluster size=5
+  Bitcoin ETF cluster size=3
+  Import AI 465 cluster size=2
+R4 alarms:
+  dedupe-primary-wipe: youtube fetchCount=25 storedPrimaryCount=0
+  dedupe-heavy-absorb: reddit fetchCount=15 storedPrimaryCount=1 (<50% of fetch)

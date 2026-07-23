@@ -461,6 +461,89 @@ export function shouldEmitYoutubeStageLine(adapterResults) {
 	);
 }
 
+/** Min fetchCount before primary-absorb alarms fire (Story 90-4 R4). */
+export const PRIMARY_ABSORB_ALARM_MIN_FETCH = 5;
+
+/**
+ * Hard wipe when primaries are zero; soft heavy-absorb when primaries < 50% of fetch
+ * (catches reddit-style partial absorb without a static cap). Pure observability.
+ *
+ * @param {{ fetchCount?: number; storedPrimaryCount?: number }} counts
+ * @returns {'wipe' | 'heavy-absorb' | null}
+ */
+export function classifyPrimaryAbsorbAlarm(counts) {
+	if (counts == null || typeof counts !== 'object') {
+		return null;
+	}
+	const fetchCount =
+		typeof counts.fetchCount === 'number' && Number.isFinite(counts.fetchCount)
+			? counts.fetchCount
+			: 0;
+	const storedPrimaryCount =
+		typeof counts.storedPrimaryCount === 'number' && Number.isFinite(counts.storedPrimaryCount)
+			? counts.storedPrimaryCount
+			: 0;
+	if (fetchCount < PRIMARY_ABSORB_ALARM_MIN_FETCH) {
+		return null;
+	}
+	if (storedPrimaryCount === 0) {
+		return 'wipe';
+	}
+	if (storedPrimaryCount < 0.5 * fetchCount) {
+		return 'heavy-absorb';
+	}
+	return null;
+}
+
+/**
+ * @param {string} sourceKey
+ * @param {'wipe' | 'heavy-absorb'} kind
+ * @param {{ fetchCount?: number; storedPrimaryCount?: number }} counts
+ * @returns {string}
+ */
+export function formatPrimaryAbsorbAlarmLine(sourceKey, kind, counts) {
+	const fetchCount = counts.fetchCount ?? 0;
+	const storedPrimaryCount = counts.storedPrimaryCount ?? 0;
+	if (kind === 'wipe') {
+		return (
+			`dedupe-primary-wipe: ${sourceKey}` +
+			` fetchCount=${fetchCount} storedPrimaryCount=0`
+		);
+	}
+	return (
+		`dedupe-heavy-absorb: ${sourceKey}` +
+		` fetchCount=${fetchCount} storedPrimaryCount=${storedPrimaryCount}` +
+		` (<50% of fetch)`
+	);
+}
+
+/**
+ * Build stderr warning lines from 90-2 triple counts (Story 90-4 R4).
+ * Does not mutate outcomes or add Convex fields — log-only, like yt-stage.
+ *
+ * @param {Array<{
+ *   sourceKey: string;
+ *   fetchCount?: number;
+ *   storedPrimaryCount?: number;
+ * }>} outcomes
+ * @returns {string[]}
+ */
+export function collectPrimaryAbsorbAlarmWarnings(outcomes) {
+	/** @type {string[]} */
+	const warnings = [];
+	for (const row of outcomes) {
+		const kind = classifyPrimaryAbsorbAlarm({
+			fetchCount: row.fetchCount,
+			storedPrimaryCount: row.storedPrimaryCount,
+		});
+		if (!kind) {
+			continue;
+		}
+		warnings.push(formatPrimaryAbsorbAlarmLine(row.sourceKey, kind, row));
+	}
+	return warnings;
+}
+
 /**
  * @param {{
  *   run?: Record<string, unknown>;

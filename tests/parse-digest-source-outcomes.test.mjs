@@ -3,7 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
 	buildSourceOutcomesFromPayload,
+	classifyPrimaryAbsorbAlarm,
+	collectPrimaryAbsorbAlarmWarnings,
 	countSourceSignalStats,
+	formatPrimaryAbsorbAlarmLine,
 	formatYoutubeStageLine,
 	mergeSourceOutcomeRows,
 	parseSourceOutcomesFromArtifact,
@@ -268,12 +271,11 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 	});
 
 	it('youtube-only healthy videos survive build→dedupe→score as primaries (Story 90-2 sanity)', () => {
-		// Distinct youtu.be paths — youtube.com/watch?v=* collapses to the same
-		// canonicalDomainPath (/watch) under current dedupe (retune is 90-4).
+		// Distinct identities via watch?v= and youtu.be path (Story 90-4 R1).
 		const videos = [
 			{
 				title: 'Rust async runtime redesign deep dive',
-				url: 'https://youtu.be/unique0abcde',
+				url: 'https://www.youtube.com/watch?v=unique0abcde',
 				channelTitle: 'Channel',
 				publishedAt: '2026-07-22T12:00:00.000Z',
 				viewCount: 100,
@@ -287,7 +289,7 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 			},
 			{
 				title: 'Quantum chemistry lab notebook techniques',
-				url: 'https://youtu.be/unique2klmno',
+				url: 'https://www.youtube.com/watch?v=unique2klmno',
 				channelTitle: 'Channel',
 				publishedAt: '2026-07-18T12:00:00.000Z',
 				viewCount: 102,
@@ -367,7 +369,7 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		});
 		assert.match(stage, /yt-stage collect=5 build=5 dedupe_primary=0 dedupe_contrib=\d+ score_primary=0/);
 
-		const outcomes = buildSourceOutcomesFromPayload({
+		const outcomes = resolveSourceOutcomes({
 			signals: deduped,
 			adapterResults: {
 				youtube: { success: true, data: { videos: youtubeVideos } },
@@ -377,6 +379,59 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 		assert.equal(youtube?.fetchCount, 5);
 		assert.equal(youtube?.storedPrimaryCount, 0);
 		assert.ok((youtube?.contributedCount ?? 0) >= 5);
+		assert.equal(
+			'primaryAbsorbAlarm' in (youtube ?? {}),
+			false,
+			'R4 must not persist primaryAbsorbAlarm on sourceOutcomes',
+		);
+		const warnings = collectPrimaryAbsorbAlarmWarnings(outcomes);
+		assert.ok(
+			warnings.some((line) => line.startsWith('dedupe-primary-wipe: youtube')),
+			'Story 90-4 R4 wipe alarm must appear as stderr warning text',
+		);
+	});
+
+	it('classifyPrimaryAbsorbAlarm hard wipe + soft heavy-absorb (Story 90-4 R4)', () => {
+		assert.equal(classifyPrimaryAbsorbAlarm(null), null);
+		assert.equal(classifyPrimaryAbsorbAlarm(undefined), null);
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 4, storedPrimaryCount: 0 }), null);
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 5, storedPrimaryCount: 0 }), 'wipe');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 25, storedPrimaryCount: 0 }), 'wipe');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 15, storedPrimaryCount: 1 }), 'heavy-absorb');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 10, storedPrimaryCount: 5 }), null);
+		assert.equal(
+			formatPrimaryAbsorbAlarmLine('youtube', 'wipe', { fetchCount: 25, storedPrimaryCount: 0 }),
+			'dedupe-primary-wipe: youtube fetchCount=25 storedPrimaryCount=0',
+		);
+		assert.equal(
+			formatPrimaryAbsorbAlarmLine('reddit', 'heavy-absorb', {
+				fetchCount: 15,
+				storedPrimaryCount: 1,
+			}),
+			'dedupe-heavy-absorb: reddit fetchCount=15 storedPrimaryCount=1 (<50% of fetch)',
+		);
+
+		const warnings = collectPrimaryAbsorbAlarmWarnings([
+			{
+				sourceKey: 'reddit',
+				fetchCount: 15,
+				storedPrimaryCount: 1,
+			},
+			{
+				sourceKey: 'youtube',
+				fetchCount: 25,
+				storedPrimaryCount: 0,
+			},
+			{
+				sourceKey: 'rss',
+				fetchCount: 10,
+				storedPrimaryCount: 8,
+			},
+		]);
+		assert.deepEqual(warnings, [
+			'dedupe-heavy-absorb: reddit fetchCount=15 storedPrimaryCount=1 (<50% of fetch)',
+			'dedupe-primary-wipe: youtube fetchCount=25 storedPrimaryCount=0',
+		]);
 	});
 
 	it('mergeSourceOutcomeRows preserves adapter error over markdown fired bullets', () => {
