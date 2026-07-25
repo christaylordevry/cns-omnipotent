@@ -43,6 +43,7 @@ function basePayload({ scored = false } = {}) {
 				disposition: 'priority',
 				normalizedEngagement: 61,
 				rankScore: 78,
+				topicSlug: 'ai-agents',
 			}
 		: {
 				section: 'hackernews',
@@ -638,10 +639,79 @@ describe('push-digest-convex.mjs', () => {
 		assert.equal(scoredSignal.args.signal.disposition, 'priority');
 		assert.equal(scoredSignal.args.signal.normalizedEngagement, 61);
 		assert.equal(scoredSignal.args.signal.rankScore, 78);
+		assert.equal(scoredSignal.args.signal.topicSlug, 'ai-agents');
 		assert.deepEqual(scoredSignal.args.signal.sourceMetadata, {
 			points: 142,
 			commentCount: 38,
 		});
+	});
+
+	it('passes topicSlug through to addDigestSignal when present (BD-4)', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = basePayload({ scored: true });
+		payload.signals[1].topicSlug = 'mcp-protocol';
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-slug' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({
+							status: 'success',
+							value: `digestSignals:sig-${body.args?.signal?.externalId ?? 'x'}`,
+						}),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
+		assert.ok(scoredSignal);
+		assert.equal(scoredSignal.args.signal.topicSlug, 'mcp-protocol');
+	});
+
+	it('omits topicSlug on addDigestSignal when unmatched (BD-4)', async () => {
+		/** @type {Array<{ path: string; args: Record<string, unknown> }>} */
+		const calls = [];
+		const payload = basePayload({ scored: true });
+		delete payload.signals[1].topicSlug;
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				calls.push({ path: body.path, args: body.args });
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-id-noslug' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({
+							status: 'success',
+							value: `digestSignals:sig-${body.args?.signal?.externalId ?? 'x'}`,
+						}),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		const addCalls = calls.filter((call) => call.path === 'digest:addDigestSignal');
+		const scoredSignal = addCalls.find((call) => call.args.signal?.title === 'Show HN: Agent framework');
+		assert.ok(scoredSignal);
+		assert.equal(Object.hasOwn(scoredSignal.args.signal, 'topicSlug'), false);
 	});
 
 	it('preserves pre-sorted rankScore descending order in addDigestSignal mutation calls (FR-14)', async () => {
@@ -922,5 +992,114 @@ describe('push-digest-convex.mjs', () => {
 			convexUrl: 'https://fallback.convex.cloud',
 			convexDeployKey: 'key|123',
 		});
+	});
+
+	it('OPS-2 AC5 — contract violation aborts before any Convex write (zero partial writes)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const payload = basePayload();
+		payload.signals[1] = {
+			...payload.signals[1],
+			sourceMetadata: {
+				...(payload.signals[1].sourceMetadata ?? {}),
+				viewCount: 523_806,
+				notInContractEver: true,
+			},
+		};
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			fetchFn: async () => {
+				fetchCalls += 1;
+				return mockResponse(200, JSON.stringify({ status: 'success', value: 'should-not-run' }));
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0, 'AC5: must not call Convex when contract fails');
+		assert.match(String(result.error), /notInContractEver/);
+		assert.match(String(result.error), /OPS-2 contract violation/);
+	});
+
+	it('OPS-2 AC5 — forceRescore + poison aborts before any Convex call (6dfc424 class)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const payload = basePayload({ scored: true });
+		payload.run = {
+			...payload.run,
+			digestRunId: 'run-force-rescore-poison',
+		};
+		payload.signals = payload.signals.map((signal, index) => ({
+			...signal,
+			digestSignalId: `sig-force-rescore-${index}`,
+			sourceMetadata: {
+				...(signal.sourceMetadata ?? {}),
+				...(index === 1 ? { notInContractEver: true } : {}),
+			},
+		}));
+
+		const result = await pushDigestToConvex({
+			env: baseEnv({ DIGEST_PUSH_JSON: JSON.stringify(payload) }),
+			forceRescore: true,
+			fetchFn: async () => {
+				fetchCalls += 1;
+				throw new Error('AC5 forceRescore: Convex must not be called on contract violation');
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0, 'AC5 forceRescore: zero Convex calls when contract fails');
+		assert.match(String(result.error), /notInContractEver/);
+		assert.match(String(result.error), /OPS-2 contract violation/);
+	});
+
+	it('OPS-2 AC5 — missing contract returns failed (not uncaught throw)', async () => {
+		/** @type {number} */
+		let fetchCalls = 0;
+		const result = await pushDigestToConvex({
+			env: baseEnv({
+				DIGEST_SIGNAL_CONTRACT_PATH: join(tmpdir(), 'ops2-missing-contract-never.json'),
+			}),
+			fetchFn: async () => {
+				fetchCalls += 1;
+				return mockResponse(200, JSON.stringify({ status: 'success', value: 'should-not-run' }));
+			},
+		});
+
+		assert.equal(result.ok, false);
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.signalsWritten, 0);
+		assert.equal(fetchCalls, 0);
+		assert.match(String(result.error), /OPS-2 contract missing/);
+	});
+
+	it('OPS-2 AC5 — valid payload still reaches createDigestRun (pre-flight does not false-block)', async () => {
+		/** @type {string[]} */
+		const paths = [];
+		const result = await pushDigestToConvex({
+			env: baseEnv(),
+			fetchFn: async (_url, init) => {
+				const body = JSON.parse(String(init?.body));
+				paths.push(body.path);
+				if (body.path === 'digest:createDigestRun') {
+					return mockResponse(200, JSON.stringify({ status: 'success', value: 'run-ops2-ok' }));
+				}
+				if (body.path === 'digest:addDigestSignal') {
+					return mockResponse(
+						200,
+						JSON.stringify({ status: 'success', value: 'digestSignals:sig-ops2' }),
+					);
+				}
+				return mockResponse(200, JSON.stringify({ status: 'success', value: null }));
+			},
+		});
+
+		assert.equal(result.ok, true);
+		assert.ok(paths.includes('digest:createDigestRun'));
+		assert.ok(paths.includes('digest:addDigestSignal'));
 	});
 });

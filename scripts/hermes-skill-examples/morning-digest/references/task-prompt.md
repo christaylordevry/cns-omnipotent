@@ -14,7 +14,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 > **Pin this block.** Invoke **every** step below (via `terminal` or MCP) **before** posting to `#hermes` or calling §9/§10 push scripts. Do **not** post the Discord digest or invoke `push-digest-convex.mjs` / `push-keyword-candidates.mjs` until **all** source terminals in this list have fired **and** the post-scoring digest push artifact terminal has fired (see **Persist digest push artifact** below). A failed source still counts as fired when you record `(source unavailable: …)` in the Output Contract — **skipping** a terminal is not allowed.
 
-**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → **18** → **19** → 3 → 6 → §9 map → dedup → score → artifact → Discord → §9 push → §10
+**Strict collection order:** 0 → 1 → 2 → 4 → 5 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → **14** → **15** → **16** → **17** → **18** → **19** → 3 → 6 → §9 map → dedup → score → artifact → **20** → Discord → §9 push → §10
 
 | Step | Source | Required invocation |
 |------|--------|---------------------|
@@ -36,6 +36,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 | 17 | Polymarket | `terminal(command="bash scripts/session-close/hermes-run-polymarket.sh", …)` — **MUST fire before Source 18**; keyword watchlist primary (`MORNING_DIGEST_POLYMARKET_KEYWORDS`) |
 | 18 | Threads | `terminal(command="bash scripts/session-close/hermes-run-threads.sh", …)` — **MUST fire before Source 19**; handle watchlist primary (`MORNING_DIGEST_THREADS_HANDLES`) |
 | 19 | LinkedIn | `terminal(command="bash scripts/session-close/hermes-run-linkedin.sh", …)` — **MUST fire before Source 3**; dual primary watchlists (`MORNING_DIGEST_LINKEDIN_COMPANIES` + `MORNING_DIGEST_LINKEDIN_PROFILES`) |
+| 20 | Internal dev-state | `terminal(command="npx tsx scripts/hermes-skill-examples/morning-digest/scripts/render-internal-dev-state-section.mjs", workdir=resolved_repo_root, timeout=30)` — **MUST fire after Persist digest push artifact and before Discord post** |
 | 3 | Perplexity (Deep Signal) | `terminal(command="bash scripts/session-close/hermes-run-perplexity.sh <shellQuote(top_trend_keyword)>", …)` — **after Source 19, before Source 6**; top keyword from Source 1 only |
 | 6 | Vault context | `node scripts/hermes-skill-examples/morning-digest/scripts/pick-signal-notebook.mjs`, then `node …/query-notebook.mjs` when ROUTED — **only after steps 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, and 3** |
 
@@ -43,7 +44,7 @@ For documentation purposes only (do not re-evaluate at runtime):
 
 **Source 3 gate:** Perplexity terminal **MUST fire** (and record success or `(source unavailable)`) after Source **19** and before Source 6 or Discord post.
 
-**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
+**Gate:** Only after steps **0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, and 6** complete → build and score `digest_push_payload` → **persist digest push artifact** → **Step 20 internal dev-state** → post the full Output Contract to `#hermes` → §9 `push-digest-convex.mjs` → §10 `push-keyword-candidates.mjs`.
 
 ## Hard constraints (must follow)
 
@@ -231,7 +232,7 @@ Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
 4. Else if `Array.isArray(gh_json.repos) && gh_json.repos.length > 0`:
    - Read **`gh_json.repos`** (`repos[]` stdout array key) only — each item uses `title` (owner/repo), `url`, `stars`, `forks` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `repos[].stars` → `sourceMetadata.stars`, `repos[].forks` → `sourceMetadata.forks` (omit `forks` when absent), `repos[].publishedAt` → `sourceMetadata.publishedAt` when present.
-   - Emit up to **N** repos (default **5**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled.
+   - Emit up to **N** repos (default **40**, configurable via `MORNING_DIGEST_GITHUB_MAX_REPOS`; per-query default **5** via `MORNING_DIGEST_GITHUB_PER_QUERY`); requires `MORNING_DIGEST_GITHUB_QUERIES` (comma-separated search strings) when enabled. Write **all** returned repos into §9 `digestSignals` (Stage A STORE_MAX / Story 89-1 — no write-time truncate).
    - For Discord **GitHub**, list each repo as `- <title> — <stars> stars, <forks> forks` where `<title>` is `repos[].title` (owner/repo string).
 5. Else → failure (empty `repos`, invalid shape, or parse error).
 6. On failure: section header **GitHub** + `- (source unavailable: <short reason>)` and **continue** to Source 8.
@@ -240,16 +241,16 @@ Stdout shape (GitHub only — do not confuse with Sources 5, 8, or 9 keys):
 
 ## Source 8 — Reddit
 
-Call `terminal` exactly once for Reddit top listings via public JSON (no OAuth). The script reads `MORNING_DIGEST_REDDIT_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). User-Agent (`CNS-morning-digest/1.0`) is set inside the script — the operator does not configure it for digest. It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
+Call `terminal` exactly once for Reddit **top-day Atom RSS** (app-free; no OAuth; `.json` 403s). The script reads `MORNING_DIGEST_REDDIT_*` from the process environment and from `$HOME/.hermes/trend-ingest.env` when present (it resolves the operator home via `resolveOperatorHome` under Hermes isolation). User-Agent (`linux:cns-morning-digest:1.0 (by /u/cns_operator)`) is hardcoded — no personal account required. It prints JSON with either `{"posts":[...]}` or `{"error":"..."}` and always exits **0** on failure:
 
 ```text
 terminal(command="bash scripts/session-close/hermes-run-reddit.sh", workdir=resolved_repo_root, timeout=45)
 ```
 
-Stdout shape (Reddit only — do not confuse with Sources 5, 7, or 9 keys):
+Stdout shape (Reddit only — do not confuse with Sources 5, 7, or 9 keys). RSS has **no** score/num_comments — **omit** `upvotes`/`commentCount` (never coerce to `0`):
 
 ```json
-{ "posts": [{ "title": "...", "url": "https://reddit.com/...", "upvotes": 42, "commentCount": 7 }] }
+{ "posts": [{ "title": "...", "url": "https://www.reddit.com/...", "publishedAt": "2026-07-22T07:04:40.000Z", "author": "/u/...", "externalId": "t3_..." }] }
 ```
 
 **After the Reddit terminal returns** (mandatory stdout threading — mirror Source 5 / §9 scoring):
@@ -258,10 +259,10 @@ Stdout shape (Reddit only — do not confuse with Sources 5, 7, or 9 keys):
 2. Try `rd_json = JSON.parse(rd_stdout)` inside try/catch or equivalent safe parse.
 3. If `rd_json.error` (string) → treat as failure; reason = that string.
 4. Else if `Array.isArray(rd_json.posts) && rd_json.posts.length > 0`:
-   - Read **`rd_json.posts`** (`posts[]` stdout array key) only — each item uses `title`, `url`, `upvotes`, `commentCount` (numbers), optional `publishedAt` (ISO string).
-   - When building §9 push signals, nest engagement under `sourceMetadata`: `posts[].upvotes` → `sourceMetadata.upvotes`, `posts[].commentCount` → `sourceMetadata.commentCount` (omit `commentCount` when absent), `posts[].publishedAt` → `sourceMetadata.publishedAt` when present.
-   - Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names; `r/` prefix is stripped automatically when present).
-   - For Discord **Reddit**, list each post as `- <title> — <upvotes> upvotes, <commentCount> comments`.
+   - Read **`rd_json.posts`** (`posts[]` stdout array key) only — each item uses `title`, `url`, optional `publishedAt` / `author` / `externalId`. Engagement keys are **absent** on the RSS path (Story 90-1). If a future enrich supplies finite `upvotes`/`commentCount`, map them under `sourceMetadata` (Path A); do **not** invent zeros.
+   - When building §9 push signals: map `posts[].publishedAt` → `sourceMetadata.publishedAt`, `posts[].author` → `sourceMetadata.author` when present; map `posts[].upvotes` / `posts[].commentCount` → `sourceMetadata` **only when** typeof number (omit otherwise — Path B / trendProxy when absent).
+   - Emit up to **N** posts (default **5**, configurable via `MORNING_DIGEST_REDDIT_MAX_POSTS`); requires `MORNING_DIGEST_REDDIT_SUBREDDITS` (comma-separated subreddit names; `r/` prefix is stripped automatically when present). Endpoint: `https://www.reddit.com/r/{sub}/top/.rss?t=day` (~2s between subs).
+   - For Discord **Reddit**, list each post as `- <title>` with optional ` — <author>` / relative time from `publishedAt` when present. **Do not** print `undefined upvotes` or invent engagement counts.
 5. Else → failure (empty `posts`, invalid shape, or parse error).
 6. On failure: section header **Reddit** + `- (source unavailable: <short reason>)` and **continue** to Source 9.
 7. **Anti-pattern:** Do not read `stories[]`, `repos[]`, or `entries[]` from Reddit stdout — those keys belong to Sources 5, 7, and 9 only.
@@ -410,11 +411,13 @@ Stdout shape (YouTube only — do not confuse with Sources 5, 7, 8, 9, 10, 11, o
 4. Else if `Array.isArray(yt_json.videos) && yt_json.videos.length > 0`:
    - Read **`yt_json.videos`** (`videos[]` stdout array key) only — each item uses `title`, `url`, `channelTitle`, `viewCount`, `likeCount`, `commentCount` (numbers), optional `publishedAt` (ISO string).
    - When building §9 push signals, nest engagement under `sourceMetadata`: `videos[].viewCount` → `sourceMetadata.viewCount`, `videos[].likeCount` → `sourceMetadata.likes`, `videos[].commentCount` → `sourceMetadata.commentCount`; map `videos[].channelTitle` → `sourceMetadata.author`; map `videos[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `videos[].title` → `summary`.
-   - Emit up to **N** videos (default **25**, hard max **50**, configurable via `MORNING_DIGEST_YOUTUBE_MAX_VIDEOS`); two-phase API flow (`search.list` then `videos.list` batch enrich).
+   - Emit up to **N** videos (default **12** keep-N after quality floor + view-velocity rank, hard max **50**, via `MORNING_DIGEST_YOUTUBE_MAX_VIDEOS`); over-fetch candidates (`PER_QUERY` default 10, lookback 72h, `CANDIDATE_MAX` 100) → `videos.list` enrich → floor (min views 200 AND likes 5) → velocity rank → keep-N (Story 90-3).
    - For Discord **YouTube**, list each video as `- <title> — <viewCount> views, <likeCount> likes` (use `title` text; `url` for §9 only — no bare URL link previews).
-5. Else → failure (empty `videos`, invalid shape, or parse error).
-6. On failure: section header **YouTube** + `- (source unavailable: <short reason>)` and **continue** to Source 14.
-7. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `headlines[]`, `launches[]`, or `entries[]` from YouTube stdout — those keys belong to other sources only.
+5. Else if `Array.isArray(yt_json.videos) && yt_json.videos.length === 0`:
+   - Treat as **success with no high-signal videos** (quality floor wiped the pool — Story 90-3 precision-over-recall). Discord: section header **YouTube** + `- (no high-signal videos today)`; §9 `youtube: []`. Do **not** treat as source unavailable.
+6. Else → failure (invalid shape or parse error).
+7. On failure: section header **YouTube** + `- (source unavailable: <short reason>)` and **continue** to Source 14.
+8. **Anti-pattern:** Do not read `repos[]`, `posts[]`, `headlines[]`, `launches[]`, or `entries[]` from YouTube stdout — those keys belong to other sources only.
 
 ## Source 14 — TikTok
 
@@ -627,7 +630,7 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
   "arxiv": [{ "title": "<string>", "snippet": "<string>" }],
   "hackernews": [{ "title": "<string>" }],
   "github": [{ "title": "<string>", "url": "<string>", "stars": <number> }],
-  "reddit": [{ "title": "<string>", "url": "<string>", "upvotes": <number> }],
+  "reddit": [{ "title": "<string>", "url": "<string>", "publishedAt": "<ISO optional>", "author": "<optional>" }],
   "rss": [{ "title": "<string>", "url": "<string>", "publishedAt": "<optional ISO string>" }],
   "producthunt": [{ "title": "<string>", "url": "<string>", "votesCount": <number> }],
   "twitter": [{ "title": "<string>", "url": "<string>", "likes": <number>, "reposts": <number> }],
@@ -661,7 +664,7 @@ After Sources 1–5, Source 7, Source 8, Source 9, Source 10, Source 11, Source 
 - **threads:** post **titles** from Source 18 when available (include `likes`, `reposts`, and `authorHandle` for ranking and peopleMatch); omit or `[]` when Threads is unavailable.
 - **linkedin:** post **titles** from Source 19 when available (include `likes`, `commentCount`, and `authorHandle` for ranking and peopleMatch); omit or `[]` when LinkedIn is unavailable.
 
-`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount) → Pinterest pin titles (up to 2, highest repinCount) → Polymarket questions (up to 2, highest volume24hrUsd) → Threads post titles (up to 2, highest likes + 2×reposts) → LinkedIn post titles (up to 2, highest likes + 2×commentCount), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
+`pick-signal-notebook.mjs` runs `buildDigestSignals(digest_sources)` internally: trends → headlines → Perplexity-derived phrases (up to 3) → arXiv titles (up to 3) → HackerNews titles (up to 3) → GitHub repo titles (up to 2, highest stars) → Reddit post titles (up to 2, highest upvotes when present else most recent `publishedAt`) → RSS title (up to 1, most recent by `publishedAt` when available) → Product Hunt launch titles (up to 2, highest votesCount) → X / Twitter post titles (up to 2, highest likes + reposts) → Bluesky post titles (up to 2, highest likes + reposts) → YouTube video titles (up to 2, highest viewCount) → TikTok video titles (up to 2, highest viewCount) → Instagram reel titles (up to 2, highest viewCount) → Pinterest pin titles (up to 2, highest repinCount) → Polymarket questions (up to 2, highest volume24hrUsd) → Threads post titles (up to 2, highest likes + 2×reposts) → LinkedIn post titles (up to 2, highest likes + 2×commentCount), case-insensitive dedupe (first wins), cap **10** signals total. Do **not** hand-build a `SIGNALS_JSON` array from memory.
 
 Before building the Source 6 pick-signal / query terminal commands, shell-quote every dynamic environment value with this exact POSIX single-quote transform:
 
@@ -857,6 +860,38 @@ terminal(
 
 The script always exits **0**. Stderr warnings use prefix `write-digest-push-artifact:`.
 
+## Step 20 — Internal dev-state (Story 81-2)
+
+Call `terminal` exactly once for internal dev-state markdown **after** the Persist digest push artifact terminal returns and **before** posting the Output contract to `#hermes`:
+
+```text
+terminal(
+  command="npx tsx scripts/hermes-skill-examples/morning-digest/scripts/render-internal-dev-state-section.mjs",
+  workdir=resolved_repo_root,
+  timeout=30
+)
+```
+
+Optional env (passed through when available): `CNS_VAULT_ROOT`, `DIGEST_RUN_AT` (same numeric `digest_start_ms` as `run.ranAt`).
+
+Stdout shape:
+
+```json
+{ "markdown": "## Internal work prioritized\n• ...", "status": "ok", "linesRendered": 3, "reason": null }
+```
+
+**After the Step 20 terminal returns** (mandatory stdout threading — mirror Source 5 HN stdout pattern):
+
+1. Let `internal_stdout` = Step 20 terminal **stdout** (trim whitespace; stderr is observability only).
+2. Try `internal_json = JSON.parse(internal_stdout)` inside try/catch or equivalent safe parse.
+3. If `internal_json.status === 'ok'` and `typeof internal_json.markdown === 'string' && internal_json.markdown.trim()`:
+   - Save `internal_dev_markdown = internal_json.markdown.trim()` for Discord Output contract **Internal work prioritized** block.
+4. Else (`empty`, `failed`, invalid JSON, or empty markdown):
+   - Omit the **Internal work prioritized** block entirely — **do not** abort the digest.
+5. On failure, stderr may contain `[internal-dev-digest] …` — observability only; never post a Discord warning for Step 20 failure.
+
+**Pre-flight gate:** Do not post to `#hermes` until Step 20 terminal has fired (success or graceful empty/failed).
+
 ## Output contract (post to `#hermes`)
 
 ```text
@@ -891,10 +926,11 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 (or - (source unavailable: <short reason>) when Source 7 failed)
 (DO NOT post bare URLs or link previews — use `- owner/repo — N stars, M forks` bullets from `title` only; `url` is for §9 Convex mapping.)
 
-**Reddit** (top posts)
-- <title> — <upvotes> upvotes, <commentCount> comments
+**Reddit** (top posts via Atom RSS)
+- <title> (optional — <author>; optional relative time from publishedAt)
 - ...
 (or - (source unavailable: <short reason>) when Source 8 failed)
+(Do **not** invent upvotes/comments — RSS has none; never print `undefined upvotes`.)
 
 **Newsletters / RSS**
 - <title> (optional — <author> when present)
@@ -956,7 +992,12 @@ The script always exits **0**. Stderr warnings use prefix `write-digest-push-art
 _Matched signal:_ <winning_signal>
 
 **Recommended focus:** <top keyword to watch today or (none — trends unavailable)>
+
+**Internal work prioritized**
+<Step 20 markdown when status ok; omit entire block when empty/failed>
 ```
+
+When Step 20 returned `status: 'ok'` with non-empty `markdown`, include the **Internal work prioritized** section using that markdown (includes `## Internal work prioritized` header and bullets). When Step 20 returned `empty` or `failed`, omit this section entirely — do not post `(source unavailable)` placeholder.
 
 **Vault context** when `route.status === 'NO_ROUTE'`:
 
@@ -1072,7 +1113,7 @@ Run **after** Sources **1–5, 7–15, 3, and 6** were attempted, `digest_source
   - HN: map RSS `score` → `points` (number); RSS `comments` → `commentCount` (number). Legacy `sourceMetadata.comments` remains accepted by validators but prefer `points` + `commentCount` for engagement normalization (64-4).
   - arXiv: `categories` (array of strings from `category`) when present.
   - GitHub: map `repos[].stars` → `sourceMetadata.stars` (number, **required** for engagement normalization); map `repos[].forks` → `sourceMetadata.forks` (number) when present; map `repos[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `stars`/`forks` at the signal root — `normalizeEngagement` reads only `sourceMetadata.stars`/`sourceMetadata.forks`; root-level fields score as null silently.
-  - Reddit: map `posts[].upvotes` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `posts[].commentCount` → `sourceMetadata.commentCount` (number) when present; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present. **Never** leave `upvotes`/`commentCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`/`sourceMetadata.commentCount`; root-level fields score as null silently.
+  - Reddit: map `posts[].publishedAt` → `sourceMetadata.publishedAt` and `posts[].author` → `sourceMetadata.author` when present. Map `posts[].upvotes` / `posts[].commentCount` → `sourceMetadata` **only when** typeof number (RSS omits them — Path B / trendProxy; never coerce missing to `0`). **Never** leave engagement at the signal root — `normalizeEngagement` reads only `sourceMetadata`.
   - RSS: map `entries[].publishedAt` → `sourceMetadata.publishedAt` when present; map `entries[].author` → `sourceMetadata.author` when present. **No engagement fields** — omit `stars`, `upvotes`, `points`, etc. **Never** leave `publishedAt`/`author` at the signal root.
   - Product Hunt: map `launches[].votesCount` → `sourceMetadata.upvotes` (number, **required** for engagement normalization); map `launches[].tagline` → `summary`; map `launches[].createdAt` → `sourceMetadata.publishedAt` when present. **Never** leave `votesCount` at the signal root — `normalizeEngagement` reads only `sourceMetadata.upvotes`; root-level fields score as null silently.
   - X / Twitter: map `posts[].likes` / `posts[].reposts` / `posts[].replies` / `posts[].quotes` → same keys under `sourceMetadata` (numbers); map `posts[].authorHandle` → `sourceMetadata.authorHandle`; map `posts[].publishedAt` → `sourceMetadata.publishedAt` when present; map first 200 chars of `posts[].title` → `summary`. **Never** leave engagement fields at the signal root — `normalizeEngagement` reads only `sourceMetadata.likes`/`reposts`/`replies`/`quotes`; root-level fields score as null silently.

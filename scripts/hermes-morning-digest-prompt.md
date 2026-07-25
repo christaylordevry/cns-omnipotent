@@ -6,7 +6,7 @@ You are running the **Hermes morning digest** for the CNS vault operator.
 2. Read **only** what Hermes can access **without** widening Discord allowlists: at minimum **constitution context** (`AI-Context/AGENTS.md` via normal Hermes load for this workdir) **plus** any Hermes-exposed tools already approved for this session (Vault IO reads, search, etc.). **Do not** fetch arbitrary URLs unless the same safety rules as HI-6 URL ingest apply (trusted HTTPS, single-URL operator intent).
 3. Produce **short** markdown suitable for Discord: prefer **under ~2000 characters** for the main delivery. If longer, split into **numbered follow-up** fragments in the same delivery channel with clear continuation markers, or post a short summary plus pointer to the vault file you wrote.
 4. Required sections in the **delivered** briefing body:
-   - `[!abstract]` with **2–3 sentences**
+   - **`> [!abstract]` blockquote** (every line prefixed with `>`, not a list item) with **2–3 sentences**
    - `## Today focus`
    - `## Open loops`
    - `## Risks / blockers`

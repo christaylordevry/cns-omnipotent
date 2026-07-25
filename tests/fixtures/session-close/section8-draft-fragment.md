@@ -1,6 +1,3 @@
-> Update this section whenever your active priorities shift.  
-> This is the "what am I working on right now" that agents check first.
-
 ### Project Status
 
 - epic-48: in-progress

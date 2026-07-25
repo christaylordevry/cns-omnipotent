@@ -11,20 +11,28 @@ import { validatePakeForVaultPath } from "../../src/pake/validate.js";
 
 type PakeType = "SourceNote" | "InsightNote" | "SynthesisNote" | "WorkflowNote" | "ValidationNote";
 
-const base = {
+const coreBase = {
   pake_id: "550e8400-e29b-41d4-a716-446655440000",
   title: "Example",
   created: "2026-04-02",
   modified: "2026-04-02",
   status: "draft" as const,
+  tags: ["a"],
+};
+
+const base = {
+  ...coreBase,
   confidence_score: 0.8,
   verification_status: "pending" as const,
   creation_method: "human" as const,
-  tags: ["a"],
 };
 
 function minimalForType(pake_type: PakeType) {
   return { ...base, pake_type };
+}
+
+function coreOnlyForType(pake_type: PakeType) {
+  return { ...coreBase, pake_type };
 }
 
 describe("path rules", () => {
@@ -63,7 +71,40 @@ describe("validatePakeForVaultPath", () => {
         validatePakeForVaultPath(`03-Resources/${pake_type}.md`, minimalForType(pake_type)),
       ).not.toThrow();
     });
+
+    it(`accepts core-only frontmatter (no quality enrichment) for ${pake_type}`, () => {
+      expect(() =>
+        validatePakeForVaultPath(`03-Resources/${pake_type}.md`, coreOnlyForType(pake_type)),
+      ).not.toThrow();
+    });
   }
+
+  it("rejects invalid confidence_score when present", () => {
+    expect(() =>
+      validatePakeForVaultPath("03-Resources/bad.md", {
+        ...coreOnlyForType("SourceNote"),
+        confidence_score: 2,
+      }),
+    ).toThrowError(expect.objectContaining({ code: "SCHEMA_INVALID" }));
+  });
+
+  it("rejects invalid verification_status when present", () => {
+    expect(() =>
+      validatePakeForVaultPath("03-Resources/bad.md", {
+        ...coreOnlyForType("SourceNote"),
+        verification_status: "unknown",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "SCHEMA_INVALID" }));
+  });
+
+  it("rejects invalid creation_method when present", () => {
+    expect(() =>
+      validatePakeForVaultPath("03-Resources/bad.md", {
+        ...coreOnlyForType("SourceNote"),
+        creation_method: "robot",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "SCHEMA_INVALID" }));
+  });
 
   it("skips validation for inbox paths regardless of frontmatter shape", () => {
     expect(() =>

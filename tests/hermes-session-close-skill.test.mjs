@@ -166,6 +166,8 @@ describe("Story 28.1 Hermes session-close skill mirror", () => {
 
     const driveSync = readFileSync(driveExportSyncPath, "utf8");
     assert.ok(driveSync.includes("NOTEBOOKLM_DRIVE_DOC_ID"));
+    assert.ok(driveSync.includes("uploadType=media") || driveSync.includes("media"));
+    assert.ok(driveSync.includes("PDF") || driveSync.includes("pdf"));
 
     const template = readFileSync(discordReplyTemplatePath, "utf8");
     assert.ok(template.includes("error_class"));

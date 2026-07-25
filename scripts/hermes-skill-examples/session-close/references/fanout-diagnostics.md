@@ -64,7 +64,9 @@ Rows merge **in place** on `notebook_id` (no duplicates). Never write export fil
 | `duplicate_source` | `duplicate`, `already exists`, `already added` |
 | `api_error` | `HTTP 5xx`, `502`, `503`, `504`, `internal server`, `service unavailable` |
 | `unknown` | default (e.g. bare `Could not add file source.`) |
-| `drive_write_error` | Drive Doc overwrite failed (drive-sync path only; set via merge `--error-class` or sync script) |
+| `drive_write_error` | Drive PDF media overwrite failed (drive-sync path only; set via merge `--error-class` or sync script) |
+| `nlm_list_timeout` | Drive-sync: `nlm source list` hit list exec timeout (default 25 s / `NLM_LIST_TIMEOUT_MS`; explicit `error_class`) |
+| `nlm_sync_timeout` | Drive-sync: `nlm source sync` hit sync exec timeout (default 120 s / `NLM_SYNC_TIMEOUT_MS`; explicit `error_class`) |
 
 ## HTTP status parsing
 

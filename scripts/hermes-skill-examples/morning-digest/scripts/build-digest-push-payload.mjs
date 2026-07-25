@@ -73,7 +73,7 @@ function omitUndefinedKeys(opts) {
  *   arxiv?: { papers?: Array<{ title?: string; snippet?: string; link?: string; category?: string }> };
  *   hackernews?: { stories?: Array<{ title?: string; link?: string; score?: number; comments?: number }> };
  *   github?: { repos?: Array<{ title?: string; url?: string; stars?: number; forks?: number; publishedAt?: string }> };
- *   reddit?: { posts?: Array<{ title?: string; url?: string; upvotes?: number; commentCount?: number; publishedAt?: string }> };
+ *   reddit?: { posts?: Array<{ title?: string; url?: string; upvotes?: number; commentCount?: number; publishedAt?: string; author?: string; externalId?: string }> };
  *   rss?: { entries?: Array<{ title?: string; url?: string; publishedAt?: string; author?: string }> };
  *   producthunt?: { launches?: Array<{ title?: string; tagline?: string; url?: string; votesCount?: number; createdAt?: string }> };
  *   twitter?: { posts?: Array<{ title?: string; url?: string; likes?: number; reposts?: number; replies?: number; quotes?: number; authorHandle?: string; publishedAt?: string }> };
@@ -226,6 +226,10 @@ export function buildDigestPushPayload(sources) {
       continue;
     }
     const url = String(post.url ?? '').trim() || undefined;
+    const rawExternalId =
+      typeof post.externalId === 'string' && post.externalId.trim()
+        ? post.externalId.trim()
+        : undefined;
     signals.push(
       omitUndefinedKeys({
         section: 'reddit',
@@ -233,11 +237,20 @@ export function buildDigestPushPayload(sources) {
         title,
         url,
         rank: rank++,
-        externalId: url ? shortSha256(url) : shortSha256(`${title}:${date}`),
+        externalId: rawExternalId || (url ? shortSha256(url) : shortSha256(`${title}:${date}`)),
         sourceMetadata: omitUndefinedKeys({
-          upvotes: typeof post.upvotes === 'number' ? post.upvotes : undefined,
-          commentCount: typeof post.commentCount === 'number' ? post.commentCount : undefined,
+          // RSS omits upvotes/commentCount (undefined) — never coerce to 0 (Path A trap).
+          // Finite numbers (e.g. future Firecrawl enrich) take Path A automatically.
+          upvotes:
+            typeof post.upvotes === 'number' && Number.isFinite(post.upvotes)
+              ? post.upvotes
+              : undefined,
+          commentCount:
+            typeof post.commentCount === 'number' && Number.isFinite(post.commentCount)
+              ? post.commentCount
+              : undefined,
           publishedAt: post.publishedAt,
+          author: typeof post.author === 'string' && post.author.trim() ? post.author.trim() : undefined,
         }),
       }),
     );

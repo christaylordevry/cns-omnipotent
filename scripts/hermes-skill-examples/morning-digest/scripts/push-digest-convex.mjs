@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { assertPayloadMatchesDigestSignalContract } from './digest-signal-contract-guard.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './fetch-arxiv-rss.mjs';
 
 export const MISSING_CONVEX_ENV_ERROR = 'missing-convex-env';
@@ -395,6 +396,33 @@ export async function pushDigestToConvex(opts = {}) {
     return formatPushResult({ status: 'error', reason: 'invalid-input' });
   }
 
+  // OPS-2 AC5: validate against contract BEFORE any Convex write (zero partial writes).
+  // Catch load/parse throws (missing/malformed/hollow fieldSets) so they take the same
+  // failed path as field violations — OPS-1 alert wiring depends on formatPushResult.
+  /** @type {{ ok: true; contractPath: string } | { ok: false; contractPath?: string; violations?: string[]; message: string }} */
+  let contractCheck;
+  try {
+    contractCheck = assertPayloadMatchesDigestSignalContract(payload, env);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`push-digest-convex: ${message}`);
+    return formatPushResult({
+      status: 'failed',
+      signalsWritten: 0,
+      reason: message,
+      expectedCount: countValidSignals(payload.signals),
+    });
+  }
+  if (!contractCheck.ok) {
+    console.error(`push-digest-convex: ${contractCheck.message}`);
+    return formatPushResult({
+      status: 'failed',
+      signalsWritten: 0,
+      reason: contractCheck.message,
+      expectedCount: countValidSignals(payload.signals),
+    });
+  }
+
   const expectedCount = countValidSignals(payload.signals);
   const convexEnv = await resolveConvexPushEnv(env);
   if (!convexEnv) {
@@ -472,7 +500,12 @@ export async function pushDigestToConvex(opts = {}) {
       typeof payload.run.ranAt === 'number' && Number.isFinite(payload.run.ranAt)
         ? payload.run.ranAt
         : Date.now();
-    const persistedRun = { ...payload.run, ranAt, status: 'started' };
+    // digestRunId on run is rescore-transport only — never send to createDigestRun.
+    const persistedRun = {
+      ...omitKeys(payload.run, ['digestRunId']),
+      ranAt,
+      status: 'started',
+    };
     const createdId = await postConvexMutation(
       fetchFn,
       convexEnv,

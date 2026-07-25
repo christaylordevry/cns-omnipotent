@@ -35,7 +35,13 @@ import {
   normalizeEngagement,
   normalizePeopleHandle,
   resolvePeopleMatch,
+  resolveWatchlistMatch,
   scorePeopleBonuses,
+  slugFromKeyword,
+  TOPIC_SLUG_MAX_LEN,
+  TOPIC_SLUG_PARITY_CASES,
+  WATCHLIST_MATCH_MIN_CONFIDENCE,
+  normalizeWatchlistTerm,
   parseNexusPeopleYaml,
   overlapRatio,
   parseDevelopmentStatus,
@@ -78,6 +84,7 @@ const nexusPeopleExamplePath = join(testDir, '../scripts/nexus-people.yaml.examp
 function baseCtx(overrides = {}) {
   return {
     domainTokens: [],
+    domainKeywords: [],
     personalTokens: [],
     goalWeightedTokens: [],
     nexusPeople: [],
@@ -2153,5 +2160,195 @@ describe('score-digest-signals CLI', () => {
 
     assert.equal(JSON.parse(stdout.trim()).length, 0);
     assert.match(stderr, /score-digest-signals: warning/);
+  });
+});
+
+describe('BD-4 watchlist topicSlug stamp', () => {
+  const domainKeywords = [
+    'AI agents',
+    'LLM infrastructure',
+    'MCP protocol',
+    'AI coding tools',
+  ];
+  const domainTokens = [
+    ...new Set(
+      domainKeywords.flatMap((keyword) =>
+        tokenizeSignalText(keyword, undefined),
+      ),
+    ),
+  ];
+
+  // Pre-computed BEFORE stamp landed (2026-07-20) — AC4 golden regression.
+  const RANK_SCORE_GOLDEN = [
+    {
+      externalId: '1',
+      scores: {
+        relevance: 61,
+        personalRelevance: 0,
+        novelty: 100,
+        urgency: 13,
+        momentum: 45,
+      },
+      rankScore: 35,
+      disposition: 'watch',
+      rank: 1,
+    },
+    {
+      externalId: '3',
+      scores: {
+        relevance: 35,
+        personalRelevance: 0,
+        novelty: 100,
+        urgency: 14,
+        momentum: 35,
+      },
+      rankScore: 28,
+      disposition: 'watch',
+      rank: 2,
+    },
+    {
+      externalId: '2',
+      scores: {
+        relevance: 0,
+        personalRelevance: 0,
+        novelty: 100,
+        urgency: 11,
+        momentum: 25,
+      },
+      rankScore: 18,
+      disposition: 'watch',
+      rank: 3,
+    },
+  ];
+
+  const goldenSignals = [
+    {
+      section: 'hackernews',
+      sourceType: 'hackernews',
+      title: 'Show HN: Building production AI agents with MCP protocol',
+      summary: 'A deep dive into LLM infrastructure for coding agents',
+      url: 'https://example.com/1',
+      externalId: '1',
+    },
+    {
+      section: 'arxiv',
+      sourceType: 'arxiv',
+      title: 'Unrelated gardening tips for tomatoes',
+      summary: 'How to mulch your raised beds',
+      url: 'https://example.com/2',
+      externalId: '2',
+    },
+    {
+      section: 'news',
+      sourceType: 'newsapi',
+      title: 'AI coding tools surge in enterprise',
+      summary: 'Vendors race to ship AI coding tools',
+      url: 'https://example.com/3',
+      externalId: '3',
+    },
+  ];
+
+  it('slugFromKeyword matches Convex/C9 parity case list', () => {
+    assert.equal(TOPIC_SLUG_MAX_LEN, 80);
+    for (const { keyword, expected } of TOPIC_SLUG_PARITY_CASES) {
+      assert.equal(slugFromKeyword(keyword), expected, keyword);
+    }
+  });
+
+  it('normalizeWatchlistTerm collapses case and whitespace', () => {
+    assert.equal(normalizeWatchlistTerm('  AI   Agents '), 'ai agents');
+  });
+
+  it('resolveWatchlistMatch picks the strongest IDF-weighted match', () => {
+    const signal = {
+      title: 'Deep dive on MCP protocol for agent tools',
+      summary: 'Model Context Protocol',
+    };
+    const match = resolveWatchlistMatch(signal, domainKeywords);
+    assert.ok(match);
+    assert.equal(match.topicSlug, 'mcp-protocol');
+    // First YAML keyword is "AI agents" — must not win when MCP scores higher.
+    assert.notEqual(match.topicSlug, 'ai-agents');
+  });
+
+  it('resolveWatchlistMatch omits an ambiguous common-token tie', () => {
+    const keywords = ['AI agents', 'biotech AI', 'AI marketing tools'];
+    const signal = { title: 'AI advice made people less accurate', summary: '' };
+    const match = resolveWatchlistMatch(signal, keywords);
+    assert.equal(match, null);
+  });
+
+  it('resolveWatchlistMatch weights a discriminating watchlist token above common AI', () => {
+    assert.equal(WATCHLIST_MATCH_MIN_CONFIDENCE, 50);
+    const keywords = ['AI agents', 'biotech AI', 'AI marketing tools'];
+    const match = resolveWatchlistMatch(
+      { title: 'A biotech breakthrough enters clinical trials', summary: '' },
+      keywords,
+    );
+    assert.ok(match);
+    assert.equal(match.topicSlug, 'biotech-ai');
+  });
+
+  it('does not route the live langchain false-positive fixture to biotech-ai', () => {
+    const keywords = [
+      'AI agents',
+      'AI coding tools',
+      'AI marketing tools',
+      'biotech AI',
+      'AI funding rounds',
+      'design to code AI',
+    ];
+    const match = resolveWatchlistMatch(
+      { title: 'langchain-ai/langchain', summary: 'Build context-aware reasoning applications' },
+      keywords,
+    );
+    assert.equal(match, null);
+  });
+
+  it('resolveWatchlistMatch returns null when nothing matches', () => {
+    const match = resolveWatchlistMatch(
+      { title: 'Tomato mulch guide', summary: 'raised beds' },
+      domainKeywords,
+    );
+    assert.equal(match, null);
+  });
+
+  it('scoreDigestSignals stamps topicSlug on match and omits on miss', () => {
+    const ctx = baseCtx({
+      domainTokens,
+      domainKeywords,
+      runAt: 1_750_000_000_000,
+    });
+    const scored = scoreDigestSignals(goldenSignals, ctx);
+    const byId = Object.fromEntries(scored.map((s) => [s.externalId, s]));
+    // Signal 1 fully covers several keywords, so the ambiguous leader is deliberately omitted.
+    assert.equal(Object.hasOwn(byId['1'], 'topicSlug'), false);
+    assert.equal(byId['3'].topicSlug, 'ai-coding-tools');
+    assert.equal(Object.hasOwn(byId['2'], 'topicSlug'), false);
+  });
+
+  it('clears an inherited topicSlug when rescoring no longer finds a match', () => {
+    const [scored] = scoreDigestSignals(
+      [{ ...goldenSignals[1], topicSlug: 'ai-agents' }],
+      baseCtx({ domainTokens, domainKeywords, runAt: 1_750_000_000_000 }),
+    );
+    assert.equal(Object.hasOwn(scored, 'topicSlug'), false);
+  });
+
+  it('rankScore golden fixture is unchanged after stamp (AC4)', () => {
+    const ctx = baseCtx({
+      domainTokens,
+      domainKeywords,
+      runAt: 1_750_000_000_000,
+    });
+    const scored = scoreDigestSignals(goldenSignals, ctx);
+    const actual = scored.map((s) => ({
+      externalId: s.externalId,
+      scores: s.scores,
+      rankScore: s.rankScore,
+      disposition: s.disposition,
+      rank: s.rank,
+    }));
+    assert.deepEqual(actual, RANK_SCORE_GOLDEN);
   });
 });

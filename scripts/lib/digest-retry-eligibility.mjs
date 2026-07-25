@@ -39,6 +39,9 @@ export const DIGEST_LOG_ACTIONS = new Set([
   'discord-only-repair-ok',
   'discord-only-repair-failed',
   'discord-only-repair-skipped-no-artifact',
+  'selective-source-refetch',
+  'skipped-already-refetched',
+  'skipped-no-refetch-needed',
 ]);
 
 /**

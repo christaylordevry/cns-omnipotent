@@ -1,0 +1,107 @@
+90-3 YouTube quality selection — LIVE before/after sim
+simAt=2026-07-23T04:10:25.396Z
+queries=10 searchUnits=1000 enrichIds=93 estimatedQuota=1002
+BEFORE: lookback24 + perQuery3 + date-order cap25 → n=25
+AFTER:  lookback72 + perQuery10 → candidates=93 floor(views>=500,likes>=10)→7 keepN=12 by viewVelocity
+
+=== SUMMARY ===
+BEFORE views med/avg/max: 6/123/1267
+AFTER  views med/avg/max: 742/1210/3498
+BEFORE likes med/avg: 0/2
+AFTER  likes med/avg: 21/47
+BEFORE vel med/avg: 5.9/60.5
+AFTER  vel med/avg: 223.4/248.6
+overlap before∩afterKept=1/25
+
+=== BEFORE (date-ordered 25) ===
+ 1 |       31v |     2L | vel=   48.8 | age=  0.6h | Are Your AI Agents Really Production Ready?
+ 2 |       20v |     2L | vel=   19.8 | age=    1h | The Tiniest AI Agent on GitHub Has Nearly 50K Stars
+ 3 |        1v |     0L | vel=    0.3 | age=  2.9h | AI Agents Take Off, Gemini Flash Updates &amp; Mistral | EXAI Global AI 
+ 4 |       20v |     0L | vel=   13.4 | age=  1.5h | The AI Kernel That Doesn&#39;t Trust AI
+ 5 |      433v |     1L | vel=  369.3 | age=  1.2h | Claude Code 毎回繋ぎ直してない?/configで常時接続
+ 6 |       22v |     4L | vel=   12.3 | age=  1.8h | 我让Claude Code和Codex同时剪视频 #hyperframes #claude #ai剪视频
+ 7 |      618v |    15L | vel=  279.1 | age=  2.2h | AIへの指示は「8割」いらなかった——Claude Code開発チームの結論
+ 8 |        2v |     0L | vel=    1.3 | age=  1.6h | Agentic AI Course in Hyderabad | Build AI Agents with LangChain, LangGra
+ 9 |        1v |     0L | vel=    0.6 | age=  1.7h | Why a Vector Database Isn&#39;t Enough for Multi-Agent Memory
+10 |        0v |     0L | vel=      0 | age=  3.7h | - Why Microsoft and Meta’s 30% Nasdaq Pullbacks Are Signalling a Massive
+11 |        0v |     0L | vel=      0 | age=  0.1h | Vector Databases Part 5 — The Production Checklist · AI Bake A Day #05
+12 |       10v |     0L | vel=    7.5 | age=  1.3h | #systemdesign #motivation #softwarearchitect #backendengineering #study
+13 |        1v |     0L | vel=    0.6 | age=  1.7h | Embeddings in Retrieval Augmented Generation | RAG
+14 |        1v |     0L | vel=    1.1 | age=  0.9h | Building the Complete RAG Architecture | RAG Series Part 5A
+15 |        0v |     0L | vel=      0 | age=  1.5h | How RAG Generates the Final Answer | RAG Series Part 4B
+16 |        0v |     0L | vel=      0 | age=  0.2h | scribe: the LLM-written knowledge base your coding agents read before th
+17 |       22v |    12L | vel=    8.3 | age=  2.7h | I Built a 100% OFFLINE JARVIS AI in Python! 🤖 | මගේ SELF MADE JARVIS #m
+18 |        0v |     0L | vel=      0 | age=  3.4h | 【ゆっくり解説】機密データを守るMacローカルAI｜LLM・RAG・ファインチューニングを全部試した
+19 |     1267v |     3L | vel=  562.9 | age=  2.3h | 3 AI tools I use to save time and grow my business. #shorts
+20 |      571v |     6L | vel=     61 | age=  9.4h | AI Is Now Working With Pharma Companies — Here&#39;s How Fast It Got The
+21 |       35v |     4L | vel=    3.7 | age=  9.5h | 10 Rules That Stop Your AI Coding Agent Burying the Answer
+22 |        6v |     0L | vel=   34.6 | age=  0.2h | সহজ ভাষায় বুঝুন Loop Engineering কি? Loop Engineering vs  Prompt Enginee
+23 |        3v |     1L | vel=    5.9 | age=  0.5h | What is Loop Engineering? Moving Beyond Prompt Engineering
+24 |        0v |     0L | vel=      0 | age=  0.7h | ChatGPT का सही इस्तेमाल सीखो 🤯 | Prompt Engineering से 10X Results | AI
+25 |       14v |     2L | vel=   80.8 | age=  0.2h | Citation Needed: Provenance for LLM-Built Knowledge Graphs — Daniel Chal
+
+=== AFTER (view-velocity keep 12) ===
+ 1 |     3498v |    94L | vel=  491.6 | age=  7.1h | OpenAI launches Codex Micro, a compact AI agent control keyboard #OpenAI
+ 2 |      618v |    15L | vel=  279.1 | age=  2.2h | AIへの指示は「8割」いらなかった——Claude Code開発チームの結論
+ 3 |      993v |    14L | vel=  244.8 | age=  4.1h | 100 Claude Code Commands Part 2
+ 4 |      742v |    21L | vel=  223.4 | age=  3.3h | You can now run massive AI models in your computer with this tool 🧠🤖 #
+ 5 |      673v |    36L | vel=  210.7 | age=  3.2h | 【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Cursor Routerが登
+ 6 |      690v |    19L | vel=  180.7 | age=  3.8h | This GitHub Pack Teaches Claude Code to Shoot Promos Like a Studio
+ 7 |     1256v |   131L | vel=  109.9 | age= 11.4h | Best AI Coding Tools 2026
+
+=== ALT AFTER (abs log-composite keep 12) ===
+ 1 |     3498v |    94L | vel=  491.6 | age=  7.1h | OpenAI launches Codex Micro, a compact AI agent control keyboard #OpenAI
+ 2 |     1256v |   131L | vel=  109.9 | age= 11.4h | Best AI Coding Tools 2026
+ 3 |      673v |    36L | vel=  210.7 | age=  3.2h | 【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Cursor Routerが登
+ 4 |      993v |    14L | vel=  244.8 | age=  4.1h | 100 Claude Code Commands Part 2
+ 5 |      742v |    21L | vel=  223.4 | age=  3.3h | You can now run massive AI models in your computer with this tool 🧠🤖 #
+ 6 |      690v |    19L | vel=  180.7 | age=  3.8h | This GitHub Pack Teaches Claude Code to Shoot Promos Like a Studio
+ 7 |      618v |    15L | vel=  279.1 | age=  2.2h | AIへの指示は「8割」いらなかった——Claude Code開発チームの結論
+
+=== Newly selected (in AFTER, not in BEFORE) ===
++ 3498v vel=492 | OpenAI launches Codex Micro, a compact AI agent control keyb
++ 993v vel=245 | 100 Claude Code Commands Part 2
++ 742v vel=223 | You can now run massive AI models in your computer with this
++ 673v vel=211 | 【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Curs
++ 690v vel=181 | This GitHub Pack Teaches Claude Code to Shoot Promos Like a 
++ 1256v vel=110 | Best AI Coding Tools 2026
+
+=== Dropped from BEFORE (not in AFTER kept) sample ===
+- 31v vel=49 | Are Your AI Agents Really Production Ready?
+- 20v vel=20 | The Tiniest AI Agent on GitHub Has Nearly 50K Stars
+- 1v vel=0 | AI Agents Take Off, Gemini Flash Updates &amp; Mistral | EXA
+- 20v vel=13 | The AI Kernel That Doesn&#39;t Trust AI
+- 433v vel=369 | Claude Code 毎回繋ぎ直してない?/configで常時接続
+- 22v vel=12 | 我让Claude Code和Codex同时剪视频 #hyperframes #claude #ai剪视频
+- 2v vel=1 | Agentic AI Course in Hyderabad | Build AI Agents with LangCh
+- 1v vel=1 | Why a Vector Database Isn&#39;t Enough for Multi-Agent Memor
+- 0v vel=0 | - Why Microsoft and Meta’s 30% Nasdaq Pullbacks Are Signalli
+- 0v vel=0 | Vector Databases Part 5 — The Production Checklist · AI Bake
+- 10v vel=7 | #systemdesign #motivation #softwarearchitect #backendenginee
+- 1v vel=1 | Embeddings in Retrieval Augmented Generation | RAG
+- 1v vel=1 | Building the Complete RAG Architecture | RAG Series Part 5A
+- 0v vel=0 | How RAG Generates the Final Answer | RAG Series Part 4B
+- 0v vel=0 | scribe: the LLM-written knowledge base your coding agents re
+- 22v vel=8 | I Built a 100% OFFLINE JARVIS AI in Python! 🤖 | මගේ SELF MA
+- 0v vel=0 | 【ゆっくり解説】機密データを守るMacローカルAI｜LLM・RAG・ファインチューニングを全部試した
+- 1267v vel=563 | 3 AI tools I use to save time and grow my business. #shorts
+- 571v vel=61 | AI Is Now Working With Pharma Companies — Here&#39;s How Fas
+- 35v vel=4 | 10 Rules That Stop Your AI Coding Agent Burying the Answer
+
+=== FLOOR SENSITIVITY (full 72h×10 pool, n≈93) ===
+  views>=100 likes>=0  → surv≈14 keep12 medViews≈682 medVel≈195
+  views>=200 likes>=5  → surv≈10 keep12 medViews≈703 medVel≈195   ← RECOMMENDED START
+  views>=500 likes>=5  → surv≈9  keep12 medViews≈715 medVel≈210
+  views>=500 likes>=10 → surv≈7  keep12 medViews≈754 medVel≈226   (too sparse for keep-12)
+  views>=1000 likes>=10→ surv≈2  (starvation)
+
+=== SEARCH ORDER SPOT-CHECK (query="claude code", lookback=72h, top5) ===
+  order=date      → fresh niche (437v…618v) — usable candidate pool
+  order=relevance → evergreen tutorials (14k–40k views, days/weeks old)
+  order=viewCount → mega-virals (28k–97k) — levels not deltas; REJECT for cockpit
+
+=== VERDICT SNAPSHOT ===
+BEFORE med views=6 likes=0  (25 date-capped newest)
+AFTER  med views≈700+ likes≈15–20 with floor 200/5 + velocity keep12
+Quality lift: ~100× median views; ~all zero-engagement spam removed
+Quota one wide pass: ~1000 search + ~2 enrich ≈ 1002 << 2000 warn

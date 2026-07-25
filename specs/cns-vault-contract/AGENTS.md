@@ -1,6 +1,6 @@
 # AGENTS.md - Central Nervous System Constitution
 
-> Version: 2.1.43 | Last updated: 2026-06-22
+> Version: 2.1.59 | Last updated: 2026-07-23
 > Canonical vault path: `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`  
 > Git mirror (implementation repo): `../../specs/cns-vault-contract/AGENTS.md` (relative from this `AI-Context/` folder when the vault lives under `Knowledge-Vault-ACTIVE/` in the Omnipotent.md clone).
 
@@ -79,6 +79,8 @@ When creating a note, route by pake_type:
 | SynthesisNote | 03-Resources/ | Cross-reference connections, summaries |
 | WorkflowNote | 01-Projects/ (requires project context) or 02-Areas/ (fallback to `02-Areas/` when project context is missing) | Action plans, specs, task tracking |
 | ValidationNote | 03-Resources/ | Fact-checks, confidence updates |
+| HookSetNote | 03-Resources/ | Run-chain hook agent output (four gated hooks) |
+| WeaponsCheckNote | 03-Resources/ | Run-chain weapons-check output (novelty + copy intensity) |
 
 Unstructured captures always go to `00-Inbox/`. When in doubt, use Inbox.
 
@@ -104,22 +106,33 @@ Unstructured captures always go to `00-Inbox/`. When in doubt, use Inbox.
 
 Every note outside Inbox must include this minimum frontmatter:
 
-This PAKE Standard applies to knowledge notes (SourceNote, InsightNote, SynthesisNote, WorkflowNote, ValidationNote). Directory contract manifests under `*/_README.md` are contract documents and are permitted to use the contract template frontmatter keys (`purpose`, `schema_required`, `allowed_pake_types`, `naming_convention`) instead.
+This PAKE Standard applies to governed knowledge notes (SourceNote, InsightNote, SynthesisNote, WorkflowNote, ValidationNote, HookSetNote, WeaponsCheckNote). HookSetNote and WeaponsCheckNote are run-chain adversarial artifacts emitted by the hook and weapons-check stages (Epic 75; see `AI-Context/modules/run-chain.md`). Directory contract manifests under `*/_README.md` are contract documents and are permitted to use the contract template frontmatter keys (`purpose`, `schema_required`, `allowed_pake_types`, `naming_convention`) instead.
 
 ```yaml
 ---
 pake_id: [UUID v4, auto-generated]
-pake_type: [SourceNote | InsightNote | SynthesisNote | WorkflowNote | ValidationNote]
+pake_type: [SourceNote | InsightNote | SynthesisNote | WorkflowNote | ValidationNote | HookSetNote | WeaponsCheckNote]
 title: "[Human-readable title]"
 created: [YYYY-MM-DD]
 modified: [YYYY-MM-DD]
 status: [draft | in-progress | reviewed | archived]
-confidence_score: [0.0 to 1.0]
-verification_status: [pending | verified | disputed]
-creation_method: [human | ai | hybrid]
 tags:
   - [relevant tags]
 ---
+```
+
+### Optional Quality Enrichment
+
+These fields are part of the PAKE quality-enrichment tier. They are **optional** on governed notes; absent fields must not block `vault_move` or `vault_update_frontmatter` triage.
+
+- **Hermes Vault IO** (`vault_create_note`, `vault_append_daily`) stamps defaults: `confidence_score: 0.5`, `verification_status: pending`, `creation_method: ai`.
+- **`/verify`** (Epic 30) may update `verification_status` and `modified` when the operator confirms a note.
+- **Nexus** direct-FS captures may omit enrichment until triaged into canonical PAKE shape.
+
+```yaml
+confidence_score: [0.0 to 1.0]
+verification_status: [pending | verified | disputed]
+creation_method: [human | ai | hybrid]
 ```
 
 Optional fields (use when applicable):
@@ -241,6 +254,13 @@ Modules hold detailed policy. Load a module only when the task requires it.
 | NotebookLM workflow | `AI-Context/modules/notebooklm-workflow.md` | NotebookLM queries, source_add, cross-notebook research, InsightNote landing, vault export script |
 | Mobile posture      | `AI-Context/modules/mobile-posture.md`      | Any question about mobile access, or any suggestion that mobile is a write surface               |
 | Model routing       | `AI-Context/modules/routing.md`             | Model selection questions, surface config, override rules, routing audit                          |
+| Note style guide    | `AI-Context/modules/note-style-guide.md`    | Creating or editing any note: callout, frontmatter, and structure conventions (also referenced in Section 4) |
+| Run-chain           | `AI-Context/modules/run-chain.md`           | Running, reviving, or debugging the Research, Synthesis, Hook, Boss research chain (Epic 75; engine protect-listed) |
+| Unified Loop        | `AI-Context/modules/unified-loop.md`        | Epic 84 Discover→Build→Verify→Persist loop, skill-contract approval gate, discover artifact, or operator handoffs (not run-chain) |
+| Two-bot vault boundary | `AI-Context/modules/two-bot-vault-boundary.md` | Hermes and NEXUS coexistence, dual write-surface governance, collision zones, or `HERMES_`/`CNS_`/`NEXUS_` env namespaces |
+| Memory pillars verification | `AI-Context/modules/memory-pillars-verification.md` | Verifying which JARVIS memory layers are active, session-close-fed, or gated (Hermes native memory; Epic 76) |
+| Hermes desktop      | `AI-Context/modules/hermes-desktop.md`      | Hermes Portal and desktop surface, browser JARVIS chat at localhost:9119, or dashboard OAuth and basic-auth (Epic 74) |
+| MCP operator runbook | `AI-Context/modules/mcp-operator-runbook.md` | MCP registration, env wiring, key rotation, or operator-run live-call smoke across Cursor and Claude Code |
 | Context7            | MCP tool (auto-invoked)                     | Any code generation, library usage, API docs, setup or configuration steps |
 | Firecrawl           | MCP tool (Tier 1)                           | Scrape, crawl, map, or extract web content for research ingestion or source capture                 |
 | Perplexity          | MCP tool (Tier 1, tool: `mcp__perplexity__search`) | Current market data, competitor intelligence, real-time search; routing rule in Section 9          |
@@ -259,26 +279,24 @@ As the CNS evolves, new modules will be added for Discord operations, research i
 
 ## 8. Current Focus
 
-> Update this section whenever your active priorities shift.
-> This is the "what am I working on right now" that agents check first.
-
 ### Project Status
 
-- Epics 1-71: complete. Epics 72 and 73 now in-progress.
-- Epic 72: in-progress (no stories tracked yet)
-- Epic 73: in-progress; story 73-7 (Digest Entity Intelligence Sections) in review
+- Epic 78: in-progress
+- Epic 89: in-progress
+- Epic 90: done (closed 2026-07-23)
+- 82 epics done; 2 in-progress (78, 89)
 
 ### Current Priorities
 
-1. Complete story 73-7 review and merge.
-2. Define and start Epic 72 stories.
-3. Close deferred live-validation gates (67-2 AC6, 68-8 C7/C11).
+1. Advance Epic 89: review open stories and push toward closure.
+2. Keep Epic 78 moving: finish or explicitly park 78-1 (Desktop Electron deferred); then 78-3 operator guide or close the epic.
+3. Epic 90 (intake health) is closed — 90-1..90-5 shipped and retro'd. Do not open new 90 stories; the infra backlog is empty and the standing bottleneck is revenue/deployment, not delivery.
 
 ### Recent Session Context
 
-- Story 73-7: Digest Entity Intelligence Sections — in review (baseline a8270ade)
-- Story 73-6: Dashboard Entity Intelligence Modules — done
-- Story 73-5: Get Entity Intelligence Query — done
+- Story 90.5: Entity-match anti-opposition / short-title guard — done (2026-07-23).
+- Story 90.3: YouTube intake quality selection (best-of, not newest) — done (2026-07-23).
+- Story 90.4: Cross-source dedupe over-collapse retune — done (2026-07-23).
 
 ## 9. Agent Behavior Guidelines
 
@@ -362,6 +380,22 @@ When two or more AI sessions may edit the same implementation repo concurrently 
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-23 | 2.1.59 | Section 8: Regenerated by /session-close — 81 epics done; 3 in-progress (78, 89, 90) |
+| 2026-07-14 | 2.1.58 | Section 8: Regenerated by /session-close — 81 epics done; 1 in-progress (78) |
+| 2026-07-10 | 2.1.57 | **§2–§3:** Registered HookSetNote and WeaponsCheckNote (run-chain adversarial artifacts, route 03-Resources/) in routing table, PAKE Standard scope, and template enum. Operator-direct edit (PAKE reconciliation Lane B). |
+| 2026-07-10 | 2.1.56 | **§2–§3:** Registered HookSetNote and WeaponsCheckNote (run-chain adversarial artifacts, route 03-Resources/) in routing table, PAKE Standard scope, and template enum. Operator-direct edit (PAKE reconciliation Lane B). |
+| 2026-07-10 | 2.1.55 | Section 7: registered unified-loop module (Epic 84). Operator-direct edit. |
+| 2026-07-10 | 2.1.54 | Section 3: quality-enrichment fields reclassified from required to optional PAKE Standard tier — reconciles note-style-guide two-bot conflict (Story 87-3 AC8). Operator-direct edit. |
+| 2026-07-10 | 2.1.53 | **Section 7:** Registered 6 modules in Active Modules (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook) so the table matches the canonical 11-module set (Epic 87). Operator-direct edit. |
+| 2026-07-09 | 2.1.52 | **Section 7:** Registered 6 modules in Active Modules (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook) so the table matches the canonical 11-module set (Epic 87). Operator-direct edit. |
+| 2026-07-09 | 2.1.51 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-07-08 | 2.1.50 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-07-05 | 2.1.49 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-07-05 | 2.1.48 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-06-28 | 2.1.47 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-06-25 | 2.1.46 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-06-25 | 2.1.45 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
+| 2026-06-24 | 2.1.44 | **Section 8:** Regenerated by /session-close after story 76-1; epics 73 and 76 in-progress. |
 | 2026-06-22 | 2.1.43 | **Section 8:** Regenerated after sprint tracker close-out (epics 54–65, 67–71). **Section 7/9:** Materialized Agent Browser row and browser-automation routing rule (body content for 2.1.41 changelog-only entry). |
 | 2026-06-17 | 2.1.42 | **Section 8:** Regenerated after sprint tracker close-out (epics 54–65, 67–71). **Section 7/9:** Materialized Agent Browser row and browser-automation routing rule (body content for 2.1.41 changelog-only entry). |
 | 2026-06-17 | 2.1.41 | **Section 7:** Added Agent Browser (WSL shell CLI + skill, not an MCP server) row. **Section 9:** Added browser-automation routing rule — prefer `agent-browser` over Playwright MCP for token-cheap smoke checks/QA; Playwright remains fallback for deep DOM debugging. |

@@ -22,6 +22,20 @@ tags: []
 # Body
 `;
 
+const nexusShapedNote = `---
+pake_id: "550e8400-e29b-41d4-a716-446655440001"
+pake_type: SourceNote
+title: "Nexus capture"
+created: "2026-04-02"
+modified: "2026-04-02"
+status: draft
+tags:
+  - nexus
+---
+
+# Nexus body
+`;
+
 describe("wikilink repair helpers", () => {
   it("maps full vault-relative paths and basename variants", () => {
     expect(mapWikilinkTarget("03-Resources/old.md", "03-Resources/old.md", "01-Projects/P/new.md")).toBe(
@@ -42,6 +56,23 @@ describe("wikilink repair helpers", () => {
 });
 
 describe("vaultMove", () => {
+  it("moves Nexus-shaped note (core-only frontmatter) to governed destination without SCHEMA_INVALID", async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-move-nexus-"));
+    await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });
+    await mkdir(path.join(vaultRoot, "01-Projects", "CNS"), { recursive: true });
+    await mkdir(path.join(vaultRoot, "_meta", "logs"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "03-Resources", "nexus-capture.md"), nexusShapedNote, "utf8");
+
+    const out = await vaultMove(vaultRoot, "03-Resources/nexus-capture.md", "01-Projects/CNS/nexus-capture.md", {
+      surface: "vitest",
+    });
+
+    expect(out.new_path).toBe("01-Projects/CNS/nexus-capture.md");
+    const moved = await readFile(path.join(vaultRoot, "01-Projects", "CNS", "nexus-capture.md"), "utf8");
+    expect(moved).toContain("Nexus body");
+    expect(moved).not.toContain("confidence_score:");
+  });
+
   it("renames a note in a temp vault (fallback) and appends audit with source and destination", async () => {
     const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "cns-move-"));
     await mkdir(path.join(vaultRoot, "03-Resources"), { recursive: true });

@@ -1,0 +1,25 @@
+=== 90-5 G7 SHIPPED SIM (2026-07-22 reconstructed) ===
+GUARD: G7 = antonym ALWAYS + short entity disable (min nouns <= 3)
+
+FIXTURE (no inject) AFTER G7 ship:
+  yt=22 polymarket=5 btc=3 importAI=2 primaries=129
+
+OPPOSITE/SHORT INJECT (6) AFTER G7:
+  injectPrimaries=6 nvidiaBoth=true btcBoth=true claudeBoth=true
+  opposite_ok=true
+
+UNIT PAIRS (entityMatch):
+  SEPARATE  Nvidia Chip Shortage × Nvidia Chip Surplus
+  SEPARATE  Bitcoin ETF × Bitcoin ETF Rally
+  SEPARATE  Claude Tips × Claude Tips for beginners
+  SEPARATE  Federal Reserve Interest Rate Hike Meeting Decision × Federal Reserve Interest Rate Cut Meeting Decision
+  MATCH  OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview
+
+SUCCESS:
+  opposite_pairs_separate=true
+  legit_clusters_survive=true
+  openai_still_matches=true
+
+ACCEPTED RESIDUAL FN:
+  Short geo near-dups (e.g. Tesla Robotaxi Austin × Miami) stay separate under G7;
+  they must win via URL/canon/Jaccard if they should merge.

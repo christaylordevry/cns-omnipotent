@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildErrorsBySource,
+  formatDigestPushFailureAlert,
   formatSydneyDate,
   isAdapterErrorPayload,
   parseAdapterStdout,
@@ -15,6 +16,7 @@ import {
   unwrapAdapterResult,
 } from '../scripts/run-digest-convex-completion.mjs';
 import { resolveDayOutcomeFilePath } from '../scripts/lib/digest-run-outcome.mjs';
+import { pushDigestToConvex } from '../scripts/hermes-skill-examples/morning-digest/scripts/push-digest-convex.mjs';
 
 describe('run-digest-convex-completion (Story 68-10)', () => {
   it('formatSydneyDate uses Australia/Sydney by default', () => {
@@ -53,6 +55,14 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
     assert.equal(line, 'collect: trends=ok twitter=fail:invalid-json');
   });
 
+  it('summarizeAdapterCollection classifies bare {error} as fail (Story 90-2 Defect A)', () => {
+    const line = summarizeAdapterCollection({
+      youtube: { error: 'quota-exceeded' },
+      twitter: { success: true, data: { posts: [] } },
+    });
+    assert.equal(line, 'collect: youtube=fail:quota-exceeded twitter=ok');
+  });
+
   it('buildErrorsBySource lists only failed wrapped sources', () => {
     assert.deepEqual(
       buildErrorsBySource({
@@ -60,6 +70,16 @@ describe('run-digest-convex-completion (Story 68-10)', () => {
         reddit: { success: false, error: 'timeout' },
       }),
       { reddit: 'timeout' },
+    );
+  });
+
+  it('buildErrorsBySource records bare {error} without pre-wrap (Story 90-2 Defect A)', () => {
+    assert.deepEqual(
+      buildErrorsBySource({
+        youtube: { error: 'quota-exceeded' },
+        trends: { success: true, data: { events: [] } },
+      }),
+      { youtube: 'quota-exceeded' },
     );
   });
 
@@ -1356,5 +1376,760 @@ describe('Story 71-4 discord-only repair from day outcome record', () => {
     const outcome = JSON.parse(await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-06-11'), 'utf8'));
     assert.equal(outcome.discord.ok, false);
     assert.equal(outcome.overall, 'partial');
+  });
+});
+
+describe('OPS-1 fail-loud on non-success digest push', () => {
+  /**
+   * @param {string} date
+   * @param {{ status?: string } | null} [todayRow]
+   */
+  function convexStatusFetchFn(date, todayRow = { status: 'published' }) {
+    return async (_url, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      if (typeof body.path === 'string' && body.path.includes('entityIntelligence')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              status: 'success',
+              value: { trackedInMotion: [], emergingToReview: [] },
+            }),
+        };
+      }
+      const value = todayRow ? [{ date, status: todayRow.status }] : [];
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'success', value }),
+        text: async () => JSON.stringify({ status: 'success', value }),
+      };
+    };
+  }
+
+  it('1 — completion-convex-push-failed → exit 1, alert names signalsWritten, log exit=1', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-convex-fail-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500: free plan disabled',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.action, 'completion-convex-push-failed');
+    assert.equal(result.overall, 'failed');
+    assert.equal(result.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /signalsWritten|wrote 0\//);
+    assert.match(alerts[0], /completion-convex-push-failed/);
+    assert.match(alerts[0], /overall=failed/);
+    assert.match(alerts[0], /free plan disabled/);
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-convex-push-failed.*exit=1/);
+  });
+
+  it('2 — skipped-already-pushed + confirmed Convex → exit 0, alert NOT called', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-skip-ok-'));
+    const hermesDir = join(operatorHome, '.hermes');
+    await mkdir(join(hermesDir, 'digest-outcomes'), { recursive: true });
+    await writeFile(
+      resolveDayOutcomeFilePath(operatorHome, '2026-07-20'),
+      JSON.stringify({
+        date: '2026-07-20',
+        convex: { ok: true, signalsWritten: 50, runId: 'run-1', status: 'published', error: null },
+        discord: { ok: true, error: null },
+        entity: { ok: true, status: 'ok', mentionsWritten: 1, error: null },
+        sources: {},
+        overall: 'success',
+        inProgress: null,
+        history: [],
+      }),
+    );
+
+    /** @type {string[]} */
+    const alerts = [];
+    /** @type {number} */
+    let alertCalls = 0;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
+      collectFn: async () => {
+        throw new Error('collect must not run on skipped-already-pushed');
+      },
+      pushFn: async () => {
+        throw new Error('push must not run on skipped-already-pushed');
+      },
+      fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      alertFn: async (_env, message) => {
+        alertCalls += 1;
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.overall, 'success');
+    assert.equal(result.action, 'skipped-already-pushed');
+    assert.equal(alertCalls, 0, 'OPS-1 AC2: skipped-already-pushed must stay silent (zero-call spy)');
+    assert.equal(alerts.length, 0, 'AC2: alert spy must have zero calls');
+  });
+
+  it('OPS-2 AC6 — contract violation → overall failed, exit 1, alert names offending field', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops2-contract-fail-'));
+    /** @type {string[]} */
+    const alerts = [];
+    /** @type {number} */
+    let convexFetchCalls = 0;
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-06-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        youtube: {
+          success: true,
+          data: {
+            videos: [
+              {
+                title: 'viewCount drift',
+                url: 'https://www.youtube.com/watch?v=ops2',
+                viewCount: 523_806,
+              },
+            ],
+          },
+        },
+      }),
+      // Real pre-flight: poison one signal with an off-contract field, then call pushDigestToConvex.
+      pushFn: async (payload, env) => {
+        const signals = Array.isArray(payload.signals) ? payload.signals : [];
+        const poisoned = {
+          ...payload,
+          signals: signals.map((signal, index) => {
+            if (index !== 0 || !signal || typeof signal !== 'object') {
+              return signal;
+            }
+            const row = /** @type {Record<string, unknown>} */ (signal);
+            const meta =
+              row.sourceMetadata && typeof row.sourceMetadata === 'object'
+                ? { .../** @type {Record<string, unknown>} */ (row.sourceMetadata) }
+                : {};
+            meta.notInContractEver = true;
+            return { ...row, sourceMetadata: meta };
+          }),
+        };
+        return pushDigestToConvex({
+          env: {
+            ...env,
+            DIGEST_PUSH_JSON: JSON.stringify(poisoned),
+            CONVEX_URL: 'https://test.convex.cloud',
+            CONVEX_DEPLOY_KEY: 'deploy-key-test',
+          },
+          fetchFn: async () => {
+            convexFetchCalls += 1;
+            throw new Error('AC5/AC6: Convex must not be called on contract violation');
+          },
+        });
+      },
+      fetchFn: convexStatusFetchFn('2026-06-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.action, 'completion-convex-push-failed');
+    assert.equal(result.overall, 'failed');
+    assert.equal(result.exitCode, 1);
+    assert.equal(convexFetchCalls, 0, 'AC5/AC6: zero Convex writes on contract violation');
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /notInContractEver/);
+    assert.match(alerts[0], /overall=failed/);
+    assert.match(alerts[0], /completion-convex-push-failed/);
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-convex-push-failed.*exit=1/);
+    assert.match(logRaw, /notInContractEver/);
+  });
+
+  it('3 — skipped-already-pushed + missing Convex row → exit 1, alert fired', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-skip-missing-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
+      collectFn: async () => {
+        throw new Error('collect must not run');
+      },
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.action, 'skipped-already-pushed');
+    assert.equal(result.overall, 'partial');
+    assert.equal(result.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /skipped-already-pushed/);
+  });
+
+  it('4 — completion-no-signals → exit 1, alert fired', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-no-signals-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [] } },
+        twitter: { success: true, data: { posts: [] } },
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.action, 'completion-no-signals');
+    assert.equal(result.overall, 'failed');
+    assert.equal(result.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /completion-no-signals/);
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-no-signals.*exit=1/);
+  });
+
+  it('5 — partial (Convex ok, Discord failed) → exit 1, delivery-loss wording', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-discord-fail-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async (payload) => ({
+        ok: true,
+        runId: 'run-partial',
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+        pushedPayload: payload,
+      }),
+      postDigestFn: async () => ({ ok: false, messageIds: [], error: 'discord-http-500' }),
+      fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.overall, 'partial');
+    assert.equal(result.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /^WARN: digest wrote \d+ signals to Convex but Discord delivery failed/);
+    assert.match(alerts[0], /overall=partial/);
+  });
+
+  it('6 — second failing run same day same overall → exit 1, alert not re-fired', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-dedup-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const sharedOpts = {
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    };
+
+    const first = await runDigestConvexCompletion(sharedOpts);
+    assert.equal(first.exitCode, 1);
+    assert.equal(alerts.length, 1);
+
+    const second = await runDigestConvexCompletion(sharedOpts);
+    assert.equal(second.exitCode, 1);
+    assert.equal(second.overall, 'failed');
+    assert.equal(alerts.length, 1, 'AC5: same overall must not re-alert');
+
+    const outcome = JSON.parse(
+      await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-07-20'), 'utf8'),
+    );
+    assert.equal(outcome.alertedOverall, 'failed');
+    assert.equal(typeof outcome.alertedAt, 'string');
+  });
+
+  it('7 — escalation partial → failed same day → alert fires again', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-escalate-'));
+    /** @type {string[]} */
+    const alerts = [];
+
+    const partial = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async (payload) => ({
+        ok: true,
+        runId: 'run-ok',
+        signalsWritten: payload.signals.filter((s) => s && typeof s === 'object').length,
+        pushedPayload: payload,
+      }),
+      postDigestFn: async () => ({ ok: false, messageIds: [], error: 'discord-down' }),
+      fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+    assert.equal(partial.overall, 'partial');
+    assert.equal(alerts.length, 1);
+
+    const failed = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+    assert.equal(failed.overall, 'failed');
+    assert.equal(failed.exitCode, 1);
+    assert.equal(alerts.length, 2, 'AC5: escalation must re-alert');
+  });
+
+  it('8 — CHECK_DIGEST_ALERT=0 → exit 1, no alert', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-suppress-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+        CHECK_DIGEST_ALERT: '0',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.overall, 'failed');
+    assert.equal(alerts.length, 0);
+  });
+
+  it('9 — alert throws → still exit 1 (no masking)', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-alert-throw-'));
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async () => {
+        throw new Error('discord network down');
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.overall, 'failed');
+  });
+
+  it('10 — writeOutcomeFn returns undefined → exit 1 + alert (P1 fail-loud default)', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-void-write-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const result = await runDigestConvexCompletion({
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
+      collectFn: async () => {
+        throw new Error('collect must not run');
+      },
+      fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      writeOutcomeFn: async () => undefined,
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.overall, 'failed');
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /completion-outcome-record-missing/);
+    const logRaw = await readFile(
+      join(operatorHome, '.hermes', 'logs', 'push-digest-watchdog.log'),
+      'utf8',
+    );
+    assert.match(logRaw, /action=completion-outcome-record-missing.*exit=1/);
+  });
+
+  it('11 — alertFn returns undefined → no stamp; next failing run alerts (P2)', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-undefined-post-'));
+    /** @type {string[]} */
+    const alerts = [];
+    /** @type {boolean | undefined} */
+    let firstPostReturn = undefined;
+    const sharedOpts = {
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'Convex HTTP 500',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return firstPostReturn;
+      },
+    };
+
+    const first = await runDigestConvexCompletion(sharedOpts);
+    assert.equal(first.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    const afterFirst = JSON.parse(
+      await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-07-20'), 'utf8'),
+    );
+    assert.equal(afterFirst.alertedAt, undefined);
+    assert.equal(afterFirst.alertedOverall, undefined);
+
+    firstPostReturn = true;
+    const second = await runDigestConvexCompletion(sharedOpts);
+    assert.equal(second.exitCode, 1);
+    assert.equal(alerts.length, 2, 'P2: undefined post must not stamp dedup');
+  });
+
+  it('12 — fail → success clears stamps → fail re-alerts (1a)', async () => {
+    const operatorHome = await mkdtemp(join(tmpdir(), 'ops1-clear-stamps-'));
+    /** @type {string[]} */
+    const alerts = [];
+    const failOpts = {
+      env: {
+        CRON_TZ: 'Australia/Sydney',
+        HOME: operatorHome,
+        CNS_OPERATOR_HOME: operatorHome,
+        CONVEX_URL: 'https://test.convex.cloud',
+        CONVEX_DEPLOY_KEY: 'deploy-key-test',
+      },
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-no-artifact', exitCode: 0 }),
+      collectFn: async () => ({
+        trends: { success: true, data: { events: [{ keyword: 'AI agents', normalizedValue: 0.5 }] } },
+        twitter: {
+          success: true,
+          data: { posts: [{ title: 'Tweet', url: 'https://x.com/a/status/1' }] },
+        },
+      }),
+      pushFn: async () => ({
+        ok: false,
+        signalsWritten: 0,
+        error: 'You have exceeded the free plan limits',
+      }),
+      fetchFn: convexStatusFetchFn('2026-07-20', null),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    };
+
+    const failed = await runDigestConvexCompletion(failOpts);
+    assert.equal(failed.exitCode, 1);
+    assert.equal(alerts.length, 1);
+    const stamped = JSON.parse(
+      await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-07-20'), 'utf8'),
+    );
+    assert.equal(stamped.alertedOverall, 'failed');
+
+    const recovered = await runDigestConvexCompletion({
+      env: failOpts.env,
+      todayDate: '2026-07-20',
+      watchdogFn: async () => ({ action: 'skipped-already-pushed', exitCode: 0 }),
+      collectFn: async () => {
+        throw new Error('collect must not run on recovery');
+      },
+      fetchFn: convexStatusFetchFn('2026-07-20', { status: 'published' }),
+      writeOutcomeFn: async () => ({
+        record: {
+          ...stamped,
+          overall: 'success',
+          convex: {
+            ok: true,
+            signalsWritten: 50,
+            runId: 'run-recovered',
+            status: 'published',
+            error: null,
+          },
+          discord: { ok: true, error: null },
+        },
+        filePath: resolveDayOutcomeFilePath(operatorHome, '2026-07-20'),
+      }),
+      alertFn: async (_env, message) => {
+        alerts.push(message);
+        return true;
+      },
+    });
+    assert.equal(recovered.overall, 'success');
+    assert.equal(recovered.exitCode, 0);
+    assert.equal(alerts.length, 1, 'recovery must not alert');
+    const cleared = JSON.parse(
+      await readFile(resolveDayOutcomeFilePath(operatorHome, '2026-07-20'), 'utf8'),
+    );
+    assert.equal(cleared.alertedAt, undefined);
+    assert.equal(cleared.alertedOverall, undefined);
+
+    const failedAgain = await runDigestConvexCompletion(failOpts);
+    assert.equal(failedAgain.exitCode, 1);
+    assert.equal(alerts.length, 2, '1a: new failure after recovery must re-alert');
+  });
+
+  it('formatDigestPushFailureAlert distinguishes data-loss vs delivery-loss', () => {
+    assert.match(
+      formatDigestPushFailureAlert(
+        {
+          date: '2026-07-20',
+          overall: 'failed',
+          lastInvocation: { action: 'completion-convex-push-failed' },
+          convex: {
+            ok: false,
+            signalsWritten: 0,
+            error: 'You have exceeded the free plan limits',
+          },
+        },
+        { signalCount: 50 },
+      ),
+      /FAIL: digest push wrote 0\/50 signals/,
+    );
+    assert.match(
+      formatDigestPushFailureAlert(
+        {
+          date: '2026-07-20',
+          overall: 'failed',
+          lastInvocation: { action: 'completion-convex-push-failed' },
+          convex: {
+            ok: false,
+            signalsWritten: 0,
+            error: 'You have exceeded the free plan limits',
+          },
+        },
+        { signalCount: 50 },
+      ),
+      /free plan limits/,
+    );
+    assert.match(
+      formatDigestPushFailureAlert({
+        date: '2026-07-20',
+        overall: 'partial',
+        lastInvocation: { action: 'completion-backfill-push' },
+        convex: { ok: true, signalsWritten: 50 },
+        discord: { ok: false, error: 'discord-http-500' },
+      }),
+      /WARN: digest wrote 50 signals to Convex but Discord delivery failed/,
+    );
+    assert.match(
+      formatDigestPushFailureAlert({
+        date: '2026-07-20',
+        overall: 'partial',
+        lastInvocation: { action: 'completion-backfill-push' },
+        convex: { ok: true, signalsWritten: 50 },
+        discord: { ok: false, error: 'discord-http-500' },
+      }),
+      /discord-http-500/,
+    );
+    const noRatio = formatDigestPushFailureAlert(
+      {
+        date: '2026-07-20',
+        overall: 'partial',
+        lastInvocation: { action: 'skipped-already-pushed' },
+        convex: { ok: false, signalsWritten: 0, error: 'log-skipped-but-convex-not-published' },
+      },
+      { signalCount: 0 },
+    );
+    assert.match(noRatio, /FAIL: digest push wrote 0 signals —/);
+    assert.doesNotMatch(noRatio, /0\/0/);
+    assert.match(noRatio, /log-skipped-but-convex-not-published/);
   });
 });

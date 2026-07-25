@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
 
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_REPOS_DEFAULT = 5;
-const PER_QUERY_DEFAULT = 3;
+/** Stage A STORE_MAX — write-all into digestSignals (Story 89-1). */
+const MAX_REPOS_DEFAULT = 40;
+/** Per-query page size before URL dedupe across queries (Story 89-1). */
+const PER_QUERY_DEFAULT = 5;
 const GITHUB_SEARCH_BASE = 'https://api.github.com/search/repositories';
 const USER_AGENT = 'CNS-morning-digest/1.0';
 

@@ -37,6 +37,7 @@ import {
   stripAnsi,
 } from "../scripts/session-close/run-deterministic.mjs";
 import { runRefreshDailyRhythm } from "../scripts/session-close/refresh-daily-rhythm.mjs";
+import { runSessionCloseVaultModulesSync } from "../scripts/session-close/lib/sync-vault-modules.mjs";
 import {
   formatNlmAuthWarning,
   mergeNlmAuthIntoCloseReport,
@@ -62,6 +63,7 @@ import { runWriteMemory } from "../scripts/session-close/write-memory.mjs";
 import { runGateApplySection8 } from "../scripts/session-close/gate-apply-section8.mjs";
 import {
   buildActiveEpics,
+  deriveProjectStatusLine,
   excerptStoryBullet,
   notebookTargetsFromWatchRegistry,
   parseAgentsSection8,
@@ -79,6 +81,7 @@ import {
 import { withSessionCloseEnvIsolation } from "./helpers/hermes-env-isolation.mjs";
 
 const execFileAsync = promisify(execFile);
+const STALE_PROJECT_STATUS_MARKERS = ["Phase 6", "1–37", "Epics 38", "43 in progress"];
 const TEST_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const NLM_AUTH_WATCHDOG_SCRIPT = join(TEST_ROOT, "scripts/session-close/lib/nlm-auth-watchdog.mjs");
 const NLM_AUTH_WATCHDOG_WRAPPER = join(TEST_ROOT, "scripts/session-close/hermes-run-nlm-auth-watchdog.sh");
@@ -99,6 +102,26 @@ const REQUIRED_PACK_KEYS = [
 const SAMPLE_AGENTS = `# AGENTS
 
 > Version: 9.9.9 | Last updated: 2026-01-01
+
+## 2. Vault Map
+
+| pake_type | Default destination | Notes |
+|-----------|---------------------|-------|
+| SourceNote | 03-Resources/ | Original source material |
+| InsightNote | 03-Resources/ | Derived observations |
+| SynthesisNote | 03-Resources/ | Cross-reference connections |
+| WorkflowNote | 01-Projects/ | Action plans |
+| ValidationNote | 03-Resources/ | Fact-checks |
+| HookSetNote | 03-Resources/ | Run-chain hook output |
+| WeaponsCheckNote | 03-Resources/ | Run-chain weapons-check output |
+
+## 3. Formatting Standards
+
+This PAKE Standard applies to governed knowledge notes.
+
+## 4. Vault IO Protocol
+
+Vault IO summary for fixtures.
 
 ## 8. Current Focus
 
@@ -268,6 +291,58 @@ describe("session-close read-sources", () => {
     assert.equal(active[0].id, "epic-48");
     assert.ok(active[0].stories.some((s) => s.includes("48-1-session-close")));
     assert.ok(active[0].stories.some((s) => s.includes("ready-for-dev")));
+  });
+
+  it("deriveProjectStatusLine uses sprint-status SSOT with plural in-progress epics", () => {
+    const lines = ["development_status:"];
+    for (let n = 1; n <= 86; n += 1) {
+      if (n === 78 || n === 86) {
+        lines.push(`  epic-${n}: in-progress`);
+      } else {
+        lines.push(`  epic-${n}: done`);
+      }
+    }
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "84 epics done; 2 in-progress (78, 86)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine uses singular in-progress label for one active epic", () => {
+    const lines = ["development_status:"];
+    for (let n = 1; n <= 82; n += 1) {
+      lines.push(`  epic-${n}: ${n === 78 ? "in-progress" : "done"}`);
+    }
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "81 epics done; 1 in-progress (78)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine reports none in-progress when all epics done", () => {
+    const lines = ["development_status:", "  epic-1: done", "  epic-2: done"];
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "2 epics done; none in-progress");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
+  });
+
+  it("deriveProjectStatusLine de-dupes duplicate epic keys with last row winning", () => {
+    const lines = [
+      "development_status:",
+      "  epic-1: done",
+      "  epic-5: done",
+      "  epic-5: done",
+      "  epic-5: in-progress",
+    ];
+    const line = deriveProjectStatusLine(parseDevelopmentStatus(lines.join("\n")));
+    assert.equal(line, "1 epics done; 1 in-progress (5)");
+    for (const marker of STALE_PROJECT_STATUS_MARKERS) {
+      assert.ok(!line.includes(marker), `must not contain stale marker: ${marker}`);
+    }
   });
 
   it("extracts section8 between ## 8. and ## 9.", () => {
@@ -644,6 +719,8 @@ describe("session-close run-deterministic", () => {
       assert.equal(report.mode, "dry-run");
       assert.equal(report.steps.export.status, "skipped");
       assert.ok(report.steps.export.message.includes("dry-run"));
+      assert.equal(report.steps.sync_vault_modules.status, "skipped");
+      assert.ok(report.steps.sync_vault_modules.message.includes("dry-run"));
       assert.equal(report.steps.fast_scan.status, "skipped");
       assert.equal(report.steps.tests.status, "skipped");
       assert.equal(report.failure_class, null);
@@ -659,12 +736,41 @@ describe("session-close run-deterministic", () => {
       const onDiskReport = JSON.parse(await readFile(reportPath, "utf8"));
       const onDiskPack = JSON.parse(await readFile(packPath, "utf8"));
       assert.equal(onDiskReport.steps.export.status, "skipped");
+      assert.equal(onDiskReport.steps.sync_vault_modules.status, "skipped");
       assert.deepEqual(onDiskReport.convex_push, {
         status: "skipped",
         rows: 0,
         reason: "dry-run",
       });
       assert.equal(onDiskPack.mode, "dry-run");
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runDeterministicPipeline skips modules sync on repo vault fallback (Story 87-2)", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-sync-fallback-"));
+    const repoVault = join(fixtureRoot, "Knowledge-Vault-ACTIVE");
+    const specsModules = join(fixtureRoot, "specs/cns-vault-contract/modules");
+    await seedSessionCloseFixture(fixtureRoot, repoVault);
+    await writeFile(
+      join(repoVault, "AI-Context", "vault-fast-scan-index.md"),
+      "# fast-scan fixture\n",
+      "utf8",
+    );
+    await mkdir(specsModules, { recursive: true });
+    await writeFile(join(specsModules, "note-style-guide.md"), "# canonical specs copy\n", "utf8");
+
+    try {
+      const step = await runSessionCloseVaultModulesSync({
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: repoVault,
+      });
+      assert.equal(step.status, "skipped");
+      assert.match(step.message, /repo vault fallback/);
+      const onDisk = await readFile(join(specsModules, "note-style-guide.md"), "utf8");
+      assert.equal(onDisk, "# canonical specs copy\n");
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }
@@ -1747,6 +1853,49 @@ describe("session-close SC-4 apply-section8", () => {
     assert.ok(text.includes("| 2026-01-01 | 9.9.9 | fixture row |"));
   });
 
+  it("runApplySection8 skips in-repo vault AGENTS when repo fallback is active (Story 87-1)", async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-fallback-"));
+    const repoVault = join(fixtureRoot, "Knowledge-Vault-ACTIVE");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, repoVault);
+    await writeFile(
+      join(repoVault, "AI-Context", "vault-fast-scan-index.md"),
+      "# fast-scan fixture\n",
+      "utf8",
+    );
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");
+    const staleVaultAgents = join(repoVault, "AI-Context", "AGENTS.md");
+    const beforeRepo = await readFile(repoAgents, "utf8");
+    const beforeStale = await readFile(staleVaultAgents, "utf8");
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: false,
+        repoRoot: fixtureRoot,
+        vaultRoot: repoVault,
+        dateStr: "2026-05-28",
+      });
+      assert.equal(result.written, true);
+      assert.equal(result.targets.length, 1);
+      assert.equal(result.targets[0], repoAgents);
+      const repoAfter = await readFile(repoAgents, "utf8");
+      const staleAfter = await readFile(staleVaultAgents, "utf8");
+      assert.notEqual(repoAfter, beforeRepo);
+      assert.equal(staleAfter, beforeStale);
+      assert.ok(repoAfter.includes("9.9.10"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it("runApplySection8 byte-syncs repo and vault AGENTS copies", async () => {
     const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-"));
     const vault = join(fixtureRoot, "vault");
@@ -1811,6 +1960,105 @@ describe("session-close SC-4 apply-section8", () => {
       assert.equal(onDisk, before);
       const preview = await readFile(result.previewPath, "utf8");
       assert.ok(preview.includes("9.9.10"));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runApplySection8 changelog row is self-descriptive, not a copy of the prior anchor description", async () => {
+    const priorDescription = "DISTINCTIVE_PRIOR_CHANGELOG_NEVER_COPY";
+    const projectStatusLine = "79 epics done; 2 in-progress (58, 78)";
+    const agentsWithAnchor = SAMPLE_AGENTS.replace(
+      "| 2026-01-01 | 9.9.9 | fixture row |",
+      `| 2026-01-01 | 9.9.9 | ${priorDescription} |`,
+    );
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-changelog-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await writeFile(join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md"), agentsWithAnchor, "utf8");
+    await writeFile(join(vault, "AI-Context", "AGENTS.md"), agentsWithAnchor, "utf8");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        dateStr: "2026-05-28",
+        contextPack: {
+          sprint: { project_status_line: projectStatusLine },
+          agents: {
+            changelog_anchor_row: `| 2026-01-01 | 9.9.9 | ${priorDescription} |`,
+          },
+        },
+      });
+      assert.ok(result.changelogRow?.includes("Regenerated by /session-close"));
+      assert.ok(result.changelogRow?.includes(projectStatusLine));
+      assert.ok(!result.changelogRow?.includes(priorDescription));
+      const preview = await readFile(result.previewPath, "utf8");
+      assert.ok(
+        preview.includes(
+          `| 2026-05-28 | 9.9.10 | Section 8: Regenerated by /session-close — ${projectStatusLine} |`,
+        ),
+      );
+      const newRowStart = preview.indexOf("| 2026-05-28 | 9.9.10 |");
+      assert.ok(newRowStart >= 0);
+      const newRowEnd = preview.indexOf("\n", newRowStart);
+      const newRow = preview.slice(newRowStart, newRowEnd === -1 ? undefined : newRowEnd);
+      assert.ok(!newRow.includes(priorDescription));
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("runApplySection8 changelog uses static fallback when project_status_line is missing", async () => {
+    const priorDescription = "ANCHOR_TEXT_MUST_NOT_APPEAR_IN_NEW_ROW";
+    const agentsWithAnchor = SAMPLE_AGENTS.replace(
+      "| 2026-01-01 | 9.9.9 | fixture row |",
+      `| 2026-01-01 | 9.9.9 | ${priorDescription} |`,
+    );
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "session-close-apply-changelog-fallback-"));
+    const vault = join(fixtureRoot, "vault");
+    const draftPath = join(fixtureRoot, ".session-close", "section8-draft.md");
+    const draftFixture = join(
+      import.meta.dirname,
+      "fixtures/session-close/section8-draft-fragment.md",
+    );
+    await seedSessionCloseFixture(fixtureRoot, vault);
+    await writeFile(join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md"), agentsWithAnchor, "utf8");
+    await writeFile(join(vault, "AI-Context", "AGENTS.md"), agentsWithAnchor, "utf8");
+    await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
+    await copyFile(draftFixture, draftPath);
+
+    try {
+      const result = await runApplySection8({
+        draftPath,
+        dryRun: true,
+        repoRoot: fixtureRoot,
+        vaultRoot: vault,
+        dateStr: "2026-05-28",
+        contextPack: {
+          agents: {
+            changelog_anchor_row: `| 2026-01-01 | 9.9.9 | ${priorDescription} |`,
+          },
+        },
+      });
+      assert.equal(result.changelogRow, "| 2026-05-28 | 9.9.10 | Section 8: Regenerated by /session-close |");
+      assert.ok(!result.changelogRow?.includes(priorDescription));
+      const preview = await readFile(result.previewPath, "utf8");
+      assert.ok(preview.includes("| 2026-05-28 | 9.9.10 | Section 8: Regenerated by /session-close |"));
+      const newRowStart = preview.indexOf("| 2026-05-28 | 9.9.10 |");
+      assert.ok(newRowStart >= 0);
+      const newRowEnd = preview.indexOf("\n", newRowStart);
+      const newRow = preview.slice(newRowStart, newRowEnd === -1 ? undefined : newRowEnd);
+      assert.ok(!newRow.includes(priorDescription));
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }

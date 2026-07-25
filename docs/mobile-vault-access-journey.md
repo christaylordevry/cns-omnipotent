@@ -16,7 +16,7 @@ Define a **supported mobile read journey** for the CNS vault, and an explicit go
 
 This document is **documentation only**. It introduces no new MCP tools, no changes to WriteGate, and no mobile write hose design.
 
-For existing dual-path documentation (Vault IO vs Nexus), see `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` Section 5 and `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`.
+For existing dual-path documentation (Vault IO vs Nexus), see `specs/cns-vault-contract/AGENTS.md` Section 5 (runtime: canonical vault `AI-Context/AGENTS.md`) and `docs/Nexus-Discord-Obsidian-Bridge-Full-Guide.md`.
 
 ## Definitions and glossary
 
@@ -119,7 +119,7 @@ Any future "mobile write" capability should be designed so that writes still rou
 
 ## Constitution pointer (agents)
 
-**Applied in repo:** `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` Section 7 includes a **Mobile posture** module row, and Section 5 states how mobile relates to Nexus and Vault IO. The short module lives at `AI-Context/modules/mobile-posture.md`.
+**Applied in specs mirror:** `specs/cns-vault-contract/AGENTS.md` Section 7 includes a **Mobile posture** module row, and Section 5 states how mobile relates to Nexus and Vault IO. The short module lives at `specs/cns-vault-contract/modules/mobile-posture.md` (runtime vault: `AI-Context/modules/mobile-posture.md`).
 
 ### One-line pointer
 

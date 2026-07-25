@@ -28,7 +28,7 @@ export function defaultSessionCloseEnvPath(env = process.env) {
   if (hermesHome) {
     return join(hermesHome, "session-close.env");
   }
-  return join(homedir(), ".hermes", "session-close.env");
+  return join(env.HOME ?? homedir(), ".hermes", "session-close.env");
 }
 
 const ENV_KEY_RE = /^[A-Z][A-Z0-9_]*$/;

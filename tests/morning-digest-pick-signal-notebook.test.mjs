@@ -306,6 +306,24 @@ describe('buildDigestSignals', () => {
     assert.deepEqual(titles, ['rd-high', 'rd-mid']);
   });
 
+  it('extractRedditSignals ranks by publishedAt desc when upvotes absent (RSS)', () => {
+    const titles = extractRedditSignals([
+      { title: 'rd-older', publishedAt: '2026-07-21T22:00:00.000Z' },
+      { title: 'rd-newest', publishedAt: '2026-07-22T12:00:00.000Z' },
+      { title: 'rd-mid', publishedAt: '2026-07-22T07:00:00.000Z' },
+    ]);
+    assert.deepEqual(titles, ['rd-newest', 'rd-mid']);
+  });
+
+  it('extractRedditSignals does not bury dated RSS-only rows under zero-upvote coercion', () => {
+    const titles = extractRedditSignals([
+      { title: 'rd-rss-fresh', publishedAt: '2026-07-22T12:00:00.000Z' },
+      { title: 'rd-enriched', upvotes: 10, publishedAt: '2026-07-21T00:00:00.000Z' },
+      { title: 'rd-rss-old', publishedAt: '2026-07-20T00:00:00.000Z' },
+    ]);
+    assert.deepEqual(titles, ['rd-enriched', 'rd-rss-fresh']);
+  });
+
   it('extractProductHuntSignals ranks by votesCount desc and caps at 2', () => {
     const titles = extractProductHuntSignals([
       { title: 'ph-low', votesCount: 1 },

@@ -7,7 +7,7 @@ Not the vault CLAUDE.md shim — that lives at `specs/cns-vault-contract/shims/C
 ## System Context
 - **CNS** — control layer: agent routing, vault IO, security gates, input surfaces
 - **PAKE** — knowledge layer: note schemas, quality scoring, ingestion, retrieval
-- **Vault** — `Knowledge-Vault-ACTIVE/` (PARA structure) is the single source of truth
+- **Vault** — canonical live vault at `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` (PARA structure) is the single source of truth; repo `./Knowledge-Vault-ACTIVE/` is a **CI fixture only** — live governed Vault IO writes must target canonical unless the task is explicitly fixture maintenance
 - **Hermes** — `~/.hermes/` — Discord gateway, skills at `~/.hermes/skills/cns/`
 - **Constitution** — `specs/cns-vault-contract/AGENTS.md` (v2.1.5)
 
@@ -18,7 +18,7 @@ Phase 6 complete. Epics 1–37 done. Epics 38 + 43 in progress.
 - Cursor: primary model Claude Sonnet 4.6
 - NotebookLM: live (4 notebooks, fan-out via session-close)
 - CNS-Daily-Rhythm.md: live (AUTO blocks refreshed by session-close Step 6.7)
-- run-chain: dormant (adapters use Anthropic API directly — Epic 38-2 deferred)
+- run-chain: revived (75-5 E2E PASS 2026-06-24; adapters use Anthropic API via `.env.live-chain`)
 
 ---
 
@@ -95,3 +95,11 @@ Dumps the repo source into the codebase so the agent has code-as-context rather 
 - Never install an npm or pip package fewer than 14 days old unless explicitly approved by the operator. This prevents supply chain attacks via recently published malicious packages.
 - Never hardcode API keys or tokens in config files — use environment variables.
 - Hermes gateway watchdog runs every 3 min via cron — check `~/.hermes/logs/watchdog.log` if gateway is unresponsive.
+
+---
+
+## Note Style (when creating/editing vault notes)
+
+SSOT: `specs/cns-vault-contract/modules/note-style-guide.md` — loaded via `@` import for zero drift (callout + structure conventions auto-inlined at session start).
+
+@specs/cns-vault-contract/modules/note-style-guide.md

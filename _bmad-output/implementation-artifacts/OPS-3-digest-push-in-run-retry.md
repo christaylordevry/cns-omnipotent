@@ -1,0 +1,210 @@
+---
+story_id: OPS-3
+epic: ops-observability
+title: bounded-in-run-retry-on-convex-push-write-leg
+status: cancelled
+closed: 2026-07-20
+closed_reason: evidence-based close-unbuilt — zero transient failures in full log history; day-level retry already exists
+reopen_trigger: a completion-convex-push-failed that succeeds on the NEXT run without intervention
+created: 2026-07-20
+operator_brief: 2026-07-20
+depends_on: OPS-1
+blocked_by: OPS-1 must be shipped and proven before this starts
+predecessors: 81-2, 71-4, 67-10
+---
+
+# Story OPS-3: Bounded in-run retry on the Convex push write leg
+
+Status: **CANCELLED 2026-07-20 — closed unbuilt by operator decision, on the evidence below**
+
+> **Closed, not deferred.** The premise did not survive contact with the data: every push failure
+> in recorded history is permanent, and retry would have helped in none of them. Building it would
+> have added a maintained mechanism, carrying an unresolved idempotency risk (a naive retry can
+> duplicate the run row and corrupt the run-over-run deltas BD-2 depends on), to guard a failure
+> class this system has never experienced.
+>
+> **Reopen only on evidence:** a `completion-convex-push-failed` that succeeds on the *next* run
+> without intervention. That is the signature of a genuine transient and the first real argument
+> for retry. OPS-1's alert history is where that would show up.
+>
+> The story text is retained in full — the analysis is the value, and it records *why* not to build
+> this the next time it looks obvious.
+
+## ⛔ Evidence gathered 2026-07-20 — this story's premise does not hold
+
+Open Question 2 (below) was answered by grepping the full watchdog log history
+(`~/.hermes/logs/push-digest-watchdog.log`, 34KB, spanning 2026-06 → 2026-07). **Every**
+`completion-convex-push-failed` in recorded history — 8 occurrences, 2 clusters:
+
+| Date | Count | Error | Class | Would retry help? |
+|---|---|---|---|---|
+| 2026-06-20 | 5 | `ArgumentValidationError: Object contains extra field…` | **permanent** — schema drift | **No** |
+| 2026-07-20 | 3 | `You have exceeded the free plan limits…` | **permanent** — quota ceiling | **No** |
+
+**Transient failures: zero. Ever.** Both real-world failure modes are deterministic and
+permanent; retrying either just delays the alert. Per gate (c) of this story ("if they are not
+occurring, this story's value is theoretical and it should be closed rather than maintained"),
+the recommendation is **close unbuilt**.
+
+Retry also carries real cost: the idempotency risk in gate (a) is unresolved, and a wrong
+implementation duplicates run rows — actively worse than the failure it replaces. Building it
+would add a maintained mechanism guarding a failure class this system has never experienced.
+
+**Reopen this story only if** the OPS-1 alert history later shows a `completion-convex-push-failed`
+that succeeded on the next run without intervention — that is the signature of a genuine
+transient, and the first real evidence for retry.
+
+### Higher-value successor spotted in the same evidence
+
+The 2026-06-20 cluster is a **second, earlier instance of the same silent-failure class** OPS-1
+fixes — five failures over ~2 hours, all `exit=0`, all unnoticed. It is also a distinct *cause*:
+a payload/schema contract drift between the digest pusher and the Convex validator, which no
+amount of retry or alerting prevents. **A schema-contract guard is worth more than retry** and
+is now OPS-2. Not scoped here.
+
+---
+
+## Original draft follows (retained for the record)
+
+Status: draft — design gate NOT approved
+
+> **Sequencing gate.** Do not start until OPS-1 has shipped and alerting is proven on a real
+> failure. Retry changes *how long* a failure takes to become visible; adding it before
+> alerting exists would make the pipeline quieter, not safer — the exact failure mode of the
+> 2026-07-20 incident.
+
+## Story
+
+As the **CNS operator**,
+I want **a single transient Convex error (502/503/504/429/network blip) at 07:15 to be retried in-run rather than failing the push**,
+so that **a momentary blip does not cost me the morning digest and a wait until the 13:00 watchdog**.
+
+---
+
+## ⚠️ Scope honesty — read before estimating
+
+**This story would NOT have prevented the 2026-07-20 incident**, and must not be described as
+if it would. That was a Convex free-plan ceiling that disabled deployments for ~12 hours.
+Retry does not fix a sustained outage — only alerting (OPS-1) does. If this story is being
+picked up *because* of 07-20, stop and re-read this section.
+
+### Retry that already exists — do not rebuild it
+
+| Layer | Status | Evidence |
+|---|---|---|
+| **Day-level re-push across cron runs** | **EXISTS** | `push-digest-watchdog.mjs:435` — on `completion-convex-push-failed`, the next watchdog run returns `deferred-push-only-artifact` → `pushOnlyFromArtifact()` re-pushes from the artifact. Fired 3× on 2026-07-20. |
+| **Convex `getRecentDigestRuns` query retry** | **EXISTS** | `fetchRecentDigestRuns(fetchFn, convexEnv, { maxAttempts, retryDelayMs, sleepFn })` |
+| **Generic retry helper** | **EXISTS, unwired here** | `scripts/hermes-skill-examples/morning-digest/scripts/fetch-with-retry.mjs` (Story 81-2) — currently only `fetch-newsapi-headlines.mjs` and `fetch-polymarket-signals.mjs` consume it |
+| **Convex push *write* leg, in-run** | **MISSING ← this story** | `pushDigestToConvex()` has no retry; one 503 fails the whole push |
+
+**Net gap:** a transient blip costs ~6 hours (07:15 → 13:00) instead of ~3 seconds.
+
+---
+
+## Design Gate — OPEN (operator approval required before dev)
+
+### (a) Idempotency is the central risk — **DECISION REQUIRED**
+
+`pushDigestToConvex` is **two-phase**: it creates a run row (`digestRunId`, `push-digest-convex.mjs:487`)
+and *then* writes signals. The existing `partial-write:{n}/{expected}` error
+(`push-digest-convex.mjs:287`) proves the partial state is real and already observed.
+
+**A naive retry of the whole function after a partial write can create a second run row for the
+same date** — duplicate digest runs, duplicated signals, corrupted run-over-run deltas (which
+BD-2 will depend on). This is a worse outcome than the failure it replaces.
+
+Proposed constraint: **retry the HTTP call, never the operation.** Retry must sit *inside*
+`pushDigestToConvex`, wrapping the individual `fetch` calls (`:323`, `:361`), so a retried
+request re-sends the *same* mutation with the *same* `digestRunId`. It must NOT wrap
+`pushDigestToConvex` from the outside, and must NOT be added at the `pushPayload` /
+`scoreWriteAndPush` level.
+
+**Open question for the operator / architect:** are the underlying Convex mutations idempotent
+on re-delivery (does re-sending an identical signal write upsert by `sourceType`+`externalId`,
+or insert a duplicate)? `resolveRescoreIdentity` (`:151`) keys on
+`` `${sourceType}\u0000${externalId}` `` which suggests an upsert path exists, but **this must
+be confirmed in `cns-dashboard` Convex before any retry ships.** If writes are insert-only, this
+story needs a different design (idempotency key / dedupe on the Convex side) and grows past
+"small".
+
+### (b) Retryable classification — **PROPOSED**
+
+Convex failures surface as thrown `Error("Convex HTTP <status>: <body>")` (`:323`, `:361`).
+The existing `DEFAULT_RETRYABLE` regex in `fetch-with-retry.mjs` is anchored `^http-(429|503|502)`
+and **will not match that message shape** — reusing the helper requires passing a custom
+`retryable` pattern. Do not "fix" the shared default; other adapters depend on it.
+
+**Retry:** `502`, `503`, `504`, `429`, network errors, `ETIMEDOUT`, `AbortError`.
+**Never retry:** `4xx` other than `429` — including the plan-limit / deployment-disabled class
+from 2026-07-20 — and `invalid-input`. Retrying a permanent error just delays the OPS-1 alert.
+
+**Budget:** 3 attempts, base delay 1000ms, linear backoff (matches `fetchWithRetry` defaults).
+Hard ceiling on total added latency: **≤ 10s**. The cron has no wall-clock guard; an unbounded
+retry loop would silently push the digest past its useful window.
+
+### (c) Interaction with OPS-1 — **PROPOSED**
+
+- Retry **exhausted** → unchanged terminal action (`completion-convex-push-failed`) → OPS-1
+  exits 1 and alerts. Retry must never swallow a final failure.
+- Retry **succeeded after N>1 attempts** → `overall: 'success'`, exit 0, **no alert** — but the
+  attempt count must be recorded in the watchdog log detail and the day outcome record. Silent
+  self-healing is how you discover six months later that Convex has been flaky since April.
+- Recommend a follow-up review of `retryAttempts` after ~30 days of data to see whether
+  transient failures are actually occurring at all. **If they are not, this story's value is
+  theoretical and it should be closed rather than maintained.**
+
+---
+
+## Draft Acceptance Criteria
+
+*(Not binding until the design gate is approved — (a) in particular may change the shape.)*
+
+**AC1** — Retry wraps the individual Convex HTTP calls inside `pushDigestToConvex`, never the
+enclosing operation. A retried attempt re-sends the same `digestRunId`.
+
+**AC2** — Exactly one run row per date under retry. Test: first write attempt returns 503,
+second succeeds → assert the run-creation call fired **once**, not twice.
+
+**AC3** — Only the transient classes in gate (b) retry. Test: HTTP 402/403 (plan-limit shape,
+the 2026-07-20 class) → **zero** retries, fails immediately.
+
+**AC4** — Budget respected: ≤3 attempts, ≤10s added latency, injected `sleepFn` in tests (**no
+real timers**).
+
+**AC5** — Exhausted retry produces the unchanged `completion-convex-push-failed` terminal action
+and still trips OPS-1's exit-1 + alert. Regression test against OPS-1's ACs.
+
+**AC6** — Successful retry records attempt count in the watchdog log detail and the day outcome
+record; no alert fires.
+
+**AC7** — No change to `fetch-with-retry.mjs`'s exported defaults (other adapters depend on
+them); the custom `retryable` pattern is passed per-call.
+
+**AC8** — Day-level watchdog re-push behaviour (`push-digest-watchdog.mjs:435`) is unchanged.
+This story adds a fast inner loop; it does not replace the outer one.
+
+**AC9** — `bash scripts/verify.sh` passes.
+
+## Out of Scope
+
+- Changing the day-level watchdog retry, its buckets, or the cron schedule.
+- Retry on the Discord post leg (separate failure domain, separate decision).
+- Retry on adapter collection (already handled per-adapter).
+- Convex-side idempotency/upsert changes — if gate (a) finds writes are insert-only, that is a
+  **cns-dashboard** story and a blocker on this one, not extra scope here.
+- Anything that reduces OPS-1's alerting surface.
+
+## Verification
+
+```bash
+cd /home/christ/ai-factory/projects/Omnipotent.md
+node --test tests/morning-digest-push-convex.test.mjs tests/run-digest-convex-completion.test.mjs
+bash scripts/verify.sh
+```
+
+## Open Questions — must be closed before dev
+
+1. **Are the Convex digest-signal writes idempotent on re-delivery?** (gate (a)) — blocking.
+2. Has a *transient* Convex failure ever actually occurred? Grep the watchdog log history for
+   `completion-convex-push-failed` where the next run succeeded. **If the answer is "never,"
+   this story should be closed unbuilt** — see gate (c).

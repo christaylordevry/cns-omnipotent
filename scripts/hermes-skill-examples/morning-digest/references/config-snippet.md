@@ -148,20 +148,71 @@ MORNING_DIGEST_HN_ENABLED=1
 
 When disabled, the fetch script returns `{"error":"hackernews disabled"}`.
 
-## GitHub repository search (Story 65-1)
+## GitHub repository search (Story 65-1, STORE_MAX Story 89-1)
 
 Set in the shell environment or in `~/.hermes/trend-ingest.env` (same file as NewsAPI is fine).
+
+**Stage A (89-1)** widens the fetch/store pool so `digestSignals.sourceMetadata.stars` accumulates history for Stage B velocity. The push path writes **every** repo the fetcher returns — there is no write-time shortlist cap.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `MORNING_DIGEST_GITHUB_QUERIES` | Comma-separated GitHub search strings | required when enabled |
-| `MORNING_DIGEST_GITHUB_MAX_REPOS` | Max repos to return | `5` |
+| `MORNING_DIGEST_GITHUB_MAX_REPOS` | Max distinct repos after URL dedupe (STORE_MAX) | `40` |
+| `MORNING_DIGEST_GITHUB_PER_QUERY` | Max repos parsed per search query (`per_page`) | `5` |
 | `MORNING_DIGEST_GITHUB_ENABLED` | Set `0` or `false` to disable | enabled |
 | `GITHUB_TOKEN` | Optional — raises API rate limits | — |
 
-## Reddit top listings (Story 67-2)
+Example operator setup (in-code defaults already match; set env for explicit ops pin):
 
-Public JSON — no OAuth credentials. User-Agent (`CNS-morning-digest/1.0`) is set inside the adapter. Set in `~/.hermes/trend-ingest.env`.
+```bash
+# In ~/.hermes/trend-ingest.env
+# Values with spaces MUST be double-quoted (FOO=a b c silently breaks).
+MORNING_DIGEST_GITHUB_MAX_REPOS=40
+MORNING_DIGEST_GITHUB_PER_QUERY=5
+MORNING_DIGEST_GITHUB_ENABLED=1
+```
+
+**Not introduced:** `SHORTLIST_MAX` / `MORNING_DIGEST_GITHUB_SHORTLIST_MAX` / `EMIT_MAX` — selection caps belong to 89-3 when a judgment shortlist exists.
+
+## YouTube Data API (Story 72-1, quality selection Story 90-3)
+
+Set in `~/.hermes/trend-ingest.env`. Values with spaces MUST be double-quoted.
+
+Pipeline: `search.list` (order=date, lookback window) → id-dedupe up to `CANDIDATE_MAX` → `videos.list` enrich → quality floor (views AND likes) → view-velocity rank → keep-N (`MAX_VIDEOS`).
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MORNING_DIGEST_YOUTUBE_API_KEY` | YouTube Data API v3 key | required when enabled |
+| `MORNING_DIGEST_YOUTUBE_QUERIES` | Comma-separated search strings | required when enabled |
+| `MORNING_DIGEST_YOUTUBE_MAX_VIDEOS` | Keep-N after floor + velocity rank (hard max 50) | `12` |
+| `MORNING_DIGEST_YOUTUBE_PER_QUERY` | `search.list` maxResults per query | `10` |
+| `MORNING_DIGEST_YOUTUBE_LOOKBACK_HOURS` | `publishedAfter` window | `72` |
+| `MORNING_DIGEST_YOUTUBE_CANDIDATE_MAX` | Max unique ids enriched (hard max 150) | `100` |
+| `MORNING_DIGEST_YOUTUBE_MIN_VIEWS` | Quality floor (AND with likes) | `200` |
+| `MORNING_DIGEST_YOUTUBE_MIN_LIKES` | Quality floor (AND with views) | `5` |
+| `MORNING_DIGEST_YOUTUBE_SEARCH_ORDER` | `search.list` order (`date` recommended) | `date` |
+| `MORNING_DIGEST_YOUTUBE_VELOCITY_MIN_AGE_HOURS` | Denominator floor for views/hours | `1` |
+| `MORNING_DIGEST_YOUTUBE_ENABLED` | Set `0` or `false` to disable | enabled |
+
+Quota: `queries×100 + ceil(candidates/50)` (warn at 2000). Floor wipe returns `{videos:[]}` — no velocity-without-floor padding.
+
+Example ops pin:
+
+```bash
+# In ~/.hermes/trend-ingest.env
+MORNING_DIGEST_YOUTUBE_MAX_VIDEOS=12
+MORNING_DIGEST_YOUTUBE_PER_QUERY=10
+MORNING_DIGEST_YOUTUBE_LOOKBACK_HOURS=72
+MORNING_DIGEST_YOUTUBE_CANDIDATE_MAX=100
+MORNING_DIGEST_YOUTUBE_MIN_VIEWS=200
+MORNING_DIGEST_YOUTUBE_MIN_LIKES=5
+MORNING_DIGEST_YOUTUBE_VELOCITY_MIN_AGE_HOURS=1
+MORNING_DIGEST_YOUTUBE_ENABLED=1
+```
+
+## Reddit top listings (Story 67-2 → 90-1 RSS)
+
+App-free Atom RSS (`…/top/.rss?t=day`) — no OAuth. User-Agent (`linux:cns-morning-digest:1.0 (by /u/cns_operator)`) is hardcoded in the adapter. Set subreddit list in `~/.hermes/trend-ingest.env`.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
@@ -170,7 +221,7 @@ Public JSON — no OAuth credentials. User-Agent (`CNS-morning-digest/1.0`) is s
 | `MORNING_DIGEST_REDDIT_PER_SUBREDDIT` | Max posts per subreddit | `3` |
 | `MORNING_DIGEST_REDDIT_ENABLED` | Set `0` or `false` to disable | enabled |
 
-**Note:** `REDDIT_CLIENT_*` in this file is for Epic 44 trend-ingest (PRAW) only — not morning-digest Source 8.
+**Transport (Story 90-1):** `https://www.reddit.com/r/{sub}/top/.rss?t=day` (Atom). No OAuth. No `REDDIT_CLIENT_*`. Omit `upvotes`/`commentCount` on stdout (never default to `0`). Same subreddit env feeds trend-ingest reddit RSS. `REDDIT_CLIENT_*` is **deprecated/unused** for both digest and trend.
 
 ## Newsletters / RSS (Story 65-4)
 

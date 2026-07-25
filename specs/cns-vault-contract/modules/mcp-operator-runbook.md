@@ -228,4 +228,3 @@ Notes: response returned with citations
 
 - `_bmad-output/implementation-artifacts/19-1-live-chain-smoke-harness-and-evidence-record.md`
 - `_bmad-output/implementation-artifacts/21-3-single-repeatable-run-script.md`
-

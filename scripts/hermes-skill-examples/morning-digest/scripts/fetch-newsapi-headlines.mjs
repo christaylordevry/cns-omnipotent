@@ -5,6 +5,7 @@
 import { fileURLToPath } from 'node:url';
 
 import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
+import { fetchWithRetry } from './fetch-with-retry.mjs';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const NEWSAPI_EVERYTHING_URL = 'https://newsapi.org/v2/everything';
@@ -258,19 +259,27 @@ export async function fetchNewsapi(config, fetchFn, fixturePayload) {
     apiKey: config.apiKey,
   });
 
-  try {
-    const res = await fetchFn(`${NEWSAPI_EVERYTHING_URL}?${params.toString()}`, {
-      signal: globalThis.AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      return { ok: false, reason: `http-${res.status}` };
+  const retryResult = await fetchWithRetry(async () => {
+    try {
+      const res = await fetchFn(`${NEWSAPI_EVERYTHING_URL}?${params.toString()}`, {
+        signal: globalThis.AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        return { ok: false, reason: `http-${res.status}` };
+      }
+      const payload = await res.json();
+      return { ok: true, value: payload };
+    } catch (err) {
+      const name =
+        err && typeof err === 'object' && 'name' in err ? String(err.name) : 'fetch-error';
+      return { ok: false, reason: name };
     }
-    const payload = await res.json();
-    return { ok: true, payload };
-  } catch (err) {
-    const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : 'fetch-error';
-    return { ok: false, reason: name };
+  });
+
+  if (!retryResult.ok) {
+    return { ok: false, reason: retryResult.reason };
   }
+  return { ok: true, payload: retryResult.value };
 }
 
 /**

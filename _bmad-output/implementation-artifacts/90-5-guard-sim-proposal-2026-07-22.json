@@ -1,0 +1,240 @@
+{
+  "fixture": "90-4-reconstructed-pre-dedupe-2026-07-22.json",
+  "recommendation": {
+    "id": "G7",
+    "name": "antonym-always + short-title entity disable (min(|A|,|B|) <= 3)",
+    "rationale": [
+      "G1 antonym-only misses subset/identical-noun short pairs",
+      "G4 subset hybrid leaves Bitcoin ETF Rally absorbed into fixture Bitcoin ETF Flows (shared bitcoin+etf, denom=3)",
+      "G3 short shared>=3 also passes both success checks but over-rejects short geo-variants (Tesla Austin×Miami) the same way G7 does for ALL short entity pairs — G7 is clearer: short titles must win via URL/canon/jaccard only",
+      "shared>=3 GLOBAL breaks polymarket Anthropic↔Which (shared=2)",
+      "Antonym layer still needed for LONG opposite titles where denom>3"
+    ]
+  },
+  "comparison": {
+    "baseline": {
+      "fixture": {
+        "totalPrimaries": 124,
+        "youtube_primaries": 18,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 2,
+        "nvidiaBothAlive": false,
+        "btcBothAlive": false,
+        "claudeBothAlive": false,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Claude Tips"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": false
+    },
+    "g1_antonym": {
+      "fixture": {
+        "totalPrimaries": 124,
+        "youtube_primaries": 18,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 3,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": false,
+        "claudeBothAlive": false,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Claude Tips"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": false
+    },
+    "g3_short_shared3": {
+      "fixture": {
+        "totalPrimaries": 129,
+        "youtube_primaries": 22,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 6,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": true,
+        "claudeBothAlive": true,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Bitcoin ETF",
+          "Bitcoin ETF Rally",
+          "Claude Tips",
+          "Claude Tips for beginners"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": true
+    },
+    "g3_short_prop075": {
+      "fixture": {
+        "totalPrimaries": 129,
+        "youtube_primaries": 22,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 3,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": false,
+        "claudeBothAlive": false,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Claude Tips"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": false
+    },
+    "g4_hybrid_subset": {
+      "fixture": {
+        "totalPrimaries": 124,
+        "youtube_primaries": 18,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 5,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": false,
+        "claudeBothAlive": true,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Bitcoin ETF",
+          "Claude Tips",
+          "Claude Tips for beginners"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": false
+    },
+    "g7_recommended": {
+      "fixture": {
+        "totalPrimaries": 129,
+        "youtube_primaries": 22,
+        "polymarket_best_ai": 5,
+        "bitcoin_etf": 3,
+        "import_ai_465": 2
+      },
+      "inject": {
+        "injectPrimaries": 6,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": true,
+        "claudeBothAlive": true,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Bitcoin ETF",
+          "Bitcoin ETF Rally",
+          "Claude Tips",
+          "Claude Tips for beginners"
+        ]
+      },
+      "legit_ok": true,
+      "opposite_ok": true
+    },
+    "shared3_global": {
+      "fixture": {
+        "totalPrimaries": 133,
+        "youtube_primaries": 23,
+        "polymarket_best_ai": 4,
+        "bitcoin_etf": 3,
+        "import_ai_465": 1
+      },
+      "inject": {
+        "injectPrimaries": 6,
+        "nvidiaBothAlive": true,
+        "btcBothAlive": true,
+        "claudeBothAlive": true,
+        "primaryTitles": [
+          "Nvidia Chip Shortage",
+          "Nvidia Chip Surplus",
+          "Bitcoin ETF",
+          "Bitcoin ETF Rally",
+          "Claude Tips",
+          "Claude Tips for beginners"
+        ]
+      },
+      "legit_ok": false,
+      "opposite_ok": true
+    }
+  },
+  "pairMatrix": {
+    "baseline": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": true,
+      "Bitcoin ETF × Bitcoin ETF Rally": true,
+      "Claude Tips × Claude Tips for beginners": true,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": true
+    },
+    "g1_antonym": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": true,
+      "Claude Tips × Claude Tips for beginners": true,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": true
+    },
+    "g3_short_shared3": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": false,
+      "Claude Tips × Claude Tips for beginners": false,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": false
+    },
+    "g3_short_prop075": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": true,
+      "Claude Tips × Claude Tips for beginners": true,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": false
+    },
+    "g4_hybrid_subset": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": false,
+      "Claude Tips × Claude Tips for beginners": false,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": true
+    },
+    "g7_recommended": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": false,
+      "Claude Tips × Claude Tips for beginners": false,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": true,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": false
+    },
+    "shared3_global": {
+      "Nvidia Chip Shortage × Nvidia Chip Surplus": false,
+      "Bitcoin ETF × Bitcoin ETF Rally": false,
+      "Claude Tips × Claude Tips for beginners": false,
+      "OpenAI GPT-5 Release Event × OpenAI GPT-5 Developer Preview": false,
+      "Tesla Robotaxi Austin × Tesla Robotaxi Miami": false
+    }
+  },
+  "polymarket_load_bearing": {
+    "anthropic_which": "shared={ai,july}=2 ratio=0.5 jaccard=0.333 — entity ONLY; denom=4 so short-disable does NOT touch",
+    "fixture_cluster_size": 5,
+    "note_x6": "Operator said x6; reconstructed fixture collapses to size 5 (4× Which company + 1× Will Anthropic). AC binds fixture size 5."
+  },
+  "success_checks": {
+    "opposite_pairs_separate": true,
+    "legit_clusters_survive": true
+  }
+}

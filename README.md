@@ -1,5 +1,9 @@
 # CNS Phase 1 — Omnipotent.md (implementation repo)
 
+> **FROZEN / READ-ONLY (M2a monorepo cutover).**  
+> As of the M2a subtree co-location into private `cns-dashboard` (`packages/orchestration`), this standalone repo must **not** receive new commits. Casual pushes here recreate the exact dual-repo divergence M2 exists to eliminate.  
+> **Land changes in the monorepo** (`cns-dashboard`). If this archive remote must absorb monorepo orchestration updates, use a deliberate `git subtree pull` / `subtree split` workflow — never a direct commit on `hermes-consolidation` / `master` here. Pending formal archive of `christaylordevry/cns-omnipotent`.
+
 This repository implements the **Central Nervous System (CNS) Phase 1** foundation: vault folder contract, `AGENTS.md` constitution mirror under `specs/cns-vault-contract/`, and the Vault IO MCP package (`src/`).
 
 What’s inside:

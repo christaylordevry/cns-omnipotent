@@ -28,6 +28,11 @@ export const PEOPLE_HANDLE_MATCH_BONUS = 20;
 export const PEOPLE_NAME_MATCH_BONUS = 10;
 export const PEOPLE_NAME_F1_THRESHOLD = 30;
 
+/** BD-4 / Architecture C9 — topicSlug max length (parity with trend-ingest.py + Convex lib/topicSlug). */
+export const TOPIC_SLUG_MAX_LEN = 80;
+/** Minimum IDF-weighted keyword coverage required to stamp a topicSlug. */
+export const WATCHLIST_MATCH_MIN_CONFIDENCE = 50;
+
 const SOURCE_PRIOR = {
   newsapi: 15,
   hackernews: 10,
@@ -103,6 +108,7 @@ const DEFAULT_REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..');
  * }} NexusPerson
  * @typedef {{
  *   domainTokens: string[],
+ *   domainKeywords: string[],
  *   personalTokens: string[],
  *   goalWeightedTokens: Array<{ token: string, weight: number }>,
  *   nexusPeople: NexusPerson[],
@@ -332,6 +338,120 @@ export function normalizeEngagement(signal) {
  */
 export function f1Score(tokensA, tokensB) {
   return Math.round(clamp(f1(tokensA, tokensB) * 100, 0, 100));
+}
+
+/**
+ * Collapse keyword identity before slugify / length tie-break (parity with
+ * cns-dashboard keywordCandidates.normalizeTerm).
+ * @param {string} term
+ * @returns {string}
+ */
+export function normalizeWatchlistTerm(term) {
+  return String(term ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Architecture C9 — stable topicSlug from watchlist keyword.
+ * Must stay byte-equivalent to Convex `convex/lib/topicSlug.ts` (BD-4 AC8 parity).
+ * @param {string} keyword
+ * @returns {string}
+ */
+export function slugFromKeyword(keyword) {
+  const trimmed = String(keyword ?? '')
+    .trim()
+    .toLowerCase();
+  const dashed = trimmed
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!dashed) {
+    return '';
+  }
+  return dashed.slice(0, TOPIC_SLUG_MAX_LEN);
+}
+
+/**
+ * Shared case list for Hermes↔Convex slug parity (BD-4 AC8).
+ * SSOT file: ../cns-dashboard/convex/lib/topic-slug-parity-cases.json
+ * (loaded at test time; keep Hermes expected values aligned with that file).
+ */
+export const TOPIC_SLUG_PARITY_CASES = [
+  { keyword: 'AI agents', expected: 'ai-agents' },
+  { keyword: '  MCP protocol  ', expected: 'mcp-protocol' },
+  { keyword: 'LLM infrastructure', expected: 'llm-infrastructure' },
+  { keyword: 'AI/coding-tools!', expected: 'ai-coding-tools' },
+  { keyword: 'knowledge management software', expected: 'knowledge-management-software' },
+  { keyword: 'solo operator business', expected: 'solo-operator-business' },
+  { keyword: 'AI funding rounds', expected: 'ai-funding-rounds' },
+  { keyword: 'design to code AI', expected: 'design-to-code-ai' },
+  {
+    keyword: 'A'.repeat(100),
+    expected: 'a'.repeat(80),
+  },
+  {
+    keyword: 'X'.repeat(50) + '!!!' + 'Y'.repeat(50),
+    expected: ('x'.repeat(50) + '-' + 'y'.repeat(50)).slice(0, 80),
+  },
+];
+
+/**
+ * Best watchlist keyword match for stamping topicSlug (BD-4). Does NOT affect relevance score.
+ * IDF is computed over the watchlist corpus so common tokens carry little weight.
+ * Weak matches and equal-confidence leaders are omitted because a wrong link is worse than no link.
+ * @param {DigestSignal} signal
+ * @param {string[]} domainKeywords
+ * @returns {{ keyword: string, topicSlug: string, matchConfidence: number } | null}
+ */
+export function resolveWatchlistMatch(signal, domainKeywords) {
+  if (!Array.isArray(domainKeywords) || domainKeywords.length === 0) {
+    return null;
+  }
+  const signalTokens = tokenizeSignalText(signal.title, signal.summary);
+  const signalSet = new Set(signalTokens);
+  const candidates = domainKeywords
+    .filter((keyword) => typeof keyword === 'string' && keyword.trim())
+    .map((keyword) => ({ keyword, tokens: [...new Set(tokenizeForScoring(keyword))] }))
+    .filter(({ tokens }) => tokens.length > 0);
+  if (signalSet.size === 0 || candidates.length === 0) {
+    return null;
+  }
+  const documentFrequency = new Map();
+  for (const { tokens } of candidates) {
+    for (const token of tokens) {
+      documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+    }
+  }
+  const tokenWeight = (token) =>
+    candidates.length === 1
+      ? 1
+      : Math.log(candidates.length / (documentFrequency.get(token) ?? candidates.length));
+
+  const matches = candidates.flatMap(({ keyword, tokens }) => {
+    const topicSlug = slugFromKeyword(keyword);
+    if (!topicSlug) {
+      return [];
+    }
+    const totalWeight = tokens.reduce((sum, token) => sum + tokenWeight(token), 0);
+    if (!(totalWeight > 0)) {
+      return [];
+    }
+    const matchedWeight = tokens.reduce(
+      (sum, token) => sum + (signalSet.has(token) ? tokenWeight(token) : 0),
+      0,
+    );
+    const matchConfidence = Math.round((matchedWeight / totalWeight) * 100);
+    return matchConfidence >= WATCHLIST_MATCH_MIN_CONFIDENCE
+      ? [{ keyword, topicSlug, matchConfidence }]
+      : [];
+  }).sort((a, b) => b.matchConfidence - a.matchConfidence);
+
+  if (matches.length === 0 || matches[1]?.matchConfidence === matches[0].matchConfidence) {
+    return null;
+  }
+  return matches[0];
 }
 
 /**
@@ -1270,6 +1390,7 @@ export async function loadScoringContext(env = process.env) {
 
   return {
     domainTokens,
+    domainKeywords,
     personalTokens,
     goalWeightedTokens,
     nexusPeople,
@@ -1666,6 +1787,10 @@ export function scoreDigestSignals(signals, ctx) {
       /** @type {DigestSignal} */ (signal),
       ctx.nexusPeople ?? [],
     );
+    const watchlistMatch = resolveWatchlistMatch(
+      /** @type {DigestSignal} */ (signal),
+      ctx.domainKeywords ?? [],
+    );
     /** @type {Record<string, unknown>} */
     const out = {
       ...signal,
@@ -1674,11 +1799,15 @@ export function scoreDigestSignals(signals, ctx) {
       rankScore,
       _oi: originalIndex,
     };
+    delete out.topicSlug;
     if (peopleMatch) {
       out.sourceMetadata = {
         ...(/** @type {DigestSignal} */ (signal).sourceMetadata ?? {}),
         peopleMatch,
       };
+    }
+    if (watchlistMatch) {
+      out.topicSlug = watchlistMatch.topicSlug;
     }
     if (normalizedEngagement != null && Number.isFinite(normalizedEngagement)) {
       out.normalizedEngagement = normalizedEngagement;

@@ -20,8 +20,13 @@ import {
 import { buildDigestPushPayload } from './hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
 import { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 import {
+  collectPrimaryAbsorbAlarmWarnings,
+  countSourceSignalStats,
+  formatYoutubeStageLine,
+  resolveAdapterFetchCount,
   resolveDigestMarkdownFromPayload,
   resolveSourceOutcomes,
+  shouldEmitYoutubeStageLine,
 } from './hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
 import { mergeTrendIngestEnv, resolveOperatorHome } from './hermes-skill-examples/morning-digest/scripts/fetch-arxiv-rss.mjs';
 import {
@@ -34,6 +39,7 @@ import { runAnalyzeEntityIntelligence } from './hermes-skill-examples/morning-di
 import { enrichPayloadWithEntityDigest } from './hermes-skill-examples/morning-digest/scripts/render-digest-entity-section.mjs';
 import { postDigestToDiscord } from './hermes-skill-examples/morning-digest/scripts/post-digest-discord.mjs';
 import { writeDigestPushArtifact } from './hermes-skill-examples/morning-digest/scripts/write-digest-push-artifact.mjs';
+import { postOutcomeCheckAlert } from './check-digest-run-outcome.mjs';
 import {
   computeOutcomeFromInvocation,
   markInvocationStarted,
@@ -41,8 +47,10 @@ import {
   queryTodayConvexStatus,
   resolveDigestOutcomesRoot,
   resolveDigestTrigger,
+  writeDayOutcomeRecordAtomic,
 } from './lib/digest-run-outcome.mjs';
 import { collectDigestLogActionsForDate } from './lib/digest-retry-eligibility.mjs';
+import { trySelectiveSourceRefetch } from './lib/selective-digest-source-refetch.mjs';
 import {
   formatWatchdogLogLine,
   resolveWatchdogLogPath,
@@ -56,6 +64,11 @@ const sessionCloseDir = join(repoRoot, 'scripts/session-close');
 
 export { invokePostPushEntityStage };
 export { enrichPayloadWithEntityDigest } from './hermes-skill-examples/morning-digest/scripts/render-digest-entity-section.mjs';
+export {
+  detectFailedPrimaryTrendSources,
+  mergeSelectiveRefetchIntoPayload,
+  trySelectiveSourceRefetch,
+} from './lib/selective-digest-source-refetch.mjs';
 export { formatSydneyDate } from './hermes-skill-examples/morning-digest/scripts/digest-date.mjs';
 export {
   buildErrorsBySource,
@@ -63,6 +76,65 @@ export {
   summarizeAdapterCollection,
   unwrapAdapterResult,
 } from './hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
+export { postOutcomeCheckAlert } from './check-digest-run-outcome.mjs';
+
+/**
+ * Truncate root-cause error text for Discord alert bodies (OPS-1).
+ * @param {unknown} err
+ * @param {number} [max]
+ * @returns {string}
+ */
+function truncateAlertError(err, max = 200) {
+  const s = String(err ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) {
+    return '';
+  }
+  return s.length <= max ? s : `${s.slice(0, max - 3)}...`;
+}
+
+/**
+ * Discord alert copy for a non-success push-completion outcome (OPS-1).
+ * Distinguishes data-loss (`failed` / Convex not ok) from delivery-loss (`partial` + Convex ok).
+ * Omits the wrote N/M ratio when expected is 0 (avoids a false "0/0 no-op" read).
+ * Appends truncated convex.error or discord.error when present.
+ *
+ * @param {Record<string, unknown>} record
+ * @param {{ signalCount?: number }} [opts]
+ * @returns {string}
+ */
+export function formatDigestPushFailureAlert(record, opts = {}) {
+  const date = String(record.date ?? 'unknown');
+  const overall = String(record.overall ?? 'unknown');
+  const lastInvocation = /** @type {{ action?: string | null }} */ (record.lastInvocation ?? {});
+  const action = String(lastInvocation.action ?? record.terminalAction ?? 'unknown');
+  const convex = /** @type {{ ok?: boolean; signalsWritten?: number; error?: string | null }} */ (
+    record.convex ?? {}
+  );
+  const discord = /** @type {{ ok?: boolean; error?: string | null }} */ (record.discord ?? {});
+  const signalsWritten = Number(convex.signalsWritten ?? 0);
+  const expected = Number(opts.signalCount ?? 0);
+  const errorDetail = truncateAlertError(
+    typeof convex.error === 'string' && convex.error
+      ? convex.error
+      : typeof discord.error === 'string' && discord.error
+        ? discord.error
+        : '',
+  );
+
+  /** @type {string} */
+  let body;
+  if (overall === 'partial' && convex.ok === true) {
+    body = `WARN: digest wrote ${signalsWritten} signals to Convex but Discord delivery failed — ${date} overall=partial action=${action}`;
+  } else if (expected > 0) {
+    body = `FAIL: digest push wrote ${signalsWritten}/${expected} signals — ${date} overall=${overall} action=${action}`;
+  } else {
+    body = `FAIL: digest push wrote ${signalsWritten} signals — ${date} overall=${overall} action=${action}`;
+  }
+
+  return errorDetail ? `${body} error=${errorDetail}` : body;
+}
 
 /**
  * @param {string} stdout
@@ -551,6 +623,10 @@ function attachSourceOutcomes(payload, adapterResults) {
   });
   if (outcomes.length > 0) {
     payload.run = { ...payload.run, sourceOutcomes: outcomes };
+    // Story 90-4 R4 — stderr-only wipe / heavy-absorb (yt-stage posture; no Convex field).
+    for (const line of collectPrimaryAbsorbAlarmWarnings(outcomes)) {
+      console.error(line);
+    }
   }
 }
 
@@ -588,18 +664,37 @@ async function scoreWriteAndPush(
   forceRescore = false,
 ) {
   let signals = /** @type {Array<Record<string, unknown>>} */ (payload.signals);
+  const buildSignals = signals;
   try {
     signals = await dedupeSignals(signals, env);
     payload.signals = signals;
+    const dedupeSignalsSnapshot = signals;
     signals = await scoreSignals(signals, ranAt, env);
     payload.signals = signals;
+
+    // Always-on youtube stage line when youtube ran (key present) — including collect=0 (90-2; retune is 90-4).
+    if (shouldEmitYoutubeStageLine(adapterResults)) {
+      const collect = resolveAdapterFetchCount(adapterResults, 'youtube');
+      const build = buildSignals.filter((s) => s?.sourceType === 'youtube').length;
+      const dedupeStats = countSourceSignalStats(dedupeSignalsSnapshot, 'youtube');
+      const scoreStats = countSourceSignalStats(signals, 'youtube');
+      console.error(
+        formatYoutubeStageLine({
+          collect,
+          build,
+          dedupePrimary: dedupeStats.storedPrimaryCount,
+          dedupeContrib: dedupeStats.contributedCount,
+          scorePrimary: scoreStats.storedPrimaryCount,
+        }),
+      );
+    }
   } catch (err) {
     const detail =
       err && typeof err === 'object' && 'message' in err
         ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
         : 'pipeline-error';
-    await log('completion-pipeline-failed', 0, detail);
-    return { action: 'completion-pipeline-failed', exitCode: 0 };
+    await log('completion-pipeline-failed', 1, detail);
+    return { action: 'completion-pipeline-failed', exitCode: 1 };
   }
 
   attachSourceOutcomes(payload, adapterResults);
@@ -609,8 +704,8 @@ async function scoreWriteAndPush(
     DIGEST_PUSH_JSON: JSON.stringify(payload),
   });
   if (writeResult.status !== 'ok') {
-    await log('completion-artifact-failed', 0, writeResult.reason);
-    return { action: 'completion-artifact-failed', exitCode: 0 };
+    await log('completion-artifact-failed', 1, writeResult.reason);
+    return { action: 'completion-artifact-failed', exitCode: 1 };
   }
 
   const doPush = pushFn ?? pushPayload;
@@ -630,8 +725,8 @@ async function scoreWriteAndPush(
         invocation.discordResult = null;
         invocation.signalCount = expectedCount;
       }
-      await log('completion-convex-push-failed', 0, detail);
-      return { action: 'completion-convex-push-failed', exitCode: 0 };
+      await log('completion-convex-push-failed', 1, detail);
+      return { action: 'completion-convex-push-failed', exitCode: 1 };
     }
 
     await persistPushedPayloadArtifact(pushResult, env, log);
@@ -666,8 +761,8 @@ async function scoreWriteAndPush(
       err && typeof err === 'object' && 'message' in err
         ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
         : 'push-error';
-    await log(`${successAction}-failed`, 0, detail);
-    return { action: `${successAction}-failed`, exitCode: 0 };
+    await log(`${successAction}-failed`, 1, detail);
+    return { action: `${successAction}-failed`, exitCode: 1 };
   }
 }
 
@@ -718,8 +813,8 @@ async function pushOnlyFromArtifact(ctx) {
         ctx.invocation.discordResult = null;
         ctx.invocation.signalCount = expectedCount;
       }
-      await ctx.log('completion-convex-push-failed', 0, detail);
-      return { action: 'completion-convex-push-failed', exitCode: 0 };
+      await ctx.log('completion-convex-push-failed', 1, detail);
+      return { action: 'completion-convex-push-failed', exitCode: 1 };
     }
 
     await persistPushedPayloadArtifact(pushResult, ctx.env, ctx.log);
@@ -756,8 +851,8 @@ async function pushOnlyFromArtifact(ctx) {
       err && typeof err === 'object' && 'message' in err
         ? String(/** @type {{ message: unknown }} */ (err).message).slice(0, 120)
         : 'push-error';
-    await ctx.log('completion-backfill-push-failed', 0, detail);
-    return { action: 'completion-backfill-push-failed', exitCode: 0 };
+    await ctx.log('completion-backfill-push-failed', 1, detail);
+    return { action: 'completion-backfill-push-failed', exitCode: 1 };
   }
 }
 
@@ -923,7 +1018,7 @@ async function mergeInvocationOutcomeRecord(ctx) {
     signalCount: ctx.invocation.signalCount ?? 0,
   });
 
-  await mergeInvocationOutcome(ctx.outcomeDir, ctx.todayDate, {
+  return mergeInvocationOutcome(ctx.outcomeDir, ctx.todayDate, {
     date: ctx.todayDate,
     trigger: outcome.trigger,
     recoveryPath: outcome.recoveryPath,
@@ -951,8 +1046,9 @@ async function mergeInvocationOutcomeRecord(ctx) {
  *   analyzeFn?: typeof runAnalyzeEntityIntelligence;
  *   fetchFn?: typeof fetch;
  *   writeOutcomeFn?: typeof mergeInvocationOutcomeRecord;
+ *   alertFn?: typeof postOutcomeCheckAlert;
  * }} [opts]
- * @returns {Promise<{ action: string; exitCode: number }>}
+ * @returns {Promise<{ action: string; exitCode: number; overall: string }>}
  */
 export async function runDigestConvexCompletion(opts = {}) {
   const env = opts.env ?? process.env;
@@ -983,10 +1079,15 @@ export async function runDigestConvexCompletion(opts = {}) {
   const fetchFn = opts.fetchFn;
   const postDigestFn = opts.postDigestFn;
   const writeOutcomeFn = opts.writeOutcomeFn ?? mergeInvocationOutcomeRecord;
+  const alertFn = opts.alertFn ?? postOutcomeCheckAlert;
   const outcomeDir = resolveDigestOutcomesRoot(operatorHome);
   const trigger = resolveDigestTrigger(env);
-  /** @type {{ action: string; exitCode: number }} */
-  let result = { action: 'completion-pipeline-failed', exitCode: 0 };
+  /** @type {{ action: string; exitCode: number; overall?: string }} */
+  let result = { action: 'completion-pipeline-failed', exitCode: 1 };
+  // Unknown / missing outcome is a FAILURE — never default toward silence (OPS-1).
+  // Assigned in `finally` on every path (record overall, or 'failed' when record missing).
+  /** @type {string} */
+  let overall;
 
   // Must run before watchdog eligibility — fast-exit paths still need a brief inProgress marker.
   await markInvocationStarted(outcomeDir, todayDate, { trigger });
@@ -1010,6 +1111,22 @@ export async function runDigestConvexCompletion(opts = {}) {
         return result;
       }
     } else {
+      await trySelectiveSourceRefetch({
+        env,
+        todayDate,
+        operatorHome,
+        log,
+        dedupeFn: dedupeSignals,
+        scoreFn: scoreSignals,
+        writeArtifactFn: async (payload, writeEnv) => {
+          await writeDigestPushArtifact({
+            ...writeEnv,
+            DIGEST_PUSH_JSON: JSON.stringify(payload),
+          });
+        },
+        collectFn: opts.collectSelectiveFn,
+      });
+
       const watchdogFn = opts.watchdogFn ?? runPushDigestWatchdog;
       const watchdogResult = await watchdogFn({ env, todayDate });
       if (watchdogResult.action === 'skipped-already-pushed') {
@@ -1139,8 +1256,8 @@ export async function runDigestConvexCompletion(opts = {}) {
       const detail = errorsBySource
         ? `adapter-refetch-empty ${JSON.stringify(errorsBySource)}`
         : 'adapter-refetch-empty';
-      await log('completion-no-signals', 0, detail);
-      result = { action: 'completion-no-signals', exitCode: 0 };
+      await log('completion-no-signals', 1, detail);
+      result = { action: 'completion-no-signals', exitCode: 1 };
       return result;
     }
 
@@ -1159,7 +1276,9 @@ export async function runDigestConvexCompletion(opts = {}) {
     );
     return result;
   } finally {
-    await writeOutcomeFn({
+    // Capture into outer vars — do NOT return from finally (would swallow try returns).
+    /** @type {{ record?: Record<string, unknown>; filePath?: string } | void} */
+    const written = await writeOutcomeFn({
       env,
       todayDate,
       operatorHome,
@@ -1169,13 +1288,97 @@ export async function runDigestConvexCompletion(opts = {}) {
       result,
       fetchFn: opts.fetchFn,
     });
+
+    /**
+     * @param {Record<string, unknown>} record
+     * @param {string} alertOverall
+     */
+    const maybeAlertAndStamp = async (record, alertOverall) => {
+      const priorAlertedOverall =
+        typeof record.alertedOverall === 'string' ? record.alertedOverall : null;
+      const alreadyAlerted =
+        typeof record.alertedAt === 'string' && priorAlertedOverall === alertOverall;
+
+      if (alreadyAlerted || env.CHECK_DIGEST_ALERT === '0') {
+        return;
+      }
+
+      const message = formatDigestPushFailureAlert(record, {
+        signalCount: invocation.signalCount,
+      });
+      try {
+        const posted = await alertFn(env, message, opts.fetchFn ?? globalThis.fetch);
+        // Only stamp after a confirmed post — undefined must not suppress later alerts.
+        if (posted === true) {
+          record.alertedAt = new Date().toISOString();
+          record.alertedOverall = alertOverall;
+          await writeDayOutcomeRecordAtomic(outcomeDir, todayDate, record);
+        }
+      } catch (err) {
+        process.stderr.write(
+          `[digest-convex-completion] Discord alert error: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    };
+
+    if (written && typeof written === 'object' && written.record) {
+      const record = /** @type {Record<string, unknown>} */ (written.record);
+      overall = typeof record.overall === 'string' ? record.overall : 'failed';
+
+      if (overall === 'success') {
+        // After recovery, clear dedup stamps so a later same-day failure can alert again.
+        if (record.alertedAt != null || record.alertedOverall != null) {
+          delete record.alertedAt;
+          delete record.alertedOverall;
+          try {
+            await writeDayOutcomeRecordAtomic(outcomeDir, todayDate, record);
+          } catch (err) {
+            process.stderr.write(
+              `[digest-convex-completion] alert-stamp clear error: ${err instanceof Error ? err.message : String(err)}\n`,
+            );
+          }
+        }
+      } else {
+        await maybeAlertAndStamp(record, overall);
+      }
+    } else {
+      // Missing outcome record is itself a failure — never treat as success.
+      overall = 'failed';
+      const underlying = result.action;
+      await log(
+        'completion-outcome-record-missing',
+        1,
+        `underlying=${underlying}`,
+      );
+      const synthetic = {
+        date: todayDate,
+        overall: 'failed',
+        lastInvocation: {
+          action: 'completion-outcome-record-missing',
+          timestamp: new Date().toISOString(),
+          trigger,
+          recoveryPath: invocation.recoveryPath,
+        },
+        terminalAction: 'completion-outcome-record-missing',
+        convex: {
+          ok: false,
+          signalsWritten: 0,
+          error: `outcome record missing after writeOutcomeFn (underlying=${underlying})`,
+        },
+        discord: { ok: false, error: null },
+      };
+      await maybeAlertAndStamp(synthetic, 'failed');
+    }
+
+    result.overall = overall;
+    result.exitCode = overall === 'success' ? 0 : 1;
   }
 }
 
 async function main() {
   const { forceRescore } = parseCompletionCliArgs(process.argv.slice(2));
-  await runDigestConvexCompletion({ forceRescore });
-  process.exit(0);
+  const { overall } = await runDigestConvexCompletion({ forceRescore });
+  process.exit(overall === 'success' ? 0 : 1);
 }
 
 const isMain =
@@ -1183,5 +1386,10 @@ const isMain =
   process.argv[1]?.endsWith('run-digest-convex-completion.mjs');
 
 if (isMain) {
-  main().catch(() => process.exit(0));
+  main().catch((err) => {
+    process.stderr.write(
+      `[digest-convex-completion] ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(1);
+  });
 }

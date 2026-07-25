@@ -20,4 +20,4 @@ Epic 29 is the active Phase 6 track: bounded cold-start files (**USER.md**, **ME
 
 ## Vault lint module (normative)
 
-Four-rule **`/vault-lint`** contract: repo path **`specs/cns-vault-contract/modules/vault-lint.md`**. From this file’s location in the spec tree: [`../modules/vault-lint.md`](../modules/vault-lint.md).
+Four-rule **`/vault-lint`** contract: repo path **`specs/cns-vault-contract/vault-lint.md`**. From this file’s location in the spec tree: [`../vault-lint.md`](../vault-lint.md).

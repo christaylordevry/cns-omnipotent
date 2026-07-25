@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# WSL cron entrypoint for unified-loop Discover-only (Story 84-1).
+# Checks gateway, runs Hermes skill cron — does not post raw Discord text.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+JOB_ID_FILE="${UNIFIED_LOOP_DISCOVER_CRON_JOB_ID_FILE:-$HOME/.hermes/unified-loop-discover-cron-job-id}"
+
+if [[ ! -f "$REPO_ROOT/.env.live-chain" ]]; then
+  echo "run-unified-loop-discover-cron: missing $REPO_ROOT/.env.live-chain" >&2
+  exit 1
+fi
+
+if [[ ! -f "$JOB_ID_FILE" ]]; then
+  echo "run-unified-loop-discover-cron: missing job id file $JOB_ID_FILE (run scripts/install-unified-loop-discover-cron.sh once)" >&2
+  exit 1
+fi
+
+_gw_out=$(hermes gateway status 2>&1 || true)
+if ! printf '%s\n' "$_gw_out" | grep -qiE 'gateway service is running|gateway is running'; then
+  echo "run-unified-loop-discover-cron: Hermes gateway is not running; aborting (no Discord delivery, no Discover run)." >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1091
+set -a
+# shellcheck source=/dev/null
+. "$REPO_ROOT/.env.live-chain"
+set +a
+
+export DISCORD_BOT_TOKEN="${HERMES_DISCORD_TOKEN:?HERMES_DISCORD_TOKEN must be set in .env.live-chain}"
+export DISCORD_ALLOWED_CHANNELS="${DISCORD_ALLOWED_CHANNELS:-}"
+export DISCORD_FREE_RESPONSE_CHANNELS="${DISCORD_FREE_RESPONSE_CHANNELS:-}"
+export DISCORD_ALLOWED_ROLES="${DISCORD_ALLOWED_ROLES:-}"
+export DISCORD_ALLOWED_USERS="${DISCORD_ALLOWED_USERS:-}"
+export DISCORD_ALLOW_ALL_USERS="${DISCORD_ALLOW_ALL_USERS:-}"
+
+JOB_ID="$(tr -d '[:space:]' <"$JOB_ID_FILE")"
+if [[ -z "$JOB_ID" ]]; then
+  echo "run-unified-loop-discover-cron: empty job id in $JOB_ID_FILE" >&2
+  exit 1
+fi
+
+export HERMES_ACCEPT_HOOKS="${HERMES_ACCEPT_HOOKS:-1}"
+export OMNIPOTENT_REPO="${OMNIPOTENT_REPO:-$REPO_ROOT}"
+export UNIFIED_LOOP_TRIGGER="cron:discover"
+
+hermes cron run "$JOB_ID"
+hermes cron tick

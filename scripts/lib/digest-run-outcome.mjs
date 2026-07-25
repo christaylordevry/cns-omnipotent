@@ -7,7 +7,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
-  ADAPTER_PAYLOAD_ARRAY_KEYS,
+  countAdapterPayloadItems,
+  isAdapterErrorPayload,
   unwrapAdapterResult,
 } from '../hermes-skill-examples/morning-digest/scripts/adapter-result.mjs';
 import {
@@ -130,8 +131,19 @@ export function buildSourcesFromAdapterOutputs(adapterOutputs) {
 
   for (const [collectKey, result] of Object.entries(adapterOutputs)) {
     const sourceKey = COLLECT_KEY_TO_SOURCE_KEY[collectKey] ?? collectKey;
-    if (!result || typeof result !== 'object' || !('success' in result)) {
+    if (!result || typeof result !== 'object') {
       sources[sourceKey] = { status: 'empty', count: 0 };
+      continue;
+    }
+
+    if (!('success' in result)) {
+      // Bare adapter stdout — Defect A: `{ error }` is failure, not empty/ok.
+      if (isAdapterErrorPayload(result)) {
+        sources[sourceKey] = { status: 'error', count: 0 };
+      } else {
+        const count = countAdapterPayloadItems(result);
+        sources[sourceKey] = count > 0 ? { status: 'ok', count } : { status: 'empty', count: 0 };
+      }
       continue;
     }
 
@@ -142,25 +154,11 @@ export function buildSourcesFromAdapterOutputs(adapterOutputs) {
     }
 
     const data = unwrapAdapterResult(result);
-    const count = countAdapterItems(data);
+    const count = countAdapterPayloadItems(data);
     sources[sourceKey] = count > 0 ? { status: 'ok', count } : { status: 'empty', count: 0 };
   }
 
   return sources;
-}
-
-/**
- * @param {Record<string, unknown>} data
- * @returns {number}
- */
-function countAdapterItems(data) {
-  for (const key of ADAPTER_PAYLOAD_ARRAY_KEYS) {
-    const value = data[key];
-    if (Array.isArray(value)) {
-      return value.length;
-    }
-  }
-  return 0;
 }
 
 /**

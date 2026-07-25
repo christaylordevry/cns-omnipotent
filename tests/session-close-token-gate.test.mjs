@@ -75,6 +75,26 @@ const SAMPLE_AGENTS = `# AGENTS
 
 > Version: 9.9.9 | Last updated: 2026-01-01
 
+## 2. Vault Map
+
+| pake_type | Default destination | Notes |
+|-----------|---------------------|-------|
+| SourceNote | 03-Resources/ | Original source material |
+| InsightNote | 03-Resources/ | Derived observations |
+| SynthesisNote | 03-Resources/ | Cross-reference connections |
+| WorkflowNote | 01-Projects/ | Action plans |
+| ValidationNote | 03-Resources/ | Fact-checks |
+| HookSetNote | 03-Resources/ | Run-chain hook output |
+| WeaponsCheckNote | 03-Resources/ | Run-chain weapons-check output |
+
+## 3. Formatting Standards
+
+This PAKE Standard applies to governed knowledge notes.
+
+## 4. Vault IO Protocol
+
+Vault IO summary for fixtures.
+
 ## 8. Current Focus
 
 > intro
@@ -146,7 +166,7 @@ describe("session-close phase B token gate", () => {
   });
 
   it("evaluatePhaseBDraftTokens ABORTED over limit", () => {
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     const result = evaluatePhaseBDraftTokens(huge);
     assert.equal(result.status, "ABORTED");
     assert.equal(result.reason, PHASE_B_ABORT_REASON);
@@ -297,7 +317,7 @@ describe("session-close phase B token gate", () => {
     const vault = join(fixtureRoot, "vault");
     await seedPhaseAArtifacts(fixtureRoot, vault);
     await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     await writeFile(join(fixtureRoot, ".session-close", "section8-draft.md"), huge, "utf8");
 
     const gateScript = join(
@@ -366,7 +386,7 @@ describe("session-close phase B token gate", () => {
     const reportPath = join(fixtureRoot, ".session-close", "close-report.json");
     await seedPhaseAArtifacts(fixtureRoot, vault);
     await mkdir(join(fixtureRoot, ".session-close"), { recursive: true });
-    const huge = "word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200);
+    const huge = `### Oversized Draft\n\n${"word ".repeat(SECTION8_DRAFT_TOKEN_LIMIT * 4 + 200)}`;
     await writeFile(draftPath, huge, "utf8");
 
     const repoAgents = join(fixtureRoot, "specs/cns-vault-contract/AGENTS.md");

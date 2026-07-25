@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Hermes CNS /session-close router. Runs deterministic Phase A, bounded Section 8 synthesis from section8-input.json only, applies via gate, runs script-wrapped fan-out, and posts a rendered Discord reply."
-version: 1.0.16
+version: 1.0.18
 author: CNS Operator
 license: MIT
 metadata:
@@ -75,3 +75,4 @@ Post stdout as the reply. Fallback only if render fails: `references/discord-rep
 - Bump `version`, run `bash scripts/install-hermes-skill-session-close.sh`, restart gateway after skill changes.
 - **Phase A tests failure**: If `hermes-run-session-close.sh` reports `failure_class: tests`, check the session-close log for details. This blocks a clean close.
 - **NotebookLM drive-sync failure**: Check `~/.hermes/logs/session-close-drive-sync.log` for full stderr (close-report keeps a 160-char `error_snippet` only). `error_class: nlm_cli_exception` means an nlm CLI traceback (Typer/Rich); other classes use fan-out diagnostics. Drive wrappers source `lib/npm-env.sh` for operator HOME parity under Hermes isolation.
+- **CRLF in vault AGENTS.md breaks changelog insertion**: The vault `AI-Context/AGENTS.md` uses Windows CRLF. The `insertChangelogRow` regex in `lib/apply-section8-body.mjs` must use `/^\|[-|\s]+\|\r?$/` — the trailing `\r?` is required. Fixed 2026-07-05; patch the file if it regresses after a git pull or reinstall.

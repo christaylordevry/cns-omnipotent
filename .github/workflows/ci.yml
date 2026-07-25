@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, hermes-consolidation]
+  pull_request:
+    branches: [main, master, hermes-consolidation]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Omnipotent
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Omnipotent deps
+        run: npm ci
+
+      # Full `npm test` needs optional local siblings (private cns-dashboard, Hermes
+      # paths). M1 CI must stay green with no PAT — gate the contract suites only.
+      - name: M1 + OPS-2 digest-signal contract tests
+        run: |
+          node --test \
+            tests/contracts/digest-signal-deployed-contract.test.mjs \
+            tests/check-digest-contract-vs-deployed.test.mjs \
+            tests/digest-signal-contract-guard.test.mjs
+
+      - name: Assert digest contract ⊆ deployed function-spec
+        run: node scripts/check-digest-contract-vs-deployed.mjs
+        env:
+          OMNIPOTENT_ROOT: ${{ github.workspace }}
+          # Convex CLI reads CONVEX_DEPLOY_KEY; secret is the least-privilege function-spec key.
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_FUNCTION_SPEC_KEY }}
+          M1_FAIL_ON_SKIP: '1'
+          CI: 'true'

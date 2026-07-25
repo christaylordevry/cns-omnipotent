@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 import urllib.error
 import urllib.parse
@@ -43,11 +44,6 @@ try:
     from pytrends.request import TrendReq as _TrendReq
 except ImportError:  # pragma: no cover - exercised when google_trends requested without pytrends
     _TrendReq = None  # type: ignore[assignment,misc]
-
-try:
-    import praw as _praw
-except ImportError:  # pragma: no cover - exercised when reddit requested without praw
-    _praw = None  # type: ignore[assignment,misc]
 
 SourceName = Literal["google_trends", "reddit", "news"]
 SOURCE_NAMES: tuple[SourceName, ...] = ("google_trends", "reddit", "news")
@@ -75,8 +71,13 @@ TRENDS_NORM_METHOD = "trends_interest_over_100"
 TRENDS_INTEREST_AGGREGATION = "mean_non_partial_window"
 REDDIT_NORM_METHOD = "reddit_7d_minmax"
 NEWS_NORM_METHOD = "news_7d_minmax"
-REDDIT_SEARCH_LIMIT = 100
-REDDIT_COLLECTION_METHOD = "reddit_search_day_cap_100"
+REDDIT_COLLECTION_METHOD = "reddit_rss_top_day_title_content_match"
+REDDIT_RSS_USER_AGENT = "linux:cns-trend-ingest:1.0 (by /u/cns_operator)"
+REDDIT_RSS_PACE_SEC = 2.0
+# Wall-clock budget for multi-subreddit RSS loop (mirrors digest adapter 45s).
+REDDIT_RSS_BUDGET_SEC = 45.0
+REDDIT_PUBLIC_BASE = "https://www.reddit.com/r"
+ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 NEWSAPI_EVERYTHING_URL = "https://newsapi.org/v2/everything"
 
 
@@ -868,50 +869,6 @@ def collect_google_trends(
     return events, patch
 
 
-def require_reddit_credentials(env: dict[str, str]) -> tuple[str, str, str]:
-    client_id = env.get("REDDIT_CLIENT_ID", "").strip()
-    client_secret = env.get("REDDIT_CLIENT_SECRET", "").strip()
-    user_agent = env.get("REDDIT_USER_AGENT", "").strip()
-    if not client_id or not client_secret or not user_agent:
-        raise ValueError(
-            "REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, and REDDIT_USER_AGENT "
-            "are required in trend-ingest.env for reddit"
-        )
-    return client_id, client_secret, user_agent
-
-
-def create_reddit_client(env: dict[str, str]) -> Any:
-    """One PRAW client per reddit ingest run (cron hardening — 44-4-1)."""
-    if _praw is None:
-        raise RuntimeError("praw is required (pip install praw)")
-    client_id, client_secret, user_agent = require_reddit_credentials(env)
-    return _praw.Reddit(
-        client_id=client_id,
-        client_secret=client_secret,
-        user_agent=user_agent,
-    )
-
-
-def fetch_reddit_mention_count(
-    entry: WatchlistEntry,
-    *,
-    env: dict[str, str] | None = None,
-    reddit: Any | None = None,
-    window_hours: int = REDDIT_NEWS_WINDOW_HOURS,
-) -> float:
-    if reddit is None:
-        if env is None:
-            raise ValueError("fetch_reddit_mention_count requires reddit or env")
-        reddit = create_reddit_client(env)
-    time_filter = _reddit_time_filter_for_window(window_hours)
-    count = 0
-    for _ in reddit.subreddit("all").search(
-        entry.keyword, time_filter=time_filter, limit=REDDIT_SEARCH_LIMIT
-    ):
-        count += 1
-    return float(count)
-
-
 def require_newsapi_key(env: dict[str, str]) -> str:
     api_key = env.get("NEWSAPI_API_KEY", "").strip()
     if not api_key:
@@ -919,14 +876,177 @@ def require_newsapi_key(env: dict[str, str]) -> str:
     return api_key
 
 
-def _reddit_time_filter_for_window(window_hours: int) -> str:
-    if window_hours <= 24:
-        return "day"
-    if window_hours <= 168:
-        return "week"
-    if window_hours <= 720:
-        return "month"
-    return "year"
+def parse_reddit_subreddits(raw: str | None) -> list[str]:
+    """Parse MORNING_DIGEST_REDDIT_SUBREDDITS (comma-separated; optional r/ prefix)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in str(raw or "").split(","):
+        sub = part.strip()
+        if sub.lower().startswith("r/"):
+            sub = sub[2:].strip()
+        if not sub:
+            continue
+        key = sub.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(sub)
+    return out
+
+
+def require_reddit_subreddits(env: dict[str, str]) -> list[str]:
+    subs = parse_reddit_subreddits(env.get("MORNING_DIGEST_REDDIT_SUBREDDITS"))
+    if not subs:
+        raise ValueError(
+            "MORNING_DIGEST_REDDIT_SUBREDDITS is required in trend-ingest.env for reddit "
+            "(comma-separated subreddit names; REDDIT_CLIENT_* unused for RSS)"
+        )
+    return subs
+
+
+def build_reddit_top_rss_url(subreddit: str) -> str:
+    sub = urllib.parse.quote(subreddit, safe="")
+    return f"{REDDIT_PUBLIC_BASE}/{sub}/top/.rss?t=day"
+
+
+def _atom_child_text(entry: ET.Element, local: str) -> str:
+    node = entry.find(f"atom:{local}", ATOM_NS)
+    if node is None:
+        node = entry.find(local)
+    if node is None or node.text is None:
+        return ""
+    return str(node.text).strip()
+
+
+def _atom_link_href(entry: ET.Element) -> str:
+    link = entry.find("atom:link", ATOM_NS)
+    if link is None:
+        link = entry.find("link")
+    if link is None:
+        return ""
+    return str(link.attrib.get("href") or "").strip()
+
+
+def parse_reddit_atom_entries(xml_text: str) -> list[dict[str, str]]:
+    """Parse Reddit Atom RSS into {title, content, url, id} dicts."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as err:
+        raise CollectorKeywordError(f"reddit RSS Atom parse error: {err}") from err
+    entries = root.findall("atom:entry", ATOM_NS)
+    if not entries:
+        entries = root.findall("entry")
+    out: list[dict[str, str]] = []
+    for entry in entries:
+        title = _atom_child_text(entry, "title")
+        content = _atom_child_text(entry, "content")
+        if not content:
+            content = _atom_child_text(entry, "summary")
+        url = _atom_link_href(entry)
+        entry_id = _atom_child_text(entry, "id")
+        if not title:
+            continue
+        out.append(
+            {
+                "title": title,
+                "content": content,
+                "url": url,
+                "id": entry_id,
+            }
+        )
+    return out
+
+
+def fetch_reddit_rss_xml(
+    subreddit: str,
+    *,
+    user_agent: str = REDDIT_RSS_USER_AGENT,
+    timeout_sec: float = CONVEX_PUSH_TIMEOUT_SEC,
+) -> str:
+    url = build_reddit_top_rss_url(subreddit)
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+            return response.read().decode("utf-8")
+    except urllib.error.HTTPError as err:
+        raise CollectorKeywordError(
+            f"reddit RSS HTTP {err.code} for r/{subreddit}"
+        ) from err
+    except urllib.error.URLError as err:
+        raise CollectorKeywordError(
+            f"reddit RSS network error for r/{subreddit}: {err}"
+        ) from err
+    except TimeoutError as err:
+        raise CollectorKeywordError(
+            f"reddit RSS timeout for r/{subreddit}: {err}"
+        ) from err
+
+
+def load_reddit_rss_corpus(
+    subreddits: list[str],
+    *,
+    pace_sec: float = REDDIT_RSS_PACE_SEC,
+    budget_sec: float = REDDIT_RSS_BUDGET_SEC,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    fetch_xml: Callable[[str], str] | None = None,
+    monotonic_fn: Callable[[], float] = time.monotonic,
+) -> list[dict[str, str]]:
+    """Fetch each subreddit once; pace between requests. Skip failed subs (partial corpus).
+
+    Stops early when wall-clock budget is exhausted. If every attempted fetch fails,
+    re-raises the last CollectorKeywordError so the reddit source patches as error.
+    """
+    fetch = fetch_xml or (lambda sub: fetch_reddit_rss_xml(sub))
+    corpus: list[dict[str, str]] = []
+    started = monotonic_fn()
+    last_error: CollectorKeywordError | None = None
+    had_success = False
+    for index, subreddit in enumerate(subreddits):
+        elapsed = monotonic_fn() - started
+        if budget_sec > 0 and elapsed >= budget_sec:
+            break
+        if index > 0 and pace_sec > 0:
+            if budget_sec > 0 and elapsed + pace_sec >= budget_sec:
+                break
+            sleep_fn(pace_sec)
+            if budget_sec > 0 and (monotonic_fn() - started) >= budget_sec:
+                break
+        try:
+            xml_text = fetch(subreddit)
+            corpus.extend(parse_reddit_atom_entries(xml_text))
+            had_success = True
+        except CollectorKeywordError as err:
+            last_error = err
+            continue
+    if not had_success and last_error is not None:
+        raise last_error
+    return corpus
+
+
+def count_keyword_in_reddit_entries(
+    keyword: str,
+    entries: list[dict[str, str]],
+) -> float:
+    """Word-boundary match against Atom title and content/summary (multi-word OK)."""
+    needle = keyword.strip()
+    if not needle:
+        return 0.0
+    pattern = re.compile(r"\b" + re.escape(needle) + r"\b", re.IGNORECASE)
+    count = 0
+    for entry in entries:
+        haystack = f"{entry.get('title', '')} {entry.get('content', '')}"
+        if pattern.search(haystack):
+            count += 1
+    return float(count)
+
+
+def fetch_reddit_mention_count(
+    entry: WatchlistEntry,
+    *,
+    corpus: list[dict[str, str]],
+) -> float:
+    """Count curated-subreddit RSS hits for a watchlist keyword (Story 90-1)."""
+    return count_keyword_in_reddit_entries(entry.keyword, corpus)
 
 
 def fetch_news_article_count(
@@ -1070,12 +1190,29 @@ def collect_reddit(
     env: dict[str, str],
     collected_at_ms: int | None = None,
     count_fetcher: Callable[[WatchlistEntry], float] | None = None,
+    corpus: list[dict[str, str]] | None = None,
+    pace_sec: float = REDDIT_RSS_PACE_SEC,
+    budget_sec: float = REDDIT_RSS_BUDGET_SEC,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    fetch_xml: Callable[[str], str] | None = None,
+    monotonic_fn: Callable[[], float] = time.monotonic,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     run_at = collected_at_ms or int(time.time() * 1000)
     if count_fetcher is None:
-        reddit = create_reddit_client(env)
-        fetch: Callable[[WatchlistEntry], float] = lambda entry: fetch_reddit_mention_count(
-            entry, reddit=reddit, window_hours=REDDIT_NEWS_WINDOW_HOURS
+        if corpus is None:
+            subreddits = require_reddit_subreddits(env)
+            corpus = load_reddit_rss_corpus(
+                subreddits,
+                pace_sec=pace_sec,
+                budget_sec=budget_sec,
+                sleep_fn=sleep_fn,
+                fetch_xml=fetch_xml,
+                monotonic_fn=monotonic_fn,
+            )
+        fetch: Callable[[WatchlistEntry], float] = (
+            lambda entry, _corpus=corpus: fetch_reddit_mention_count(
+                entry, corpus=_corpus
+            )
         )
     else:
         fetch = count_fetcher
@@ -1285,28 +1422,21 @@ def run(argv: list[str] | None = None) -> int:
             batch.signal_sources.append(trends_patch)
 
         if "reddit" in active_sources:
-            if _praw is None:
+            try:
+                reddit_events, reddit_patch = collect_reddit(
+                    snapshot,
+                    ingest_run_id=batch.ingest_run_id,
+                    norm_cache=norm_cache
+                    or {"version": NORM_CACHE_VERSION, "entries": {}},
+                    env=env_vars,
+                    collected_at_ms=snapshot_at,
+                )
+            except (ValueError, RuntimeError, CollectorKeywordError) as err:
                 reddit_events, reddit_patch = [], _source_collector_error_patch(
                     "reddit",
                     last_run_ms=snapshot_at,
-                    message="praw is required for reddit (pip install praw)",
+                    message=str(err),
                 )
-            else:
-                try:
-                    reddit_events, reddit_patch = collect_reddit(
-                        snapshot,
-                        ingest_run_id=batch.ingest_run_id,
-                        norm_cache=norm_cache
-                        or {"version": NORM_CACHE_VERSION, "entries": {}},
-                        env=env_vars,
-                        collected_at_ms=snapshot_at,
-                    )
-                except (ValueError, RuntimeError) as err:
-                    reddit_events, reddit_patch = [], _source_collector_error_patch(
-                        "reddit",
-                        last_run_ms=snapshot_at,
-                        message=str(err),
-                    )
             batch.events.extend(reddit_events)
             batch.signal_sources.append(reddit_patch)
 

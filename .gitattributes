@@ -1,0 +1,6 @@
+# Constitution + governed vault docs are WSL-accessed and must stay LF.
+# Prevents session-close CRLF flip-flop that turns each commit into a whole-file diff.
+specs/cns-vault-contract/AGENTS.md text eol=lf
+specs/cns-vault-contract/**/*.md   text eol=lf
+Knowledge-Vault-ACTIVE/**/*.md      text eol=lf
+*.md                                text eol=lf

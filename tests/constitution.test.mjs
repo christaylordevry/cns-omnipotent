@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
@@ -44,6 +44,41 @@ describe("Story 1.1 constitution mirror", () => {
   it("Phase 1 spec exists at repo path referenced by CLAUDE.md", () => {
     assert.ok(
       existsSync(join(root, "specs/cns-vault-contract/CNS-Phase-1-Spec.md")),
+    );
+  });
+
+  it("Story 87-1: specs modules mirror canonical vault (12 files, vault-lint at spec root)", () => {
+    const modulesDir = join(root, "specs/cns-vault-contract/modules");
+    const expected = [
+      "vault-io.md",
+      "security.md",
+      "note-style-guide.md",
+      "notebooklm-workflow.md",
+      "hermes-desktop.md",
+      "run-chain.md",
+      "unified-loop.md",
+      "two-bot-vault-boundary.md",
+      "memory-pillars-verification.md",
+      "routing.md",
+      "mobile-posture.md",
+      "mcp-operator-runbook.md",
+    ];
+    for (const f of expected) {
+      assert.ok(existsSync(join(modulesDir, f)), `missing module ${f}`);
+    }
+    const moduleFiles = readdirSync(modulesDir).filter((f) => f.endsWith(".md"));
+    assert.strictEqual(
+      moduleFiles.length,
+      expected.length,
+      `expected exactly ${expected.length} modules, found: ${moduleFiles.join(", ")}`,
+    );
+    assert.ok(
+      !existsSync(join(modulesDir, "vault-lint.md")),
+      "vault-lint must not live under modules/",
+    );
+    assert.ok(
+      existsSync(join(root, "specs/cns-vault-contract/vault-lint.md")),
+      "vault-lint must live at spec root",
     );
   });
 });

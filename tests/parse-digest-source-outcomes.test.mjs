@@ -3,6 +3,11 @@ import { describe, it } from 'node:test';
 
 import {
 	buildSourceOutcomesFromPayload,
+	classifyPrimaryAbsorbAlarm,
+	collectPrimaryAbsorbAlarmWarnings,
+	countSourceSignalStats,
+	formatPrimaryAbsorbAlarmLine,
+	formatYoutubeStageLine,
 	mergeSourceOutcomeRows,
 	parseSourceOutcomesFromArtifact,
 	preservePriorHardOutcomes,
@@ -10,7 +15,11 @@ import {
 	resolveDigestMarkdownFromPayload,
 	resolveSourceKeyFromSectionHeader,
 	resolveSourceOutcomes,
+	shouldEmitYoutubeStageLine,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/parse-digest-source-outcomes.mjs';
+import { dedupeDigestSignals } from '../scripts/hermes-skill-examples/morning-digest/scripts/dedupe-digest-signals.mjs';
+import { buildDigestPushPayload } from '../scripts/hermes-skill-examples/morning-digest/scripts/build-digest-push-payload.mjs';
+import { scoreDigestSignals } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
 
 describe('parse-digest-source-outcomes (Story 69-3)', () => {
 	it('maps section headers to canonical source keys', () => {
@@ -145,14 +154,284 @@ describe('parse-digest-source-outcomes (Story 69-3)', () => {
 			],
 		});
 
-		assert.equal(
-			outcomes.find((row) => row.sourceKey === 'newsapi')?.signalCount,
-			1,
-		);
+		const newsapi = outcomes.find((row) => row.sourceKey === 'newsapi');
+		assert.equal(newsapi?.status, 'fired');
+		assert.equal(newsapi?.storedPrimaryCount, 0);
+		assert.equal(newsapi?.contributedCount, 1);
+		// Legacy signalCount = primaries only — contrib must not inflate it (90-2).
+		assert.equal(newsapi?.signalCount, undefined);
 		assert.equal(
 			outcomes.find((row) => row.sourceKey === 'hackernews')?.signalCount,
 			1,
 		);
+	});
+
+	it('exposes triple counts for prod-shaped youtube over-collapse (Story 90-2)', () => {
+		const youtubeVideos = Array.from({ length: 25 }, (_, i) => ({
+			title: `Claude prompting tips video ${i}`,
+			url: `https://www.youtube.com/watch?v=yt${i}`,
+			channelTitle: 'AI Channel',
+			publishedAt: '2026-07-22T10:00:00.000Z',
+		}));
+		const adapterResults = {
+			youtube: { success: true, data: { videos: youtubeVideos } },
+			twitter: {
+				success: true,
+				data: {
+					posts: [
+						{
+							title: 'I got some really useful Claude prompting tips',
+							url: 'https://x.com/user/status/1',
+						},
+					],
+				},
+			},
+		};
+		// Post-dedupe shape: twitter winner absorbed all 25 youtube as contributors.
+		const signals = [
+			{
+				sourceType: 'twitter',
+				title: 'I got some really useful Claude prompting tips',
+				url: 'https://x.com/user/status/1',
+				sourceMetadata: {
+					dedupClusterSize: 33,
+					contributingSources: [
+						{ sourceType: 'twitter' },
+						...youtubeVideos.map((v) => ({
+							sourceType: 'youtube',
+							url: v.url,
+						})),
+						{ sourceType: 'rss' },
+						{ sourceType: 'bluesky' },
+					],
+				},
+			},
+		];
+
+		const outcomes = buildSourceOutcomesFromPayload({
+			run: {},
+			signals,
+			adapterResults,
+		});
+		const youtube = outcomes.find((row) => row.sourceKey === 'youtube');
+		assert.ok(youtube);
+		assert.equal(youtube.fetchCount, 25);
+		assert.equal(youtube.storedPrimaryCount, 0);
+		assert.equal(youtube.contributedCount, 25);
+		assert.equal(youtube.signalCount, undefined);
+		assert.equal(youtube.status, 'fired');
+	});
+
+	it('markdown merge does not hide storedPrimaryCount=0 behind a lone high signalCount (Story 90-2)', () => {
+		const merged = mergeSourceOutcomeRows(
+			[
+				{
+					sourceKey: 'youtube',
+					status: 'fired',
+					fetchCount: 25,
+					storedPrimaryCount: 0,
+					contributedCount: 25,
+					signalCount: undefined,
+				},
+			],
+			[
+				{
+					sourceKey: 'youtube',
+					status: 'fired',
+					signalCount: 25,
+				},
+			],
+		);
+		const youtube = merged.find((row) => row.sourceKey === 'youtube');
+		assert.equal(youtube?.fetchCount, 25);
+		assert.equal(youtube?.storedPrimaryCount, 0);
+		assert.equal(youtube?.contributedCount, 25);
+		assert.equal(youtube?.signalCount, undefined);
+	});
+
+	it('formatYoutubeStageLine surfaces the primary→0 cliff (Story 90-2)', () => {
+		assert.equal(
+			formatYoutubeStageLine({
+				collect: 25,
+				build: 25,
+				dedupePrimary: 0,
+				dedupeContrib: 25,
+				scorePrimary: 0,
+			}),
+			'yt-stage collect=25 build=25 dedupe_primary=0 dedupe_contrib=25 score_primary=0',
+		);
+	});
+
+	it('shouldEmitYoutubeStageLine keys off youtube ∈ adapterResults, including all-zeros (Story 90-2)', () => {
+		assert.equal(shouldEmitYoutubeStageLine({ youtube: { success: true, data: { videos: [] } } }), true);
+		assert.equal(shouldEmitYoutubeStageLine({ youtube: { error: 'quota-exceeded' } }), true);
+		assert.equal(shouldEmitYoutubeStageLine({ twitter: { success: true, data: { posts: [] } } }), false);
+		assert.equal(shouldEmitYoutubeStageLine(undefined), false);
+		assert.equal(shouldEmitYoutubeStageLine(null), false);
+	});
+
+	it('youtube-only healthy videos survive build→dedupe→score as primaries (Story 90-2 sanity)', () => {
+		// Distinct identities via watch?v= and youtu.be path (Story 90-4 R1).
+		const videos = [
+			{
+				title: 'Rust async runtime redesign deep dive',
+				url: 'https://www.youtube.com/watch?v=unique0abcde',
+				channelTitle: 'Channel',
+				publishedAt: '2026-07-22T12:00:00.000Z',
+				viewCount: 100,
+			},
+			{
+				title: 'Local bakery wins regional award ceremony',
+				url: 'https://youtu.be/unique1fghij',
+				channelTitle: 'Channel',
+				publishedAt: '2026-07-20T12:00:00.000Z',
+				viewCount: 101,
+			},
+			{
+				title: 'Quantum chemistry lab notebook techniques',
+				url: 'https://www.youtube.com/watch?v=unique2klmno',
+				channelTitle: 'Channel',
+				publishedAt: '2026-07-18T12:00:00.000Z',
+				viewCount: 102,
+			},
+		];
+		const built = buildDigestPushPayload({
+			date: '2026-07-22',
+			ranAt: Date.parse('2026-07-22T12:00:00.000Z'),
+			youtube: { videos },
+		});
+		assert.equal(built.signals.filter((s) => s.sourceType === 'youtube').length, 3);
+		const deduped = dedupeDigestSignals(built.signals);
+		assert.equal(deduped.filter((s) => s.sourceType === 'youtube').length, 3);
+		const scoreCtx = {
+			domainTokens: [],
+			personalTokens: [],
+			epicNumericTokens: [],
+			noveltyHistoryEntries: [],
+			runAt: Date.parse('2026-07-22T12:00:00.000Z'),
+			watchlistMissing: false,
+		};
+		const scored = scoreDigestSignals(deduped, scoreCtx);
+		assert.equal(scored.filter((s) => s.sourceType === 'youtube').length, 3);
+		const stats = countSourceSignalStats(scored, 'youtube');
+		assert.equal(stats.storedPrimaryCount, 3);
+		assert.equal(stats.contributedCount, 0);
+	});
+
+	it('mixed cluster fixture shows fetch>0 / primary=0 / contrib>0 after real dedupe (Story 90-2)', () => {
+		const sharedTitle = 'Claude Prompting Tips For Developers Worldwide Guide';
+		const publishedAt = '2026-07-22T10:00:00.000Z';
+		const youtubeVideos = Array.from({ length: 5 }, (_, i) => ({
+			title: sharedTitle,
+			url: `https://www.youtube.com/watch?v=cliff${i}`,
+			channelTitle: 'YT',
+			publishedAt,
+			viewCount: 10,
+		}));
+		const built = buildDigestPushPayload({
+			date: '2026-07-22',
+			ranAt: Date.parse(publishedAt),
+			twitter: {
+				posts: [
+					{
+						title: sharedTitle,
+						url: 'https://x.com/user/status/cliff1',
+						authorHandle: 'user',
+						publishedAt,
+						likes: 500,
+						reposts: 50,
+					},
+				],
+			},
+			youtube: { videos: youtubeVideos },
+		});
+		const buildYt = built.signals.filter((s) => s.sourceType === 'youtube').length;
+		assert.equal(buildYt, 5);
+		const deduped = dedupeDigestSignals(built.signals);
+		const dedupeStats = countSourceSignalStats(deduped, 'youtube');
+		assert.ok(dedupeStats.storedPrimaryCount === 0, 'youtube primaries wiped by twitter winner');
+		assert.ok(dedupeStats.contributedCount >= 5, 'youtube appears as contributors');
+		const scoreCtx = {
+			domainTokens: [],
+			personalTokens: [],
+			epicNumericTokens: [],
+			noveltyHistoryEntries: [],
+			runAt: Date.parse(publishedAt),
+			watchlistMissing: false,
+		};
+		const stage = formatYoutubeStageLine({
+			collect: 5,
+			build: buildYt,
+			dedupePrimary: dedupeStats.storedPrimaryCount,
+			dedupeContrib: dedupeStats.contributedCount,
+			scorePrimary: countSourceSignalStats(scoreDigestSignals(deduped, scoreCtx), 'youtube')
+				.storedPrimaryCount,
+		});
+		assert.match(stage, /yt-stage collect=5 build=5 dedupe_primary=0 dedupe_contrib=\d+ score_primary=0/);
+
+		const outcomes = resolveSourceOutcomes({
+			signals: deduped,
+			adapterResults: {
+				youtube: { success: true, data: { videos: youtubeVideos } },
+			},
+		});
+		const youtube = outcomes.find((row) => row.sourceKey === 'youtube');
+		assert.equal(youtube?.fetchCount, 5);
+		assert.equal(youtube?.storedPrimaryCount, 0);
+		assert.ok((youtube?.contributedCount ?? 0) >= 5);
+		assert.equal(
+			'primaryAbsorbAlarm' in (youtube ?? {}),
+			false,
+			'R4 must not persist primaryAbsorbAlarm on sourceOutcomes',
+		);
+		const warnings = collectPrimaryAbsorbAlarmWarnings(outcomes);
+		assert.ok(
+			warnings.some((line) => line.startsWith('dedupe-primary-wipe: youtube')),
+			'Story 90-4 R4 wipe alarm must appear as stderr warning text',
+		);
+	});
+
+	it('classifyPrimaryAbsorbAlarm hard wipe + soft heavy-absorb (Story 90-4 R4)', () => {
+		assert.equal(classifyPrimaryAbsorbAlarm(null), null);
+		assert.equal(classifyPrimaryAbsorbAlarm(undefined), null);
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 4, storedPrimaryCount: 0 }), null);
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 5, storedPrimaryCount: 0 }), 'wipe');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 25, storedPrimaryCount: 0 }), 'wipe');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 15, storedPrimaryCount: 1 }), 'heavy-absorb');
+		assert.equal(classifyPrimaryAbsorbAlarm({ fetchCount: 10, storedPrimaryCount: 5 }), null);
+		assert.equal(
+			formatPrimaryAbsorbAlarmLine('youtube', 'wipe', { fetchCount: 25, storedPrimaryCount: 0 }),
+			'dedupe-primary-wipe: youtube fetchCount=25 storedPrimaryCount=0',
+		);
+		assert.equal(
+			formatPrimaryAbsorbAlarmLine('reddit', 'heavy-absorb', {
+				fetchCount: 15,
+				storedPrimaryCount: 1,
+			}),
+			'dedupe-heavy-absorb: reddit fetchCount=15 storedPrimaryCount=1 (<50% of fetch)',
+		);
+
+		const warnings = collectPrimaryAbsorbAlarmWarnings([
+			{
+				sourceKey: 'reddit',
+				fetchCount: 15,
+				storedPrimaryCount: 1,
+			},
+			{
+				sourceKey: 'youtube',
+				fetchCount: 25,
+				storedPrimaryCount: 0,
+			},
+			{
+				sourceKey: 'rss',
+				fetchCount: 10,
+				storedPrimaryCount: 8,
+			},
+		]);
+		assert.deepEqual(warnings, [
+			'dedupe-heavy-absorb: reddit fetchCount=15 storedPrimaryCount=1 (<50% of fetch)',
+			'dedupe-primary-wipe: youtube fetchCount=25 storedPrimaryCount=0',
+		]);
 	});
 
 	it('mergeSourceOutcomeRows preserves adapter error over markdown fired bullets', () => {

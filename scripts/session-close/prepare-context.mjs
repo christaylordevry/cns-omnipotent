@@ -25,9 +25,9 @@ export async function buildContextPack(opts = {}) {
     vaultRoot: opts.vaultRoot,
   });
 
-  const agentsText = await readFile(paths.agentsPath, "utf8");
+  const agentsText = await readFile(paths.constitutionAgentsPath, "utf8");
   const { version, section8, changelogAnchorRow } = parseAgentsSection8(agentsText);
-  const sprint = await readSprintSnapshot(paths.sprintPath, paths.repoRoot);
+  const sprint = await readSprintSnapshot(paths.sprintPath);
   const recent_stories = await selectRecentStories(paths.artifactsDir, 3);
   const vault_lint = await readVaultLintSummary(paths.vaultRoot);
   const hermes_provider = await readHermesProviderLine();

@@ -8,9 +8,14 @@ import { queryBrainIndex } from "../../src/brain/retrieval/query-index.js";
 
 async function writeIndex(params: {
   dir: string;
-  embedder?: { providerId: string; modelId: string };
+  schemaVersion?: 1 | 2;
+  embedder?: { providerId: string; modelId: string; vectorDimension?: number };
   records: Array<{
     path: string;
+    chunk_index?: number;
+    char_start?: number;
+    char_end?: number;
+    text?: string;
     embedding: number[];
     quality?: {
       status?: string;
@@ -21,12 +26,39 @@ async function writeIndex(params: {
   }>;
 }): Promise<string> {
   const indexPath = path.join(params.dir, "brain-index.json");
-  const obj = {
-    schema_version: 1,
-    embedder: params.embedder ?? { providerId: "stub", modelId: "stub-v1" },
-    records: params.records,
-    exclusions: [],
-  };
+  const schemaVersion = params.schemaVersion ?? 2;
+  const records =
+    schemaVersion === 2
+      ? params.records.map((r, i) => ({
+          path: r.path,
+          chunk_index: r.chunk_index ?? i,
+          char_start: r.char_start ?? 0,
+          char_end: r.char_end ?? (r.text?.length ?? 0),
+          text: r.text ?? `chunk for ${r.path}`,
+          embedding: r.embedding,
+          ...(r.quality ? { quality: r.quality } : {}),
+        }))
+      : params.records;
+  const obj =
+    schemaVersion === 2
+      ? {
+          schema_version: 2,
+          embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
+          chunking: {
+            target_tokens: 768,
+            overlap_tokens: 64,
+            tokenizer_encoding: "cl100k_base",
+            tokenizer_package: "gpt-tokenizer@3.4.0",
+          },
+          records,
+          exclusions: [],
+        }
+      : {
+          schema_version: 1,
+          embedder: params.embedder ?? { providerId: "test", modelId: "fixed" },
+          records,
+          exclusions: [],
+        };
   await writeFile(indexPath, `${JSON.stringify(obj, null, 2)}\n`, "utf8");
   return indexPath;
 }
@@ -45,7 +77,7 @@ async function writeManifest(params: {
     build_timestamp_utc: params.last_build_utc,
     allowlist_snapshot: { subtrees: [], inbox: { enabled: false } },
     embedder: { providerId: "stub", modelId: "stub-v1" },
-    counts: { candidates_discovered: 0, embedded: 0, excluded: 0, failed: 0 },
+    counts: { candidates_discovered: 0, embedded: 0, notes_embedded: 0, excluded: 0, failed: 0 },
     exclusion_reason_breakdown: {},
     failures: [],
     vault_snapshot: {
@@ -139,8 +171,74 @@ describe("queryBrainIndex", () => {
       embed: async () => [1, 0],
     };
 
-    const out = await queryBrainIndex({ indexPath, query: "q", topK: 10, embedder });
+    const out = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 1,
+    });
     expect(out.results.map((r) => r.path)).toEqual(["notes/z-source.md", "notes/a-workflow.md"]);
+  });
+
+  it("honours qualityWeightStrength in finalScore (α=0 cosine order, α=1 quality order, α=0.3 intermediate)", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-alpha-"));
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        {
+          path: "notes/high-quality.md",
+          embedding: [0.9, 0.1],
+          quality: { status: "reviewed", confidence_score: 1.0, verification_status: "verified", pake_type: "SourceNote" },
+        },
+        {
+          path: "notes/high-cosine.md",
+          embedding: [1, 0],
+          quality: { status: "draft", confidence_score: 0.1, verification_status: "pending" },
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const alphaZero = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 0,
+      explain: true,
+    });
+    expect(alphaZero.results[0]?.path).toBe("notes/high-cosine.md");
+    expect(alphaZero.results[0]?.components?.effectiveQualityMultiplier).toBeCloseTo(1);
+
+    const alphaOne = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 1,
+      explain: true,
+    });
+    expect(alphaOne.results[0]?.path).toBe("notes/high-quality.md");
+    expect(alphaOne.results[0]?.components?.qualityMultiplier).toBeCloseTo(1);
+    expect(alphaOne.results[0]?.components?.effectiveQualityMultiplier).toBeCloseTo(1);
+
+    const alphaMid = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      qualityWeightStrength: 0.3,
+      explain: true,
+    });
+    expect(alphaMid.results[0]?.components?.qualityWeightStrength).toBeCloseTo(0.3);
+    expect(alphaMid.results[0]?.components?.effectiveQualityMultiplier).toBeGreaterThan(
+      alphaMid.results[1]?.components?.effectiveQualityMultiplier ?? 0,
+    );
   });
 
   it("applies manifest stale-sample freshness penalty when quality weighting is enabled", async () => {
@@ -176,6 +274,45 @@ describe("queryBrainIndex", () => {
     const codes = (out.warnings ?? []).map((w) => w.code);
     expect(codes).toContain("INDEX_ESTIMATED_STALE");
     expect(codes).toContain("FRESHNESS_PENALTY_APPLIED");
+  });
+
+  it("uses caller-provided stale-sample freshness penalty", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-fresh-cfg-"));
+    const quality = {
+      status: "reviewed",
+      confidence_score: 1,
+      verification_status: "verified",
+      pake_type: "SourceNote",
+    };
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        { path: "notes/a-stale.md", embedding: [1, 0], quality },
+        { path: "notes/z-fresh.md", embedding: [0.95, 0.05], quality },
+      ],
+    });
+    await writeManifest({
+      dir,
+      outcome: "success",
+      last_build_utc: "2026-04-14T00:00:00.000Z",
+      estimated_stale_count: 1,
+      estimated_stale_sample: ["notes/a-stale.md"],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({
+      indexPath,
+      query: "q",
+      topK: 10,
+      embedder,
+      staleSamplePenaltyFactor: 0.5,
+    });
+    expect(out.results.map((r) => r.path)).toEqual(["notes/z-fresh.md", "notes/a-stale.md"]);
+    expect(out.results[1]?.components).toBeUndefined();
   });
 
   it("does not apply manifest stale-sample freshness penalty when quality weighting is disabled", async () => {
@@ -241,6 +378,7 @@ describe("queryBrainIndex", () => {
     const first = out.results[0];
     expect(first?.components?.rawSimilarity).toBeCloseTo(1);
     expect(first?.components?.qualityMultiplier).toBeCloseTo(0.9);
+    expect(first?.components?.effectiveQualityMultiplier).toBeCloseTo(0.97);
     expect(first?.components?.quality.typeWeight).toBeCloseTo(1);
     expect(first?.components?.freshnessPenalty).toBe(1);
     expect(first?.components?.finalScore).toBeCloseTo(first?.score ?? 0);
@@ -346,6 +484,7 @@ describe("queryBrainIndex", () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-zv-"));
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "test", modelId: "zero" },
       records: [{ path: "notes/a.md", embedding: [1, 0] }],
     });
 
@@ -406,6 +545,7 @@ describe("queryBrainIndex", () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-zvman-"));
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "test", modelId: "zero" },
       records: [{ path: "notes/a.md", embedding: [1, 0] }],
     });
     await writeManifest({
@@ -466,6 +606,101 @@ describe("queryBrainIndex", () => {
     const codes = (out.warnings ?? []).map((w) => w.code);
     expect(codes).toContain("DIMENSION_MISMATCH");
   });
+
+  it("fails fast when query embedder does not match the index embedder", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-em-"));
+    const indexPath = await writeIndex({
+      dir,
+      embedder: { providerId: "portal", modelId: "portal-model" },
+      records: [{ path: "notes/a.md", embedding: [1, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "stub", modelId: "stub-v1" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 10, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_EMBEDDER_MISMATCH" },
+    });
+  });
+
+  it("rejects schema v1 indexes with INDEX_SCHEMA_STALE", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-v1-"));
+    const indexPath = await writeIndex({
+      dir,
+      schemaVersion: 1,
+      records: [{ path: "notes/a.md", embedding: [1, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 5, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_SCHEMA_STALE" },
+    });
+  });
+
+  it("collapses multiple high-scoring chunks per parent before top-k so co-relevant notes remain", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-collapse-"));
+    const noteA = "notes/guide-a.md";
+    const noteB = "notes/guide-b.md";
+    const indexPath = await writeIndex({
+      dir,
+      records: [
+        ...Array.from({ length: 5 }, (_, i) => ({
+          path: noteA,
+          chunk_index: i,
+          text: `guide-a chunk ${i}`,
+          embedding: [1, 0],
+        })),
+        {
+          path: noteB,
+          chunk_index: 0,
+          text: "guide-b sole chunk",
+          embedding: [0.95, 0.05],
+        },
+      ],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    const out = await queryBrainIndex({ indexPath, query: "q", topK: 5, embedder, qualityWeighting: false });
+    const paths = out.results.map((r) => r.path);
+    expect(paths).toHaveLength(2);
+    expect(paths).toContain(noteA);
+    expect(paths).toContain(noteB);
+    expect(new Set(paths).size).toBe(2);
+    expect(out.results[0]?.path).toBe(noteA);
+    expect(out.results[0]?.chunk_index).toBe(0);
+    expect(out.results[0]?.text).toBe("guide-a chunk 0");
+  });
+
+  it("fails fast when query embedding dimension does not match index metadata", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cns-brain-q-edim-"));
+    const indexPath = await writeIndex({
+      dir,
+      embedder: { providerId: "test", modelId: "fixed", vectorDimension: 3 },
+      records: [{ path: "notes/a.md", embedding: [1, 0, 0] }],
+    });
+
+    const embedder: Embedder = {
+      metadata: { providerId: "test", modelId: "fixed" },
+      embed: async () => [1, 0],
+    };
+
+    await expect(queryBrainIndex({ indexPath, query: "q", topK: 10, embedder })).rejects.toMatchObject({
+      code: "SCHEMA_INVALID",
+      details: { code: "INDEX_EMBEDDER_DIMENSION_MISMATCH" },
+    });
+  });
 });
 
 describe("query-index CLI", () => {
@@ -477,6 +712,7 @@ describe("query-index CLI", () => {
     await writeFile(path.join(dir, "body.md"), marker, "utf8");
     const indexPath = await writeIndex({
       dir,
+      embedder: { providerId: "stub", modelId: "stub-v1", vectorDimension: 8 },
       records: [
         { path: "notes/a.md", embedding: [1, 0, 0, 0, 0, 0, 0, 0] },
         { path: "notes/b.md", embedding: [0, 1, 0, 0, 0, 0, 0, 0] },
@@ -485,7 +721,7 @@ describe("query-index CLI", () => {
 
     const res = spawnSync("npx", ["tsx", entry, "--index-path", indexPath, "--query", "q", "--top-k", "2", "--explain"], {
       encoding: "utf8",
-      env: { ...process.env },
+      env: { ...process.env, CNS_BRAIN_EMBEDDER: "stub" },
     });
     expect(res.status).toBe(0);
     expect(res.stdout.trim().startsWith("{")).toBe(true);

@@ -6,7 +6,8 @@ import {
   runBuildIndex,
   writeBuildIndexArtifact,
 } from "./build-index.js";
-import { StubEmbedder } from "./embedder.js";
+import type { EmbedderMetadata } from "./embedder.js";
+import { resolveBrainEmbedder } from "./resolve-embedder.js";
 import { loadBrainCorpusAllowlistFromVault } from "./load-corpus-allowlist.js";
 import {
   BRAIN_INDEX_MANIFEST_SCHEMA_VERSION,
@@ -26,7 +27,7 @@ function buildFailedManifest(params: {
   allowlistSnapshot: BrainIndexManifestAllowlistSnapshot;
   failureCode: string;
   failureMessage: string;
-  embedder: StubEmbedder["metadata"];
+  embedder: EmbedderMetadata;
   drift: Awaited<ReturnType<typeof computeVaultSnapshotAndFreshness>>;
 }): BrainIndexManifest {
   return {
@@ -35,7 +36,7 @@ function buildFailedManifest(params: {
     build_timestamp_utc: new Date(params.buildTimestampMs).toISOString(),
     allowlist_snapshot: params.allowlistSnapshot,
     embedder: params.embedder,
-    counts: { candidates_discovered: 0, embedded: 0, excluded: 0, failed: 0 },
+    counts: { candidates_discovered: 0, embedded: 0, notes_embedded: 0, excluded: 0, failed: 0 },
     exclusion_reason_breakdown: {},
     failures: [],
     vault_snapshot: params.drift.vault_snapshot,
@@ -64,6 +65,7 @@ async function main(): Promise<void> {
         "Usage: tsx src/brain/build-index-cli.ts --output-dir <abs-path>",
         "",
         "Requires CNS_VAULT_ROOT. Allowlist: <vault>/_meta/schemas/brain-corpus-allowlist.json",
+        "Embedder: CNS_BRAIN_EMBEDDER=stub|portal (default stub). Portal: CNS_BRAIN_EMBED_MODEL required.",
         "",
       ].join("\n"),
     );
@@ -82,6 +84,7 @@ async function main(): Promise<void> {
 
   const safeOutputDir = await assertOutputDirOutsideVault(vaultRoot, outDir);
   const buildTimestampMs = Date.now();
+  const embedder = resolveBrainEmbedder();
 
   const loaded = await loadBrainCorpusAllowlistFromVault(vaultRoot);
   if (!loaded.ok) {
@@ -93,7 +96,7 @@ async function main(): Promise<void> {
       allowlistSnapshot: { subtrees: [], inbox: { enabled: false } },
       failureCode: "ALLOWLIST_INVALID",
       failureMessage: String(failure.message).split("\n")[0] ?? "Invalid allowlist",
-      embedder: new StubEmbedder().metadata,
+      embedder: embedder.metadata,
       drift,
     });
     try {
@@ -105,7 +108,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  const embedder = new StubEmbedder();
   let artifactWritten = false;
   try {
     const run = await runBuildIndex(vaultRoot, loaded.value, embedder);
@@ -114,7 +116,13 @@ async function main(): Promise<void> {
 
     const drift = await computeVaultSnapshotAndFreshness(vaultRoot, run.candidates, buildTimestampMs);
     const breakdown = buildExclusionReasonBreakdown(run.result.exclusions, run.hardExcludedMetaLogsCount);
-    const counts = buildCounts(run.candidates.length, run.result.records.length, run.result.exclusions);
+    const notesEmbedded = new Set(run.result.records.map((r) => r.path)).size;
+    const counts = buildCounts(
+      run.candidates.length,
+      run.result.records.length,
+      notesEmbedded,
+      run.result.exclusions,
+    );
     const failures = buildBoundedFailureSummaries(run.result.exclusions);
 
     const manifest: BrainIndexManifest = {
@@ -123,6 +131,7 @@ async function main(): Promise<void> {
       build_timestamp_utc: new Date(buildTimestampMs).toISOString(),
       allowlist_snapshot: allowlistToSnapshot(loaded.value),
       embedder: run.result.embedder,
+      chunking: run.result.chunking,
       counts,
       exclusion_reason_breakdown: breakdown,
       failures,

@@ -124,8 +124,64 @@ function isHnRedirectorUrl(url) {
 }
 
 /**
+ * YouTube watch hosts that identify videos via `v=` query (not path).
+ * youtu.be /shorts /embed keep identity in the path — no special case needed.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isYoutubeWatchHost(hostname) {
+  const host = String(hostname ?? '')
+    .replace(/^www\./i, '')
+    .toLowerCase();
+  return (
+    host === 'youtube.com' ||
+    host === 'm.youtube.com' ||
+    host === 'music.youtube.com' ||
+    host === 'youtube-nocookie.com'
+  );
+}
+
+/**
+ * @param {string} urlString
+ * @returns {boolean}
+ */
+function isYoutubeWatchUrl(urlString) {
+  try {
+    const u = new URL(urlString);
+    if (!isYoutubeWatchHost(u.hostname)) {
+      return false;
+    }
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    return path === '/watch';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Preserve `v=` identity the same way HN preserves `id` (Story 90-4 R1).
+ *
+ * @param {string} urlString
+ * @returns {string}
+ */
+function normalizeYoutubeWatchUrl(urlString) {
+  try {
+    const u = new URL(urlString);
+    const videoId = u.searchParams.get('v');
+    if (!videoId || !videoId.trim()) {
+      return normalizeHttpUrlStringFallback(urlString);
+    }
+    return `https://youtube.com/watch?v=${encodeURIComponent(videoId.trim())}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Inline port of src/ingest/duplicate.ts normalizeSourceUriForDedup + utm/fbclid strip.
  * HN item URLs preserve `id` so unrelated stories do not collapse to /item.
+ * YouTube watch URLs preserve `v=` so distinct videos do not collapse to /watch (Story 90-4).
  *
  * @param {string} uri
  * @returns {string}
@@ -141,6 +197,9 @@ export function normalizeDigestUrl(uri) {
   if (isHnRedirectorUrl(withoutTracking)) {
     return normalizeHnItemUrl(withoutTracking);
   }
+  if (isYoutubeWatchUrl(withoutTracking)) {
+    return normalizeYoutubeWatchUrl(withoutTracking);
+  }
   if (/^https?:\/\//i.test(withoutTracking)) {
     return normalizeHttpUrlStringFallback(withoutTracking);
   }
@@ -152,6 +211,10 @@ export function normalizeDigestUrl(uri) {
 }
 
 /**
+ * Domain+path key for cross-source clustering.
+ * YouTube `/watch` embeds `v=<id>` so distinct videos stay distinct (Story 90-4 R1).
+ * Patching only `normalizeDigestUrl` is insufficient — this arm dropped `u.search`.
+ *
  * @param {string} url
  * @returns {string}
  */
@@ -164,6 +227,14 @@ export function canonicalDomainPath(url) {
     const u = new URL(normalized);
     const host = u.hostname.replace(/^www\./i, '').toLowerCase();
     const path = u.pathname.replace(/\/+$/, '') || '/';
+    if (isYoutubeWatchHost(host) && path === '/watch') {
+      const videoId = u.searchParams.get('v');
+      if (videoId && videoId.trim()) {
+        // Collapse m./music./nocookie variants onto youtube.com for identity.
+        // Encode like normalizeYoutubeWatchUrl so both arms agree on identity.
+        return `youtube.com/watch?v=${encodeURIComponent(videoId.trim())}`;
+      }
+    }
     return `${host}${path}`;
   } catch {
     return '';
@@ -272,6 +343,111 @@ function signalPublishedAtMs(signal) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** Minimum shared/min(|A|,|B|) for entity-match (Story 90-4 R2). */
+const ENTITY_MATCH_PROPORTION = 0.5;
+
+/**
+ * Short-title entity disable (Story 90-5 G7): when either side has ≤ this many
+ * proper-noun tokens, entity-match returns false (URL/canon/Jaccard still apply).
+ */
+const ENTITY_MATCH_SHORT_MAX = 3;
+
+/**
+ * Lowercase antonym pairs for exclusive-token opposition (Story 90-5 G7).
+ * Must be lowercase — extractProperNounTokens only emits Title-Case tokens
+ * lowercased. Mid-headline sentence-case antonyms never reach this map; that
+ * is an inherent Title-Case filter limit, not a missing lexicon entry.
+ * Plurals/inflections are explicit pairs (no stemmer / trailing-'s' strip).
+ * @type {ReadonlyArray<readonly [string, string]>}
+ */
+const ANTONYM_PAIRS = [
+  // Seed singular (G7 ship)
+  ['shortage', 'surplus'],
+  ['rise', 'fall'],
+  ['up', 'down'],
+  ['gain', 'loss'],
+  ['buy', 'sell'],
+  ['bull', 'bear'],
+  ['win', 'loss'],
+  ['hike', 'cut'],
+  ['increase', 'decrease'],
+  ['boom', 'bust'],
+  ['surge', 'slump'],
+  ['rally', 'crash'],
+  // Seed plural / inflected variants (review B1 — exact-token match only)
+  ['shortages', 'surpluses'],
+  ['rises', 'falls'],
+  ['gains', 'losses'],
+  ['buys', 'sells'],
+  ['wins', 'losses'],
+  ['hikes', 'cuts'],
+  ['increases', 'decreases'],
+  ['booms', 'busts'],
+  ['surges', 'slumps'],
+  ['rallies', 'crashes'],
+  // Finance / tech expansion + variants (review B2)
+  ['inflow', 'outflow'],
+  ['inflows', 'outflows'],
+  ['soar', 'plunge'],
+  ['soars', 'plunges'],
+  ['jump', 'drop'],
+  ['jumps', 'drops'],
+  ['upgrade', 'downgrade'],
+  ['upgrades', 'downgrades'],
+  ['approve', 'reject'],
+  ['approves', 'rejects'],
+  ['approval', 'rejection'],
+  ['approvals', 'rejections'],
+  ['hawkish', 'dovish'],
+  ['bullish', 'bearish'],
+  ['beat', 'miss'],
+  ['beats', 'misses'],
+];
+
+/** @type {Map<string, Set<string>>} */
+const ANTONYM_OF = (() => {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const [left, right] of ANTONYM_PAIRS) {
+    if (!map.has(left)) {
+      map.set(left, new Set());
+    }
+    if (!map.has(right)) {
+      map.set(right, new Set());
+    }
+    map.get(left)?.add(right);
+    map.get(right)?.add(left);
+  }
+  return map;
+})();
+
+/**
+ * True when exclusive proper-noun tokens (A−B vs B−A) form a known antonym pair.
+ * Shared antonym words (present on both titles) do not fire.
+ *
+ * @param {string[]} nounsA
+ * @param {string[]} nounsB
+ * @returns {boolean}
+ */
+function hasAntonymOpposition(nounsA, nounsB) {
+  const setA = new Set(nounsA);
+  const setB = new Set(nounsB);
+  const exclusiveA = nounsA.filter((n) => !setB.has(n));
+  const exclusiveB = new Set(nounsB.filter((n) => !setA.has(n)));
+  for (const token of exclusiveA) {
+    const opposites = ANTONYM_OF.get(token);
+    if (!opposites) {
+      continue;
+    }
+    for (const opposite of opposites) {
+      if (exclusiveB.has(opposite)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * @param {Record<string, unknown>} a
  * @param {Record<string, unknown>} b
@@ -291,6 +467,17 @@ export function crossTitleEntityMatch(a, b) {
     }
   }
   if (shared < 2) {
+    return false;
+  }
+  const denom = Math.min(nounsA.length, nounsB.length);
+  if (denom === 0 || shared / denom < ENTITY_MATCH_PROPORTION) {
+    return false;
+  }
+  // Story 90-5 G7: antonym exclusive-token guard (always) + short-title entity disable.
+  if (hasAntonymOpposition(nounsA, nounsB)) {
+    return false;
+  }
+  if (Math.min(nounsA.length, nounsB.length) <= ENTITY_MATCH_SHORT_MAX) {
     return false;
   }
   const pubA = signalPublishedAtMs(a);

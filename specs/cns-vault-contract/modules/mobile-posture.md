@@ -43,4 +43,3 @@ Operator-only exception (if explicitly enabled):
 
 - **Canonical journey (implementation repo):** `../../../docs/mobile-vault-access-journey.md`
 - **BMAD stub (stable link):** `_bmad-output/planning-artifacts/mobile-vault-access-journey.md` (points at the canonical doc)
-

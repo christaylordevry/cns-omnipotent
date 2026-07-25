@@ -126,8 +126,8 @@ Output exactly:
 **GitHub** (trending repos)
 - <title> — <stars> stars, <forks> forks
 
-**Reddit** (hot posts)
-- <title> — <upvotes> upvotes, <commentCount> comments
+**Reddit** (top posts via Atom RSS)
+- <title> (optional — <author>)
 
 **Newsletters / RSS**
 - <title> (optional — <author> when present)

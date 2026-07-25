@@ -27,6 +27,7 @@ import {
   resolveOperatorHome,
 } from "./lib/operator-home.mjs";
 import { resolvePaths } from "./lib/paths.mjs";
+import { runSessionCloseVaultModulesSync } from "./lib/sync-vault-modules.mjs";
 import { formatPriorFanoutSummary } from "./lib/update-memory-cns-state.mjs";
 import { runWriteMemory } from "./write-memory.mjs";
 
@@ -701,6 +702,25 @@ export async function runDeterministicPipeline(opts = {}) {
   });
 
   const exportPath = join(paths.repoRoot, "scripts/output/vault-export-for-notebooklm.md");
+
+  if (dryRun) {
+    const syncStep = await runSessionCloseVaultModulesSync({
+      dryRun: true,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    steps.sync_vault_modules = { status: syncStep.status, message: syncStep.message };
+  } else {
+    const syncStep = await runSessionCloseVaultModulesSync({
+      dryRun: false,
+      repoRoot: paths.repoRoot,
+      vaultRoot: paths.vaultRoot,
+    });
+    steps.sync_vault_modules = { status: syncStep.status, message: syncStep.message };
+    if (syncStep.status === "failed") {
+      setFailure("sync_vault_modules");
+    }
+  }
 
   if (dryRun) {
     steps.export = { status: "skipped", message: "export: skipped (dry-run)" };

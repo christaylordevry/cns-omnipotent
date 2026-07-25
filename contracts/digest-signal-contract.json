@@ -1,0 +1,112 @@
+{
+  "meta": {
+    "generated": true,
+    "generatedFrom": "cns-dashboard/convex/validators.ts",
+    "regenerateCommand": "npm run generate:digest-signal-contract  # from cns-dashboard; writes ../Omnipotent.md/contracts/digest-signal-contract.json",
+    "generatedAt": "2026-07-25T10:00:11.807Z",
+    "sourceGit": {
+      "repo": "cns-dashboard",
+      "branch": "feat/m1-deploy-aware-contract",
+      "commit": "229b43d613e2601d4ae7da0ad3ea0e8c8a12a4f9",
+      "dirty": true
+    }
+  },
+  "fieldSets": {
+    "digestSignalInput": [
+      "digestRunId",
+      "disposition",
+      "externalId",
+      "normalizedEngagement",
+      "rank",
+      "rankScore",
+      "score",
+      "scores",
+      "section",
+      "sourceMetadata",
+      "sourceType",
+      "summary",
+      "title",
+      "topicSlug",
+      "url",
+      "workspaceId"
+    ],
+    "digestSignalScores": [
+      "momentum",
+      "novelty",
+      "personalRelevance",
+      "relevance",
+      "urgency"
+    ],
+    "sourceMetadata": [
+      "author",
+      "authorHandle",
+      "categories",
+      "commentCount",
+      "comments",
+      "contributingSources",
+      "dedupClusterSize",
+      "forks",
+      "leadingOutcome",
+      "leadingProbability",
+      "likes",
+      "liquidityUsd",
+      "outcomePrices",
+      "outcomes",
+      "peopleMatch",
+      "points",
+      "publishedAt",
+      "quotes",
+      "replies",
+      "reposts",
+      "stars",
+      "upvotes",
+      "viewCount",
+      "volumeUsd"
+    ],
+    "contributingSources": [
+      "commentCount",
+      "comments",
+      "forks",
+      "likes",
+      "points",
+      "publishedAt",
+      "quotes",
+      "replies",
+      "reposts",
+      "sourceType",
+      "stars",
+      "upvotes",
+      "url",
+      "viewCount"
+    ],
+    "peopleMatch": [
+      "bonusPoints",
+      "matchType",
+      "matchedHandle",
+      "personName"
+    ],
+    "digestRunInput": [
+      "briefingId",
+      "date",
+      "deepSignalSummary",
+      "errors_by_source",
+      "focusKeyword",
+      "notebookId",
+      "ranAt",
+      "sourceOutcomes",
+      "status",
+      "topTrend",
+      "vaultContextSummary",
+      "workspaceId"
+    ],
+    "digestSourceOutcome": [
+      "contributedCount",
+      "fetchCount",
+      "reason",
+      "signalCount",
+      "sourceKey",
+      "status",
+      "storedPrimaryCount"
+    ]
+  }
+}

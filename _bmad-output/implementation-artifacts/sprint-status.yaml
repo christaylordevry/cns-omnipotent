@@ -1,5 +1,5 @@
 # generated: 2026-04-12T16:30:00Z
-# last_updated: 2026-06-22T00:00:00Z
+# last_updated: 2026-07-23T22:55:00+10:00
 # project: CNS
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,11 +35,37 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-12T16:30:00Z"
-last_updated: "2026-06-22T18:56:38+10:00"
+last_updated: "2026-07-23T21:05:00+10:00"
 project: CNS
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
+
+# Pre-Implementation Checklist — Hermes Consolidation (Epics 74–78)
+# NOT stories — ops/checklist only (epics-hermes-consolidation.md 2026-06-24)
+# Sequencing: Pre-1 → Pre-3 → 74-1 (first executable; no Portal) → Pre-4 at 74-2 → Epic 74 → 75 ∥ 76 → 77 → 78
+pre_implementation_checklist:
+  pre-1-fixture-fix:
+    status: done
+    owner: dev
+    note: Fixed tests/fixtures/session-close/section8-draft-fragment.md blockquote preamble and oversized draft test inputs
+  pre-2-session-close:
+    status: deferred
+    owner: operator
+    deferred_to: 76-1-session-close-orientation-artifact-refresh
+    note: Hermes provider resolves to none until Portal — not a pre-Epic-74 gate
+  pre-3-static-body-fix:
+    status: optional
+    owner: dev
+    note: CNS-Daily-Rhythm.md static body rows (Web App Vision Epic 42 DONE, stack, URL)
+  pre-4-portal-subscribe-fr-gate:
+    status: done
+    owner: operator
+    gate_at_stories:
+      - 74-2-portal-oauth-login-and-provider-switch
+      - 74-4-tool-gateway-web-search
+      - 78-1-portal-tts-and-push-to-talk-on-desktop
+    note: $30 paid tier confirmed 2026-06-24 at 74-2; Tool Gateway active
 
 development_status:
   epic-1: done
@@ -404,8 +430,17 @@ development_status:
   57-4-external-memory-provider-eval: done
 
   # Epic 58 — NotebookLM vault export Drive sync (operator brief 2026-06-03)
+  # Reopened 2026-07-08: 58-3 PDF source fix for deterministic drive_write_error (Doc write 134s > ~60s budget)
+  # 58-3 VERIFIED LIVE 2026-07-09: /session-close write path succeeded (no drive_write_error, PDF on Drive fast).
+  # 58-4 (2026-07-13): residual gate FIRED — both 07-09 and 07-10 closes left all 3 targets UNSTAMPED.
+  #   Root causes: all-or-nothing merge after sequential loop + no per-call nlm timeout + no phase markers.
+  #   Separate: tests polluted ~/.hermes/logs/session-close-drive-sync.log (382 fake OAuth lines).
+  # Closed 2026-07-13: 58-2 WatchedSurface Tier-2 NO-GO (brief-CNS-2026-07-13) — reservation withdrawn.
   epic-58: done
   58-1-migrate-vault-export-drive-doc-sync: done
+  58-2-watchedsurface-tier2-multi-surface: cancelled # NO-GO 2026-07-13 (brief-CNS-2026-07-13): reservation-without-pain, no failing single-corpus query; Tier-2 reopens 58-3/58-4 sync failure modes; export scope 01-Projects+03-Resources by design
+  58-3-session-close-notebooklm-pdf-source-fix: done
+  58-4-drive-sync-phase-hardening-and-diagnostics-integrity: done
 
   # Epic 59 — Session-close runtime context reduction (operator brief 2026-06-03)
   epic-59: done
@@ -548,7 +583,7 @@ development_status:
 
   # Epic 72 — Source Expansion: YouTube (post-Reddit closure; operator brief 2026-06-19)
   # Reddit Source 8 closed platform-side — YouTube API key replaces lost social signal
-  epic-72: in-progress
+  epic-72: done
   72-1-youtube-data-api-adapter: done
   72-2-youtube-outcome-record-investigation: done
   72-3-tiktok-instagram-scrapecreators-adapter: done
@@ -559,12 +594,188 @@ development_status:
 
   # Epic 73 — Nexus Entity Intelligence (spec-nexus-entity-intelligence; architecture 2026-06-21)
   # Gate: 73-1 → 73-2/73-3 (parallel) → 73-4 → 73-5 → 73-6/73-7 (parallel) → 73-8
-  epic-73: in-progress
+  # Closed 2026-07-04: all stories done, live-prod verified (hasBaselineHistory cross-ref confirmed independently)
+  epic-73: done
   73-1-entity-mentions-schema-and-mutations: done
   73-2-extract-entities-pure-functions: done
   73-3-build-entity-mention-payload: done
   73-4-analyze-entity-intelligence-orchestrator: done
   73-5-get-entity-intelligence-query: done
   73-6-dashboard-entity-intelligence-modules: done
-  73-7-digest-entity-sections: in-progress
-  73-8-entity-intelligence-health-live-prod: backlog
+  73-7-digest-entity-sections: done
+  73-8-entity-intelligence-health-live-prod: done # cns-dashboard story file: 73-8-entity-intelligence-health-live-prod-verification.md
+
+  # Epic 74 — Hermes on Portal + Desktop (alias Epic A; prd + architecture 2026-06-24)
+  # First executable: 74-1 (no Portal). Pre-4 at 74-2. Pre-2 session-close → 76-1 (deferred).
+  # Gates: NFR3 → 74-1 before 74-2; FR-GATE → 74-4 + 78-1
+  # Sequencing: Epic 74 → Epic 75 ∥ Epic 76 → Epic 77 → Epic 78
+  epic-74: done
+  74-1-brain-embedder-audit-before-portal-switch: done # FIRST — NFR3 gate before 74-2
+  74-2-portal-oauth-login-and-provider-switch: done # Portal OAuth + nous provider switch (2026-06-24)
+  74-3-auxiliary-compression-on-portal: done # FR2 — compression on Portal Haiku (2026-06-24)
+  74-4-tool-gateway-web-search: backlog # FR-GATE — non-blocking; reopen epic-74 if picked up
+  74-5-gateway-and-morning-digest-regression-gate: done
+  74-6-hermes-dashboard-oauth-registration-systemd-and-reachability: done
+  74-7-hermes-desktop-live-chat-connection: done
+  74-8-portal-and-desktop-governance-documentation: done
+  epic-74-retrospective: optional
+
+  # Epic 75 — Run-Chain Knowledge + Revival (alias Epic B; depends Epic 74 complete)
+  epic-75: done
+  75-1-hermes-test-domain-and-vitest-include: done
+  75-2-run-chain-governance-module-and-project-folder: done
+  75-3-hermes-run-chain-trigger-skill: done
+  75-4-anthropic-key-validate-script-and-fr11-a-smoke: done
+  75-5-run-chain-end-to-end-revival-verification: done
+  epic-75-retrospective: optional
+
+  # Epic 76 — Orientation & Governance Cleanup (alias Epic C; parallel with Epic 75)
+  # Pre-2 session-close executes here via 76-1 after Portal restores provider
+  epic-76: done
+  76-1-session-close-orientation-artifact-refresh: done # absorbs deferred Pre-2; story file story-76-1-session-close-refresh.md
+  76-2-both-project-context-md-files-synced: done
+  76-3-fast-scan-index-and-inbox-triage-plan: done
+  76-4-missing-governance-files-mobile-posture-and-personas: done
+  76-5-two-bot-vault-boundary-documentation: done
+  76-6-memory-pillars-and-honcho-verification: done
+  epic-76-retrospective: optional
+
+  # Epic 77 — JARVIS Awareness in Nexus (alias Epic D1; cross-repo cns-dashboard + Omnipotent.md)
+  # Gate: 77-1 before 77-5; depends Epic 74
+  # Closed 2026-07-04: 77-1..77-5 done (MVP gate satisfied); 77-6/77-7 explicitly non-blocking per their own AC text
+  epic-77: done
+  77-1-convex-hermes-awareness-snapshot-http-endpoint: done # cns-dashboard commit 6299704; gates 77-5
+  77-2-hermes-awareness-pull-client-and-cron-cache: done # Omnipotent.md commit 7b0077a
+  77-3-convex-webhook-push-for-high-signal-events: done # cns-dashboard commit be5246e; tracker sync gap found+closed 2026-07-04, was already done there
+  77-4-awareness-sync-hermes-skill: done # skill mirror + install + contract tests; data-accuracy bug found+fixed via 3x live Discord retest 2026-07-04
+  77-5-nexus-awareness-panels-ui: done # cns-dashboard commit 1118ee4; Vercel live
+  77-6-async-ask-hermes-box-stretch-fr13: backlog # stretch-fr13 — not Epic 77 MVP gate
+  77-7-dashboard-sync-retention-decision: backlog
+  epic-77-retrospective: optional
+
+  # Epic 78 — JARVIS Voice + Model Routing (alias Epic D2; depends Epic 74; FR-GATE for TTS)
+  epic-78: in-progress
+  78-1-portal-tts-and-push-to-talk-on-desktop: in-progress # config done; AC#4 PARTIAL — Desktop Electron build deferred (see deferred-work.md)
+  78-2-per-skill-hermes-model-routing-activation: cancelled # superseded by Epic 80 (80-1 auxiliary pin + 80-2 retirement) — smart_model_routing had zero consumers in Hermes v0.17.0; see 78-2-skill-routing-evidence.md + 80-2-retire-smart-model-routing-evidence.md
+  78-3-voice-and-routing-operator-guide-section: backlog
+  epic-78-retrospective: optional
+
+  # Epic 79 — Felt Recall — Semantic Brain + Cited Auto-Injection (hermes-omniscient)
+  epic-79: done
+  79-1-a4-0-inject-probe: done
+  79-2-portalembedder-production-brain-index: done
+  79-3-recall-policy-config-recall-inject: done
+  79-4-golden-set-calibration-gate: done
+  79-5-production-cns-brain-recall-plugin-prefetch-cli: done
+  79-6-chunked-brain-index-chunk-aware-recall: done
+  79-7-recall-calibration-soften-quality-weighting: done
+  79-8-distribute-recall-budget-across-max-chunks: done
+  epic-79-retrospective: optional
+
+  # Epic 82 — Local Nexus JARVIS Voice (hermes-omniscient Phase D; cns-dashboard)
+  # Closed 2026-07-04: all 8 stories done, live PTT proven end-to-end (chip shows voice_pane not degraded)
+  epic-82: done
+  82-1-spike-omni-001-ws-proxy: done # cns-dashboard story file; findings → Omnipotent.md
+  82-2-spike-omni-002-voice-channel: done
+  82-3-voice-drawer: done # smoke-verified live 2026-06-29
+  82-4-spike-omni-003-voice-recall-status-ground-truth: done
+  82-5-brain-recall-prefetch-bare-path-dashboard-env: done # AC5 live PTT proof 2026-07-01 confirmed 2026-07-03
+  82-6-voice-pane-cold-turn-embedder-warm-keep: done # live PTT gate confirmed 2026-07-03; chip UI bug tracked separately as 82-8
+  82-7-voice-session-persist-and-rt-refresh: done
+  82-8-fix-voice-recall-status-chip-false-degraded: done # cns-dashboard commit 4bdf5f9; live PTT confirmed 2026-07-04, chip shows voice_pane not degraded
+  epic-82-retrospective: optional
+
+  # Epic 80 — Cost-Effective Auxiliary Routing (hermes-omniscient Phase B1)
+  # FR14: pin auxiliary: block to Portal Haiku; 80-2 retires inert smart_model_routing
+  epic-80: done
+  80-1-pin-auxiliary-block-to-portal-haiku: done
+  80-2-retire-inert-smart-model-routing-operator-guide: done
+  epic-80-retrospective: optional
+
+  # Epic 81 — Morning Intelligence — Digest Enrichment + Discovery Surface (hermes-omniscient)
+  # 81-1 split: 81-1a cns-dashboard Convex transport (done @a0e7c73) → 81-1b Omnipotent collector+push
+  # 81-3 (DiscoveryWorkPanel.svelte) done in cns-dashboard @a926191+9d75da4
+  epic-81: done
+  81-1b-internal-dev-state-collector-dashboard-sync-push: done
+  81-2-morning-digest-internal-block-watchdog-reliability: done
+  epic-81-retrospective: optional
+
+  # Epic 83 — Operator Learning Loop (hermes-omniscient v1.5; FR15)
+  # Honcho external MemoryProvider; Brain recall stays on pre_llm_call (Epic 79)
+  epic-83: done
+  83-1-honcho-dialectic-configuration: done
+  83-2-memory-budget-raise-cross-session-verification: done
+  83-3-automated-session-close-feeding-memory: done
+  epic-83-retrospective: optional
+
+  # Epic 84 — Unified Loop run-chain (hermes-omniscient v1.5; FR22)
+  # DDR-E84-001 LOCKED 2026-07-06; discover artifact ~/.hermes/artifacts/unified-loop/discover.json
+  epic-84: done
+  84-1-unified-loop-governance-schedule-shell: done
+  84-2-adversarial-verify-wiring: done
+  84-3-approval-gated-build-governed-persist: done
+  epic-84-retrospective: optional
+
+  # Epic 86 — Session-close project status SSOT (hotfix 2026-07-05; HANDOFF session 14)
+  # Fixes readProjectStatusLine reading stale CLAUDE.md Phase Status instead of sprint-status.yaml
+  epic-86: done
+  86-1-session-close-project-status-ssot: done
+  epic-86-retrospective: optional
+
+  # Epic 87 — Constitution mirror dedup (stop tracking stale Knowledge-Vault-ACTIVE/AI-Context copies)
+  # specs/cns-vault-contract/ is sole git-tracked mirror; vault mock tree keeps non-constitution fixtures
+  epic-87: done
+  87-1-untrack-vault-ai-context-constitution-duplicates: done
+  87-2-specs-modules-vault-sync-drift-gate: done
+  87-3-pake-quality-enrichment-frontmatter-reconcile: done
+  epic-87-retrospective: optional
+
+  # Epic 88 — Note-creation governance polish (guide clarifications + reserved pipeline hardening)
+  # Trigger: E2E Claude Desktop note was lint-clean but violated creation-time status + linking intent
+  # Closed 2026-07-13: note-authoring parity proven on all 3 surfaces without obsidian-markdown skill — guide sufficient
+  epic-88: done
+  88-1-clarify-note-style-guide-fresh-ai-status-linking: done
+  88-2-pipeline-link-integrity-inline-linking-hardening: done # Hermes ingest-prompt connectivity + rich-note; AC1 demo loop-engineering-for-quant-trading-rohonchain
+  88-3-confirm-obsidian-markdown-fires-governed-create: done # closed 2026-07-13: guide sufficient, no skill-wiring needed — 2026-07-12 parity notes (0xjeff-hermes-analyst-60-day-lessons-vs-cns-positioning, pluto-system-design-vs-cns-architecture-sizing in canonical 03-Resources/) are Nexus-grade governed notes produced from note-style-guide alone; skill confirmed does-not-auto-fire and connectivity folded via 88-1/88-2 guide hardening
+  epic-88-retrospective: optional
+
+  # CNS Redesign — build dependencies (SSOT story files in this repo; Phase A lands in cns-dashboard)
+  # BD-4 blocks Obj 2.3 / Scenario 03.2 Trends Crossing — design gate PENDING operator approval before dev
+  # BD-9 blocks Scenario 02 entity narrative — known-entity read path (NOT Epic 89)
+  cns-redesign-build-deps: in-progress
+  BD-4-stamp-matched-watchlist-topic: done # Phase A+B done; adversarial review patches + verify PASS 2026-07-20
+  BD-9-known-entity-read-path: ready-for-dev # Gate A exposure ready; Gate B Confidence PROPOSE-THEN-STOP (amend 2026-07-23); cns-dashboard cns-redesign only
+
+  # Ops observability — fail loudly on unvalidated state (digest push + constitution propagation + drive-sync rollup)
+  # Reopened 2026-07-23: OPS-7 shared abort-mock helper + lint ban (closes both OPS-6 deferrals; coupled)
+  # Prior reopen 2026-07-23: OPS-6 verify.sh non-determinism (73-4/73-7 AbortSignal.timeout unref + hung mocks)
+  # Prior reopen 2026-07-21: OPS-5 drive-sync deterministic timeout + canary + rollup honesty (Epic 58 residual)
+  # Prior reopen 2026-07-20: closed prematurely after OPS-3; OPS-4 constitution propagation guard
+  # Original: 2026-07-20 Convex free-plan outage — signalsWritten:0, exit=0
+  ops-observability: done # OPS-7 done 2026-07-23 (code-review harden+patches); OPS-1/2/4/5/6 done; OPS-3 cancelled-unbuilt
+  OPS-1-digest-push-fail-loud: done # code review patches 1a+P1–P3 applied 2026-07-20; verify.sh PASS
+  OPS-2-digest-signal-schema-contract-guard: done # Phase A reviewed+patched 2026-07-20 (cns-dashboard); Phase B reviewed+patched 2026-07-20 (hollow fieldSets throw, contributingSources type check, contract-load→failed path, forceRescore poison AC5 test, merge assertion lock); dual-copy cmp OK
+  OPS-3-digest-push-in-run-retry: cancelled # CLOSED UNBUILT 2026-07-20 by operator decision on evidence: full watchdog log history has 8 push failures in 2 clusters (06-20 ArgumentValidationError schema drift x5; 07-20 free-plan quota x3) — ALL permanent, ZERO transient. Retry helps neither, and a naive retry can duplicate the run row (BD-2 delta corruption). Day-level retry already exists (push-digest-watchdog.mjs:435). REOPEN TRIGGER: a completion-convex-push-failed that self-heals on the next run without intervention. Story text retained — the analysis records why not to build this next time it looks obvious.
+  OPS-4-session-close-constitution-propagation-guard: done # code-review patches 2026-07-21 (soften+cross-line, source-unreadable, empty changelog, AC5 correction); eslint+verify exit 0
+  OPS-5-drive-sync-timeout-canary-and-rollup-honesty: done # code-review 2026-07-21: NLM_TIMEOUT_MS_CAP=240_000 (not 300k), canary disk-first, empty-env WARNING; verify.sh exit 0 post-patch
+  OPS-6-verify-gate-async-timeout-determinism: done # code-review 2026-07-23: Fix B keepalive mocks; AC1–6 OK; 0 patch; 2 defer → closed by OPS-7
+  OPS-7-shared-abort-mock-helper-and-lint-ban: done # code-review 2026-07-23: onabort selector harden; file-level allowlist kept+rationale; notebook fail-loud catch; AC5 pastes; lint clean
+
+  # Epic 89 — Digest source-shaping (level→delta) for always-alive cockpit
+  # 89-1 Stage A: STORE_MAX=40 / PER_QUERY=5 write-all into digestSignals (data accumulation only)
+  # 89-2 Stage B: velocity rank + threshold from accumulated distribution
+  # 89-3 Selection rules (SHORTLIST_MAX + Polymarket type-exclusion) — blocked until shortlist exists
+  epic-89: in-progress
+  89-1-digest-stage-a-github-store-max-widen: done # code-review 2026-07-21: no Stage B storage hold; display ceilings deferred
+  89-2-digest-stage-b-github-velocity-rank: backlog # AC required at create-story: interim UI copy swap (see deferred-work 89-2 REQUIRED AC)
+  89-3-judgment-shortlist-github-cap-and-polymarket-exclusion: backlog # blocked: no shortlist selector in code yet
+
+  # Epic 90 — Intake health (Reddit restore + YouTube honesty / dedupe / quality)
+  # 90-1: app-free Atom RSS both layers (OAuth/JSON+UA DROPPED). Do NOT touch credit-exhausted social.
+  # Sequencing: 90-2 (obs) → 90-4 (dedupe retune) → 90-3 (youtube quality).
+  epic-90: done # closed 2026-07-23: 90-1..90-5 all done + retro (ea0a8a3); D1 closed by 90-5
+  90-1-restore-reddit-intake: done # 2026-07-23 RSS both layers; review patches (partial+budget, word-boundary); verify green
+  90-2-youtube-silent-drop-observability: done # 2026-07-23 obs only; review Option1 yt-stage on youtube key; verify green
+  90-4-dedupe-over-collapse-retune: done # R1(canon v=)+R2(prop≥0.5)+R4(stderr wipe/heavy-absorb K=5); SKIP cap8; code-review patches applied 2026-07-23
+  90-3-youtube-quality-selection: done # code-review patches 2026-07-23; wipe QUIET+loud stderr; perQuery≤50; lift fixture; verify PASS
+  90-5-entity-match-anti-opposition-guard: done # G7 + review B lexicon plurals/finance; dedup 36/36; verify PASS 2026-07-23

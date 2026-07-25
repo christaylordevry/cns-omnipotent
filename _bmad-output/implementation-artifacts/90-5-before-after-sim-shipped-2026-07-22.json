@@ -1,0 +1,66 @@
+{
+  "story": "90-5",
+  "guard": "G7",
+  "shipped": "2026-07-23",
+  "note": "BEFORE = 90-4 R1+R2 only (proposal sim). AFTER = shipped G7 in crossTitleEntityMatch.",
+  "before_fixture_from_proposal": {
+    "youtube_primaries": 18,
+    "polymarket": 5,
+    "btc": 3,
+    "importAI": 2,
+    "primaries": 124
+  },
+  "after_fixture": {
+    "primaries": 129,
+    "youtube_primaries": 22,
+    "polymarket": 5,
+    "btc": 3,
+    "importAI": 2
+  },
+  "after_inject": {
+    "injectPrimaries": 6,
+    "nvidiaBoth": true,
+    "btcBoth": true,
+    "claudeBoth": true,
+    "opposite_ok": true,
+    "legit": {
+      "primaries": 135,
+      "youtube_primaries": 22,
+      "polymarket": 5,
+      "btc": 3,
+      "importAI": 2
+    }
+  },
+  "unit_pairs": [
+    {
+      "a": "Nvidia Chip Shortage",
+      "b": "Nvidia Chip Surplus",
+      "entityMatch": false
+    },
+    {
+      "a": "Bitcoin ETF",
+      "b": "Bitcoin ETF Rally",
+      "entityMatch": false
+    },
+    {
+      "a": "Claude Tips",
+      "b": "Claude Tips for beginners",
+      "entityMatch": false
+    },
+    {
+      "a": "Federal Reserve Interest Rate Hike Meeting Decision",
+      "b": "Federal Reserve Interest Rate Cut Meeting Decision",
+      "entityMatch": false
+    },
+    {
+      "a": "OpenAI GPT-5 Release Event",
+      "b": "OpenAI GPT-5 Developer Preview",
+      "entityMatch": true
+    }
+  ],
+  "success": {
+    "opposite_pairs_separate": true,
+    "legit_clusters_survive": true,
+    "openai_still_matches": true
+  }
+}

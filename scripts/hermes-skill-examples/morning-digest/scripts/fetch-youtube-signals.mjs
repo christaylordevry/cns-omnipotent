@@ -1,6 +1,7 @@
 // fetch-youtube-signals.mjs — YouTube Data API v3 for morning-digest Source 13
 // Usage: node fetch-youtube-signals.mjs
 // stdout: {"videos":[...]} or {"error":"..."}; always exit 0 on fetch/parse failure
+// Story 90-3: over-fetch → enrich → quality floor → view-velocity rank → keep-N
 
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delayMs } from 'node:timers/promises';
@@ -10,10 +11,30 @@ import { mergeTrendIngestEnv } from './fetch-arxiv-rss.mjs';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const FETCH_TIMEOUT_MS = 15_000;
 const SEARCH_DELAY_MS = 100;
-const MAX_VIDEOS_DEFAULT = 25;
+/** Keep-N after velocity rank (was date-order cap 25). */
+const MAX_VIDEOS_DEFAULT = 12;
 const MAX_VIDEOS_HARD = 50;
-const PER_QUERY_DEFAULT = 3;
-const LOOKBACK_HOURS_DEFAULT = 24;
+const PER_QUERY_DEFAULT = 10;
+/** YouTube search.list maxResults hard ceiling. */
+const PER_QUERY_HARD = 50;
+const LOOKBACK_HOURS_DEFAULT = 72;
+/** Cap absurd LOOKBACK_HOURS env so publishedAfterIso stays a valid Date. */
+const LOOKBACK_HOURS_HARD = 720;
+const CANDIDATE_MAX_DEFAULT = 100;
+const CANDIDATE_MAX_HARD = 150;
+const MIN_VIEWS_DEFAULT = 200;
+const MIN_LIKES_DEFAULT = 5;
+/** Denominator floor for view-velocity (hours). Default 1h dampens ultra-fresh spikes. */
+const VELOCITY_MIN_AGE_HOURS_DEFAULT = 1;
+const SEARCH_ORDER_DEFAULT = 'date';
+const ALLOWED_SEARCH_ORDERS = new Set([
+  'date',
+  'rating',
+  'relevance',
+  'title',
+  'videoCount',
+  'viewCount',
+]);
 const QUOTA_WARN_THRESHOLD = 2000;
 const VIDEOS_LIST_BATCH_SIZE = 50;
 
@@ -41,6 +62,65 @@ export function parseYoutubeQueries(raw) {
 }
 
 /**
+ * @param {string | undefined} raw
+ * @returns {string}
+ */
+export function parseSearchOrder(raw) {
+  const order = String(raw ?? '').trim();
+  if (ALLOWED_SEARCH_ORDERS.has(order)) {
+    return order;
+  }
+  return SEARCH_ORDER_DEFAULT;
+}
+
+/**
+ * @param {string | undefined} raw
+ * @param {number} fallback
+ * @param {{ min?: number, max?: number }} [bounds]
+ * @returns {number}
+ */
+function parsePositiveInt(raw, fallback, bounds = {}) {
+  const parsed = parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  let value = parsed;
+  if (bounds.min != null) {
+    value = Math.max(bounds.min, value);
+  }
+  if (bounds.max != null) {
+    value = Math.min(bounds.max, value);
+  }
+  return value;
+}
+
+/**
+ * @param {string | undefined} raw
+ * @param {number} fallback
+ * @returns {number}
+ */
+function parseNonNegativeInt(raw, fallback) {
+  const parsed = parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+/**
+ * @param {string | undefined} raw
+ * @param {number} fallback
+ * @returns {number}
+ */
+function parsePositiveFloat(raw, fallback) {
+  const parsed = parseFloat(String(raw ?? ''));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+/**
  * @param {Record<string, string | undefined>} env
  * @returns {{
  *   enabled: boolean,
@@ -49,21 +129,53 @@ export function parseYoutubeQueries(raw) {
  *   maxVideos: number,
  *   perQuery: number,
  *   lookbackHours: number,
+ *   candidateMax: number,
+ *   minViews: number,
+ *   minLikes: number,
+ *   searchOrder: string,
+ *   velocityMinAgeHours: number,
  * }}
  */
 export function loadYoutubeConfig(env = process.env) {
   const enabled = isYoutubeEnabled(env.MORNING_DIGEST_YOUTUBE_ENABLED);
   const apiKey = String(env.MORNING_DIGEST_YOUTUBE_API_KEY ?? '').trim() || undefined;
   const queries = parseYoutubeQueries(env.MORNING_DIGEST_YOUTUBE_QUERIES);
-  const rawMax = parseInt(String(env.MORNING_DIGEST_YOUTUBE_MAX_VIDEOS ?? ''), 10);
-  const rawPerQuery = parseInt(String(env.MORNING_DIGEST_YOUTUBE_PER_QUERY ?? ''), 10);
-  const rawLookback = parseInt(String(env.MORNING_DIGEST_YOUTUBE_LOOKBACK_HOURS ?? ''), 10);
-  const maxVideos =
-    Number.isFinite(rawMax) && rawMax > 0 ? Math.min(rawMax, MAX_VIDEOS_HARD) : MAX_VIDEOS_DEFAULT;
-  const perQuery = Number.isFinite(rawPerQuery) && rawPerQuery > 0 ? rawPerQuery : PER_QUERY_DEFAULT;
-  const lookbackHours =
-    Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : LOOKBACK_HOURS_DEFAULT;
-  return { enabled, apiKey, queries, maxVideos, perQuery, lookbackHours };
+  const maxVideos = parsePositiveInt(env.MORNING_DIGEST_YOUTUBE_MAX_VIDEOS, MAX_VIDEOS_DEFAULT, {
+    max: MAX_VIDEOS_HARD,
+  });
+  const perQuery = parsePositiveInt(env.MORNING_DIGEST_YOUTUBE_PER_QUERY, PER_QUERY_DEFAULT, {
+    max: PER_QUERY_HARD,
+  });
+  const lookbackHours = parsePositiveInt(
+    env.MORNING_DIGEST_YOUTUBE_LOOKBACK_HOURS,
+    LOOKBACK_HOURS_DEFAULT,
+    { max: LOOKBACK_HOURS_HARD },
+  );
+  const candidateMax = parsePositiveInt(
+    env.MORNING_DIGEST_YOUTUBE_CANDIDATE_MAX,
+    CANDIDATE_MAX_DEFAULT,
+    { max: CANDIDATE_MAX_HARD },
+  );
+  const minViews = parseNonNegativeInt(env.MORNING_DIGEST_YOUTUBE_MIN_VIEWS, MIN_VIEWS_DEFAULT);
+  const minLikes = parseNonNegativeInt(env.MORNING_DIGEST_YOUTUBE_MIN_LIKES, MIN_LIKES_DEFAULT);
+  const searchOrder = parseSearchOrder(env.MORNING_DIGEST_YOUTUBE_SEARCH_ORDER);
+  const velocityMinAgeHours = parsePositiveFloat(
+    env.MORNING_DIGEST_YOUTUBE_VELOCITY_MIN_AGE_HOURS,
+    VELOCITY_MIN_AGE_HOURS_DEFAULT,
+  );
+  return {
+    enabled,
+    apiKey,
+    queries,
+    maxVideos,
+    perQuery,
+    lookbackHours,
+    candidateMax,
+    minViews,
+    minLikes,
+    searchOrder,
+    velocityMinAgeHours,
+  };
 }
 
 /**
@@ -83,6 +195,126 @@ export function publishedAfterIso(lookbackHours, now = new Date()) {
 export function parseStatCount(value) {
   const parsed = parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Hours since publish. Missing/invalid publishedAt → Infinity (velocity 0).
+ * @param {string | undefined} publishedAt
+ * @param {Date} [now]
+ * @returns {number}
+ */
+export function hoursSincePublish(publishedAt, now = new Date()) {
+  if (!publishedAt) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const publishedMs = Date.parse(publishedAt);
+  if (!Number.isFinite(publishedMs)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  // Future / clock-skew timestamps are untrusted → Infinity → velocity 0.
+  if (publishedMs > now.getTime()) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return (now.getTime() - publishedMs) / 3_600_000;
+}
+
+/**
+ * View-velocity: views / max(hoursSincePublish, minAgeHours).
+ * @param {number} viewCount
+ * @param {string | undefined} publishedAt
+ * @param {number} [minAgeHours]
+ * @param {Date} [now]
+ * @returns {number}
+ */
+export function viewVelocity(
+  viewCount,
+  publishedAt,
+  minAgeHours = VELOCITY_MIN_AGE_HOURS_DEFAULT,
+  now = new Date(),
+) {
+  if (!Number.isFinite(viewCount) || viewCount < 0) {
+    return 0;
+  }
+  const hours = hoursSincePublish(publishedAt, now);
+  if (!Number.isFinite(hours)) {
+    return 0;
+  }
+  const denominator = Math.max(hours, minAgeHours);
+  if (denominator <= 0) {
+    return 0;
+  }
+  return viewCount / denominator;
+}
+
+/**
+ * @param {Array<{ viewCount: number, likeCount: number }>} videos
+ * @param {number} minViews
+ * @param {number} minLikes
+ * @returns {typeof videos}
+ */
+export function applyQualityFloor(videos, minViews, minLikes) {
+  return videos.filter((row) => row.viewCount >= minViews && row.likeCount >= minLikes);
+}
+
+/**
+ * @template { { viewCount: number, likeCount: number, publishedAt?: string } } T
+ * @param {T[]} videos
+ * @param {number} [minAgeHours]
+ * @param {Date} [now]
+ * @returns {T[]}
+ */
+export function rankVideosByVelocity(
+  videos,
+  minAgeHours = VELOCITY_MIN_AGE_HOURS_DEFAULT,
+  now = new Date(),
+) {
+  return [...videos].sort((a, b) => {
+    const velA = viewVelocity(a.viewCount, a.publishedAt, minAgeHours, now);
+    const velB = viewVelocity(b.viewCount, b.publishedAt, minAgeHours, now);
+    if (velB !== velA) {
+      return velB - velA;
+    }
+    if (b.viewCount !== a.viewCount) {
+      return b.viewCount - a.viewCount;
+    }
+    return b.likeCount - a.likeCount;
+  });
+}
+
+/**
+ * Floor → velocity rank → keep-N. No floor-starvation fallback (precision over recall).
+ * @template { { viewCount: number, likeCount: number, publishedAt?: string } } T
+ * @param {T[]} enriched
+ * @param {{
+ *   minViews: number,
+ *   minLikes: number,
+ *   keepN: number,
+ *   velocityMinAgeHours?: number,
+ *   now?: Date,
+ * }} options
+ * @returns {T[]}
+ */
+export function selectYoutubeVideos(enriched, options) {
+  const floored = applyQualityFloor(enriched, options.minViews, options.minLikes);
+  const ranked = rankVideosByVelocity(
+    floored,
+    options.velocityMinAgeHours ?? VELOCITY_MIN_AGE_HOURS_DEFAULT,
+    options.now,
+  );
+  const keepN =
+    Number.isFinite(options.keepN) && options.keepN > 0 ? Math.floor(options.keepN) : 0;
+  return ranked.slice(0, keepN);
+}
+
+/**
+ * @param {number} queryCount
+ * @param {number} candidateCount
+ * @returns {number}
+ */
+export function estimateYoutubeQuota(queryCount, candidateCount) {
+  const enrichCalls =
+    candidateCount <= 0 ? 0 : Math.ceil(candidateCount / VIDEOS_LIST_BATCH_SIZE);
+  return queryCount * 100 + enrichCalls;
 }
 
 /**
@@ -172,6 +404,7 @@ export function classifyYoutubeHttpError(res, json) {
  *   apiKey: string,
  *   perQuery: number,
  *   lookbackHours: number,
+ *   searchOrder?: string,
  *   now?: Date,
  * }} config
  * @param {typeof fetch} fetchFn
@@ -186,11 +419,12 @@ export async function searchVideosForQuery(query, config, fetchFn, fixtureJson) 
     return { ok: true, videos: parseSearchResponse(fixtureJson, config.perQuery) };
   }
 
+  const order = parseSearchOrder(config.searchOrder);
   const params = new URLSearchParams({
     part: 'snippet',
     q: query,
     type: 'video',
-    order: 'date',
+    order,
     publishedAfter: publishedAfterIso(config.lookbackHours, config.now),
     maxResults: String(config.perQuery),
     key: config.apiKey,
@@ -405,6 +639,7 @@ export function toStdoutVideo(row) {
 export async function runYoutubeFetch(env, options = {}) {
   const fetchFn = options.fetch ?? globalThis.fetch;
   const config = loadYoutubeConfig(env);
+  const now = options.now ?? new Date();
 
   if (!config.enabled) {
     return { error: 'youtube disabled' };
@@ -414,13 +649,6 @@ export async function runYoutubeFetch(env, options = {}) {
   }
   if (config.queries.length === 0) {
     return { error: 'missing-queries' };
-  }
-
-  const estimatedQuota = config.queries.length * 100 + config.maxVideos;
-  if (estimatedQuota > QUOTA_WARN_THRESHOLD) {
-    console.error(
-      `youtube quota warning: estimated ${estimatedQuota} units (queries=${config.queries.length}, maxVideos=${config.maxVideos})`,
-    );
   }
 
   /** @type {Array<{ videoId: string, title: string, channelTitle: string, publishedAt?: string }>} */
@@ -440,7 +668,8 @@ export async function runYoutubeFetch(env, options = {}) {
         apiKey: config.apiKey,
         perQuery: config.perQuery,
         lookbackHours: config.lookbackHours,
-        now: options.now,
+        searchOrder: config.searchOrder,
+        now,
       },
       fetchFn,
       fixture,
@@ -460,13 +689,20 @@ export async function runYoutubeFetch(env, options = {}) {
     }
   }
 
-  const deduped = dedupeVideosById(searchHits, config.maxVideos);
-  if (!sawSearchSuccess || deduped.length === 0) {
+  const candidates = dedupeVideosById(searchHits, config.candidateMax);
+  if (!sawSearchSuccess || candidates.length === 0) {
     return { error: 'youtube fetch failed' };
   }
 
+  const estimatedQuota = estimateYoutubeQuota(config.queries.length, candidates.length);
+  if (estimatedQuota > QUOTA_WARN_THRESHOLD) {
+    console.error(
+      `youtube quota warning: estimated ${estimatedQuota} units (queries=${config.queries.length}, candidates-enriched=${candidates.length}, keep=${config.maxVideos})`,
+    );
+  }
+
   const enrichResult = await enrichVideoStatistics(
-    deduped.map((row) => row.videoId),
+    candidates.map((row) => row.videoId),
     config.apiKey,
     fetchFn,
     options.fixtureVideosListByBatch,
@@ -475,16 +711,36 @@ export async function runYoutubeFetch(env, options = {}) {
     return { error: enrichResult.reason };
   }
 
-  const videos = deduped.map((row) => {
+  const enriched = candidates.map((row) => {
     const stats = enrichResult.statsById.get(row.videoId) ?? {
       viewCount: 0,
       likeCount: 0,
       commentCount: 0,
     };
-    return toStdoutVideo({ ...row, ...stats });
+    return { ...row, ...stats };
   });
 
-  return { videos };
+  const selected = selectYoutubeVideos(enriched, {
+    minViews: config.minViews,
+    minLikes: config.minLikes,
+    keepN: config.maxVideos,
+    velocityMinAgeHours: config.velocityMinAgeHours,
+    now,
+  });
+
+  if (selected.length === 0 && enriched.length > 0) {
+    // QUIET (not {error}): working-as-designed precision. Loud stderr for log inspection —
+    // enriched=N distinguishes floor-wipe from empty-fetch (enriched=0 → {error}).
+    console.error(
+      `quality-floor-wiped: ${enriched.length} candidates enriched, 0 cleared floor (minViews=${config.minViews} minLikes=${config.minLikes})`,
+    );
+  } else {
+    console.error(
+      `youtube select: candidates-enriched=${enriched.length} kept=${selected.length} (minViews=${config.minViews} minLikes=${config.minLikes} keepN=${config.maxVideos})`,
+    );
+  }
+
+  return { videos: selected.map((row) => toStdoutVideo(row)) };
 }
 
 function isMainModule() {

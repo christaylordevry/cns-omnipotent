@@ -6,17 +6,25 @@ import { promisify } from 'node:util';
 import { describe, it } from 'node:test';
 
 import {
+  applyQualityFloor,
   classifyYoutubeHttpError,
   dedupeVideosById,
   enrichVideoStatistics,
+  estimateYoutubeQuota,
+  hoursSincePublish,
   isYoutubeEnabled,
   loadYoutubeConfig,
   mapSearchItem,
+  parseSearchOrder,
   parseSearchResponse,
   parseStatCount,
   parseVideosListResponse,
+  publishedAfterIso,
+  rankVideosByVelocity,
   runYoutubeFetch,
   searchVideosForQuery,
+  selectYoutubeVideos,
+  viewVelocity,
 } from '../scripts/hermes-skill-examples/morning-digest/scripts/fetch-youtube-signals.mjs';
 import { normalizeEngagement } from '../scripts/hermes-skill-examples/morning-digest/scripts/score-digest-signals.mjs';
 
@@ -97,6 +105,79 @@ const FIXTURE_VIDEOS_LIST = {
   ],
 };
 
+/** Quality-selection fixture: spike short, rising hit, slow absolute pile, junk. */
+const FIXTURE_QUALITY_SEARCH = {
+  items: [
+    {
+      id: { kind: 'youtube#video', videoId: 'spike-short' },
+      snippet: {
+        title: 'Viral short 200 views in 5 min',
+        channelTitle: 'Shorts',
+        publishedAt: '2026-07-23T11:55:00.000Z',
+      },
+    },
+    {
+      id: { kind: 'youtube#video', videoId: 'rising-hit' },
+      snippet: {
+        title: 'Rising Claude Code tip',
+        channelTitle: 'Dev',
+        publishedAt: '2026-07-23T08:00:00.000Z',
+      },
+    },
+    {
+      id: { kind: 'youtube#video', videoId: 'slow-pile' },
+      snippet: {
+        title: 'Older high absolute views',
+        channelTitle: 'Archive',
+        publishedAt: '2026-07-21T12:00:00.000Z',
+      },
+    },
+    {
+      id: { kind: 'youtube#video', videoId: 'junk-zero' },
+      snippet: {
+        title: 'Brand new zero engagement',
+        channelTitle: 'Spam',
+        publishedAt: '2026-07-23T11:50:00.000Z',
+      },
+    },
+    {
+      id: { kind: 'youtube#video', videoId: 'low-likes' },
+      snippet: {
+        title: 'High views low likes short',
+        channelTitle: 'Bait',
+        publishedAt: '2026-07-23T06:00:00.000Z',
+      },
+    },
+  ],
+};
+
+const FIXTURE_QUALITY_STATS = {
+  items: [
+    {
+      id: 'spike-short',
+      statistics: { viewCount: '200', likeCount: '5', commentCount: '0' },
+    },
+    {
+      id: 'rising-hit',
+      statistics: { viewCount: '2400', likeCount: '80', commentCount: '12' },
+    },
+    {
+      id: 'slow-pile',
+      statistics: { viewCount: '50000', likeCount: '900', commentCount: '100' },
+    },
+    {
+      id: 'junk-zero',
+      statistics: { viewCount: '3', likeCount: '0', commentCount: '0' },
+    },
+    {
+      id: 'low-likes',
+      statistics: { viewCount: '5000', likeCount: '2', commentCount: '0' },
+    },
+  ],
+};
+
+const NOW_QUALITY = new Date('2026-07-23T12:00:00.000Z');
+
 describe('fetch-youtube-signals.mjs parsing', () => {
   it('maps search API fields to intermediate video shape', () => {
     const mapped = mapSearchItem(FIXTURE_SEARCH.items[0]);
@@ -143,24 +224,362 @@ describe('fetch-youtube-signals.mjs parsing', () => {
   });
 });
 
+describe('90-3 quality selection helpers', () => {
+  it('viewVelocity uses minAgeHours denominator floor', () => {
+    // 200 views in 5 minutes → raw age 5/60h; with minAge=1h → vel=200
+    const publishedAt = '2026-07-23T11:55:00.000Z';
+    assert.equal(hoursSincePublish(publishedAt, NOW_QUALITY), 5 / 60);
+    assert.equal(viewVelocity(200, publishedAt, 1 / 60, NOW_QUALITY), 200 / (5 / 60));
+    assert.equal(viewVelocity(200, publishedAt, 1, NOW_QUALITY), 200);
+  });
+
+  it('applyQualityFloor requires views AND likes', () => {
+    const rows = [
+      { viewCount: 5000, likeCount: 2 },
+      { viewCount: 100, likeCount: 50 },
+      { viewCount: 500, likeCount: 10 },
+    ];
+    const kept = applyQualityFloor(rows, 200, 5);
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0].viewCount, 500);
+  });
+
+  it('rankVideosByVelocity: fresh riser beats stale when velocity is higher', () => {
+    const rows = [
+      {
+        videoId: 'stale',
+        viewCount: 3000,
+        likeCount: 40,
+        publishedAt: '2026-07-21T12:00:00.000Z', // 48h → vel=62.5
+      },
+      {
+        videoId: 'riser',
+        viewCount: 2400,
+        likeCount: 80,
+        publishedAt: '2026-07-23T08:00:00.000Z', // 4h → vel=600
+      },
+    ];
+    const ranked = rankVideosByVelocity(rows, 1, NOW_QUALITY);
+    assert.equal(ranked[0].videoId, 'riser');
+    assert.equal(ranked[1].videoId, 'stale');
+  });
+
+  it('selectYoutubeVideos floors junk and low-likes, keeps top by velocity, truncates keepN', () => {
+    const enriched = [
+      {
+        videoId: 'spike-short',
+        viewCount: 200,
+        likeCount: 5,
+        publishedAt: '2026-07-23T11:55:00.000Z',
+      },
+      {
+        videoId: 'rising-hit',
+        viewCount: 2400,
+        likeCount: 80,
+        publishedAt: '2026-07-23T08:00:00.000Z',
+      },
+      {
+        videoId: 'slow-pile',
+        viewCount: 50_000,
+        likeCount: 900,
+        publishedAt: '2026-07-21T12:00:00.000Z',
+      },
+      {
+        videoId: 'junk-zero',
+        viewCount: 3,
+        likeCount: 0,
+        publishedAt: '2026-07-23T11:50:00.000Z',
+      },
+      {
+        videoId: 'low-likes',
+        viewCount: 5000,
+        likeCount: 2,
+        publishedAt: '2026-07-23T06:00:00.000Z',
+      },
+    ];
+    const selected = selectYoutubeVideos(enriched, {
+      minViews: 200,
+      minLikes: 5,
+      keepN: 2,
+      velocityMinAgeHours: 1,
+      now: NOW_QUALITY,
+    });
+    assert.equal(selected.length, 2);
+    assert.ok(!selected.some((v) => v.videoId === 'junk-zero'));
+    assert.ok(!selected.some((v) => v.videoId === 'low-likes'));
+    // slow-pile vel≈1042, rising-hit vel=600, spike-short vel=200 (minAge 1h)
+    assert.equal(selected[0].videoId, 'slow-pile');
+    assert.equal(selected[1].videoId, 'rising-hit');
+  });
+
+  it('selectYoutubeVideos returns empty when floor wipes pool (no velocity-without-floor fallback)', () => {
+    const enriched = [
+      { videoId: 'a', viewCount: 50, likeCount: 1, publishedAt: '2026-07-23T10:00:00.000Z' },
+      { videoId: 'b', viewCount: 10, likeCount: 0, publishedAt: '2026-07-23T11:00:00.000Z' },
+    ];
+    const selected = selectYoutubeVideos(enriched, {
+      minViews: 200,
+      minLikes: 5,
+      keepN: 12,
+      now: NOW_QUALITY,
+    });
+    assert.deepEqual(selected, []);
+  });
+
+  it('estimateYoutubeQuota uses candidates-enriched not keep-N', () => {
+    assert.equal(estimateYoutubeQuota(10, 93), 1000 + 2);
+    assert.equal(estimateYoutubeQuota(10, 12), 1000 + 1);
+    assert.equal(estimateYoutubeQuota(10, 0), 1000);
+  });
+
+  it('parseSearchOrder rejects unknown values to date', () => {
+    assert.equal(parseSearchOrder('viewCount'), 'viewCount');
+    assert.equal(parseSearchOrder('bogus'), 'date');
+    assert.equal(parseSearchOrder(undefined), 'date');
+  });
+
+  it('fixture reproduces before/after quality lift: date-order vs velocity+floor', () => {
+    const enriched = FIXTURE_QUALITY_STATS.items.map((item, index) => {
+      const search = FIXTURE_QUALITY_SEARCH.items[index];
+      return {
+        videoId: item.id,
+        viewCount: parseStatCount(item.statistics.viewCount),
+        likeCount: parseStatCount(item.statistics.likeCount),
+        publishedAt: search.snippet.publishedAt,
+      };
+    });
+    // BEFORE: encounter/date order cap (no floor) — sim shape of old pre-enrich keep.
+    const before = enriched.slice(0, 5);
+    const after = selectYoutubeVideos(enriched, {
+      minViews: 200,
+      minLikes: 5,
+      keepN: 5,
+      velocityMinAgeHours: 1,
+      now: NOW_QUALITY,
+    });
+    const beforeIds = before.map((v) => v.videoId);
+    const afterIds = after.map((v) => v.videoId);
+    assert.ok(beforeIds.includes('junk-zero'));
+    assert.ok(beforeIds.includes('low-likes'));
+    assert.ok(!afterIds.includes('junk-zero'));
+    assert.ok(!afterIds.includes('low-likes'));
+    assert.deepEqual(afterIds, ['slow-pile', 'rising-hit', 'spike-short']);
+    const mean = (rows, key) => rows.reduce((sum, r) => sum + r[key], 0) / rows.length;
+    // BEFORE still carries floor-failing junk; AFTER is all floor-passers and higher mean engagement.
+    assert.ok(before.some((v) => v.viewCount < 200 || v.likeCount < 5));
+    assert.ok(after.every((v) => v.viewCount >= 200 && v.likeCount >= 5));
+    assert.ok(mean(after, 'viewCount') > mean(before, 'viewCount'));
+    assert.ok(mean(after, 'likeCount') > mean(before, 'likeCount'));
+  });
+
+  it('undated and zero-view videos get velocity 0 and rank last', () => {
+    const ranked = rankVideosByVelocity(
+      [
+        { videoId: 'undated', viewCount: 9000, likeCount: 50 },
+        { videoId: 'zero', viewCount: 0, likeCount: 0, publishedAt: '2026-07-23T11:00:00.000Z' },
+        {
+          videoId: 'live',
+          viewCount: 400,
+          likeCount: 10,
+          publishedAt: '2026-07-23T10:00:00.000Z',
+        },
+      ],
+      1,
+      NOW_QUALITY,
+    );
+    assert.equal(ranked[0].videoId, 'live');
+    assert.equal(viewVelocity(9000, undefined, 1, NOW_QUALITY), 0);
+    assert.equal(viewVelocity(0, '2026-07-23T11:00:00.000Z', 1, NOW_QUALITY), 0);
+  });
+
+  it('future publishedAt is untrusted (velocity 0)', () => {
+    assert.equal(hoursSincePublish('2026-07-23T13:00:00.000Z', NOW_QUALITY), Number.POSITIVE_INFINITY);
+    assert.equal(viewVelocity(5000, '2026-07-23T13:00:00.000Z', 1, NOW_QUALITY), 0);
+  });
+
+  it('non-finite viewCount yields velocity 0', () => {
+    assert.equal(viewVelocity(Number.NaN, '2026-07-23T10:00:00.000Z', 1, NOW_QUALITY), 0);
+    assert.equal(viewVelocity(-10, '2026-07-23T10:00:00.000Z', 1, NOW_QUALITY), 0);
+  });
+
+  it('selectYoutubeVideos returns fewer than keepN without padding; undefined keepN → []', () => {
+    const enriched = [
+      {
+        videoId: 'only',
+        viewCount: 500,
+        likeCount: 10,
+        publishedAt: '2026-07-23T08:00:00.000Z',
+      },
+    ];
+    const selected = selectYoutubeVideos(enriched, {
+      minViews: 200,
+      minLikes: 5,
+      keepN: 12,
+      now: NOW_QUALITY,
+    });
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].videoId, 'only');
+    const noKeep = selectYoutubeVideos(enriched, {
+      minViews: 200,
+      minLikes: 5,
+      keepN: undefined,
+      now: NOW_QUALITY,
+    });
+    assert.deepEqual(noKeep, []);
+  });
+
+  it('parseStatCount treats missing likeCount as 0 (not null)', () => {
+    assert.equal(parseStatCount(undefined), 0);
+    assert.equal(parseStatCount(null), 0);
+    const stats = parseVideosListResponse({
+      items: [{ id: 'x', statistics: { viewCount: '300' } }],
+    });
+    assert.equal(stats.get('x')?.likeCount, 0);
+    assert.equal(stats.get('x')?.viewCount, 300);
+  });
+});
+
 describe('fetch-youtube-signals.mjs runYoutubeFetch', () => {
   it('returns videos from fixtures without network (search + enrich)', async () => {
     const payload = await runYoutubeFetch(
       {
         MORNING_DIGEST_YOUTUBE_API_KEY: 'test-key',
         MORNING_DIGEST_YOUTUBE_QUERIES: 'AI agents',
+        MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '0',
+        MORNING_DIGEST_YOUTUBE_MIN_LIKES: '0',
       },
       {
         fixtureSearchByQuery: { 'AI agents': FIXTURE_SEARCH },
         fixtureVideosListByBatch: {
           'video-one,video-two': FIXTURE_VIDEOS_LIST,
         },
+        now: new Date('2026-06-19T00:00:00.000Z'),
       },
     );
     assert.ok(Array.isArray(payload.videos));
     assert.equal(payload.videos.length, 2);
     assert.equal(payload.videos[0].viewCount, 12500);
     assert.equal(payload.videos[0].url, 'https://www.youtube.com/watch?v=video-one');
+  });
+
+  it('enriches full candidate pool then ranks by velocity and applies floor', async () => {
+    const payload = await runYoutubeFetch(
+      {
+        MORNING_DIGEST_YOUTUBE_API_KEY: 'test-key',
+        MORNING_DIGEST_YOUTUBE_QUERIES: 'quality',
+        MORNING_DIGEST_YOUTUBE_MAX_VIDEOS: '3',
+        MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '200',
+        MORNING_DIGEST_YOUTUBE_MIN_LIKES: '5',
+        MORNING_DIGEST_YOUTUBE_VELOCITY_MIN_AGE_HOURS: '1',
+      },
+      {
+        fixtureSearchByQuery: { quality: FIXTURE_QUALITY_SEARCH },
+        fixtureVideosListByBatch: {
+          'spike-short,rising-hit,slow-pile,junk-zero,low-likes': FIXTURE_QUALITY_STATS,
+        },
+        now: NOW_QUALITY,
+      },
+    );
+    assert.ok(Array.isArray(payload.videos));
+    // floor drops junk-zero + low-likes; keep 3 of spike/rising/slow
+    assert.equal(payload.videos.length, 3);
+    const ids = payload.videos.map((v) => new URL(v.url).searchParams.get('v'));
+    assert.ok(!ids.includes('junk-zero'));
+    assert.ok(!ids.includes('low-likes'));
+    assert.equal(ids[0], 'slow-pile');
+    assert.equal(ids[1], 'rising-hit');
+    assert.equal(ids[2], 'spike-short');
+  });
+
+  it('returns empty videos when floor wipes all candidates (precision over recall)', async () => {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      errors.push(args.map(String).join(' '));
+    };
+    try {
+      const payload = await runYoutubeFetch(
+        {
+          MORNING_DIGEST_YOUTUBE_API_KEY: 'test-key',
+          MORNING_DIGEST_YOUTUBE_QUERIES: 'AI agents',
+          MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '999999',
+          MORNING_DIGEST_YOUTUBE_MIN_LIKES: '999999',
+        },
+        {
+          fixtureSearchByQuery: { 'AI agents': FIXTURE_SEARCH },
+          fixtureVideosListByBatch: {
+            'video-one,video-two': FIXTURE_VIDEOS_LIST,
+          },
+        },
+      );
+      assert.deepEqual(payload, { videos: [] });
+      assert.ok(
+        errors.some((line) =>
+          line.includes('quality-floor-wiped: 2 candidates enriched, 0 cleared floor'),
+        ),
+        `expected loud floor-wipe stderr, got: ${JSON.stringify(errors)}`,
+      );
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('candidateMax bounds how many ids are enriched', async () => {
+    const wideSearch = {
+      items: Array.from({ length: 5 }, (_, index) => ({
+        id: { kind: 'youtube#video', videoId: `cap-${index + 1}` },
+        snippet: {
+          title: `Cap video ${index + 1}`,
+          channelTitle: 'Cap',
+          publishedAt: `2026-07-23T0${index}:00:00.000Z`,
+        },
+      })),
+    };
+    let enrichBatchKey = '';
+    const payload = await runYoutubeFetch(
+      {
+        MORNING_DIGEST_YOUTUBE_API_KEY: 'test-key',
+        MORNING_DIGEST_YOUTUBE_QUERIES: 'cap',
+        MORNING_DIGEST_YOUTUBE_CANDIDATE_MAX: '2',
+        MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '0',
+        MORNING_DIGEST_YOUTUBE_MIN_LIKES: '0',
+        MORNING_DIGEST_YOUTUBE_MAX_VIDEOS: '12',
+      },
+      {
+        fixtureSearchByQuery: { cap: wideSearch },
+        fixtureVideosListByBatch: new Proxy(
+          {},
+          {
+            has(_target, key) {
+              enrichBatchKey = String(key);
+              return key === 'cap-1,cap-2';
+            },
+            get(_target, key) {
+              if (key === 'cap-1,cap-2') {
+                return {
+                  items: [
+                    {
+                      id: 'cap-1',
+                      statistics: { viewCount: '100', likeCount: '10', commentCount: '1' },
+                    },
+                    {
+                      id: 'cap-2',
+                      statistics: { viewCount: '200', likeCount: '20', commentCount: '2' },
+                    },
+                  ],
+                };
+              }
+              return undefined;
+            },
+          },
+        ),
+        now: NOW_QUALITY,
+      },
+    );
+    assert.ok(Array.isArray(payload.videos));
+    assert.equal(payload.videos.length, 2);
+    assert.equal(enrichBatchKey, 'cap-1,cap-2');
+    assert.equal(dedupeVideosById(parseSearchResponse(wideSearch, 10), 2).length, 2);
   });
 
   it('returns youtube disabled when enabled flag is false', async () => {
@@ -193,6 +612,8 @@ describe('fetch-youtube-signals.mjs runYoutubeFetch', () => {
         MORNING_DIGEST_YOUTUBE_QUERIES: 'AI agents,MCP demo',
         MORNING_DIGEST_YOUTUBE_MAX_VIDEOS: '25',
         MORNING_DIGEST_YOUTUBE_PER_QUERY: '3',
+        MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '0',
+        MORNING_DIGEST_YOUTUBE_MIN_LIKES: '0',
       },
       {
         fixtureSearchByQuery: {
@@ -265,6 +686,8 @@ describe('fetch-youtube-signals.mjs runYoutubeFetch', () => {
       {
         MORNING_DIGEST_YOUTUBE_API_KEY: 'test-key',
         MORNING_DIGEST_YOUTUBE_QUERIES: 'AI agents',
+        MORNING_DIGEST_YOUTUBE_MIN_VIEWS: '0',
+        MORNING_DIGEST_YOUTUBE_MIN_LIKES: '0',
       },
       {
         fixtureSearchByQuery: { 'AI agents': FIXTURE_SEARCH },
@@ -289,15 +712,33 @@ describe('fetch-youtube-signals.mjs runYoutubeFetch', () => {
 });
 
 describe('loadYoutubeConfig', () => {
-  it('defaults maxVideos, perQuery, and lookback when unset', () => {
+  it('defaults keep-N, perQuery, lookback, floor, candidateMax, velocity min-age when unset', () => {
     const config = loadYoutubeConfig({
       MORNING_DIGEST_YOUTUBE_API_KEY: 'key',
       MORNING_DIGEST_YOUTUBE_QUERIES: 'agents, llm',
     });
-    assert.equal(config.maxVideos, 25);
-    assert.equal(config.perQuery, 3);
-    assert.equal(config.lookbackHours, 24);
+    assert.equal(config.maxVideos, 12);
+    assert.equal(config.perQuery, 10);
+    assert.equal(config.lookbackHours, 72);
+    assert.equal(config.candidateMax, 100);
+    assert.equal(config.minViews, 200);
+    assert.equal(config.minLikes, 5);
+    assert.equal(config.searchOrder, 'date');
+    assert.equal(config.velocityMinAgeHours, 1);
     assert.deepEqual(config.queries, ['agents', 'llm']);
+  });
+
+  it('clamps perQuery to 50 and lookbackHours to 720', () => {
+    const config = loadYoutubeConfig({
+      MORNING_DIGEST_YOUTUBE_API_KEY: 'key',
+      MORNING_DIGEST_YOUTUBE_QUERIES: 'x',
+      MORNING_DIGEST_YOUTUBE_PER_QUERY: '999',
+      MORNING_DIGEST_YOUTUBE_LOOKBACK_HOURS: '99999',
+    });
+    assert.equal(config.perQuery, 50);
+    assert.equal(config.lookbackHours, 720);
+    // Safe Date under clamp
+    assert.ok(Number.isFinite(Date.parse(publishedAfterIso(config.lookbackHours, NOW_QUALITY))));
   });
 
   it('isYoutubeEnabled treats empty as enabled', () => {

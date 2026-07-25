@@ -117,3 +117,16 @@ export function computeQualityMultiplierComponents(quality?: QualityMetadata): Q
 export function computeQualityMultiplier(quality?: QualityMetadata): number {
   return computeQualityMultiplierComponents(quality).multiplier;
 }
+
+/** Default α when policy omits `index.quality_weight_strength` (Story 79-7). */
+export const DEFAULT_QUALITY_WEIGHT_STRENGTH = 0.3;
+
+/**
+ * Blend raw quality multiplier with neutral 1.0 using strength α ∈ [0, 1].
+ * α=0 → 1.0 (quality off); α=1 → rawMultiplier (today's behaviour).
+ */
+export function applyQualityWeightStrength(rawMultiplier: number, alpha: number): number {
+  const a = Math.max(0, Math.min(1, alpha));
+  const raw = Math.max(0, Math.min(1, rawMultiplier));
+  return 1 - a * (1 - raw);
+}

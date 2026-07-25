@@ -54,7 +54,7 @@ Separately, call **`vault_list`** with `path: "."` and `recursive: true`. From a
 
 Batch **`vault_read_frontmatter`** using the `paths` array argument. Keep each request **≤ 40** paths. Cover every path in `GOVERNED_MD`.
 
-If frontmatter is missing or YAML breaks, treat as Rule 4 failures per `vault-lint.md` (invalid `created` blocks Rule 3 for that file).
+If frontmatter is missing or YAML breaks, treat as Rule 4 failures per `specs/cns-vault-contract/vault-lint.md` (invalid `created` blocks Rule 3 for that file).
 
 ## 5) Rule 1 — duplicate `source_uri` (ERROR)
 
@@ -137,12 +137,25 @@ Discord line shape (WARNINGS):
 
 ## 8) Rule 4 — missing required frontmatter (ERROR / WARNING)
 
-On each `GOVERNED_MD` path, validate critical fields per `vault-lint.md` table:
+On each `GOVERNED_MD` path, validate fields per `vault-lint.md` Rule 4 tables.
 
-`pake_id`, `pake_type`, `title`, `created`, `modified`, `status`, `confidence_score`, `verification_status`, `creation_method`, `tags`.
+**Core fields** (ERROR if missing, empty, or wrong type / out of allowed set):
 
-- **ERROR** if missing, empty, or wrong type / out of allowed set / `tags` not a non-empty list / dates not `YYYY-MM-DD` / score not numeric in `[0.0,1.0]`.
+`pake_id`, `pake_type`, `title`, `created`, `modified`, `status`, `tags`.
+
+- `pake_type` must be one of `SourceNote`, `InsightNote`, `HookSetNote`, `WeaponsCheckNote`, `SynthesisNote`, `WorkflowNote`, `ValidationNote`.
+- `status` must be one of `draft`, `in-progress`, `reviewed`, `archived`.
+- `created` and `modified` must be `YYYY-MM-DD`.
+- `tags` must be a YAML list with at least one entry (not a scalar string).
 - **WARNING** if `pake_id` present but **not** UUID v4 (regex: case-insensitive `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).
+
+**Quality enrichment fields** (WARNING if missing; ERROR only if present but invalid):
+
+`confidence_score`, `verification_status`, `creation_method`.
+
+- `confidence_score`: parseable number in `[0.0, 1.0]` when present.
+- `verification_status`: one of `pending`, `verified`, `disputed` when present.
+- `creation_method`: one of `human`, `ai`, `hybrid` when present.
 
 Optional field warnings per spec table (`source_uri` for SourceNote, `cross_references` for Insight/Synthesis, `ai_summary` any).
 

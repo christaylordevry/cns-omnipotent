@@ -140,6 +140,14 @@ describe('digest-run-outcome (Story 71-3)', () => {
     assert.equal(sources.google_trends.count, 1);
   });
 
+  it('classifies bare {error} adapter stdout as sources.error not empty (Story 90-2)', () => {
+    const sources = buildSourcesFromAdapterOutputs({
+      youtube: { error: 'quota-exceeded' },
+    });
+    assert.equal(sources.youtube.status, 'error');
+    assert.equal(sources.youtube.count, 0);
+  });
+
   it('counts youtube videos[] for outcome sources.youtube (72-2)', () => {
     const sources = buildSourcesFromAdapterOutputs({
       youtube: {
@@ -630,5 +638,36 @@ describe('digest-run-outcome amendment — day-level merge (Story 71-3)', () => 
     const record = await readDayOutcomeRecord(dir, date, readFile, (msg) => warnings.push(msg));
     assert.equal(record, null);
     assert.ok(warnings.some((w) => w.includes('corrupt')));
+  });
+
+  it('OPS-1: mergeDayOutcomeRecord preserves alertedAt / alertedOverall (dedup stamps)', () => {
+    const existing = {
+      date,
+      convex: { ok: false, signalsWritten: 0, runId: null, status: null, error: 'convex-push-failed' },
+      discord: { ok: false, error: null },
+      sources: {},
+      overall: 'failed',
+      alertedAt: '2026-07-20T07:16:00.000Z',
+      alertedOverall: 'failed',
+      history: [],
+    };
+
+    const { record } = mergeDayOutcomeRecord(existing, {
+      date,
+      trigger: 'watchdog-1300',
+      recoveryPath: 'none',
+      terminalAction: 'completion-convex-push-failed',
+      timestamp: '2026-07-20T13:00:00.000Z',
+      convex: { ok: false, signalsWritten: 0, runId: null, status: null, error: 'convex-push-failed' },
+      discord: { ok: false, error: null },
+      sources: {},
+      overall: 'failed',
+      ranAdapters: false,
+      signalCount: 50,
+    });
+
+    assert.equal(record.alertedAt, '2026-07-20T07:16:00.000Z');
+    assert.equal(record.alertedOverall, 'failed');
+    assert.equal(record.overall, 'failed');
   });
 });

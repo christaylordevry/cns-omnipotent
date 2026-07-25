@@ -1,0 +1,1013 @@
+{
+  "simAt": "2026-07-23T04:10:25.396Z",
+  "queries": 10,
+  "searchOrder": "date",
+  "wide": {
+    "lookbackHours": 72,
+    "perQuery": 10
+  },
+  "beforePolicy": {
+    "lookbackHours": 24,
+    "perQuery": 3,
+    "maxVideos": 25,
+    "selection": "date-order-encounter"
+  },
+  "afterPolicy": {
+    "lookbackHours": 72,
+    "perQuery": 10,
+    "candidatePool": 93,
+    "minViews": 500,
+    "minLikes": 10,
+    "keepN": 12,
+    "rank": "viewVelocity = views / max(hoursSincePublish, 1/60)"
+  },
+  "quota": {
+    "searchUnits": 1000,
+    "enrichRequests": 2,
+    "enrichIds": 93,
+    "note": "search.list=100/call; videos.list=1/call (batch up to 50)",
+    "estimatedTotal": 1002,
+    "warnThreshold": 2000
+  },
+  "poolSizes": {
+    "wideRawHits": 95,
+    "afterUniqueCandidates": 93,
+    "afterSurvivedFloor": 7,
+    "beforeCount": 25,
+    "afterKept": 7
+  },
+  "summary": {
+    "before": {
+      "label": "BEFORE date-cap25",
+      "n": 25,
+      "views": {
+        "min": 0,
+        "med": 6,
+        "avg": 123,
+        "max": 1267
+      },
+      "likes": {
+        "min": 0,
+        "med": 0,
+        "avg": 2,
+        "max": 15
+      },
+      "velocity": {
+        "med": 5.9,
+        "avg": 60.5
+      }
+    },
+    "afterVelocity": {
+      "label": "AFTER velocity keep12",
+      "n": 7,
+      "views": {
+        "min": 0,
+        "med": 742,
+        "avg": 1210,
+        "max": 3498
+      },
+      "likes": {
+        "min": 0,
+        "med": 21,
+        "avg": 47,
+        "max": 131
+      },
+      "velocity": {
+        "med": 223.4,
+        "avg": 248.6
+      }
+    },
+    "afterAbsComposite": {
+      "label": "ALT abs-composite keep12",
+      "n": 7,
+      "views": {
+        "min": 0,
+        "med": 742,
+        "avg": 1210,
+        "max": 3498
+      },
+      "likes": {
+        "min": 0,
+        "med": 21,
+        "avg": 47,
+        "max": 131
+      },
+      "velocity": {
+        "med": 223.4,
+        "avg": 248.6
+      }
+    }
+  },
+  "beforeVideos": [
+    {
+      "rank": 1,
+      "videoId": "fiXRqkmCb6o",
+      "title": "Are Your AI Agents Really Production Ready?",
+      "channel": "Platformatic",
+      "publishedAt": "2026-07-23T03:32:17Z",
+      "hoursAge": 0.6,
+      "views": 31,
+      "likes": 2,
+      "comments": 0,
+      "viewVelocity": 48.8,
+      "query": "ai agent framework"
+    },
+    {
+      "rank": 2,
+      "videoId": "csbM6kw5NG0",
+      "title": "The Tiniest AI Agent on GitHub Has Nearly 50K Stars",
+      "channel": "Bitwise AI",
+      "publishedAt": "2026-07-23T03:09:51Z",
+      "hoursAge": 1,
+      "views": 20,
+      "likes": 2,
+      "comments": 0,
+      "viewVelocity": 19.8,
+      "query": "ai agent framework"
+    },
+    {
+      "rank": 3,
+      "videoId": "jycHXn25TNI",
+      "title": "AI Agents Take Off, Gemini Flash Updates &amp; Mistral | EXAI Global AI ",
+      "channel": "EXAI Global",
+      "publishedAt": "2026-07-23T01:16:04Z",
+      "hoursAge": 2.9,
+      "views": 1,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0.3,
+      "query": "ai agent framework"
+    },
+    {
+      "rank": 4,
+      "videoId": "qrIqJO1IiuM",
+      "title": "The AI Kernel That Doesn&#39;t Trust AI",
+      "channel": "Trent Slade",
+      "publishedAt": "2026-07-23T02:41:05Z",
+      "hoursAge": 1.5,
+      "views": 20,
+      "likes": 0,
+      "comments": 1,
+      "viewVelocity": 13.4,
+      "query": "llm orchestration"
+    },
+    {
+      "rank": 5,
+      "videoId": "rszO2J9IN6I",
+      "title": "Claude Code 毎回繋ぎ直してない?/configで常時接続",
+      "channel": "まさやん【AIギルドch】- AIでクリエイティブと開発を効率化・自動化する仲間",
+      "publishedAt": "2026-07-23T03:00:04Z",
+      "hoursAge": 1.2,
+      "views": 433,
+      "likes": 1,
+      "comments": 0,
+      "viewVelocity": 369.3,
+      "query": "claude code"
+    },
+    {
+      "rank": 6,
+      "videoId": "u4esE1DtGZY",
+      "title": "我让Claude Code和Codex同时剪视频 #hyperframes #claude #ai剪视频",
+      "channel": "Serena心心加州",
+      "publishedAt": "2026-07-23T02:23:03Z",
+      "hoursAge": 1.8,
+      "views": 22,
+      "likes": 4,
+      "comments": 1,
+      "viewVelocity": 12.3,
+      "query": "claude code"
+    },
+    {
+      "rank": 7,
+      "videoId": "XQCpS41bmns",
+      "title": "AIへの指示は「8割」いらなかった——Claude Code開発チームの結論",
+      "channel": "AISPALab",
+      "publishedAt": "2026-07-23T01:57:34Z",
+      "hoursAge": 2.2,
+      "views": 618,
+      "likes": 15,
+      "comments": 0,
+      "viewVelocity": 279.1,
+      "query": "claude code"
+    },
+    {
+      "rank": 8,
+      "videoId": "QzaHod_aLv8",
+      "title": "Agentic AI Course in Hyderabad | Build AI Agents with LangChain, LangGra",
+      "channel": "GloryTecks",
+      "publishedAt": "2026-07-23T02:36:21Z",
+      "hoursAge": 1.6,
+      "views": 2,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 1.3,
+      "query": "multi-agent systems"
+    },
+    {
+      "rank": 9,
+      "videoId": "JVSXdQm9Ybk",
+      "title": "Why a Vector Database Isn&#39;t Enough for Multi-Agent Memory",
+      "channel": "AI TechBook",
+      "publishedAt": "2026-07-23T02:26:43Z",
+      "hoursAge": 1.7,
+      "views": 1,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0.6,
+      "query": "multi-agent systems"
+    },
+    {
+      "rank": 10,
+      "videoId": "vKaUBg4t-ZA",
+      "title": "- Why Microsoft and Meta’s 30% Nasdaq Pullbacks Are Signalling a Massive",
+      "channel": "ג'וני",
+      "publishedAt": "2026-07-23T00:29:16Z",
+      "hoursAge": 3.7,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "multi-agent systems"
+    },
+    {
+      "rank": 11,
+      "videoId": "VbRPN5rLj4o",
+      "title": "Vector Databases Part 5 — The Production Checklist · AI Bake A Day #05",
+      "channel": "AI Bake A Day",
+      "publishedAt": "2026-07-23T04:04:30Z",
+      "hoursAge": 0.1,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "vector database"
+    },
+    {
+      "rank": 12,
+      "videoId": "oRXqPGCnxlo",
+      "title": "#systemdesign #motivation #softwarearchitect #backendengineering #study",
+      "channel": "ecogrowthpath",
+      "publishedAt": "2026-07-23T02:50:13Z",
+      "hoursAge": 1.3,
+      "views": 10,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 7.5,
+      "query": "vector database"
+    },
+    {
+      "rank": 13,
+      "videoId": "cfJCCqdsM84",
+      "title": "Embeddings in Retrieval Augmented Generation | RAG",
+      "channel": "Yash Jain",
+      "publishedAt": "2026-07-23T02:30:13Z",
+      "hoursAge": 1.7,
+      "views": 1,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0.6,
+      "query": "vector database"
+    },
+    {
+      "rank": 14,
+      "videoId": "curWNpDdKGc",
+      "title": "Building the Complete RAG Architecture | RAG Series Part 5A",
+      "channel": "ramkumar lanke",
+      "publishedAt": "2026-07-23T03:16:35Z",
+      "hoursAge": 0.9,
+      "views": 1,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 1.1,
+      "query": "RAG pipeline"
+    },
+    {
+      "rank": 15,
+      "videoId": "4R15AVjdLxQ",
+      "title": "How RAG Generates the Final Answer | RAG Series Part 4B",
+      "channel": "ramkumar lanke",
+      "publishedAt": "2026-07-23T02:41:18Z",
+      "hoursAge": 1.5,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "RAG pipeline"
+    },
+    {
+      "rank": 16,
+      "videoId": "YpQmy_wpDs0",
+      "title": "scribe: the LLM-written knowledge base your coding agents read before th",
+      "channel": "Oliver Kriška",
+      "publishedAt": "2026-07-23T04:00:31Z",
+      "hoursAge": 0.2,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "local LLM"
+    },
+    {
+      "rank": 17,
+      "videoId": "H0TbxYPXqzY",
+      "title": "I Built a 100% OFFLINE JARVIS AI in Python! 🤖 | මගේ SELF MADE JARVIS #m",
+      "channel": "Manuja Dev",
+      "publishedAt": "2026-07-23T01:30:27Z",
+      "hoursAge": 2.7,
+      "views": 22,
+      "likes": 12,
+      "comments": 5,
+      "viewVelocity": 8.3,
+      "query": "local LLM"
+    },
+    {
+      "rank": 18,
+      "videoId": "Oanpazy8onM",
+      "title": "【ゆっくり解説】機密データを守るMacローカルAI｜LLM・RAG・ファインチューニングを全部試した",
+      "channel": "株式会社カンマン",
+      "publishedAt": "2026-07-23T00:45:12Z",
+      "hoursAge": 3.4,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "local LLM"
+    },
+    {
+      "rank": 19,
+      "videoId": "x2gtQsayIE4",
+      "title": "3 AI tools I use to save time and grow my business. #shorts",
+      "channel": "AI Tool Stack",
+      "publishedAt": "2026-07-23T01:55:22Z",
+      "hoursAge": 2.3,
+      "views": 1267,
+      "likes": 3,
+      "comments": 2,
+      "viewVelocity": 562.9,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 20,
+      "videoId": "mSo01VdbX3s",
+      "title": "AI Is Now Working With Pharma Companies — Here&#39;s How Fast It Got The",
+      "channel": "Future In 60 Seconds",
+      "publishedAt": "2026-07-22T18:48:49Z",
+      "hoursAge": 9.4,
+      "views": 571,
+      "likes": 6,
+      "comments": 0,
+      "viewVelocity": 61,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 21,
+      "videoId": "7XXTPvry9QM",
+      "title": "10 Rules That Stop Your AI Coding Agent Burying the Answer",
+      "channel": "Prism Labs",
+      "publishedAt": "2026-07-22T18:39:29Z",
+      "hoursAge": 9.5,
+      "views": 35,
+      "likes": 4,
+      "comments": 0,
+      "viewVelocity": 3.7,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 22,
+      "videoId": "cW5Vgp00wRE",
+      "title": "সহজ ভাষায় বুঝুন Loop Engineering কি? Loop Engineering vs  Prompt Enginee",
+      "channel": "ArthaMatrix",
+      "publishedAt": "2026-07-23T04:00:02Z",
+      "hoursAge": 0.2,
+      "views": 6,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 34.6,
+      "query": "prompt engineering"
+    },
+    {
+      "rank": 23,
+      "videoId": "6NpaqeUqbdk",
+      "title": "What is Loop Engineering? Moving Beyond Prompt Engineering",
+      "channel": "SH AI Academy",
+      "publishedAt": "2026-07-23T03:40:07Z",
+      "hoursAge": 0.5,
+      "views": 3,
+      "likes": 1,
+      "comments": 0,
+      "viewVelocity": 5.9,
+      "query": "prompt engineering"
+    },
+    {
+      "rank": 24,
+      "videoId": "7-_t-kMLH2o",
+      "title": "ChatGPT का सही इस्तेमाल सीखो 🤯 | Prompt Engineering से 10X Results | AI",
+      "channel": "AI Shortcut",
+      "publishedAt": "2026-07-23T03:30:38Z",
+      "hoursAge": 0.7,
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 0,
+      "query": "prompt engineering"
+    },
+    {
+      "rank": 25,
+      "videoId": "H7puB0RwJMM",
+      "title": "Citation Needed: Provenance for LLM-Built Knowledge Graphs — Daniel Chal",
+      "channel": "AI Engineer",
+      "publishedAt": "2026-07-23T04:00:02Z",
+      "hoursAge": 0.2,
+      "views": 14,
+      "likes": 2,
+      "comments": 1,
+      "viewVelocity": 80.8,
+      "query": "open source LLM"
+    }
+  ],
+  "afterVideosVelocity": [
+    {
+      "rank": 1,
+      "videoId": "J5s-x-b2pdg",
+      "title": "OpenAI launches Codex Micro, a compact AI agent control keyboard #OpenAI",
+      "channel": "AI Honeycove",
+      "publishedAt": "2026-07-22T21:03:27Z",
+      "hoursAge": 7.1,
+      "views": 3498,
+      "likes": 94,
+      "comments": 3,
+      "viewVelocity": 491.6,
+      "query": "multi-agent systems"
+    },
+    {
+      "rank": 2,
+      "videoId": "XQCpS41bmns",
+      "title": "AIへの指示は「8割」いらなかった——Claude Code開発チームの結論",
+      "channel": "AISPALab",
+      "publishedAt": "2026-07-23T01:57:34Z",
+      "hoursAge": 2.2,
+      "views": 618,
+      "likes": 15,
+      "comments": 0,
+      "viewVelocity": 279.1,
+      "query": "claude code"
+    },
+    {
+      "rank": 3,
+      "videoId": "mNqnMmiKiiA",
+      "title": "100 Claude Code Commands Part 2",
+      "channel": "Jonathan Acuña - Doctor AI",
+      "publishedAt": "2026-07-23T00:07:03Z",
+      "hoursAge": 4.1,
+      "views": 993,
+      "likes": 14,
+      "comments": 7,
+      "viewVelocity": 244.8,
+      "query": "claude code"
+    },
+    {
+      "rank": 4,
+      "videoId": "227BuCIrZfM",
+      "title": "You can now run massive AI models in your computer with this tool 🧠🤖 #",
+      "channel": "Dr. Alvaro Cintas",
+      "publishedAt": "2026-07-23T00:51:11Z",
+      "hoursAge": 3.3,
+      "views": 742,
+      "likes": 21,
+      "comments": 1,
+      "viewVelocity": 223.4,
+      "query": "open source LLM"
+    },
+    {
+      "rank": 5,
+      "videoId": "7ceTkeLmbiM",
+      "title": "【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Cursor Routerが登",
+      "channel": "AI整体師",
+      "publishedAt": "2026-07-23T00:58:45Z",
+      "hoursAge": 3.2,
+      "views": 673,
+      "likes": 36,
+      "comments": 6,
+      "viewVelocity": 210.7,
+      "query": "claude code"
+    },
+    {
+      "rank": 6,
+      "videoId": "65ykTu8wt8Y",
+      "title": "This GitHub Pack Teaches Claude Code to Shoot Promos Like a Studio",
+      "channel": "Evgenii Arsentev",
+      "publishedAt": "2026-07-23T00:21:22Z",
+      "hoursAge": 3.8,
+      "views": 690,
+      "likes": 19,
+      "comments": 0,
+      "viewVelocity": 180.7,
+      "query": "claude code"
+    },
+    {
+      "rank": 7,
+      "videoId": "xUR344sc8tU",
+      "title": "Best AI Coding Tools 2026",
+      "channel": "VIRAL AI TOOLS",
+      "publishedAt": "2026-07-22T16:44:55Z",
+      "hoursAge": 11.4,
+      "views": 1256,
+      "likes": 131,
+      "comments": 20,
+      "viewVelocity": 109.9,
+      "query": "AI coding assistant"
+    }
+  ],
+  "afterVideosAbs": [
+    {
+      "rank": 1,
+      "videoId": "J5s-x-b2pdg",
+      "title": "OpenAI launches Codex Micro, a compact AI agent control keyboard #OpenAI",
+      "channel": "AI Honeycove",
+      "publishedAt": "2026-07-22T21:03:27Z",
+      "hoursAge": 7.1,
+      "views": 3498,
+      "likes": 94,
+      "comments": 3,
+      "viewVelocity": 491.6,
+      "query": "multi-agent systems"
+    },
+    {
+      "rank": 2,
+      "videoId": "xUR344sc8tU",
+      "title": "Best AI Coding Tools 2026",
+      "channel": "VIRAL AI TOOLS",
+      "publishedAt": "2026-07-22T16:44:55Z",
+      "hoursAge": 11.4,
+      "views": 1256,
+      "likes": 131,
+      "comments": 20,
+      "viewVelocity": 109.9,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 3,
+      "videoId": "7ceTkeLmbiM",
+      "title": "【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Cursor Routerが登",
+      "channel": "AI整体師",
+      "publishedAt": "2026-07-23T00:58:45Z",
+      "hoursAge": 3.2,
+      "views": 673,
+      "likes": 36,
+      "comments": 6,
+      "viewVelocity": 210.7,
+      "query": "claude code"
+    },
+    {
+      "rank": 4,
+      "videoId": "mNqnMmiKiiA",
+      "title": "100 Claude Code Commands Part 2",
+      "channel": "Jonathan Acuña - Doctor AI",
+      "publishedAt": "2026-07-23T00:07:03Z",
+      "hoursAge": 4.1,
+      "views": 993,
+      "likes": 14,
+      "comments": 7,
+      "viewVelocity": 244.8,
+      "query": "claude code"
+    },
+    {
+      "rank": 5,
+      "videoId": "227BuCIrZfM",
+      "title": "You can now run massive AI models in your computer with this tool 🧠🤖 #",
+      "channel": "Dr. Alvaro Cintas",
+      "publishedAt": "2026-07-23T00:51:11Z",
+      "hoursAge": 3.3,
+      "views": 742,
+      "likes": 21,
+      "comments": 1,
+      "viewVelocity": 223.4,
+      "query": "open source LLM"
+    },
+    {
+      "rank": 6,
+      "videoId": "65ykTu8wt8Y",
+      "title": "This GitHub Pack Teaches Claude Code to Shoot Promos Like a Studio",
+      "channel": "Evgenii Arsentev",
+      "publishedAt": "2026-07-23T00:21:22Z",
+      "hoursAge": 3.8,
+      "views": 690,
+      "likes": 19,
+      "comments": 0,
+      "viewVelocity": 180.7,
+      "query": "claude code"
+    },
+    {
+      "rank": 7,
+      "videoId": "XQCpS41bmns",
+      "title": "AIへの指示は「8割」いらなかった——Claude Code開発チームの結論",
+      "channel": "AISPALab",
+      "publishedAt": "2026-07-23T01:57:34Z",
+      "hoursAge": 2.2,
+      "views": 618,
+      "likes": 15,
+      "comments": 0,
+      "viewVelocity": 279.1,
+      "query": "claude code"
+    }
+  ],
+  "droppedByFloorSample": [
+    {
+      "rank": 1,
+      "videoId": "x2gtQsayIE4",
+      "title": "3 AI tools I use to save time and grow my business. #shorts",
+      "channel": "AI Tool Stack",
+      "publishedAt": "2026-07-23T01:55:22Z",
+      "hoursAge": 2.3,
+      "views": 1267,
+      "likes": 3,
+      "comments": 2,
+      "viewVelocity": 562.9,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 2,
+      "videoId": "1qM94g5iv5A",
+      "title": "anyone can become the Claude code, Ryze ai sales guy btw 😎 #claudecode ",
+      "channel": "Olivia S",
+      "publishedAt": "2026-07-23T00:05:54Z",
+      "hoursAge": 4.1,
+      "views": 715,
+      "likes": 6,
+      "comments": 2,
+      "viewVelocity": 175.4,
+      "query": "claude code"
+    },
+    {
+      "rank": 3,
+      "videoId": "mSo01VdbX3s",
+      "title": "AI Is Now Working With Pharma Companies — Here&#39;s How Fast It Got The",
+      "channel": "Future In 60 Seconds",
+      "publishedAt": "2026-07-22T18:48:49Z",
+      "hoursAge": 9.4,
+      "views": 571,
+      "likes": 6,
+      "comments": 0,
+      "viewVelocity": 61,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 4,
+      "videoId": "rszO2J9IN6I",
+      "title": "Claude Code 毎回繋ぎ直してない?/configで常時接続",
+      "channel": "まさやん【AIギルドch】- AIでクリエイティブと開発を効率化・自動化する仲間",
+      "publishedAt": "2026-07-23T03:00:04Z",
+      "hoursAge": 1.2,
+      "views": 433,
+      "likes": 1,
+      "comments": 0,
+      "viewVelocity": 369.3,
+      "query": "claude code"
+    },
+    {
+      "rank": 5,
+      "videoId": "33kdo3wL8nU",
+      "title": "i thought prompt engineering would be way harder than this",
+      "channel": "Prmpts",
+      "publishedAt": "2026-07-23T01:04:43Z",
+      "hoursAge": 3.1,
+      "views": 252,
+      "likes": 4,
+      "comments": 0,
+      "viewVelocity": 81.4,
+      "query": "prompt engineering"
+    },
+    {
+      "rank": 6,
+      "videoId": "1GnbDrvfGtM",
+      "title": "Google’s FREE Claude Code Alternative Is INSANE (Gemma)",
+      "channel": "Julian Goldie SEO",
+      "publishedAt": "2026-07-23T01:00:03Z",
+      "hoursAge": 3.2,
+      "views": 243,
+      "likes": 18,
+      "comments": 0,
+      "viewVelocity": 76.6,
+      "query": "claude code"
+    },
+    {
+      "rank": 7,
+      "videoId": "XzDzrB427a0",
+      "title": "🔔 Claude Code Desktop に iOS Simulator pane 搭載 #claude #claudecode #ios",
+      "channel": "☕ Claude Code Cafe",
+      "publishedAt": "2026-07-23T00:00:39Z",
+      "hoursAge": 4.2,
+      "views": 221,
+      "likes": 4,
+      "comments": 0,
+      "viewVelocity": 53.1,
+      "query": "claude code"
+    },
+    {
+      "rank": 8,
+      "videoId": "b4ggF-9snT8",
+      "title": "ማይክሮሶፍት ሰራተኞቹን AI እንዳይጠቀሙ አገደ | Microsoft Bans Claude Code for 100,000 E",
+      "channel": "ClickAi-Simon Worku",
+      "publishedAt": "2026-07-22T17:06:37Z",
+      "hoursAge": 11.1,
+      "views": 48,
+      "likes": 14,
+      "comments": 5,
+      "viewVelocity": 4.3,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 9,
+      "videoId": "oVc8jVdrjDA",
+      "title": "AI Model Accessibility: Open Source vs. Closed Models #shorts",
+      "channel": "The Business Engineer",
+      "publishedAt": "2026-07-22T19:49:46Z",
+      "hoursAge": 8.3,
+      "views": 47,
+      "likes": 0,
+      "comments": 0,
+      "viewVelocity": 5.6,
+      "query": "open source LLM"
+    },
+    {
+      "rank": 10,
+      "videoId": "p0jZ_cV9ZmA",
+      "title": "🤖 LLM Orchestration Frameworks: Which One Should You Choose?",
+      "channel": "The ThinkLab by Saurabh",
+      "publishedAt": "2026-07-20T08:24:39Z",
+      "hoursAge": 67.8,
+      "views": 45,
+      "likes": 1,
+      "comments": 0,
+      "viewVelocity": 0.7,
+      "query": "llm orchestration"
+    },
+    {
+      "rank": 11,
+      "videoId": "RFcOzR-r004",
+      "title": "D1.1 Agentic Architecture &amp; Orchestration Explained | Claude AI Doma",
+      "channel": "seetaram dantu",
+      "publishedAt": "2026-07-20T07:22:56Z",
+      "hoursAge": 68.8,
+      "views": 37,
+      "likes": 2,
+      "comments": 0,
+      "viewVelocity": 0.5,
+      "query": "llm orchestration"
+    },
+    {
+      "rank": 12,
+      "videoId": "7XXTPvry9QM",
+      "title": "10 Rules That Stop Your AI Coding Agent Burying the Answer",
+      "channel": "Prism Labs",
+      "publishedAt": "2026-07-22T18:39:29Z",
+      "hoursAge": 9.5,
+      "views": 35,
+      "likes": 4,
+      "comments": 0,
+      "viewVelocity": 3.7,
+      "query": "AI coding assistant"
+    },
+    {
+      "rank": 13,
+      "videoId": "fiXRqkmCb6o",
+      "title": "Are Your AI Agents Really Production Ready?",
+      "channel": "Platformatic",
+      "publishedAt": "2026-07-23T03:32:17Z",
+      "hoursAge": 0.6,
+      "views": 31,
+      "likes": 2,
+      "comments": 0,
+      "viewVelocity": 48.8,
+      "query": "ai agent framework"
+    },
+    {
+      "rank": 14,
+      "videoId": "Hmz0M5YXRyU",
+      "title": "What are Vector Databases? #learnai #aiforbeginners #vectordatabases",
+      "channel": "AI with Rashi",
+      "publishedAt": "2026-07-22T18:28:47Z",
+      "hoursAge": 9.7,
+      "views": 28,
+      "likes": 2,
+      "comments": 2,
+      "viewVelocity": 2.9,
+      "query": "vector database"
+    },
+    {
+      "rank": 15,
+      "videoId": "u4esE1DtGZY",
+      "title": "我让Claude Code和Codex同时剪视频 #hyperframes #claude #ai剪视频",
+      "channel": "Serena心心加州",
+      "publishedAt": "2026-07-23T02:23:03Z",
+      "hoursAge": 1.8,
+      "views": 22,
+      "likes": 4,
+      "comments": 1,
+      "viewVelocity": 12.3,
+      "query": "claude code"
+    }
+  ],
+  "overlap": {
+    "beforeIdsInAfterKept": 1,
+    "onlyInAfter": [
+      {
+        "id": "J5s-x-b2pdg",
+        "title": "OpenAI launches Codex Micro, a compact AI agent control keyb",
+        "views": 3498,
+        "vel": 492
+      },
+      {
+        "id": "mNqnMmiKiiA",
+        "title": "100 Claude Code Commands Part 2",
+        "views": 993,
+        "vel": 245
+      },
+      {
+        "id": "227BuCIrZfM",
+        "title": "You can now run massive AI models in your computer with this",
+        "views": 742,
+        "vel": 223
+      },
+      {
+        "id": "7ceTkeLmbiM",
+        "title": "【#AIニュース No.420】Claude Code向けセキュリティプラグインベータ版利用可能に！新機能Curs",
+        "views": 673,
+        "vel": 211
+      },
+      {
+        "id": "65ykTu8wt8Y",
+        "title": "This GitHub Pack Teaches Claude Code to Shoot Promos Like a ",
+        "views": 690,
+        "vel": 181
+      },
+      {
+        "id": "xUR344sc8tU",
+        "title": "Best AI Coding Tools 2026",
+        "views": 1256,
+        "vel": 110
+      }
+    ],
+    "onlyInBefore": [
+      {
+        "id": "fiXRqkmCb6o",
+        "title": "Are Your AI Agents Really Production Ready?",
+        "views": 31,
+        "vel": 49
+      },
+      {
+        "id": "csbM6kw5NG0",
+        "title": "The Tiniest AI Agent on GitHub Has Nearly 50K Stars",
+        "views": 20,
+        "vel": 20
+      },
+      {
+        "id": "jycHXn25TNI",
+        "title": "AI Agents Take Off, Gemini Flash Updates &amp; Mistral | EXA",
+        "views": 1,
+        "vel": 0
+      },
+      {
+        "id": "qrIqJO1IiuM",
+        "title": "The AI Kernel That Doesn&#39;t Trust AI",
+        "views": 20,
+        "vel": 13
+      },
+      {
+        "id": "rszO2J9IN6I",
+        "title": "Claude Code 毎回繋ぎ直してない?/configで常時接続",
+        "views": 433,
+        "vel": 369
+      },
+      {
+        "id": "u4esE1DtGZY",
+        "title": "我让Claude Code和Codex同时剪视频 #hyperframes #claude #ai剪视频",
+        "views": 22,
+        "vel": 12
+      },
+      {
+        "id": "QzaHod_aLv8",
+        "title": "Agentic AI Course in Hyderabad | Build AI Agents with LangCh",
+        "views": 2,
+        "vel": 1
+      },
+      {
+        "id": "JVSXdQm9Ybk",
+        "title": "Why a Vector Database Isn&#39;t Enough for Multi-Agent Memor",
+        "views": 1,
+        "vel": 1
+      },
+      {
+        "id": "vKaUBg4t-ZA",
+        "title": "- Why Microsoft and Meta’s 30% Nasdaq Pullbacks Are Signalli",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "VbRPN5rLj4o",
+        "title": "Vector Databases Part 5 — The Production Checklist · AI Bake",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "oRXqPGCnxlo",
+        "title": "#systemdesign #motivation #softwarearchitect #backendenginee",
+        "views": 10,
+        "vel": 7
+      },
+      {
+        "id": "cfJCCqdsM84",
+        "title": "Embeddings in Retrieval Augmented Generation | RAG",
+        "views": 1,
+        "vel": 1
+      },
+      {
+        "id": "curWNpDdKGc",
+        "title": "Building the Complete RAG Architecture | RAG Series Part 5A",
+        "views": 1,
+        "vel": 1
+      },
+      {
+        "id": "4R15AVjdLxQ",
+        "title": "How RAG Generates the Final Answer | RAG Series Part 4B",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "YpQmy_wpDs0",
+        "title": "scribe: the LLM-written knowledge base your coding agents re",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "H0TbxYPXqzY",
+        "title": "I Built a 100% OFFLINE JARVIS AI in Python! 🤖 | මගේ SELF MA",
+        "views": 22,
+        "vel": 8
+      },
+      {
+        "id": "Oanpazy8onM",
+        "title": "【ゆっくり解説】機密データを守るMacローカルAI｜LLM・RAG・ファインチューニングを全部試した",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "x2gtQsayIE4",
+        "title": "3 AI tools I use to save time and grow my business. #shorts",
+        "views": 1267,
+        "vel": 563
+      },
+      {
+        "id": "mSo01VdbX3s",
+        "title": "AI Is Now Working With Pharma Companies — Here&#39;s How Fas",
+        "views": 571,
+        "vel": 61
+      },
+      {
+        "id": "7XXTPvry9QM",
+        "title": "10 Rules That Stop Your AI Coding Agent Burying the Answer",
+        "views": 35,
+        "vel": 4
+      },
+      {
+        "id": "cW5Vgp00wRE",
+        "title": "সহজ ভাষায় বুঝুন Loop Engineering কি? Loop Engineering vs  Pr",
+        "views": 6,
+        "vel": 35
+      },
+      {
+        "id": "6NpaqeUqbdk",
+        "title": "What is Loop Engineering? Moving Beyond Prompt Engineering",
+        "views": 3,
+        "vel": 6
+      },
+      {
+        "id": "7-_t-kMLH2o",
+        "title": "ChatGPT का सही इस्तेमाल सीखो 🤯 | Prompt Engineering से 10X ",
+        "views": 0,
+        "vel": 0
+      },
+      {
+        "id": "H7puB0RwJMM",
+        "title": "Citation Needed: Provenance for LLM-Built Knowledge Graphs —",
+        "views": 14,
+        "vel": 81
+      }
+    ]
+  },
+  "recommendedPolicy": {
+    "lookbackHours": 72,
+    "perQuery": 10,
+    "searchOrder": "date",
+    "minViews": 200,
+    "minLikes": 5,
+    "keepN": 12,
+    "candidateMax": 100,
+    "rank": "viewVelocity = viewCount / max(hoursSincePublish, 1/60)",
+    "rejectOrders": [
+      "relevance",
+      "viewCount"
+    ],
+    "rejectReason": "return evergreen mega-virals inside publishedAfter window; violate deltas-not-levels"
+  }
+}

@@ -1,5 +1,529 @@
 # Deferred work
 
+## 89-2 REQUIRED AC (from cns-dashboard S01 gate, 2026-07-23)
+
+> **Pick up at create-story** for `89-2-digest-stage-b-github-velocity-rank` (backlog; no story file yet).
+
+- **When github velocity rank ships, the Nexus judgment-queue UI copy MUST swap in the SAME story** to claim movement ordering. Until 89-2 lands, the queue orders by change-gate class (escalated before new) with stored `rankScore` as a **TEMPORARY** tie-break only, and the copy must **not** claim "ranked by movement". Without this AC the temporary tie-break becomes permanent and the level-bias the redesign exists to fix returns wearing honest wording.
+- **Source:** cns-dashboard `_bmad-output/C-UX-Scenarios/01-eric-morning-orient/s01-review-decision-sheet.md` (B5).
+- **Explicitly forbidden** in that decision: any frontend blend mixing level `rankScore` into a fake movement score.
+
+## Deferred from: code review of OPS-7-shared-abort-mock-helper-and-lint-ban.md (2026-07-23)
+
+- ~~**`onabort` / non-`addEventListener` hung patterns bypass ban**~~ — **CLOSED by OPS-7 review harden (2026-07-23):** shipped `AssignmentExpression[left.property.name='onabort']`. Residual: other EventTarget APIs (e.g. `once('abort')`) remain out of selector contract.
+- **`hungUntilAbort` TOCTOU** — abort between `signal.aborted` pre-check and `addEventListener` can leave the promise unsettled with keepalive still running. Same order as OPS-6 Fix B / suggested helper shape; timeout tests abort after the mock starts so practical risk is low.
+- **`hungUntilAbort` lacks input validation** — `setInterval` runs before a non-`AbortSignal` would throw on property access; keepalive may never clear. Current call sites (`createHungAbortFetchMock`, notebook-stale, portal-embedder) all validate first.
+- **Dual `.mjs` / `.d.ts` signature drift** — co-located type surface is not mechanically synced to the implementation SSOT.
+- **No dedicated helper unit tests** — critical branches covered only via the four migrated call-site suites, not a direct helper suite.
+
+## Deferred from: code review of OPS-6-verify-gate-async-timeout-determinism.md (2026-07-23)
+
+- **Shared Fix B hung-abort mock helper** — identical keepalive + `signal.aborted` pre-check duplicated in `analyze-entity-intelligence` and `render-digest-entity-section` timeout tests. Spec open question #2; extract only if a third copy appears. **CLOSED by OPS-7** (2026-07-23) — `tests/helpers/abort-mock.mjs`; all four call sites migrated.
+- **Suite-wide lint/grep ban on listener-only hung mocks** — optional follow-up to prevent recurrence of AbortSignal.timeout unref flakes; out of OPS-6 blast radius. **CLOSED by OPS-7** (2026-07-23) — `no-restricted-syntax` on `tests/**/*.{mjs,ts}`; helper allowlisted only.
+
+## Deferred from: code review of 90-5-entity-match-anti-opposition-guard.md (2026-07-23)
+
+- **Sentence-case / lowercase decisive antonyms invisible to entity arm** — `extractProperNounTokens` (pre-90-5) only keeps Title-Case tokens; G7 antonym-always only sees those. Long opposite-topic titles with mid-sentence polarity words can still entity-merge. Fixing requires tokenizer policy change, not a silent lexicon tweak.
+
+## Deferred from: code review of 90-3-youtube-quality-selection.md (2026-07-23)
+
+- **Digest-layer floor-wipe visibility** — operator 2026-07-23: keep adapter `{videos:[]}` (QUIET, not `{error}`); optional later enhancement to surface persistent floor-starve in digest outcomes / ops dashboards without polluting `errors_by_source`. Not in 90-3 PR.
+- **Quota warn only after search** — estimate uses actual candidate N; pre-flight worst-case (`queries*100+ceil(candidateMax/50)`) not required by AC5.
+- **First-come `dedupeVideosById` under `candidateMax`** — early queries can exhaust the enrich cap; round-robin fairness not in ship package.
+- **No stable final tie-break** — equal velocity/views/likes order is unstable at keep-N boundary; P4 only specifies views then likes.
+- **Invalid `SEARCH_ORDER` silent → `date`** — AC2 intentional; no misconfig log.
+- **`title`/`videoCount` remain in search-order allowlist** — valid YouTube enum; odd with `type=video`.
+- **Unbounded `velocityMinAgeHours` / no `candidateMax < keepN` reject** — ops misconfig edges only.
+- **Always-on stderr select stats on healthy runs** — may look like cron failure noise; keeps 90-2-style visibility.
+
+## Deferred from: code review of 90-4-dedupe-over-collapse-retune.md (2026-07-23)
+
+- ~~**Entity-match over-clusters short opposite-topic titles**~~ — **CLOSED by 90-5 (2026-07-23):** shipped G7 (antonym-always + short-title entity disable `min(|A|,|B|)≤3`). Polymarket fixture cluster size **5** preserved; Fed Hike×Cut long-antonym regression proves G7 > G3a. Short geo FNs (Austin×Miami) accepted.
+- **youtu.be/ID vs youtube.com/watch?v=ID distinct canon keys** — R1 embeds `v=` on watch hosts only; path-form youtu.be stays `youtu.be/<id>`. Same video across forms does not URL-cluster. Bridging belongs with invert-normalize backlog, not a silent R1 expand.
+- **Empty/missing `v=` watch URLs** — still fall through to query-stripping fallback and can collide on `youtube.com/watch`.
+- **`list=`-only watch URLs without `v=`** — can still collapse to `youtube.com/watch`; out of R1 scope.
+- **No m./music./nocookie host-variant unit tests** — production special-cases them; coverage gap only.
+- **`classifyPrimaryAbsorbAlarm` negative storedPrimaryCount → heavy-absorb** — trusted 90-2 counters are non-negative integers in practice.
+- **`attachSourceOutcomes` console.error unwired in tests** — helpers unit-tested; completion-script loop matches yt-stage posture.
+- **Reddit inject test not coupled to R4 alarm collection** — wipe/heavy-absorb covered in `parse-digest-source-outcomes` suite separately.
+
+## Deferred from: 90-4-dedupe-over-collapse-retune (2026-07-23)
+
+- **Invert normalize/canon identity policy** — today hosts special-case identity params (HN `id`, YouTube `v=`). Backlog: strip tracking-only (`utm_*`, `fbclid`, `gclid`, `ref`) and **preserve identity params by default** for all hosts. Explicitly out of 90-4 ship package.
+
+## Deferred from: code review of 90-2-youtube-silent-drop-observability.md (2026-07-23)
+
+- **`digestSourceOutcomeValidator` numeric looseness** — new optional `fetchCount` / `storedPrimaryCount` / `contributedCount` use `v.optional(v.number())` like legacy `signalCount`; negatives/fractionals can persist.
+- **`countAdapterPayloadItems` first-array-wins** — returns length of first recognized key in `ADAPTER_PAYLOAD_ARRAY_KEYS`; multi-array payloads undercount (relocated helper, prior behavior).
+- **Non-error unknown adapter stdout → empty** — `buildSourcesFromAdapterOutputs` still treats unrecognized bare objects/scalars as `empty` (exit-0 contract); only bare `{error}` was in 90-2 Defect A scope.
+
+## Deferred from: code review of 90-1-restore-reddit-intake.md (2026-07-23)
+
+- **Empty Atom feed → false-zero mention counts** — HTTP 200 with zero entries currently yields ok/zero rather than an explicit empty-corpus signal.
+- **Cross-subreddit double-count in trend corpus** — flat extend without id/url dedupe; fixture tests expect multi-sub inflation.
+- **Weak `REDDIT_COLLECTION_METHOD` no-op test patches** — former `_praw` readiness gates replaced with identity patches; strengthen when next touching trend tests.
+- **`externalId` continuity / dedupe** — Atom `<id>` preferred over URL-hash; digest URL dedupe still ignores `externalId`.
+
+## Deferred from: code review of 89-1-digest-stage-a-github-store-max-widen.md (2026-07-21)
+
+- **NexusDigestSignalFeed `DIGEST_SIGNAL_LIMIT=100` + `getDigestSignalsForRun` hard clamp 100** — after STORE_MAX 5→40, ~98→~133 signals/run silently drops ~33 lowest-`rankScore` rows in the feed (no error). Storage write-all is fine; Stage B history is unaffected. Follow-up: raise/paginate feed limit (dashboard story), not a 89-1 reopen.
+- **`validate-epic-68-digest.mjs` `SIGNALS_LIMIT=100`** — audit fetch can undercount widened runs (already warns when truncated). Raise limit or paginate when next touching that validator.
+- **Discord `DISCORD_MAX_CONTENT=2000`** — +35 GitHub bullets ≈ +1620 chars ≈ +1 chunk; sequential posts stay well under bot channel rate limits. Materially noisier GitHub section in `#hermes` only.
+- **`DIGEST_PUSH_TIMEOUT_MS=45_000` over sequential `addDigestSignal`** — ~+35 mutations shrink headroom; monitor first live widened push wall-clock. Not a count ceiling; no failure evidenced in review.
+
+## 🚦 BLOCKING VERIFICATION CHORES — trend ingest fix (2026-07-21) — do these BEFORE any redesign work
+
+> **Context:** the trend-ingest env had five unquoted space-separated values, so those variables
+> resolved to **unset** (`FOO=a b c` sets `FOO=a` for a command named `b`). GitHub / YouTube /
+> Polymarket / Pinterest queries were never delivered; `pytrends` was also missing so Google
+> Trends errored hourly. **Fixed 2026-07-21 14:46** (backup: `~/.hermes/trend-ingest.env.bak-20260721-144626`).
+> Immediately after: `watchlistKeywords` 1 → 14, `trendTopics` 5 → 19, ingest `httpStatus 200 / ok`.
+> The pre-existing 5 topics carried `lastUpdated` of **1103.8 h (46 days)** — the continuous layer
+> had been dead since early June while its crons ran every 15 minutes.
+>
+> **All redesign evidence gathered before this fix is contaminated.** Specifically, the
+> "top 5 is garbage" finding (`langchain` #1, three Polymarket bets) is explained by unset
+> GitHub queries and `POLYMARKET_KEYWORDS` collapsed to `AI`. The claim that `rankScore` has
+> structurally bad taste is **NOT supported** by that evidence and must be re-tested.
+
+**CHORE 1 — does the hourly `runAnalyticsPass` populate the trend layer?**
+As of the fix, all 19 topics still read `momentum: 0`, `lifecycleStage: None`, empty
+`sourceBreakdown`; `trends:getTopicBySlug` returns identity only. After an hourly tick, check:
+non-zero `momentum`? any `lifecycleStage` off `None`? `sourceBreakdown` filling with per-source
+entries? recent `trendScores.computedAt` / `trendAnomalies.detectedAt`?
+**If yes** — the always-alive substrate is real; build the cockpit on the trend layer with the
+digest as a morning-orient lens. **If no** — there is another broken link upstream of any design.
+
+**CHORE 2 — does the digest shortlist improve on corrected sources?**
+`MORNING_DIGEST_*` feeds the 07:00 batch; the 2026-07-21 run predates the fix, so its 75 rows are
+still contaminated. After the next clean run measure: top-5 composition (curated topics vs generic
+AI repos/markets), stamp density (BD-5), cross-source corroboration, and whether emoji tweets are
+edge noise rather than centre stage.
+
+**Upstream follow-on (storyed 2026-07-21):** curated queries alone do **not** fix GitHub level-bias
+or Polymarket always-on markets. **89-1** (`89-1-digest-stage-a-github-store-max-widen`) —
+STORE_MAX=40 / PER_QUERY=5 **write-all** into `digestSignals` (**done** 2026-07-21; Stage B warm-up
+clock starts on next digests with ≥30 github rows). **89-3** holds GitHub SHORTLIST_MAX=5 + Polymarket **type-exclusion** (not a score
+penalty) until a judgment shortlist selector exists (none in code 2026-07-21). **89-2** Stage B
+velocity after 7 digests with ≥30 GitHub rows stored.
+
+**Do NOT commit to** a cluster layer, a scoring rebuild, or a feed-vs-analyst premise decision
+until CHORE 1/2 land. Full write-up + north-star reframe:
+`cns-dashboard/_bmad-output/planning-artifacts/curation-selection-research-2026-07-21.md`.
+
+---
+
+## Deferred from: code review of OPS-5-drive-sync-timeout-canary-and-rollup-honesty.md (2026-07-21)
+
+- Uncaught throw before `allSettled` rollup (`patchCloseReport` / report re-read / `drive_sync_phase` markers) leaves `failure_class` unset; CLI `main().catch` still returns `{ ok: false }` but does not stamp `notebooklm`. Pre-existing pattern; not the vacuous `ok:true` class OPS-5 closed. Wrap setup+workers in try/finally stamp if tightening.
+
+## Deferred from: code review of OPS-4-session-close-constitution-propagation-guard.md (2026-07-21)
+
+- Changelog version scan continues past `## Changelog` to EOF — a version-looking table row in a later section can spuriously collide; malformed real changelog rows are ignored. Bound the scan to the changelog section when tightening collision parsing.
+- `parseAgentsHeaderVersion` accepts the first `> Version:` substring and non-strict digit/dot shapes — sufficient for current AGENTS; harden if header format drifts.
+
+## 🚨 `/session-close` PROPAGATES vault AGENTS.md corruption into the git mirror (found 2026-07-20, session 24)
+
+> **ROOT CAUSE CORRECTED 2026-07-20 (same day).** The first version of this entry claimed
+> session-close *created* the §2/§3 corruption. **That was wrong.** Empirical test: feeding a clean
+> AGENTS.md through `applySection8ToAgentsText` produces clean output (`governed governed`=0, each
+> pake_type row exactly once). The transform is sound. The corruption was **already present in the
+> vault working copy** before the close ran. Session-close read it, version-bumped it, and wrote it
+> over the clean git-tracked mirror. It is the **amplifier**, not the origin. Corrected before any
+> fix was attempted — do not chase the transform.
+
+**Highest-priority item in this file.** AGENTS.md is the constitution loaded into every agent's
+context at session start, so corruption there is inherited by every future session on every surface.
+
+### What actually happened
+
+`apply-section8.mjs:121-126` reads the constitution from **one** source and writes the patched
+result to **two** targets:
+
+```js
+try   { agentsText = await readFile(paths.constitutionAgentsPath, "utf8"); }  // → vault copy
+catch { agentsText = await readFile(paths.repoAgentsPath, "utf8"); }
+// ...then writes `patched` to BOTH specs/cns-vault-contract/AGENTS.md AND the vault copy
+```
+
+`constitutionAgentsPath` resolves to the **vault** copy (`lib/paths.mjs:113-114`). So a dirty vault
+working copy is propagated, unvalidated, over the git-tracked mirror. There is **no drift check on
+this path** despite 87-2 existing as a specs↔vault sync-drift gate.
+
+**Evidence chain:** pre-recovery vault git HEAD (`227b490`) was v2.1.57 and clean (0/1/1); the repo
+mirror was v2.1.58 (07-14) and clean; the vault *working copy* was `M` (dirty vs its own HEAD); the
+close's output was v2.1.58 — exactly `bumpPatchVersion(2.1.57)` — and corrupt. Since the transform is
+provably clean, the input carried the duplication.
+
+**Origin of the vault-side corruption is still UNKNOWN** — some write between 2026-07-14 and
+2026-07-20. Worth finding, but the propagation defect below is exploitable by *any* such corruption
+and is the thing to fix first.
+
+### The corruption that got spread
+
+| Defect | Section | Detail |
+|---|---|---|
+| Duplicated table rows | **§2** | `HookSetNote` and `WeaponsCheckNote` each appear **twice** in the note-routing table |
+| Word duplication | **§3** | "applies to governed **governed** knowledge notes" in the PAKE Standard scope sentence |
+
+Both were written to **the canonical vault *and* the specs mirror** — `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`
+(17:47) and `specs/cns-vault-contract/AGENTS.md`. Verified by marker counts: corrupt copies show
+`governed governed`=1, HookSetNote rows=2, WeaponsCheckNote rows=2; the last committed repo version
+shows 0/1/1.
+
+**Two further defects in the same run:**
+
+- **Version collision.** Hermes reported "AGENTS.md bumped to v2.1.58" but the file was *already*
+  2.1.58 from 2026-07-14. No bump occurred, and the changelog gained a second 2.1.58 row. This is the
+  known version-collision trap (memory `project_stale_agents_md_drift`).
+- **The regenerated §8 was itself wrong.** It marked Story 88.1 "in review" although Epic 88 closed
+  2026-07-13, *dropped* "Epic 58 closed", dropped the vault-recovery and 84-2/84-3 context, and
+  omitted the entire ops-observability epic (OPS-1/OPS-2) completed that same day. The regen moved
+  §8 backwards, not forwards.
+
+**Recovered 2026-07-20** by restoring the repo-committed v2.1.58 (clean §2/§3 + newest clean §8) to
+both copies; corrupt version preserved at `AI-Context/AGENTS.md.corrupt-2026-07-20.bak` as evidence.
+Note the vault's own git HEAD holds only v2.1.57 (07-10) — older §8 — so the **repo** commit, not the
+vault commit, is the correct recovery source.
+
+**⛔ Do not run `/session-close` again until the propagation gate exists.** Each run costs $3–5 and
+re-spreads whatever the vault copy currently holds.
+
+### Fix direction (three separable pieces, in priority order)
+
+1. **Validate before propagating (the real fix).** Before writing the patched constitution to either
+   target, assert the *source* is sane and not stale: (a) structural invariants — each `pake_type`
+   routing row appears exactly once, no doubled tokens; (b) the source version is **>=** the version
+   already in the git-tracked mirror. Refuse to write on violation, and fail loudly. Reuse 87-2's
+   drift-gate logic rather than inventing a second one.
+2. **Version-collision guard.** `bumpPatchVersion` on a stale source produced 2.1.58 when the mirror
+   was *already* 2.1.58, yielding two identical changelog rows. Refuse to emit a version that already
+   exists in the changelog.
+3. **Rollup honesty** (shared with the drive-sync entry below): the run reported
+   `agents_sync: synced` and `failure_class: none` while doing all of the above.
+
+A regression test should assert marker counts on the rendered output **and** that a deliberately
+corrupt source is *rejected* rather than propagated — the latter is the one that matters, and it is
+the same lesson as OPS-1: unknown or invalid state is never success.
+
+## Epic 58 residual — drive-sync fails DETERMINISTICALLY at the 25s bound (found 2026-07-20, session 24 close)
+
+> **Status (2026-07-21): CLOSED.** Pieces **(a)** and **(c)** fixed by **OPS-5**
+> (`OPS-5-drive-sync-timeout-canary-and-rollup-honesty`). Piece **(b)** resolved by operator UI
+> action — see (b) below. Measured evidence preserved. **All 3/3 targets verified green
+> 2026-07-21** by hand-running the exact session-close argv; no `/session-close` spend required.
+
+All **3 of 3** NotebookLM targets failed on session 24's `/session-close`. Hermes summarised it as
+"the usual pattern (intermittent timeouts)" with `failure_class: none`. The log does not support
+that reading — this is three distinct problems, none of them intermittent.
+
+**(a) Two are a deterministic timeout, not flakiness.** `~/.hermes/logs/session-close-drive-sync.log`:
+
+```
+07:47:43.992  start
+07:48:09.985  f037c741…  Command failed: nlm source sync …   → 25.99s
+07:48:10.286  dc6abf1a…  Command failed: nlm source sync …   → 26.29s
+```
+
+Live remeasure 2026-07-21: `time nlm source sync …` → **real 0m41.2s** vs then-bound
+`NLM_EXEC_TIMEOUT_MS = 25_000`. Both died within ~1s of the bound, syncing a **1.63 MB** source.
+This is the same budget-vs-duration class as 58-3 (a 1.5 MB native-Doc conversion taking 134s
+against a ~60s budget), **moved from the write step to the sync step** as the export grew.
+**OPS-5:** split to `NLM_LIST_TIMEOUT_MS=25_000` / `NLM_SYNC_TIMEOUT_MS=120_000` + canary at 0.5× sync bound.
+
+**(b) The third is not a timeout at all** — it is a config/state mismatch, masked by being lumped in:
+
+```
+981466f0…  no Drive source matched NOTEBOOKLM_DRIVE_DOC_ID 1olnjZJMP7xa9adwt_DlQRHTcDEk1GxKM
+           and no google_docs / vault-export word_doc fallback source was available
+```
+
+Reported as `error_class: unknown`. Different failure, different fix — the doc ID does not resolve to
+any source in that notebook.
+
+**RESOLVED 2026-07-21 (operator UI).** Root cause: the 58-3 PDF migration **never covered this
+notebook**, despite the record below claiming "all 3 notebooks" (that line is now corrected).
+`981466f0` still held the pre-migration source `vault-export-for-notebooklm**.md**` of type
+`generated_text` — a frozen legacy paste with no Drive linkage. The two working notebooks hold
+`vault-export-for-notebooklm` (no extension) of type `word_doc`; only that type satisfies
+`matchWordDocVaultExportFallback` (`sync-vault-export-drive.mjs:379`).
+
+Fix = attach the Drive PDF as a source in the NotebookLM UI. **No code change; matcher untouched.**
+Widening the matcher to accept `generated_text` was explicitly rejected — such a source has no Drive
+linkage, so `nlm source sync` would refresh nothing, converting a loud failure into a silent no-op.
+
+Verified: new source `43663c0f-b944-429c-a258-6f0bea4b010c`, type `word_doc`;
+`nlm source sync … -y` → **exit 0**.
+
+**Env thread closed:** `NOTEBOOKLM_DRIVE_DOC_ID` lives in **`~/.hermes/session-close.env:14`** — a
+third file, which is why grepping `.env.live-chain` and `~/.hermes/.env` came back empty. The value
+is **not stale**: `1olnj…` is a live 2.99 MB PDF titled `vault-export-for-notebooklm`, modified
+2026-07-20 (i.e. the upload half of drive-sync works). The stale-doc-ID hypothesis is dead.
+
+**(c) The rollup hides a total failure.** `failure_class: none` while 3/3 targets failed is the exact
+silent-success pattern OPS-1 and OPS-2 removed from the digest pipeline on the same day. 58-4 (shipped
+2026-07-13) fixed the *stamping* — targets are now correctly marked failed instead of left unstamped —
+but the operator-facing summary still rolls up to `none`, so nothing surfaces. **All-targets-failed
+must not be able to report `failure_class: none`.** **OPS-5:** phase rollup stamps `notebooklm` /
+`notebooklm_partial` / `notebooklm_no_targets` and refuses `{ ok: true, synced: 0 }`.
+
+Note the drive-sync log was rotated on 2026-07-13, so it holds only session 24; there is no history
+in it to distinguish "new regression" from "has been failing since 58-4" — check
+`session-close-drive-sync.log.bak-2026-07-13` and the session-close outcome records before assuming
+either.
+
+## Deferred from: code review of OPS-2-digest-signal-schema-contract-guard.md (2026-07-20)
+
+- `ADAPTER_TASK_KEY_TO_SOURCE_TYPE` remains a hand-copied map beside the live `COLLECT_ADAPTER_TASK_KEYS` import. AC4 still fails if a new collect key lacks a map entry; mechanical derivation from producer `sourceType` constants would remove drift risk later.
+- `resolveContractRepoRoot` returns `dirname(DIGEST_SIGNAL_CONTRACT_PATH)` when that env is set — fine today because `resolveDigestSignalContractPath` returns the explicit file path, but any future caller that joins `DIGEST_SIGNAL_CONTRACT_RELATIVE_PATH` onto that “root” will point at the wrong directory.
+
+## Deferred from: code review of OPS-1-digest-push-fail-loud.md (2026-07-20)
+
+- Concurrent alert + `writeDayOutcomeRecordAtomic` stamp race (check-then-act): two overlapping invocations could both post before either stamps. Pre-existing day-outcome file concurrency model; digest cron slots are hours apart. Revisit only if overlapping watchdog invocations become real.
+
+## Open Design — wire Hermes MCP (deferred 2026-07-16)
+
+Open Design (`nexu-io/open-design`) was installed system-wide 2026-07-16 (see memory `reference_open_design_install`). MCP wired into **claude / cursor / codex** via `od mcp install <agent>`; **Hermes deliberately skipped** — `od mcp install hermes` only prints a manual block because "Hermes config format is unverified," and `~/.hermes/config.yaml` is a governed CNS surface (WriteGate / non-negotiable #4). Defer until there's a concrete need for Hermes to drive OD design generation (e.g. a Discord "design a landing page with the CNS Instrument system" skill).
+
+**To wire it** — add under `mcp_servers:` in `~/.hermes/config.yaml` (via the proper Hermes flow, not a raw edit; back up first, then restart the gateway):
+```yaml
+  open-design:
+    command: "/home/christ/.nvm/versions/node/v24.14.0/bin/node"
+    args: ["/home/christ/tools/open-design/apps/daemon/dist/cli.js","mcp","--daemon-url","http://127.0.0.1:7456"]
+    env:
+      OD_DATA_DIR: "/home/christ/tools/open-design/.od"
+```
+Daemon must be running (`systemctl --user status open-design`). Verify: Hermes lists an `open-design` MCP with tools `list_projects`, `get_artifact`, `create_artifact`, etc. This is substrate, not revenue — build only when a real Hermes→OD use case lands ([[project_strategic_bottleneck_deploy_not_build]]).
+
+## 58-2 WatchedSurface Tier-2 multi-surface — ✅ CLOSED 2026-07-13, NO-GO / cancelled
+
+Reserved in 58-1 for additional watched NotebookLM sources beyond the single vault-export Drive PDF (candidates: per-PARA exports, CNS-Daily-Rhythm.md, sprint-status.yaml, AGENTS.md §8). Product brief `_bmad-output/planning-artifacts/briefs/brief-CNS-2026-07-13/brief.md` settled **NO-GO**: no concrete recurring operator decision measurably fails on the Tier-1 single-PDF fan-out; origin was reservation-without-pain; building would add duplication + sync failure modes after 58-3/58-4 hardening. Export scope is `01-Projects` + `03-Resources` by design (`export-vault-for-notebooklm.sh`); coverage gaps without a failing query do not earn a build. Operator bottleneck is revenue, not NotebookLM surface coverage.
+
+**Epic 58 closed** (58-1, 58-3, 58-4 done; 58-2 `cancelled`). Reopen only with a named failing query + proposed scoped surface as evidence — do not keep a reserved stub.
+
+## Fable 5 reasoning-manual extraction → CNS reasoning layer (QUEUED 2026-07-13)
+
+Extract Claude Fable 5's reasoning "operating manual" while access lasts and deploy it so Fable-grade reasoning runs on cheaper models. Full plan, corrected prompts, and anti-downgrade guardrails in **`HANDOFF-2026-07-13-fable5-reasoning-extraction.md`** (repo root). **Phased — operator decision 2026-07-13, start safe:**
+- **Phase 1 (do first, ZERO system risk):** operator extracts in the Claude app with Fable 5, loads the full manual into a Claude Project (Opus 4.8), runs the two verification traps ($4.0M→$4.2M = 5% not 20%; the ambiguity trap). Touches nothing always-on. Prove it reasons better before scaling.
+- **Phase 2 (DEFERRED until Phase 1 proves value):** governed `@`-imported "everywhere" reasoning layer — condensed core **hard-capped ~1,500 chars with a declared §6.5 token budget**, `note-style-guide` precedent (specs SSOT + byte-identical vault mirror + verify.sh parity), **additive** (do NOT revert the note-style `@`-import), **defers to AGENTS.md §1 Behavioral Integrity / §9** (no duplication/conflict). Fresh Claude Code session.
+- **Separately deferred:** per-workflow skill extraction (source doc "bonus") aimed at revenue workflows (outreach/proposal/content).
+
+**Anti-downgrade rationale (operator-flagged):** a full always-on manual would bloat cold-start context (§6.5 Token Budget Policy; only the ~1,370-token note-style-guide is `@`-imported today). Phase-1-first avoids all of it. Pre-flight: verify current Fable access/pricing (source doc's "July 12" deadline is past) + correct model IDs (`claude-fable-5`, `claude-opus-4-8`; NOT `claude-3-opus-20240229`). This is substrate work — timebox it; bottleneck is revenue ([[project_strategic_bottleneck_deploy_not_build]]).
+
+## 88-3 obsidian-markdown skill-wiring (Epic 88) — ✅ CLOSED 2026-07-13, guide sufficient, no build
+
+`88-3-confirm-obsidian-markdown-fires-governed-create` asked to confirm whether the global obsidian-markdown skill loads+fires on governed creates (Claude Code + Desktop) and to fold its connectivity conventions into the governed path where it doesn't. Both halves resolved without skill-wiring:
+- **Fire-check:** confirmed during 88-2 — the skill does **not** auto-fire on governed `vault_create_note`.
+- **Connectivity fold:** the 2026-07-12 note-authoring parity work proved the hardened `note-style-guide` **alone** produces Nexus-grade governed notes on all 3 surfaces (Hermes, Cursor, Claude Desktop). Evidence re-verified 2026-07-13 in canonical `03-Resources/`: `0xjeff-hermes-analyst-60-day-lessons-vs-cns-positioning.md` and `pluto-system-design-vs-cns-architecture-sizing.md` — full PAKE frontmatter + enrichment tier, abstract/tip/warning callouts, block IDs, verified inline wikilinks.
+
+The guide hardening (88-1 status/linking clarifications + 88-2 link-integrity/inline-linking + the parity-session phantom-link/under-link items) supersedes any need to wire the skill into the governed path. **Epic 88 closed.** The `project_nexus_note_quality_mechanism` framing ("fix lever = wire the skill in") is obsolete — the lever turned out to be the guide itself.
+
+## session-close changelog-row duplication bug (2026-07-10) — ✅ DONE (`b865c1d`, 2026-07-10)
+
+Fixed: `changelogMessageFromPack` (`scripts/session-close/apply-section8.mjs`) no longer copies the prior row's description from `changelog_anchor_row`; it now emits a self-descriptive row from `pack.sprint.project_status_line` (`Section 8: Regenerated by /session-close — {status line}`, static fallback when absent). 2 new regression tests (verified failing on the pre-fix code, 2/2). 3-lens `/bmad-code-review` clean (0 actionable); node suite 94/94; `lib/apply-section8-body.mjs` untouched. Trivial leftover: stale `@returns {string | undefined}` JSDoc on that fn (now always returns string) — fold in on next touch.
+
+## Firecrawl MCP token dead — 401 on every call (surfaced 2026-07-12)
+
+**Ops debt, non-blocking.** The Firecrawl MCP returns `Unauthorized: Invalid token` on every tool call (`firecrawl_scrape` confirmed 2026-07-12; also hit during the Cursor 0xjeff url-ingest, which fell back to a Substack mirror). Firecrawl is a Tier-1 MCP in `AGENTS.md` §7 and CLAUDE.md's active-MCP table, so a dead token silently degrades every research/ingest path to fallbacks (WebFetch, transcript proxies, `yt-dlp`). Re-auth: refresh the Firecrawl API key wherever the MCP reads it (env var, not hardcoded per security policy) and re-verify with a single `firecrawl_scrape`. Until then, the working fallbacks are: **WebFetch** for readable HTML/Substack mirrors (cannot render JS-heavy pages like YouTube), and **`yt-dlp`** (`~/.local/bin/yt-dlp`, installed 2026-07-12) for YouTube transcripts via auto-captions. Recurring enough to fix at the source. Related: [[hermes-consolidation-initiative]].
+
+## vault-lint remediation (2026-07-10) — ✅ DONE (`fc1d26e`, canonical vault)
+
+The 13 frontmatter lint errors were remediated in canonical-vault commit `fc1d26e` ("remediate 13 frontmatter lint errors — status/verification_status/created (Errors 13->0)"), on top of baseline `227b490`. The old `HANDOFF-2026-07-10-vault-lint-remediation.md` mapping was applied as specced: `invalid_status: reference` → `reviewed` (7), `invalid_verification_status: unverified` → `pending` (5), missing `created` → note's `modified` (5, overlapping). **Verified 2026-07-12** by re-running `bulk_scan.py`: **Scanned=151, Clean=119, Errors=0, Warnings=37** (R4 errors=0). Spot-checked offenders confirm real value fixes, not rule-softening: `Hermes-Cost-Reduction-AI-Labs-vs-CNS-Setup` (`reference→reviewed`), `langchain-repo-analysis-and-cns-fit` (`unverified→pending`), `Mission-Control-Evaluation-Task` (`created` backfilled). This entry sat stale as "QUEUED" until the 2026-07-12 re-orientation caught that `fc1d26e` had already closed it.
+
+**Still open (separate, optional — never bundle without operator ask):** ~19 stale-pending triage (`verification_status: pending` >14d — verified-vs-leave is an operator call); ~10 orphans (no inbound wikilinks); 8 missing-quality-enrichment WARNINGS (Nexus-shaped sparse notes that legitimately omit the enrichment tier per note-style-guide — expected, not action items); vault CRLF line-ending normalization (phantom `git status` churn, cosmetic). All warnings/hygiene, zero errors.
+
+## FUTURE INITIATIVE (wanted, not needed now): personal live-data + auto-awareness
+
+Close the loop between **what you know** (the vault) and **what's happening now** (your live context). Two linked gaps surfaced 2026-07-10 (validated against a "second brain" build guide + the Nexus/JARVIS bar):
+1. **Personal live-data**: wire **read-only, OAuth-scoped** Google Calendar (first), then Gmail/Slack, into the awareness layer (pattern: `workspace-mcp`). Today's digest pulls only external/public signals (arxiv/social/news), never your calendar or inbox — so a JARVIS can't know your day. Read-only + scoped keys fit the "keys not prompts" posture just established.
+2. **Auto-awareness in Claude Code**: Claude Code has *on-demand* vault awareness but not Hermes' *always-on injected* recall (`pre_llm_call` brain/Honcho). Wiring live personal data + injected recall into Claude Code sessions = one initiative. Route the design through BMAD (`feedback_route_design_questions_through_bmad`) when opened. **Not blocking; aspirational.**
+
+## PAKE frontmatter three-layer reconcile — Lane B done (2026-07-10)
+
+Operator-direct specs edit + specs→vault sync (NOT session-close; NOT `sync-vault-modules` reverse):
+
+- **AGENTS.md v2.1.56** — §2 routing + §3 scope/template enum now include HookSetNote and WeaponsCheckNote (Epic 75 run-chain artifacts → `03-Resources/`). All 3 constitution copies byte-identical (`constitution.test` green).
+- **note-style-guide.md** — Gap 5 legacy keys reconciled (`created`, `reviewed` status enum, `source_uri`, 7 pake_types + PAKE Type Guide entries; Clippings/03-Resources → `reviewed`). Specs + canonical vault byte-identical (`vault-modules-parity` green).
+
+**Still open** from 87-3 investigation (Lane A partial / other lanes): `status: stable` lint-vs-Zod; scalar `tags`; vault-lint `task-prompt.md` + `vault-lint-remediate-34-2.ts` enrichment ERROR→WARNING sync; `vault-lint.md` pake_type table if not already done in Lane A.
+
+## Repo↔canonical vault topology (surfaced 2026-07-10) — ✅ RESOLVED IN SPEC (`00b25c5`/`237625f`)
+
+Two independently-maintained `Knowledge-Vault-ACTIVE` trees have drifted, and governed writes via a Claude Code session's vault-io MCP reach only the repo copy — NOT the vault Hermes/Nexus/brain-index actually use:
+- **Canonical (live runtime):** `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE` — `CNS_VAULT_ROOT` in `~/.hermes/config.yaml:729`.
+- **Repo (git-tracked dev SSOT):** `./Knowledge-Vault-ACTIVE` — what `verify.sh` + the repo-bound vault-io MCP use.
+
+Evidence: `CNS-Operator-Guide.md` diverged on formatting (`title` quoting, `confidence_score` 1 vs 1.0) even before migration; `03-Resources/Vault-Intelligence-Discovery-Workflow.md` is a **stale repo copy** (`status: stable`, date-typed `created`, `modified: 2026-04-05`) while canonical is current (`reviewed`, quoted `created`, `modified: 2026-05-17`). Both trees required separate migration for the single Gap-1 `stable` note.
+
+**Resolved (confirmed at the 2026-07-12 re-orientation — a proposed BMAD architecture session was stopped as redundant).** The topology is settled contract, not an open design question: canonical = runtime SSOT; repo `./Knowledge-Vault-ACTIVE` = **frozen CI fixture** (drift is intentional, not a mirror — so there is no fixture "sync problem"). Full contract in `specs/cns-vault-contract/README.md` (client-root matrix; per-client `CNS_VAULT_ROOT` incl. the `%APPDATA%\Claude\claude_desktop_config.json` `wsl.exe` wrapper that sets it for Claude Code/Desktop; frozen-fixture policy) via commit `00b25c5`; fixture-root startup stderr-guard in `237625f`; decision trace in `investigations/vault-topology-mcp-root-contract-investigation.md` (backlog items 1 & 2 marked Done). All live surfaces (Hermes, Cursor, Claude Code, Desktop) point at canonical; `verify.sh` vault-modules-parity gates the specs↔canonical **module** mirror, which is distinct from the frozen fixture.
+
+**Residuals (small, non-architectural):**
+- **Canonical vault git discipline** — the vault is its own safety-net repo (baseline `227b490`); checkpoint `fbd5c03` (2026-07-12) captured session governed notes + module mirror + audit log, vault now clean (0 uncommitted). No automated commit cadence; hand checkpoints are current practice.
+- **`project-context.md`** still calls `Knowledge-Vault-ACTIVE/` the SoT ambiguously — 1-line cleanup to match the README contract (Cursor's turf).
+- Repo fixture `Vault-Intelligence-Discovery-Workflow.md` still `status: stable` — acceptable per the now-documented freeze policy; fix only if a fixture test needs it PAKE-valid.
+
+Related: [[reference_canonical_vs_repo_vault_path]], [[project_vault_module_ssot]].
+
+## Deferred from: code review of 86-1-session-close-project-status-ssot (2026-07-10)
+
+- **Token-cap deep truncation can cut the in-progress nums list mid-string** — `token-estimate.mjs` (~20-token last-resort truncation of `project_status_line`) can slice `deriveProjectStatusLine`'s `(1, 5, 7, …)` list mid-number when the whole context pack is over budget. Pre-existing mechanism, not introduced by 86-1, and unreachable at current epic scale (only fires after notebooks + stories are dropped and still over budget). Revisit if the active-epic list ever grows large enough to approach the cap.
+
+### Fast-follow patch bundle (4 LOW items, code review of 86-1) — ✅ DONE (`88cc459`, 2026-07-10)
+
+Resolved in one patch commit: stale `@param repoRoot` JSDoc removed, `deriveProjectStatusLine` now de-dupes epic keys last-wins via `Map<number,string>` (+ duplicate-key test), dead `readProjectStatusLine` export deleted, none-case test gained the stale-marker loop. 3-lens `/bmad-code-review` clean; node suite 92/92; pushed.
+
+## Deferred from: code review of 87-3-pake-quality-enrichment-frontmatter-reconcile (2026-07-09)
+
+- **`status: stable` lint vs Zod mismatch** — bulk_scan `STATUSES` includes `stable`; Zod and vault-lint spec do not. Pre-existing; notes can pass lint but fail governed mutations.
+- **vault-lint Rule 4 `pake_type` table** — Spec lists 5 types; bulk_scan and Zod accept 7 (includes HookSetNote, WeaponsCheckNote). Pre-existing spec drift.
+- **Scalar `tags:` string** — bulk_scan ERROR; Zod coerces string to array. Pre-existing cross-layer mismatch.
+- **Hermes vault-lint `task-prompt.md`** — Still documents missing enrichment as ERROR; bulk_scan now WARNING. Follow-up doc sync outside 87-3 file list.
+- **`vault-lint-remediate-34-2.ts`** — `rule4Findings()` still flags absent enrichment as ERROR; remediate script not in 87-3 scope.
+- **note-style-guide legacy `date`/`reference` fields** — Required-field list still uses Nexus-era keys; enrichment section added but top-of-file PAKE list not reconciled. Pre-existing.
+
+## Deferred from: code review of 87-2-specs-modules-vault-sync-drift-gate (2026-07-09)
+
+- **`apply-section8.mjs` edited in commit `4d4902e`** — 87-1 review bundle added `usingRepoVaultFallback` vault-target skip; violates 87-2 hard constraint "do not edit apply-section8.mjs" but change is out of 87-2 file scope and correct for 87-1. Track under 87-1 follow-up if needed.
+
+- **`resolveLiveVaultModulesDir` session-close.env fallback** — Parity gate reads `~/.hermes/session-close.env` when `CNS_VAULT_ROOT` process env unset (intentional hotfix). Deviates from AC#2 literal skip wording but correct on operator machines.
+
+## Deferred from: code review of 87-1-untrack-vault-ai-context-constitution-duplicates (2026-07-09)
+
+- **vault-fast-scan-index date churn** — Incidental `2026-07-03` → `2026-07-05` edit bundled in 87-1 constitution dedup diff; harmless but out of stated scope.
+- **note-style-guide vs AGENTS PAKE template** — Canonical `note-style-guide.md` forbids `confidence_score` / `verification_status` while AGENTS §3 requires them; pre-existing vault tension mirrored into specs, not introduced by untrack logic.
+- **CLAUDE.md vault SSOT wording** — Repo-root `CLAUDE.md` still cites `Knowledge-Vault-ACTIVE/` as source of truth; pre-existing doc drift, not in 87-1 diff.
+- **canonical byte-parity CI gate** — Story 87-2 owns automated `diff -qr` enforcement; 87-1 test only checks file existence.
+
+## Session-close / constitution hygiene (2026-07-05, session 15)
+
+**Surfaced by:** Post-incident cleanup after the session-14 MEMORY.md/AGENTS.md drift incident (see `HANDOFF-2026-07-05-session14-hermes-consolidation.md`). Root cause of the AGENTS.md pollution was fixed this session (Story 86-1: `readProjectStatusLine` now derives from `sprint-status.yaml` SSOT, not stale `CLAUDE.md` Phase Status). Remaining items:
+
+- **Vault `AI-Context/MEMORY.md` is orphaned and stale — RESOLVED 2026-07-14 (Session 4)** — quarantined to `04-Archive/ai-context-orphans-2026-07-14/MEMORY.md` (operator FS; WriteGate path). Session-close router has no MEMORY.md regeneration step; Hermes native `~/.hermes/memories/{USER,MEMORY}.md` remains SSOT.
+
+- **Test-fixture-shaped corruption of a live file — root cause still unconfirmed** — before session 14 the vault MEMORY.md had been overwritten with unit-test fixture content ("AGENTS v9.9.10", "Epics: 48 in-progress", "Tests: skipped (dry-run)"), matching `tests/session-close-pipeline.test.mjs` SC-4 fixtures. That test only does in-memory string transforms (no real file write), so how fixture data reached a production path is unexplained. Lower stakes now that the file is orphaned/being-deleted, but the write-path leak is a real latent bug worth a dedicated trace before writing any new artifact through the same helpers.
+
+- **§7 Active Modules registration — RESOLVED 2026-07-09 (AGENTS v2.1.52).** Operator-direct edit registered all 6 previously-unregistered canonical modules in AGENTS.md §7 (note-style-guide, run-chain, two-bot-vault-boundary, memory-pillars-verification, hermes-desktop, mcp-operator-runbook), so §7 now matches the 11-module canonical set (Epic 87). Applied identically to all three AGENTS copies (real vault SSOT, `specs/`, `_bmad-output/planning-artifacts/`); `constitution.test.mjs` green (budget 450/500, planning==specs parity). Next session-close `apply-section8` keeps them in sync.
+
+- **NotebookLM drive-sync 60s write timeout on large exports** — **RESOLVED by Story 58-3 — VERIFIED LIVE 2026-07-09** (`58-3-session-close-notebooklm-pdf-source-fix.md`): session-close writes vault export as Drive PDF via media upload (≪ 60 s) instead of Docs `insertText` (~134 s). Write path confirmed on live `/session-close` (no more `drive_write_error`; PDF on Drive). Operator migration done (~~all 3 notebooks~~ **2 of 3** — see correction) on the `word_doc` PDF source, env `NOTEBOOKLM_DRIVE_DOC_ID=1olnj…`.
+  - ⚠️ **Correction 2026-07-21:** the "all 3 notebooks" claim was **false**. `981466f0` was never migrated and kept its `generated_text` source; only `dc6abf1a` and `f037c741` got the `word_doc` PDF. The unverified claim is why the gap survived from 07-09 to 07-21 — the 07-20 failure looked like a new bug rather than an incomplete migration. Now fixed (see Epic 58 residual, piece (b)). **Lesson: a migration record should state what was checked, not what was intended.**
+
+- **⚠️ WATCH NEXT SESSION-CLOSE — drive-sync PHASE 90s wall-clock (gate FIRED / being-fixed by 58-4)** — both 2026-07-09 and 2026-07-10 closes left all 3 `notebooklm_targets` **UNSTAMPED** (no `fanout_status`) despite `steps.drive_write` ok. Corrected diagnosis (not "just raise 90s"): (1) all-or-nothing merge after the full sequential 3-notebook loop — wall-clock kill lost every stamp; (2) no per-call `timeout` on `nlm source list` (the slow call); (3) sequential ×3 under ~90 s Hermes budget; (4) no `drive_sync_phase` start/end markers (killed vs never-invoked undiagnosable). **Do not** treat raising the 90 s budget as the fix. Story **58-4** hardens: incremental per-notebook merge + merge mutex, concurrent `Promise.allSettled`, 25 s `NLM_EXEC_TIMEOUT_MS` with `nlm_list_timeout` / `nlm_sync_timeout`, and `drive_sync_phase.{started_at,finished_at}`. Separate integrity note: unit tests had been appending fake `Google OAuth token refresh failed` lines into `~/.hermes/logs/session-close-drive-sync.log` (382 lines; rotated to `.bak-2026-07-13` on 2026-07-13) — not live auth failure. See `58-4-drive-sync-phase-hardening-and-diagnostics-integrity.md`.
+
+- **AGENTS.md line-ending flip-flop (LF↔CRLF) pollutes history** — session-close writes the vault-mirrored `specs/cns-vault-contract/AGENTS.md` with CRLF; prior commits stored LF, so each session-close commit shows a whole-file diff (e.g. `cf89643`: 440/441 raw vs 12/13 real content lines). Add a `.gitattributes` entry pinning the constitution files' EOL so future diffs stay clean.
+
+- **(Optional) session-close Section 8 synthesis runs on the global default model (Sonnet 4.6)** — session-close is a *skill*, so it inherits `model.default`; Hermes v0.17.0 has no per-skill routing (the `auxiliary:` Haiku pins from Epic 80 cover framework sub-tasks only, not skills). The only way to run just this pass on Haiku without downgrading all of JARVIS is to re-architect the bounded Section 8 synthesis into a scripted direct-to-Haiku API call (Phase A already runs deterministic scripts). Low priority — the pass is a bounded ~1,500-token call.
+
+---
+
+## Deferred from: code review of 81-2-morning-digest-internal-block-watchdog-reliability (2026-07-05)
+
+- **`DIGEST_WATCHDOG_REFETCH=1` env set but no consumer reads it** — `selective-digest-source-refetch.mjs` passes the flag to wrapper subprocesses; no adapter checks it yet. Proposal optional hook; wrapper re-exec is sufficient for v1.
+- **Skip-path watchdog log actions registered but not emitted** — `skipped-already-refetched` and `skipped-no-refetch-needed` are in `DIGEST_LOG_ACTIONS` but `trySelectiveSourceRefetch` returns without logging those skip paths. Minor observability gap.
+
+---
+
+## Deferred from: code review of 81-1b-internal-dev-state-collector-dashboard-sync-push (2026-07-05)
+
+- **No `main()` integration test for Story 81-1b independent failure semantics (AC3)** — snapshot-fail/dev-state-succeed and vice versa are covered by manual code trace and unit tests of the individual pieces (secret scan, push builder, exit-code logic) but not exercised together through `dashboard-sync.ts`'s `main()`. Add an integration test mocking `collectAndMaybePush` + `pushInternalDevState` if this path ever needs to change.
+
+---
+
+## Hermes self-improvement ungoverned skill writes (2026-07-04)
+
+**Surfaced by:** Story 77-4 awareness-sync data-accuracy fix (live Discord test).
+
+**Problem:** Hermes's self-improvement loop can auto-patch deployed skill files under `~/.hermes/skills/cns/` without mirroring to `scripts/hermes-skill-examples/` in the repo. The 2026-07-04 pass added a false "sprint-status.yaml only covers Epics 1–76" claim to `awareness-sync/SKILL.md` and created `references/cns-epic-project-status.md` with a hand-frozen story table — both bypassed code review and the `verify.sh` skill-parity gate entirely.
+
+**Follow-up to scope (not fixed in 77-4 data-accuracy patch):**
+
+- Should self-improvement patches to skill files require a review/PR step before deploy?
+- Or at minimum: always mirror writes to the repo SSOT so `assert-hermes-skill-install-gate.mjs` catches drift on next `verify.sh`?
+- Consider extending protect-list / curator rules for skill reference files that must not contain mutable status tables.
+
+**Related observation (same live-test session):** repeated identical "what's the state of X project" questions in the same or a freshly-restarted Discord session did not appear to re-invoke the `awareness-sync` skill/tool at all — Hermes answered from brain-recall's passive `CNS-Daily-Rhythm.md` `AUTO:ACTIVE_PROJECTS` citation plus its own conversational memory of prior answers, even across a full gateway restart. The answer only became accurate after `/session-close` refreshed that AUTO block — not because the skill was re-run. Worth investigating whether brain-recall's pre_llm_call injection is satisfying the model's "I have enough context" threshold before it considers invoking bound skills for story-level detail questions. Not blocking (the AUTO block is a legitimate, if coarser-grained, accurate source once refreshed), but the awareness-sync skill's story-level table may be effectively unreachable via natural-language questions until this is understood.
+
+---
+
+## Deferred from: code review of 82-2-spike-omni-002-voice-channel (2026-06-28)
+
+- **`profile_home` vs launch `HERMES_HOME` state.db split** — Plugin reads only `{HERMES_HOME}/state.db`; remote-profile sessions persist elsewhere. Channel Resolution Contract flags for 82-3 VoiceDrawer.
+
+- **Per-turn sqlite open on discord/text hot path** — `_session_source_from_db` runs on every hook call. Acceptable for spike; revisit if voice prefetch p95 exceeds budget.
+
+- **Spike log PII on disk** — `CNS_BRAIN_RECALL_SPIKE_LOG=1` writes truncated `user_message` to `~/.hermes/logs/`. Env-gated spike tooling; tighten if promoted to production observability.
+
+---
+
+## Deferred from: code review of 79-5-production-cns-brain-recall-plugin-prefetch-cli (2026-06-26)
+
+- **Per-turn recall latency (cold-start + index load + Portal embed)** — measure p95 at Story 79-4 live cutover (`shadow_mode: false`); if over budget, consider persistent prefetch helper instead of per-turn `npx tsx` subprocess. Forward flag only; not blocking shadow wiring.
+
+---
+
+## Hermes Desktop Electron build — AC#4 voice E2E blocker (2026-06-25)
+
+**Surfaced by:** Story 78-1 operator assessment.
+
+**Problem:** Story 78-1 voice config on WSL is correct (`auto_tts: true`, `tts.use_gateway: true`, `stt.use_gateway: true`, whisper-1). AC#4 Desktop E2E cannot run:
+
+1. **No packaged native Desktop app** — Windows Store search finds nothing; `install.ps1` updates CLI/upstream but does not produce a Desktop `.exe`.
+2. **Electron source only** — `apps/desktop` present in hermes-agent repo after pull; requires build/packaging step (out of 78-1 scope).
+3. **Browser UI voice fallback blocked** — WSL sounddevice / audio device limitation for mic capture at `http://localhost:9119`.
+
+**Operator action when ready:**
+
+- Build/package Hermes Desktop from `apps/desktop` (Electron) per upstream docs, or install when Nous ships a packaged Windows Desktop release.
+- Re-run AC#4: remote gateway `http://localhost:9119`, OAuth, Ctrl+B push-to-talk, streaming TTS confirmation.
+- Update `78-1-voice-e2e-evidence.md` §AC #4 from PARTIAL → PASS; move story 78-1 to `review`.
+
+**Unblocked:** Story **78-2** (per-skill Hermes model routing) — pure config, no Desktop dependency.
+
+---
+
+## cns-dashboard CI failure — @esbuild/aix-ppc64 platform mismatch (2026-06-25)
+
+GitHub CI fails on `npm ci` with `EBADPLATFORM @esbuild/aix-ppc64 — wanted aix/ppc64, runner is linux/x64`. Stray platform-specific optional dep in `package-lock.json`. Vercel builds fine. Fix: `package-lock.json` cleanup to remove stray platform entries. Not blocking any Epic 77 story.
+
+---
+
+## Ops health items — surfaced by awareness-sync live smoke (2026-06-25)
+
+Observed from `awareness-sync` Discord response during Epic 77 Story 77-4 validation:
+
+- **Run-chain dormant 25 days** — last run was Story 52.1 (Morning Digest NotebookLM Synthesis). Trigger a manual chain run when ready; skill + endpoint are live.
+- **Inbox 23** — triage backlog from 76-3 plan still pending execution. Run `/triage` family via Hermes when ready.
+- **MCPs 2/7 healthy** — vault-io stale; context7, discord, firecrawl, playwright all unknown status. Run an MCP health check and resolve stale/unknown statuses.
+- **8 investigations, all in triage** — nothing active or progressing. Review investigation board when ops window allows.
+
+---
+
+## Deferred from: code review of 75-5-run-chain-end-to-end-revival-verification (2026-06-25)
+
+- **Dashboard `RUN_CHAIN_STORY_KEY` still 38-2** — `scripts/dashboard-sync.ts:112` points at Epic 38 story; dashboard shows dormant after 75-5 Revived docs until key updated or status derived from `run-chain.md`.
+- **`parseEnvFile` edge cases (EXPORT casing, CRLF, duplicates)** — incremental hardening on `validate-anthropic-key.ts` optional; land via 75-4 patch if `.env.live-chain` uses `export` lines (75-5 review decision 2B reverted in-story fix).
+- **Skill mirror stale dormant messaging** — `trigger-pattern.md` / `task-prompt.md` still reference dormant/75-4 gate; update when `#hermes` binding follow-up lands or via 75-3 review patch.
+- **`AGENTS.md` Run-chain module row (WriteGate)** — Session 4 housekeeping: add Run-chain row to §7 module table via `/session-close` in `#hermes`; sync `specs/cns-vault-contract/AGENTS.md` + canonical vault `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md` in one operation (do not sync in-repo untracked `Knowledge-Vault-ACTIVE/AI-Context/AGENTS.md`). Reverted from 75-5 working tree (WriteGate).
+
+## Parked initiative — CNS/Nexus Dashboard UX Redesign (2026-06-24)
+
+**Status:** Intentionally deferred. **Not in Hermes Consolidation scope (Epics 74–78).**
+
+Operator wants a full redesign of how the cns-dashboard / Nexus cockpit **looks and operates**. Deliberately kept OUT of the Hermes Consolidation overhaul to avoid scope blow-up and to protect the "nothing breaks" goal (G2) while the backend is being stabilized.
+
+**Why deferred to its own epic (not folded into 74–78):**
+- The conversational JARVIS lives on Desktop/Discord (ADR-HERMES-001 topology a), not the cockpit — a redesign does not advance the JARVIS goal.
+- A better redesign is possible *after* Epic 77 (D1 awareness): design against real, working JARVIS data flows rather than a system that doesn't exist yet.
+- Epic 77's new UI (awareness panels + async ask box) is scoped minimal + theme-consistent (UX-DR1–5, reusing `nexus-theme.css`), so it moves with any future redesign — not throwaway.
+- Adding a live-dashboard redesign mid-overhaul fights the stabilization goal.
+
+**Recommended path when picked up:**
+1. Run `bmad-ux` / UX designer agent (Sally) as a **planning-only** track to capture the redesign vision (can happen anytime; does not block 74–78).
+2. Build as a **dedicated epic after the Hermes Consolidation overhaul lands** (ideally post-Epic 77).
+
+**Reference:** `prd-hermes-consolidation.md`, `architecture-hermes-consolidation.md` (topology a, cockpit = awareness surface), `ux-designs/ux-CNS-2026-06-21/` (current Nexus UX baseline).
+
+---
+
 ## Deferred from: code review of 73-7-digest-entity-sections (2026-06-22)
 
 - Full verify gate fails seven unrelated session-close Section 8 tests because the changed draft validator rejects existing fixtures that do not start with `###`; Story 73.7 focused tests pass 66 of 66.
@@ -546,9 +1070,11 @@ Repeated runs of the same research prompt can yield **different source URLs** fr
 
 ### Per-skill Hermes model routing
 
-Haiku for triage/graduate/vault-lint/session-close; Sonnet for vault-think/verify/run-chain. Blocked on Hermes native per-skill model API. Policy documented in MEMORY.md.
+**Status (2026-07-03, Story 80-2):** **Closed / superseded by Epic 80.** Hermes v0.17.0 never shipped a `smart_model_routing` consumer (confirmed 78-2 + fresh grep audit). Block **retired** — YAML-commented in `~/.hermes/config.yaml` Story 80-2. **Sole cost routing lever:** `auxiliary:` block (Story 80-1 — six tasks pinned to Portal Haiku). Do not re-enable, extend, or file stories to "implement" `smart_model_routing` unless Hermes upstream ships a documented consumer (then new epic, not resurrection of 78-2 tier map).
 
-- **Class:** (b) Phase 2 backlog
+- **Class:** ~~(b) Phase 2 backlog~~ **closed**
+- **Policy:** Tune `auxiliary:` only; main operator turns stay `model.default` Sonnet on Portal
+- **Rollback:** Uncomment `smart_model_routing` block from `~/.hermes/config.yaml.bak-*-80-2` or restore full backup; see `AI-Context/modules/routing.md` §Epic 80
 
 ### `vault-lint-remediate-34-2.ts` `--verify-only`
 
@@ -994,3 +1520,85 @@ Epic 5 audit scope from code: no `TODO.*audit` in `src/`; deferrals were “defe
 ## Deferred from: code review of 60-2-dry-refactor-shared-withsessioncloseenv-isolation-helper (2026-06-04)
 
 - Optional direct unit tests for `tests/helpers/hermes-env-isolation.mjs` (save/restore ordering, nested-call safety); integration coverage via three migrated suites is sufficient for now.
+
+## Deferred from: code review of 79-4-golden-set-calibration-gate (2026-06-26)
+
+- `precision@k` metric is expected-recall-in-top-k (|expected ∩ topK| / |expected|), not classic IR precision — documented in harness; acceptable for SM-1 bar if operator agrees.
+- Operator live calibration not run — golden paths verified in vault (including `AI-Context/modules/run-chain.md`); `operator_signoff: pending` until Chris runs Portal index calibrate.
+
+## Deferred from: 84-2 Verify dry-run findings on 84-1 discover shell (2026-07-06)
+
+Surfaced by the prove-once Verify dry-run (bmad-code-review + adversarial-general + edge-case-hunter on `3f5d4af..1d6d77e`, evidence `84-2-verify-evidence.md`). None block 84-2 (wiring proven); all are 84-1 robustness gaps. **Do before enabling the discover cron** (dormant under 4a until operator turns it on):
+
+- **`write-discover-artifact.mjs`** — no guard when `collectInternalDevState()` throws or returns a non-array → malformed `discover.json`; add `Array.isArray` check + `TypeError`.
+- **`write-discover-artifact.mjs`** — empty `items[]` writes a `topPick` fallback but no operator-facing "no ranked work" message → operator could approve Build with no work item; document empty-items path in task-prompt.
+- **`write-discover-artifact.mjs`** — no schema/size validation on `discover.json` before/after write (partial write / disk full → corrupt JSON consumed by Build); add a post-write parse/validate.
+- **`install-unified-loop-discover-cron.sh`** — non-idempotent: re-running appends a second `cns-unified-loop-discover` crontab line → double Discover runs; check-for-existing-tag before append.
+- **`run-unified-loop-discover-cron.sh`** — hard `exit 1` when `.env.live-chain` missing (it sources `HERMES_DISCORD_TOKEN` there) is correct behavior but undocumented; add a troubleshooting row to `references/cron-snippet.md`.
+- **Portability (low, single-operator OK):** `write-discover-artifact.mjs` `DEFAULT_REPO_ROOT` is an operator-absolute path; fine while `OMNIPOTENT_REPO` is set or the default matches, but fail-fast if `repoRoot` lacks `collect-internal-dev-state.ts`.
+- Contract tests assert file/string presence but never execute `write-discover-artifact.mjs` against a temp `$HOME` ("green tests, broken cron" risk) — add an execution test when the above hardening lands.
+
+## Deferred from: Epic 78-1 AC#4 Desktop voice E2E investigation (2026-07-06)
+
+Windows Hermes Desktop app already installed at `%LOCALAPPDATA%\hermes\hermes-agent\apps\desktop` with full toolchain (Electron, Vite, electron-builder) — no packaged installer had been built, but `npm run start` (build + `electron .`) launches the real native app. Live-debugged with the operator; two real, distinct findings surfaced, neither fixed yet:
+
+1. **Push-to-talk hold-key binding doesn't fire.** `Settings → Voice → Voice Shortcut` is correctly configured (`ctrl+b`, later changed to `alt+v` — config write confirmed live in `~/.hermes/config.yaml`'s `voice.record_key`), but holding the key does nothing (`ctrl+b` instead triggers the app's own sidebar-toggle shortcut — a likely in-app keybind collision; `alt+v` also did not trigger recording). The **click-the-wave-icon** record path works instead (see #2) — so this is specifically a hold-key push-to-talk regression/collision in Hermes Desktop, not a total voice-input failure.
+2. **STT works; the agent-turn call that follows does not, due to an unrelated provider misconfiguration.** Clicking the wave icon *did* correctly transcribe real speech via Whisper (`"Hello, Harmeys, this is the voice test."` — "Hermes" misheard as "Harmeys", otherwise accurate) and sent it as a real message to the real WSL backend (new session appeared in the live session list). The subsequent agent reply call failed with HTTP 400: `agent.conversation_loop` routed to `provider=anthropic, base_url=https://api.anthropic.com, model=claude-sonnet-4-6` (direct Anthropic OAuth) instead of the Nous Portal routing (`provider=nous, inference-api.nousresearch.com`) used everywhere else in this initiative — that direct-Anthropic connection is out of Anthropic's new "third-party app extra usage" quota (`~/.hermes/logs/errors.log:2026-07-06 20:44:41`, `request_id: req_011CckffnTaGD57nSSBFP82s`). No reply text was generated, so TTS (`Read Responses Aloud`) never got exercised — this is not a TTS bug, it never ran.
+
+**Do before resuming AC#4:**
+- Find and fix the Desktop app's model/provider selector (bottom of chat composer, showed "Sonnet 4.6 · Med") — it appears to allow selecting a direct-Anthropic-OAuth route separate from the Nous Portal routing; switch this Desktop session back to Nous-routed Sonnet.
+- Re-test hold-key push-to-talk after that's fixed; if it still doesn't fire, treat the keybind collision as a separate Hermes Desktop bug (worth an upstream report) and standardize on the click-the-wave-icon record path for AC#4 evidence instead.
+- Once a real reply is generated, confirm TTS (`Read Responses Aloud`) actually plays back — that half of the round-trip is still unverified.
+
+Story 78-1 AC#4 remains `PARTIAL` — this session made real progress (proved a packaged/dev-launched Desktop app connects to the real WSL backend, and that STT genuinely works) but did not close the AC.
+
+## Deferred from: Ras Mic system-design video review — unify signal-pipeline context (2026-07-19)
+
+Surfaced while reviewing Ras Mic's "System Design Overview" video (youtu.be/4jy0T98dYoI) against the CNS architecture during the CNS-redesign initiative. Verdict: the video mostly VALIDATES the existing stack (cns-dashboard is already SvelteKit + Convex + Vercel = his exact recommendation; Convex already the control-plane/source-of-truth). Only one idea has real teeth for CNS, and it is deferred on purpose.
+
+**The idea — co-locate the digest scorer into Convex (lightweight version of his "monorepo / durable-processes-inside-Convex" argument):**
+- Today the `rankScore` scorer lives in external Node scripts on Hermes cron (`~/.hermes/scripts/score-digest-signals.mjs`, `computeRankScore()` at :1625), which push into Convex `digestSignals` over HTTP (`push-digest-convex.mjs` → `digest:addDigestSignal`). The scorer is in a DIFFERENT repo from the schema it writes (cns-dashboard `convex/validators.ts`) and the UI that reads it.
+- **Proven pain (this session):** answering "where does rankScore come from" required chasing the value across FOUR repos — cns-dashboard → Omnipotent.md → NEXUS → ~/.hermes — precisely because scorer, schema, and display are fragmented. That is the exact "separated contexts" cost Ras Mic's monorepo argument targets.
+- **Candidate fix:** move the scorer into Convex as an action/workflow so scorer + schema + display are co-located and agent-buildable, without a full monorepo merge. His "durable processes / put long-running work inside Convex workflow components" point is the relevant pattern (replaces external cron).
+
+**Why DEFERRED, not scheduled:** collides head-on with the strategic frame ([[project_strategic_bottleneck_deploy_not_build]]) — CNS/infra is already mature/over-built; bottleneck is revenue/deploy, not delivery; re-architecting a working pipeline is "sophisticated procrastination." The fragmentation cost is felt ~once per session, not continuously. **Only revisit if cross-repo hunting becomes a recurring, real drag.** Do NOT bundle into the redesign (that is frontend trust/IA work — a different axis).
+
+**Explicitly NOT adopting from the video** (Pluto-specific multi-tenant SaaS, pure scope-inflation for a single-operator internal instrument): WorkOS enterprise auth, Autumn credit-billing, Daytona agent sandboxes, Expo/Electron mobile+desktop surfaces, iMessage service.
+
+## Deferred from: Milanote-style per-case evidence canvas — CNS redesign (2026-07-19)
+
+Surfaced during CNS-redesign Scenario 03 (Eric's Dig and Deepen) when the operator asked for a Milanote-like investigation workspace. Perplexity deep-research + a codebase grounding pass produced a sound target architecture. **Deferred deliberately — see "Why deferred."**
+
+### Target architecture (validated, build this later)
+**Hybrid, with the seam at `investigating`:**
+- **Upstream of the seam (triage / global view):** keep the structured 4-column Kanban + Convex as the authoritative state machine and source of truth. Never store signal state on a canvas.
+- **Downstream of the seam (deep work on 1–3 cases):** each card in `investigating` opens a per-case freeform canvas for evidence reasoning.
+- Rationale: pure Kanban underserves "follow the evidence"; pure canvas underserves "triage and commit/discard"; pure DB underserves human sense-making.
+
+### What ALREADY EXISTS (verified in cns-dashboard, 2026-07-19) — reuse, don't rebuild
+- **4-column Kanban is fully built:** `investigationBoardItems.column` = `triage | investigating | waiting | resolved` (`convex/validators.ts:374`); mutations `addToInvestigationBoard` (:70), `moveBoardItem` (:106, fires a Hermes awareness push on promotion to `investigating`), `removeBoardItem`, `updateBoardItemNote`; query `listInvestigationBoard`. UI: `NexusInvestigationBoard.svelte`, `NexusInvestigationBoardCard.svelte`, `NexusInvestigationPanel.svelte`. Rendered at `/nexus/investigate`.
+- **Freeform canvas ENGINE is fully built:** `ResearchCanvasView.svelte` (433 lines) — drag, x/y positions, clamping, debounced persistence — backed by `canvasLayouts` table + `getCanvasLayout` / `saveCanvasLayout` (`convex/canvasLayouts.ts`). Spatial placement + persistence is SOLVED machinery.
+
+### What is NEW build (the actual gap)
+1. **Per-case scoping** — the existing canvas is a SINGLE GLOBAL canvas (the exact "global dumping ground" anti-pattern the research says to reject). Needs keying to a board item / case.
+2. **Wrong object type** — the canvas places **topic cards keyed by slug** (`canvasSlugs`, `TOPIC_CARD_WIDTH`, sparklines); the Kanban holds **`digestSignalId`** refs. A case canvas must place signals/entities/evidence, not topics. This is why it is NOT a re-point.
+3. **Connectors / arrows** — no edge/arrow logic exists anywhere. Research flagged connectors as LOAD-BEARING for evidence graphs (support/contradict relations).
+4. **Mixed columns-on-canvas** — "Supporting / Contradicting / Unknown / Leads" buckets sitting on the freeform surface.
+
+### Also adopt when built (from the research)
+Board-per-case opened from the card · collapse/expand with card counts · case-board templates · lightweight note/link annotation cards layered over pipeline data · `triage` already serves the "unsorted inbox" pattern.
+
+### Explicitly REJECT (do not cargo-cult Milanote)
+Deep nested board hierarchies as primary IA · boards as the data store for signals (state stays in Convex) · Milanote-style shallow global search / "home board" metaphor (need faceted metadata filtering instead) · aesthetic per-case art direction (color/icon only for severity/state/type) · a long-lived GLOBAL canvas holding all signals.
+
+### Why DEFERRED (do not build now)
+- **The operator has never run a single investigation.** Baseline is non-adoption (`cns-dashboard/_bmad-output/A-Product-Brief/baseline-capture.md`). Designing an evidence graph — connectors, supporting/contradicting buckets, per-case boards — for a workflow never once performed is designing for an imagined user. What the canvas must hold is unknown until real digs happen.
+- Research's own caveat: **spatial memory only pays off when the item set is stable and few.** No data yet on what real dig sets look like.
+- **Collides with Obj 3.3** (stay bounded — Nexus + Trends only, zero scope inflation). A per-case canvas with connectors is a NEW FEATURE, not a redesign of an existing surface.
+- **Deferring is cheap:** the drag/position/persist engine already exists, so building later costs barely more than building now — and by then real digs will have revealed the actual requirements.
+
+### Revisit trigger
+After the operator has worked enough real digs through `triage → investigating → resolved` to know what evidence he actually needs to arrange, and whether spatial arrangement helps his reasoning at all.
+
+### NOT in the current redesign
+Scenario 03's sunshine path uses the existing Kanban with its real column semantics; `/trends/canvas` stays where it is, OFF the sunshine path. No Milanote work ships in this redesign.

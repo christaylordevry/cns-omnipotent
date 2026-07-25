@@ -31,12 +31,13 @@ DATE_PAT = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 WIKILINK_PAT = re.compile(r'!?\[\[([^\]|]+)(?:\|[^\]]*)?\]\]')
 UUID_V4 = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
 
-REQUIRED_FIELDS = ['pake_id','pake_type','title','created','modified','status',
-                   'confidence_score','verification_status','creation_method','tags']
+CORE_REQUIRED_FIELDS = ['pake_id','pake_type','title','created','modified','status','tags']
+QUALITY_ENRICHMENT_FIELDS = ['confidence_score','verification_status','creation_method']
 PAKE_TYPES = ['SourceNote','InsightNote','HookSetNote','WeaponsCheckNote',
               'SynthesisNote','WorkflowNote','ValidationNote']
-STATUSES = ['draft','in-progress','reviewed','stable','archived']
+STATUSES = ['draft','in-progress','reviewed','archived']
 VERIF_STATUSES = ['pending','verified','disputed']
+CREATION_METHODS = ['human','ai','hybrid']
 
 
 def extract_frontmatter_and_body(path_str):
@@ -171,10 +172,11 @@ stale.sort()
 # ── RULE 4: missing/invalid frontmatter ───────────────────────────────────────
 errors_r4 = []
 warnings_r4_uuid = []
+warnings_r4_missing_quality = []
 for rel, fm in frontmatters.items():
     note_errors = []
     note_warnings = []
-    for field in REQUIRED_FIELDS:
+    for field in CORE_REQUIRED_FIELDS:
         val = fm.get(field)
         if val is None or (isinstance(val, str) and not val.strip()) or (isinstance(val, list) and not val):
             note_errors.append(f"missing_{field}")
@@ -183,10 +185,36 @@ for rel, fm in frontmatters.items():
             note_errors.append(f"invalid_pake_type: {val}")
         elif field == 'status' and val not in STATUSES:
             note_errors.append(f"invalid_status: {val}")
-        elif field == 'verification_status' and val.strip() not in VERIF_STATUSES:
-            note_errors.append(f"invalid_verification_status: {val}")
         elif field in ('created', 'modified') and not DATE_PAT.match(val.strip()):
             note_errors.append(f"invalid_date_{field}: {val}")
+        elif field == 'tags' and not isinstance(val, list):
+            note_errors.append("tags_not_list")
+        elif field == 'pake_id' and isinstance(val, str) and val.strip():
+            if not UUID_V4.match(val.strip()):
+                note_warnings.append(f"pake_id_not_uuid_v4: {val}")
+    for field in QUALITY_ENRICHMENT_FIELDS:
+        val = fm.get(field)
+        if val is None or (isinstance(val, str) and not val.strip()):
+            note_warnings.append(f"missing_{field}")
+            continue
+        if isinstance(val, list) and not val:
+            if field == 'confidence_score':
+                note_errors.append(f"invalid_confidence_score: {val}")
+            elif field == 'verification_status':
+                note_errors.append(f"invalid_verification_status: {val}")
+            else:
+                note_errors.append(f"invalid_creation_method: {val}")
+            continue
+        if field == 'verification_status':
+            if not isinstance(val, str):
+                note_errors.append(f"invalid_verification_status: {val}")
+            elif val.strip() not in VERIF_STATUSES:
+                note_errors.append(f"invalid_verification_status: {val}")
+        elif field == 'creation_method':
+            if not isinstance(val, str):
+                note_errors.append(f"invalid_creation_method: {val}")
+            elif val.strip() not in CREATION_METHODS:
+                note_errors.append(f"invalid_creation_method: {val}")
         elif field == 'confidence_score':
             try:
                 s = float(val)
@@ -194,24 +222,24 @@ for rel, fm in frontmatters.items():
                     note_errors.append(f"out_of_range_confidence_score: {val}")
             except Exception:
                 note_errors.append(f"invalid_confidence_score: {val}")
-        elif field == 'tags' and not isinstance(val, list):
-            note_errors.append("tags_not_list")
-        elif field == 'pake_id' and isinstance(val, str) and val.strip():
-            if not UUID_V4.match(val.strip()):
-                note_warnings.append(f"pake_id_not_uuid_v4: {val}")
     if note_errors:
         errors_r4.append((rel, note_errors, fm.get('created', 'unknown'), fm.get('modified', 'unknown')))
     if note_warnings:
-        warnings_r4_uuid.append((rel, note_warnings))
+        uuid_only = [w for w in note_warnings if w.startswith('pake_id_not_uuid_v4')]
+        quality_only = [w for w in note_warnings if w.startswith('missing_')]
+        if uuid_only:
+            warnings_r4_uuid.append((rel, uuid_only))
+        if quality_only:
+            warnings_r4_missing_quality.append((rel, quality_only))
 errors_r4.sort()
 
 # ── SUMMARY ───────────────────────────────────────────────────────────────────
 error_paths = set(r for r, _, _, _ in errors_r4) | set(p for paths in dup_groups.values() for p in paths)
-warn_paths = set(r for r, _, _, _ in stale) | set(r for r, _ in warnings_r4_uuid) | set(r for r, _, _ in orphans)
+warn_paths = set(r for r, _, _, _ in stale) | set(r for r, _ in warnings_r4_uuid) | set(r for r, _ in warnings_r4_missing_quality) | set(r for r, _, _ in orphans)
 clean = len(governed_md) - len(error_paths | warn_paths)
 scanned = len(governed_md)
 total_errors = len(dup_groups) + len(errors_r4)
-total_warnings = len(orphans) + len(stale) + len(warnings_r4_uuid)
+total_warnings = len(orphans) + len(stale) + len(warnings_r4_uuid) + len(warnings_r4_missing_quality)
 
 print(f"Scanned={scanned} Clean={clean} Errors={total_errors} Warnings={total_warnings}")
-print(f"  R1(dup)={len(dup_groups)} R2(orphan)={len(orphans)} R3(stale)={len(stale)} R4(missing)={len(errors_r4)} R4(uuid)={len(warnings_r4_uuid)}")
+print(f"  R1(dup)={len(dup_groups)} R2(orphan)={len(orphans)} R3(stale)={len(stale)} R4(missing)={len(errors_r4)} R4(missing_quality)={len(warnings_r4_missing_quality)} R4(uuid)={len(warnings_r4_uuid)}")
