@@ -21,8 +21,14 @@ jobs:
       - name: Install Omnipotent deps
         run: npm ci
 
-      - name: Omnipotent test suite
-        run: npm test
+      # Full `npm test` needs optional local siblings (private cns-dashboard, Hermes
+      # paths). M1 CI must stay green with no PAT — gate the contract suites only.
+      - name: M1 + OPS-2 digest-signal contract tests
+        run: |
+          node --test \
+            tests/contracts/digest-signal-deployed-contract.test.mjs \
+            tests/check-digest-contract-vs-deployed.test.mjs \
+            tests/digest-signal-contract-guard.test.mjs
 
       - name: Assert digest contract ⊆ deployed function-spec
         run: node scripts/check-digest-contract-vs-deployed.mjs
