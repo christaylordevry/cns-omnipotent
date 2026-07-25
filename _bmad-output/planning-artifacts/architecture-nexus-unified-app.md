@@ -261,7 +261,7 @@ Ideal-first reasoning approved by operator as non-anchored.
 
 - Keep `contracts/digest-signal-contract.json` as the producer allowlist (generated from `validators.ts`).
 - **Runtime truth:** prod `npx convex function-spec` — assert **contract ⊆ deployed** (never regenerate the contract *from* function-spec).
-- **Single implementation owner:** `cns-dashboard` (`scripts/lib/digest-signal-deployed-contract.ts`). Omnipotent invokes via sibling path with loud SKIP when absent.
+- **Single implementation owner:** `Omnipotent.md` (public) — `scripts/lib/digest-signal-deployed-contract.mjs`. `cns-dashboard` (private) invokes via sibling checkout of public Omni (no PAT). Loud SKIP when the Omni script is absent.
 - Land on **master** (auto-deploy line), not a stranded feature branch.
 - Retire the manual OPS-2 shape-sync ritual for covered field sets.
 - No `@cns/contracts` package in this milestone.

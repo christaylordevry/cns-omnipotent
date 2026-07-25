@@ -14,7 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test:gate-failures": "node scripts/assert-verify-failure-modes.mjs",
-    "test:node": "node --test tests/*.test.mjs",
+    "test:node": "node --test tests/*.test.mjs tests/contracts/*.test.mjs",
     "test:vitest": "vitest run --config vitest.config.ts",
     "test": "npm run -s test:node && npm run -s test:vitest",
     "check:digest-contract-vs-deployed": "node scripts/check-digest-contract-vs-deployed.mjs",

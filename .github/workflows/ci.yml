@@ -13,26 +13,12 @@ jobs:
       - name: Checkout Omnipotent
         uses: actions/checkout@v4
 
-      - name: Checkout cns-dashboard sibling (M1 check owner)
-        uses: actions/checkout@v4
-        with:
-          repository: christaylordevry/cns-dashboard
-          path: cns-dashboard
-          token: ${{ secrets.CNS_DASHBOARD_READ_TOKEN || github.token }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            cns-dashboard/package-lock.json
 
       - name: Install Omnipotent deps
-        run: npm ci
-
-      - name: Install cns-dashboard deps (vite-node + convex CLI for function-spec)
-        working-directory: cns-dashboard
         run: npm ci
 
       - name: Omnipotent test suite
@@ -41,7 +27,6 @@ jobs:
       - name: Assert digest contract ⊆ deployed function-spec
         run: node scripts/check-digest-contract-vs-deployed.mjs
         env:
-          CNS_DASHBOARD_ROOT: ${{ github.workspace }}/cns-dashboard
           OMNIPOTENT_ROOT: ${{ github.workspace }}
           # Convex CLI reads CONVEX_DEPLOY_KEY; secret is the least-privilege function-spec key.
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_FUNCTION_SPEC_KEY }}
