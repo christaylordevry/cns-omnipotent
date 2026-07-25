@@ -249,16 +249,22 @@ Ideal-first reasoning approved by operator as non-anchored.
 
 1. **Minimal live fix first:** change whichever side the evidence proves wrong; commit this independently to unblock the morning spine.
 2. **Prove the operator outcome:** run a real morning digest; Convex accepts the write; the cockpit displays a digest run **newer than 2026-07-22**.
-3. **Formalize second:** extract the proven shape into the first-class shared-contract package (`@cns/contracts` is illustrative); make both app validators and Hermes/orchestration writers import it.
+3. **Formalize second (RE-SCOPED):** do **not** extract into `@cns/contracts` during the dual-repo bridge. Make contract verification **deployment-aware** (contract ⊆ prod `function-spec`) — see M1 below. Shared-package consumption is deferred to M2's in-monorepo `packages/contracts`.
 
 **Acceptance criterion:** success is the real end-to-end digest outcome above. Type-checking and dual imports are necessary but insufficient.
 
-### M1 — Dual-repo contract consumption
+### M1 — Deploy-aware contract verification (RE-SCOPED 2026-07-25)
 
-- App and writers both import the shared contract.
-- Each repo's verification asserts contract compatibility/version.
-- Retire the manual OPS-2 synchronization ritual for covered shapes.
-- Repositories remain split only as a temporary migration state.
+**Supersedes** the earlier “build `@cns/contracts` + dual import” M1. Evidence from M0: the allowlist artifact and OPS-2 guard already exist; the miss was asserting against **repo** validators while **prod** ran a thinner schema. An npm package would be throwaway infra deleted by M2.
+
+**Delivered shape:**
+
+- Keep `contracts/digest-signal-contract.json` as the producer allowlist (generated from `validators.ts`).
+- **Runtime truth:** prod `npx convex function-spec` — assert **contract ⊆ deployed** (never regenerate the contract *from* function-spec).
+- **Single implementation owner:** `cns-dashboard` (`scripts/lib/digest-signal-deployed-contract.ts`). Omnipotent invokes via sibling path with loud SKIP when absent.
+- Land on **master** (auto-deploy line), not a stranded feature branch.
+- Retire the manual OPS-2 shape-sync ritual for covered field sets.
+- No `@cns/contracts` package in this milestone.
 
 ### M2 — One multi-package workspace
 
