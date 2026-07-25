@@ -1,79 +1,46 @@
-# Development Guide
+# Development Guide — CNS Multi-Part
 
-This repo is a **Node.js + TypeScript** codebase that ships an **MCP server** over **stdio**.
+**Updated:** 2026-07-25
 
 ## Prerequisites
 
-- Node.js **>= 20** (required by `package.json` `engines.node`)
-- npm (lockfile is `package-lock.json`)
+- Node 20+ (dashboard prefers 24 per `.nvmrc`)
+- WSL2 with vault mount at `/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE`
+- Hermes installed; crontab for digests/trends
+- Convex access to prod `amiable-ox-862` (or local split per dashboard docs)
 
-## Install
-
-From repo root:
+## Omnipotent.md
 
 ```bash
+cd /home/christ/ai-factory/projects/Omnipotent.md
 npm install
+bash scripts/verify.sh    # must pass before done
+npm run dev               # MCP stdio — set CNS_VAULT_ROOT
 ```
 
-## Common commands
+Safe edit policy: ask before MCP signature changes, audit path, `security.md`, bulk refactors.  
+Constitution edits: sync `specs/cns-vault-contract/AGENTS.md` **and** vault `AI-Context/AGENTS.md` together; never via WriteGate-blocked vault_io for AGENTS.
 
-### Run (dev)
-
-```bash
-npm run dev
-```
-
-This runs `tsx src/index.ts`.
-
-### Run the verification gate (required before “done”)
+## cns-dashboard
 
 ```bash
-bash scripts/verify.sh
-```
-
-For Node/TS projects this runs, in order:
-
-- `npm test`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build` *(if present; optional but failing still fails the script)*
-
-### Test
-
-```bash
+cd /home/christ/ai-factory/projects/cns-dashboard
+npm install
 npm test
+# PUBLIC_CONVEX_URL=https://amiable-ox-862.convex.cloud for live Nexus data
 ```
 
-Notes:
+Design: INSTRUMENT tokens only for new Nexus work. Honesty primitives — no fabricated confidence/sparklines.
 
-- `npm run test:node` runs Node’s built-in test runner on `tests/*.test.mjs`
-- `npm run test:vitest` runs Vitest integration tests
+## Hermes ops
 
-### Lint
+- Gateway watchdog every 3 min
+- Morning digest 07:00 Sydney via Omnipotent `run-morning-digest-cron.sh`
+- Logs under `~/.hermes/logs/`
+- Skills install from `scripts/install-hermes-skill-*.sh`
 
-```bash
-npm run lint
-```
+## Architecture next step
 
-### Typecheck
+Point `/bmad-create-architecture` at:
 
-```bash
-npm run typecheck
-```
-
-## Configuration and runtime contract
-
-### Vault root
-
-For Phase 1 stdio, the Vault IO MCP server reads the vault root from:
-
-- `CNS_VAULT_ROOT`
-
-Operator details and policy: `specs/cns-vault-contract/README.md`.
-
-## Project rules (important)
-
-Before implementing changes, read:
-
-- `CLAUDE.md` (phase scope boundaries and non-negotiables)
-
+`_bmad-output/planning-artifacts/brownfield/00-index.md`

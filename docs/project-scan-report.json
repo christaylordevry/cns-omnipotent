@@ -1,126 +1,187 @@
 {
   "workflow_version": "1.2.0",
   "timestamps": {
-    "started": "2026-04-07T00:00:00.000Z",
-    "last_updated": "2026-04-07T00:00:00.000Z",
-    "completed": "2026-04-07T00:00:00.000Z"
+    "started": "2026-07-25T00:53:06.000Z",
+    "last_updated": "2026-07-25T01:05:00.000Z",
+    "completed": "2026-07-25T01:05:00.000Z"
   },
-  "mode": "initial_scan",
-  "scan_level": "quick",
+  "mode": "full_rescan",
+  "scan_level": "exhaustive",
   "project_root": "/home/christ/ai-factory/projects/Omnipotent.md",
   "project_knowledge": "/home/christ/ai-factory/projects/Omnipotent.md/docs",
+  "brownfield_output": "/home/christ/ai-factory/projects/Omnipotent.md/_bmad-output/planning-artifacts/brownfield",
   "current_step": "completed",
   "project_types": [
     {
-      "part_id": "repo",
+      "part_id": "omnipotent",
+      "project_type_id": "backend",
+      "display_name": "CNS control / Vault IO MCP + Hermes scripts",
+      "root_path": "/home/christ/ai-factory/projects/Omnipotent.md"
+    },
+    {
+      "part_id": "dashboard",
+      "project_type_id": "web",
+      "display_name": "Nexus web app (SvelteKit + Convex)",
+      "root_path": "/home/christ/ai-factory/projects/cns-dashboard"
+    },
+    {
+      "part_id": "hermes",
       "project_type_id": "cli",
-      "display_name": "cli"
+      "display_name": "Hermes runtime (gateway/skills/scorer)",
+      "root_path": "/home/christ/.hermes"
+    },
+    {
+      "part_id": "vault",
+      "project_type_id": "data",
+      "display_name": "PAKE vault (reference via vault-io only)",
+      "root_path": "/mnt/c/Users/Christopher Taylor/Knowledge-Vault-ACTIVE"
     }
   ],
   "findings": {
     "project_classification": {
-      "repository_type": "monolith",
-      "parts_count": 1,
+      "repository_type": "multi-part",
+      "parts_count": 4,
       "primary_language": "TypeScript",
-      "runtime": "Node.js",
-      "notes": "Entrypoint runs an MCP stdio server (acts like a CLI/service binary)."
+      "notes": "Phase 0 unified-app brownfield: Omnipotent + cns-dashboard + Hermes runtime + vault reference."
     },
     "technology_stack_summary": [
       {
-        "category": "Runtime",
-        "technology": "Node.js",
-        "version": ">=20",
-        "justification": "package.json engines.node"
+        "part": "omnipotent",
+        "stack": "Node>=20 TypeScript MCP SDK Vitest"
       },
       {
-        "category": "Language",
-        "technology": "TypeScript",
-        "version": "5.9.3",
-        "justification": "package.json devDependencies.typescript"
+        "part": "dashboard",
+        "stack": "SvelteKit2 Svelte5 Convex1.39 Vite8 Vercel"
       },
       {
-        "category": "MCP",
-        "technology": "@modelcontextprotocol/sdk",
-        "version": "^1.29.0",
-        "justification": "package.json dependencies"
-      },
-      {
-        "category": "Tests",
-        "technology": "node:test + vitest",
-        "version": "node builtin + vitest ^3.2.4",
-        "justification": "package.json scripts"
-      },
-      {
-        "category": "Quality gate",
-        "technology": "scripts/verify.sh",
-        "version": "N/A",
-        "justification": "README.md + scripts/verify.sh"
+        "part": "hermes",
+        "stack": "Nous anthropic/claude-sonnet-4.6 Honcho Discord gateway"
       }
+    ],
+    "phase0_highlights": [
+      "Nexus nav 3 LIVE / 5 DEAD; /trends ORPHAN from Nexus",
+      "25 Convex tables; ~83 exports; GET /hermes/awareness live",
+      "Dismiss client-only; Dig/Watch Convex-backed",
+      "Active digest contributedCount validation defect",
+      "INSTRUMENT tokens on cockpit; trends theme divergent"
     ]
   },
   "outputs_generated": [
-    "project-scan-report.json",
-    "project-overview.md",
-    "source-tree-analysis.md",
-    "development-guide.md",
-    "index.md"
+    "docs/project-scan-report.json",
+    "docs/index.md",
+    "docs/project-overview.md",
+    "docs/source-tree-analysis.md",
+    "docs/development-guide.md",
+    "_bmad-output/planning-artifacts/brownfield/00-index.md",
+    "_bmad-output/planning-artifacts/brownfield/system-overview.md",
+    "_bmad-output/planning-artifacts/brownfield/data-spine.md",
+    "_bmad-output/planning-artifacts/brownfield/surface-inventory.md",
+    "_bmad-output/planning-artifacts/brownfield/operator-workflows.md",
+    "_bmad-output/planning-artifacts/brownfield/ops-runtime-map.md"
   ],
   "completed_steps": [
     {
       "step": "step_0_5",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Loaded documentation-requirements.csv and selected quick scan defaults (no full source read).",
+      "timestamp": "2026-07-25T00:53:06.000Z",
+      "summary": "Loaded documentation-requirements.csv; exhaustive scan selected.",
       "outputs_written": []
+    },
+    {
+      "step": "step_0_6",
+      "status": "completed",
+      "timestamp": "2026-07-25T00:53:06.000Z",
+      "summary": "Archived April 2026 quick-scan; full_rescan + exhaustive.",
+      "outputs_written": ["docs/.archive/project-scan-report-2026-04-07.json"]
     },
     {
       "step": "step_1",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Classified as monolith with 1 part (TypeScript Node CLI/server: MCP stdio entrypoint).",
+      "timestamp": "2026-07-25T00:54:00.000Z",
+      "summary": "Classified multi-part system: 4 parts (omnipotent backend, dashboard web, hermes runtime, vault data).",
       "outputs_written": []
     },
     {
       "step": "step_2",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Inventoried existing docs across repo and docs/ directory.",
+      "timestamp": "2026-07-25T00:54:30.000Z",
+      "summary": "Loaded master plan + HANDOFF-2026-07-24 + project-context as operator context; inventoried existing docs/ and planning-artifacts.",
       "outputs_written": []
     },
     {
       "step": "step_3",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Tech stack: Node.js (>=20), TypeScript (NodeNext), MCP SDK; tests via node:test + Vitest; gate via scripts/verify.sh.",
+      "timestamp": "2026-07-25T00:56:00.000Z",
+      "summary": "Tech stacks documented per part (MCP/Node; SvelteKit+Convex; Hermes nous; vault PARA).",
       "outputs_written": []
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:00:00.000Z",
+      "summary": "Exhaustive parallel scans: Omnipotent scripts/MCP; dashboard routes+83 Convex fns+25 tables+nav; Hermes crons/skills/scorer; vault_list PARA root.",
+      "outputs_written": []
+    },
+    {
+      "step": "step_5",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:02:00.000Z",
+      "summary": "Annotated multi-part source trees written.",
+      "outputs_written": ["docs/source-tree-analysis.md"]
+    },
+    {
+      "step": "step_6",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:03:00.000Z",
+      "summary": "Dev/ops guides and ops-runtime-map written.",
+      "outputs_written": ["docs/development-guide.md", "_bmad-output/planning-artifacts/brownfield/ops-runtime-map.md"]
+    },
+    {
+      "step": "step_7",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:03:30.000Z",
+      "summary": "Integration architecture captured inside data-spine + system-overview (4 parts, Convex hub).",
+      "outputs_written": ["_bmad-output/planning-artifacts/brownfield/data-spine.md", "_bmad-output/planning-artifacts/brownfield/system-overview.md"]
+    },
+    {
+      "step": "step_8",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:04:00.000Z",
+      "summary": "Architecture-facing brownfield package written for Gate 0 (not replacing future create-architecture).",
+      "outputs_written": ["_bmad-output/planning-artifacts/brownfield/00-index.md"]
     },
     {
       "step": "step_9",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Wrote quick-scan docs: project overview, source tree analysis, development guide.",
+      "timestamp": "2026-07-25T01:04:30.000Z",
+      "summary": "Supporting docs: surface inventory, operator workflows, project-overview.",
       "outputs_written": [
-        "docs/project-overview.md",
-        "docs/source-tree-analysis.md",
-        "docs/development-guide.md"
+        "_bmad-output/planning-artifacts/brownfield/surface-inventory.md",
+        "_bmad-output/planning-artifacts/brownfield/operator-workflows.md",
+        "docs/project-overview.md"
       ]
     },
     {
       "step": "step_10",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Generated master documentation index.",
-      "outputs_written": [
-        "docs/index.md"
-      ]
+      "timestamp": "2026-07-25T01:04:45.000Z",
+      "summary": "Master docs/index.md points at brownfield package as primary AI retrieval for architecture.",
+      "outputs_written": ["docs/index.md"]
+    },
+    {
+      "step": "step_11",
+      "status": "completed",
+      "timestamp": "2026-07-25T01:05:00.000Z",
+      "summary": "Phase 0 deliverables (a)(b)(c) complete; no _(To be generated)_ markers in brownfield package.",
+      "outputs_written": []
     },
     {
       "step": "step_12",
       "status": "completed",
-      "timestamp": "2026-04-07T00:00:00.000Z",
-      "summary": "Workflow complete (quick scan).",
+      "timestamp": "2026-07-25T01:05:00.000Z",
+      "summary": "Workflow complete. Next: /bmad-create-architecture with brownfield/00-index.md.",
       "outputs_written": []
     }
   ],
-  "resume_instructions": "Quick scan completed. Re-run in deep/exhaustive mode to extract API/data-model/component details from source."
+  "resume_instructions": "Workflow complete. Use _bmad-output/planning-artifacts/brownfield/00-index.md for create-architecture."
 }
