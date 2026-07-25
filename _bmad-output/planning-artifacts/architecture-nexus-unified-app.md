@@ -32,6 +32,10 @@ decisionsLocked:
     target: C-contract-bridge-then-A-workspace
     status: locked
     lockedAt: "2026-07-25"
+  - id: D1c-m2-execution-mechanics
+    target: private-dashboard-base-subtree-npm-workspaces-first
+    status: locked
+    lockedAt: "2026-07-25"
   - id: D2-shell-data-flow-ia
     target: one-shell-workflow-ia
     status: locked
@@ -213,12 +217,9 @@ Ideal-first reasoning approved by operator as non-anchored.
 1. **Vault never vendored** — live PARA; agents use vault-io only.
 2. **Hermes runtime stays `~/.hermes`** — in-repo = source / skills / contracts **synced out** to runtime; not the live process tree.
 
-### Explicitly not decided here
+### Explicitly not decided here (historical — Gate 0)
 
-- Package manager / Turbo layout details beyond "Turbo + pnpm workspace"
-- Which git remote becomes primary
-- Exact package names
-- **Migration sequencing** → Decision 1b
+At Gate 0 lock, these were still open: package manager / Turbo layout details beyond "Turbo + pnpm workspace", which git remote becomes primary, exact package names, migration sequencing → Decision 1b. **M2 execution mechanics are now locked in Decision 1c** (after 1b below).
 
 ### Operator refinements absorbed
 
@@ -268,9 +269,10 @@ Ideal-first reasoning approved by operator as non-anchored.
 
 ### M2 — One multi-package workspace
 
-- Establish the Turbo/pnpm root and converge into `apps/*`, `packages/contracts`, orchestration/Hermes source, Vault IO/specs, one `_bmad-output`, and one root verify gate.
-- Choose the git-history and repository-collapse mechanic separately after architecture approval.
-- Co-location does not replace contracts; `packages/contracts` remains the linchpin.
+- **End-state tooling** remains Turbo + pnpm (D1). **M2 cutover tooling** is npm workspaces first (Decision 1c deliberate deviation); Turbo/pnpm land post-M2c.
+- Phased: **M2a** pure subtree co-location → **M2b** move dashboard to `apps/dashboard`, introduce workspaces, rewire paths/CI/Vercel/Convex (throwaway Vercel project for Root Directory) → **M2c** collapse duplicate `_bmad-output` / verify gates.
+- History mechanic: `git subtree add` into `packages/orchestration` (Decision 1c).
+- Co-location does not replace contracts; `packages/contracts` remains the linchpin (stands up in M2b, not M2a).
 
 ### M3 — Runtime synchronization boundary
 
@@ -282,9 +284,45 @@ Ideal-first reasoning approved by operator as non-anchored.
 ### Non-goals and anchoring record
 
 - No code or migration executes before Gate 0.
-- Package names, Turbo configuration, primary remote, and git-history mechanics remain open.
+- Package names / Turbo / primary remote / git-history were open at Gate 0 — **now locked in Decision 1c** (except post-M2c Turbo/pnpm migration details).
 - **Anchoring flag:** M0's first deliverable is shaped by the live `contributedCount` P0. This controls sequencing, not target topology.
 - **Anchoring flag:** split repos through M1 are temporary containment, never the end state.
+
+---
+
+## Decision 1c — M2 execution mechanics (LOCKED)
+
+**Status:** LOCKED 2026-07-25 · Operator approved four M2 decisions + amendments.
+
+| Decision | Lock |
+|----------|------|
+| **Base + visibility** | Primary remote = private `cns-dashboard`. Subtree-merge Omnipotent in. Monorepo stays private. |
+| **History** | `git subtree add` (no squash). Archive `cns-omnipotent` remote; reversibility via `subtree split`. |
+| **Package manager** | **npm workspaces in M2**; Turbo/pnpm deferred — see deliberate deviation below. |
+| **Layout** | `apps/dashboard`, `packages/contracts`, `packages/orchestration`, `specs/`, one `_bmad-output`, one verify. Keep env name `OMNIPOTENT_ROOT` through M2 (`CNS_ORCHESTRATION_ROOT` rename deferred). |
+
+### Deliberate phased deviation — Turbo/pnpm (not drift)
+
+**D1 target remains** `A-turbo-pnpm-monorepo-multi-package`.
+
+**M2 implementation intentionally uses npm workspaces first**, with **Turbo + pnpm deferred until after M2c**. This is a **recorded phased deviation**, not a change of target:
+
+1. Both repos today are npm + `package-lock.json`; CI caches npm.
+2. Dashboard already has a Vite 8 / rolldown optional-native-binding footgun on incremental installs — introducing pnpm in the same window as subtree + path rewires stacks unrelated failure modes onto the production cutover.
+3. npm workspaces are sufficient to make `packages/contracts` a real workspace dependency once the dashboard moves under `apps/dashboard` (M2b).
+4. Turbo’s value (filtered task graphs, remote cache) appears **after** the tree, verify gate, and Vercel/Convex cwd are stable.
+
+**Follow-on (post-M2c, propose-then-stop):** migrate lockfile to pnpm and add Turbo at the workspace root. Until then, D1’s “Turbo/pnpm” wording is the **end-state package tooling**, not the M2 cutover tooling.
+
+### M2 phase amendments (binding)
+
+- **M2a = pure co-location:** subtree Omnipotent → `packages/orchestration` only. **No** workspace-root `package.json`, **no** `vercel.json` change, **no** path rewires. Success = dashboard builds/deploys exactly as before; Omni code merely lives under the prefix.
+- **Workspaces introduced in M2b** when dashboard moves to `apps/dashboard` (avoids a root manifest that must double as the dashboard package).
+- **Vercel Root Directory is project-level** — cannot be PR-gated via `vercel.json` (confirmed: OpenAPI `vercel.json` schema has **no** `rootDirectory`; that field exists only on the **Project** REST/Dashboard setting). Cutover mitigation **(a)** is the plan of record: throwaway second Vercel project pointed at the M2b branch with Root Directory = `apps/dashboard`, confirm build/serve, delete throwaway, then flip production project Root Directory at merge. Fallback **(b):** coordinated merge + immediate setting flip; rollback = revert PR + restore Root Directory. This Root Directory flip is the **one step not fully PR-gated**.
+
+### Separate (does not block M2)
+
+`cns-omnipotent` has been public for its full history (~563 commits). Making the monorepo private does **not** un-publish that history. Run secret scanning over Omni history; rotate anything real. GitHub secret-scanning alerts were **disabled** on that repo at scan time — do not treat absence of GH alerts as clean.
 
 ---
 
@@ -556,5 +594,5 @@ Only if that share is high enough to justify the cost (today trend ingest covers
 3. Phase 0 record committed as one planning commit (brownfield package + this architecture + reconciled master plan).
 4. **Still no code.** M0 begins only on explicit operator go.
 
-**Not covered by Gate 0 (remain propose-then-stop during execution):** package names, Turbo config, git-history mechanic, Daytona vs Docker, contract fork (a) vs (b), per-DM field schemas.
+**Not covered by Gate 0 (were open; several now locked in Decision 1c):** Daytona vs Docker, contract fork (a) vs (b), per-DM field schemas, and **post-M2c** Turbo/pnpm migration details remain propose-then-stop. **Locked in 1c:** primary remote (private dashboard), subtree history mechanic, npm-workspaces-first M2, layout names, `OMNIPOTENT_ROOT` retained through M2, Vercel Root Directory mitigation (a).
 
